@@ -45,6 +45,17 @@ g.log = {"Consumed Water Bottle.", "Backpack full.", "Moved Rock."}
 g:draw_inventory(300, 400)
 solaros.dump("ops_inventory_full.txt")
 
+-- Scene 2c: every slot worn, cursor on the jacket
+g = fresh()
+local worn = {head = "cap", ears = "earmuffs", eyes = "sunglasses", neck = "scarf",
+              jacket = "jacket", shirt = "tshirt", hands = "gloves", wrists = "bracers",
+              pants = "jeans", feet = "boots"}
+for slot, item in pairs(worn) do g.player.equipped[slot] = item end
+g.inv_cursor = #g:ground_list() + 5
+g.log = {"Moved Leather Jacket.", "Moved Scarf."}
+g:draw_inventory(300, 400)
+solaros.dump("ops_inventory_dressed.txt")
+
 -- Scene 3: the map screen
 g = fresh()
 g:draw_map(300, 400)

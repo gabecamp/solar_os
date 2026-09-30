@@ -129,4 +129,27 @@ local _, gl = find(g:ground_list(), "gloves")
 assert(gl and gl.qty == 1, "old gloves should land on the ground")
 print("    OK")
 
+print("[+] every body slot has an item, and every wearable not worn at the start spawns")
+local Game2, ITEM_DB, EQUIP_SLOTS = dofile("lib_only.lua")
+for _, slot in ipairs(EQUIP_SLOTS) do
+    local found
+    for id, def in pairs(ITEM_DB) do if def.slot == slot then found = id end end
+    assert(found, "no item fits the " .. slot .. " slot")
+    assert(ITEM_DB[found].wear, found .. " has no look on the doll")
+end
+for seed_try = 1, 5 do
+    g = Game2.new()
+    local start = {}
+    for _, item in pairs(g.player.equipped) do start[item] = true end
+    local seen = {}
+    for key, pile in pairs(g.ground) do
+        assert(g.tiles[key] ~= "water", "loot on an impassable tile")
+        for _, st in ipairs(pile) do seen[st.item] = true end
+    end
+    for id, def in pairs(ITEM_DB) do
+        if def.slot and not start[id] then assert(seen[id], id .. " never spawns") end
+    end
+end
+print("    OK")
+
 print("\nREGRESSION TESTS PASSED")

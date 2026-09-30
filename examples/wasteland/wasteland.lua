@@ -84,11 +84,30 @@ local ITEM_DB = {
                     wear = {{"head", 116, 126, "BLACK"}}},
     gloves       = {name = "Gloves",       slot = "hands", consumable = nil,
                     wear = {{"arms", 234, 252, "BLACK"}}},
+    -- optional 5th/6th wear fields: only paint where the distance from the
+    -- body's center line is between them (authored units), e.g. just the
+    -- sides of the head for earmuffs, or an open jacket front
+    earmuffs     = {name = "Earmuffs",     slot = "ears",  consumable = nil,
+                    wear = {{"head", 118, 122, "BLACK", 0, 12},
+                            {"head", 124, 136, "BLACK", 8, 12}}},
+    sunglasses   = {name = "Sunglasses",   slot = "eyes",  consumable = nil,
+                    wear = {{"head", 127, 131, "BLACK", 1, 9}}},
+    scarf        = {name = "Scarf",        slot = "neck",  consumable = nil,
+                    wear = {{"torso", 139, 150, "BLACK", 0, 12}}},
+    jacket       = {name = "Leather Jacket", slot = "jacket", consumable = nil,
+                    wear = {{"torso", 146, 222, "BLACK", 5, 40},
+                            {"arms", 150, 232, "BLACK"}}},
+    bracers      = {name = "Bracers",      slot = "wrists", consumable = nil,
+                    wear = {{"arms", 222, 233, "BLACK"}}},
     canned_beans = {name = "Canned Beans", slot = nil, consumable = {hunger = 40}},
     water_bottle = {name = "Water Bottle", slot = nil, consumable = {thirst = 50}},
     rock         = {name = "Rock",         slot = nil, consumable = nil},
     cloth_scrap  = {name = "Cloth Scrap",  slot = nil, consumable = nil},
 }
+
+-- Worn gear that is scattered around the map (the starting clothes aren't).
+local WORLD_WEARABLES = {"cap", "gloves", "earmuffs", "sunglasses", "scarf",
+                         "jacket", "bracers"}
 
 -- ---------------------------------------------------------------------
 -- Item sprites (16x16, 1-bit)
@@ -190,6 +209,96 @@ local SPRITE_ART = {
         "....########....",
         "....########....",
         "....########....",
+        "................",
+    },
+    earmuffs = {
+        "................",
+        "....########....",
+        "...##......##...",
+        "..##........##..",
+        "..#..........#..",
+        ".##..........##.",
+        ".#............#.",
+        "###..........###",
+        "####........####",
+        "####........####",
+        "####........####",
+        "####........####",
+        "###..........###",
+        "................",
+        "................",
+        "................",
+    },
+    sunglasses = {
+        "................",
+        "................",
+        "................",
+        "................",
+        "#..............#",
+        "##............##",
+        ".##############.",
+        ".######..######.",
+        ".######..######.",
+        ".#####....#####.",
+        "..####....####..",
+        "...##......##...",
+        "................",
+        "................",
+        "................",
+        "................",
+    },
+    scarf = {
+        "................",
+        "..############..",
+        ".##############.",
+        ".##############.",
+        "..############..",
+        "........####....",
+        "........####....",
+        ".......#####....",
+        ".......####.....",
+        ".......####.....",
+        "......#####.....",
+        "......####......",
+        "......#.#.#.....",
+        "......#.#.#.....",
+        "................",
+        "................",
+    },
+    jacket = {
+        "................",
+        "...####..####...",
+        "..#####..#####..",
+        ".######..######.",
+        "#######..#######",
+        "#######..#######",
+        "###.###..###.###",
+        "###.###..###.###",
+        "###.###..###.###",
+        "###.###..###.###",
+        "###.###..###.###",
+        "###.###..###.###",
+        "....###..###....",
+        "....###..###....",
+        "....########....",
+        "................",
+    },
+    bracers = {
+        "................",
+        "................",
+        "................",
+        "..############..",
+        ".##############.",
+        ".#.#.#.#.#.#.#..",
+        ".##############.",
+        ".##############.",
+        ".#.#.#.#.#.#.#..",
+        ".##############.",
+        "..############..",
+        "................",
+        "................",
+        "................",
+        "................",
         "................",
     },
     canned_beans = {
@@ -468,6 +577,30 @@ local function generate_world(seed)
         {item = "canned_beans", qty = 1},
         {item = "water_bottle", qty = 2},
     }
+
+    -- Scatter loot on other passable tiles: every wearable once, plus a few
+    -- food/water caches. Keys are sorted so a seed always gives the same map.
+    local spots = {}
+    for key, terrain in pairs(tiles) do
+        if TERRAIN[terrain].passable and key ~= hex_key(0, 0) then
+            spots[#spots + 1] = key
+        end
+    end
+    table.sort(spots)
+    local function drop(item, qty)
+        seed = rand_next(seed)
+        local key = spots[seed % #spots + 1]
+        ground[key] = ground[key] or {}
+        for _, s in ipairs(ground[key]) do
+            if s.item == item then s.qty = s.qty + qty; return end
+        end
+        table.insert(ground[key], {item = item, qty = qty})
+    end
+    for _, item in ipairs(WORLD_WEARABLES) do drop(item, 1) end
+    for _, item in ipairs({"canned_beans", "canned_beans", "water_bottle",
+                           "water_bottle", "water_bottle", "cloth_scrap"}) do
+        drop(item, 1)
+    end
     return tiles, ground, seed
 end
 
@@ -584,6 +717,8 @@ function Game:try_move(q, r)
     apply_awake_hours(p, terrain.cost)
     update_visibility(p, self.tiles)
     self:push_log("Moved to " .. terrain.name .. " (" .. terrain.cost .. " MP)")
+    local pile = self.ground[key]
+    if pile and #pile > 0 then self:push_log("Something is here. (I to look)") end
     if p.needs.hunger <= 0 then self:push_log("You are starving!") end
     if p.needs.thirst <= 0 then self:push_log("You are dehydrated!") end
 end
@@ -818,6 +953,16 @@ function Game:draw_map(w, h)
                 self:draw_hex(px, py, nil, gfx.LIGHT)
                 draw_glyph(terrain_id, px, py, gfx.LIGHT)
             end
+            local pile = self.ground[key]
+            if pile and #pile > 0 and (p.visible[key] or p.explored[key]) then
+                -- something lies here: small boxed dot in the hex's upper right
+                local mx, my = rnd(px) + 5, rnd(py) - 11
+                gfx.color(gfx.WHITE)
+                gfx.fill_rect(mx - 1, my - 1, 7, 7)
+                gfx.color(gfx.BLACK)
+                gfx.rect(mx - 1, my - 1, 7, 7)
+                gfx.fill_rect(mx + 1, my + 1, 3, 3)
+            end
             if is_player then
                 -- white halo keeps the marker visible on dark/black tiles
                 gfx.color(gfx.WHITE)
@@ -838,7 +983,7 @@ function Game:draw_map(w, h)
         gfx.text(6, ly, line)
         ly = ly + 14
     end
-    gfx.text(6, h - 8, "Arrows move  Space rest  I inventory  Q quit")
+    gfx.text(6, h - 8, "Move:arrows Rest:space I:inventory Q:quit")
 
     gfx.refresh()
 end
@@ -1159,14 +1304,29 @@ local function body_row(src_y)
 end
 
 -- Paint one body part between two authored rows (clothing on the doll).
-local function paint_part(part, src_y0, src_y1, color)
+-- inner/outer (optional, authored units) keep only the pixels whose distance
+-- from the center line is in [inner, outer), on both sides.
+local function paint_part(part, src_y0, src_y1, color, inner, outer)
     local y0, y1 = body_row(src_y0), body_row(src_y1)
+    local bands
+    if outer then
+        local i = math.floor(inner * BODY_SCALE + 0.5)
+        local o = math.floor(outer * BODY_SCALE + 0.5)
+        bands = {{BODY_CX - o, BODY_CX - i}, {BODY_CX + i, BODY_CX + o}}
+    end
     gfx.color(color)
     for _, b in ipairs(PART_BLOCKS[part]) do
         local top, bottom = math.max(b.y, y0), math.min(b.y + b.h, y1)
         if bottom > top then
             for _, sp in ipairs(b.spans) do
-                gfx.fill_rect(sp[1], top, sp[2] - sp[1], bottom - top)
+                if bands then
+                    for _, band in ipairs(bands) do
+                        local a, z = math.max(sp[1], band[1]), math.min(sp[2], band[2])
+                        if z > a then gfx.fill_rect(a, top, z - a, bottom - top) end
+                    end
+                else
+                    gfx.fill_rect(sp[1], top, sp[2] - sp[1], bottom - top)
+                end
             end
         end
     end
@@ -1197,7 +1357,7 @@ function Game:draw_silhouette()
         local wear = item and ITEM_DB[item].wear
         if wear then
             for _, w in ipairs(wear) do
-                paint_part(w[1], w[2], w[3], gfx[w[4]])
+                paint_part(w[1], w[2], w[3], gfx[w[4]], w[5], w[6])
             end
         end
     end
@@ -1257,9 +1417,15 @@ function Game:draw_equip_slot(slot, x, y, w, h, is_cursor, is_selected)
         gfx.text(tx, ty, label)
         dashed_rect(x, y, w, h)
     end
+    if is_selected or is_cursor then
+        -- white inner line keeps the cursor visible over black clothes
+        gfx.color(gfx.WHITE)
+        gfx.rect(x, y, w, h)
+    end
     gfx.color(gfx.BLACK)
     if is_selected then
         gfx.rect(x - 2, y - 2, w + 4, h + 4)
+        gfx.rect(x - 1, y - 1, w + 2, h + 2)
     elseif is_cursor then
         gfx.rect(x - 1, y - 1, w + 2, h + 2)
     end

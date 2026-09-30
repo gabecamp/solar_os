@@ -46,6 +46,6 @@ def replay(ops_path, out_path):
     framed.paste(img, (4, 4))
     framed.save(out_path)
 
-for name in ("inventory", "inventory_barefoot", "inventory_full", "map", "map_explored", "map_full"):
+for name in ("inventory", "inventory_barefoot", "inventory_full", "inventory_dressed", "map", "map_explored", "map_full"):
     replay(f"ops_{name}.txt", f"preview_{name}.png")
 print("ok")
