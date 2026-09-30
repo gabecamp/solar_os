@@ -12,6 +12,8 @@ Controls:
   Arrows / WASD   - move on the map screen; on the inventory screen any
                     direction steps the cursor (ground, body top-down, bag)
   Space           - rest (map screen)
+  F               - scavenge the tile you're on (1 MP, 1 hour; finds go on
+                    the ground here - open the inventory to pick them up)
   Enter / Space   - inventory: pick up the item under the cursor, then press
                     again on a ground cell, bag cell or body slot to move it
   E               - inventory: eat/drink ONE of the item under the cursor
@@ -36,6 +38,9 @@ local HEX_SIZE = 16          -- center-to-corner, in pixels
 local BASE_MAX_MP = 2
 local BASE_SIGHT = 2
 local REST_HOURS = 4
+local SCAVENGE_HOURS = 1      -- also costs this many MP
+local SCAVENGE_TRIES = 3      -- searches per tile before it's picked clean
+local SCAVENGE_ROLLS = 2      -- loot-table rolls per search
 -- gfx.getch timeout. The screen is only redrawn after a key was handled, so
 -- idle wakeups just check should_exit(); this only bounds how quickly a
 -- quit request from the OS is noticed.
@@ -46,7 +51,7 @@ local KEY_ENTER = 13          -- SolarOS sends Enter as '\n' (KEY_LF); CR kept j
 local KEY_LF = 10
 local KEY_ESC = 27
 local KEY_A, KEY_D, KEY_S, KEY_W = 97, 100, 115, 119
-local KEY_E, KEY_I, KEY_Q = 101, 105, 113
+local KEY_E, KEY_F, KEY_I, KEY_Q = 101, 102, 105, 113
 
 -- Terrain: id -> {name, cost (MP + hours), passable, shade}
 -- shade is one of gfx.WHITE / gfx.LIGHT / gfx.DARK / gfx.BLACK, used as
@@ -101,8 +106,21 @@ local ITEM_DB = {
                     wear = {{"arms", 222, 233, "BLACK"}}},
     canned_beans = {name = "Canned Beans", slot = nil, consumable = {hunger = 40}},
     water_bottle = {name = "Water Bottle", slot = nil, consumable = {thirst = 50}},
+    berries      = {name = "Wild Berries", slot = nil, consumable = {hunger = 15, thirst = 5}},
     rock         = {name = "Rock",         slot = nil, consumable = nil},
     cloth_scrap  = {name = "Cloth Scrap",  slot = nil, consumable = nil},
+}
+
+-- What scavenging can turn up, per terrain: {item, weight}. "nothing" is a
+-- dud roll. Plains are old roadside junk, forest is food and cold-weather
+-- gear, hills are rock and whatever hikers left behind.
+local SCAVENGE_LOOT = {
+    plains = {{"nothing", 8}, {"rock", 3}, {"cloth_scrap", 4}, {"canned_beans", 3},
+              {"water_bottle", 3}, {"cap", 1}, {"sunglasses", 1}, {"gloves", 1}},
+    forest = {{"nothing", 7}, {"berries", 6}, {"cloth_scrap", 2}, {"water_bottle", 2},
+              {"scarf", 1}, {"earmuffs", 1}, {"gloves", 1}},
+    hills  = {{"nothing", 9}, {"rock", 6}, {"water_bottle", 2}, {"canned_beans", 1},
+              {"jacket", 1}, {"bracers", 1}, {"boots", 1}},
 }
 
 -- Worn gear that is scattered around the map (the starting clothes aren't).
@@ -297,6 +315,24 @@ local SPRITE_ART = {
         "..############..",
         "................",
         "................",
+        "................",
+        "................",
+        "................",
+    },
+    berries = {
+        "................",
+        "......#.........",
+        ".....#..........",
+        "....#.#.........",
+        "...#...#........",
+        "..###..###......",
+        ".#####.#####....",
+        ".#####.#####....",
+        "..###...###.....",
+        ".....###........",
+        "....#####.......",
+        "....#####.......",
+        ".....###........",
         "................",
         "................",
         "................",
@@ -675,6 +711,8 @@ function Game.new()
         seed = os.time() % 32768
     end
     self.tiles, self.ground, seed = generate_world(seed)
+    self.seed = seed             -- RNG state for scavenging
+    self.scavenged = {}          -- tile key -> searches used
     self.player = new_player()
     update_visibility(self.player, self.tiles)
     self.screen = "map"          -- "map" or "inventory"
@@ -737,6 +775,53 @@ function Game:move_dir(dq, dr)
         if dot > best_dot then best_dot, best = dot, n end
     end
     if best then self:try_move(best[1], best[2]) end
+end
+
+function Game:scavenge_left()
+    local key = hex_key(self.player.q, self.player.r)
+    return SCAVENGE_TRIES - (self.scavenged[key] or 0)
+end
+
+-- Search the current tile: costs MP and hours like moving, rolls the
+-- terrain's loot table, and drops what turns up on the ground here.
+function Game:scavenge()
+    local p = self.player
+    local key = hex_key(p.q, p.r)
+    local loot = SCAVENGE_LOOT[self.tiles[key]]
+    if not loot then
+        self:push_log("Nothing to search here.")
+        return
+    end
+    if self:scavenge_left() <= 0 then
+        self:push_log("This area is picked clean.")
+        return
+    end
+    if p.mp <= 0 then
+        self:push_log("Too tired to search. Rest first.")
+        return
+    end
+    p.mp = p.mp - SCAVENGE_HOURS
+    p.hours = p.hours + SCAVENGE_HOURS
+    apply_awake_hours(p, SCAVENGE_HOURS)
+    self.scavenged[key] = (self.scavenged[key] or 0) + 1
+
+    local found = {}
+    for _ = 1, SCAVENGE_ROLLS do
+        local item
+        self.seed, item = weighted_pick(self.seed, loot)
+        if item ~= "nothing" then
+            self:put_stack("ground", nil, {item = item, qty = 1})
+            found[#found + 1] = ITEM_DB[item].name
+        end
+    end
+    if #found == 0 then
+        self:push_log("Searched " .. SCAVENGE_HOURS .. "h. Found nothing.")
+    else
+        self:push_log("Found: " .. table.concat(found, ", ") .. ".")
+        self:push_log("Press I to pick it up.")
+    end
+    if p.needs.hunger <= 0 then self:push_log("You are starving!") end
+    if p.needs.thirst <= 0 then self:push_log("You are dehydrated!") end
 end
 
 function Game:rest()
@@ -919,8 +1004,10 @@ function Game:draw_map(w, h)
     gfx.font(gfx.FONT_BOLD_14)
     gfx.text(6, 16, "Wasteland Survivor")
     gfx.font(gfx.FONT_MONO_12)
+    local scav = SCAVENGE_LOOT[self.tiles[hex_key(p.q, p.r)]]
+        and (self:scavenge_left() .. "/" .. SCAVENGE_TRIES) or "-"
     gfx.text(6, 34, "MP " .. math.max(p.mp, 0) .. "/" .. p.max_mp
-        .. "   Hrs " .. p.hours .. "   Sight " .. p.sight)
+        .. "  Hrs " .. p.hours .. "  Sight " .. p.sight .. "  Scav " .. scav)
     gfx.text(6, 50, "Hun " .. math.floor(p.needs.hunger)
         .. " Thi " .. math.floor(p.needs.thirst)
         .. " Rst " .. math.floor(p.needs.rest))
@@ -983,7 +1070,7 @@ function Game:draw_map(w, h)
         gfx.text(6, ly, line)
         ly = ly + 14
     end
-    gfx.text(6, h - 8, "Move:arrows Rest:space I:inventory Q:quit")
+    gfx.text(6, h - 8, "Arrows Spc:rest F:scavenge I:inv Q:quit")
 
     gfx.refresh()
 end
@@ -1584,6 +1671,8 @@ local ok, err = pcall(function()
             game:move_dir(0, 1)
         elseif key == KEY_SPACE then
             game:rest()
+        elseif key == KEY_F then
+            game:scavenge()
         elseif key == KEY_I then
             game.screen = "inventory"
             game.inv_cursor = 1

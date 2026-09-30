@@ -73,6 +73,14 @@ end
 g:draw_map(300, 400)
 solaros.dump("ops_map_explored.txt")
 
+-- Scene 4b: just scavenged a forest tile
+g = fresh()
+g.tiles["0,0"] = "forest"
+g.ground["0,0"] = {}
+g:scavenge()
+g:draw_map(300, 400)
+solaros.dump("ops_map_scavenge.txt")
+
 -- Scene 5: whole map revealed, player standing on hills (worst case for the marker)
 g = fresh()
 g.tiles["0,0"] = "hills"

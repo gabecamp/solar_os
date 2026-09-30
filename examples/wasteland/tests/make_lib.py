@@ -9,6 +9,7 @@ Outputs (git-ignored, regenerated on every run):
   lib_only.lua       -> unit_test, sprite_test, bounds_test, body_test, render_scene
   lib_map.lua        -> glyph_test
   lib_layout.lua     -> bounds_test, regression_test (layout constants + INV_ROWS/INV_POS)
+  lib_scavenge.lua   -> scavenge_test
   wasteland_run.lua  -> full copy, run under the fake solaros by run_tests.sh / soak
 """
 import pathlib
@@ -36,5 +37,8 @@ lib = src[:cut]
           "INV_LOG_Y = INV_LOG_Y, INV_LOG_LINES = INV_LOG_LINES, "
           "BODY_CX = BODY_CX, BODY_TOP = BODY_TOP, BODY_BOTTOM = BODY_BOTTOM}, "
           "function() return INV_ROWS, INV_POS end\n")
+(here / "lib_scavenge.lua").write_text(
+    lib + "\nreturn Game, ITEM_DB, SCAVENGE_LOOT, SCAVENGE_TRIES, SCAVENGE_ROLLS, "
+          "SCAVENGE_HOURS, TERRAIN\n")
 (here / "wasteland_run.lua").write_text(src)
-print("generated lib_only.lua, lib_map.lua, lib_layout.lua, wasteland_run.lua")
+print("generated lib_*.lua, wasteland_run.lua")
