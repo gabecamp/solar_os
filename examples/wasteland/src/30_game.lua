@@ -18,6 +18,7 @@ function Game.new()
     end
     self.tiles, self.ground, seed = generate_world(seed)
     self.seed = seed             -- RNG state for scavenging
+    self.weather_seed = seed     -- fixed per world: weather is rolled from it (Game:weather)
     self.scavenged = {}          -- tile key -> searches used
     self.camps = {}              -- tile key -> {until_hour} while a campfire burns
     self.known = {}              -- recipe id -> true once you know how to make it
@@ -27,7 +28,7 @@ function Game.new()
     self.craft_ui = {cursor = 1, back = "map"}   -- crafting screen state (not "craft": that is the method)
     self.player = new_player()
     recompute_stats(self.player)
-    update_visibility(self.player, self.tiles)
+    self:refresh_view()
     self.screen = "creator"      -- "creator", then "map" or "inventory"
     self.creator_cursor = 1      -- rows: attributes, then traits
     self.creator_msg = nil
@@ -48,7 +49,7 @@ function Game:start_game()
     recompute_stats(p)
     p.mp = p.max_mp
     p.explored = {}
-    update_visibility(p, self.tiles)
+    self:refresh_view()
     self.screen = "map"
     return true
 end
@@ -91,7 +92,7 @@ function Game:try_move(q, r)
     p.q, p.r = q, r
     p.hours = p.hours + terrain.cost
     apply_awake_hours(p, terrain.cost)
-    update_visibility(p, self.tiles)
+    self:refresh_view()
     self:push_log("Moved to " .. terrain.name .. " (" .. terrain.cost .. " MP)")
     local pile = self.ground[key]
     if pile and #pile > 0 then self:push_log("Something is here. (I to look)") end
@@ -182,11 +183,15 @@ function Game:rest()
         self:push_log("Already rested.")
         return
     end
+    local fire = self:fire_here()
     p.hours = p.hours + REST_HOURS
     apply_rest_hours(p, REST_HOURS)
+    if fire then   -- a campfire: warm, and better sleep
+        p.needs.rest = clamp(p.needs.rest + REST_HOURS * (100 / 6) * WORLD.fire_rest_bonus)
+    end
     p.mp = effective_max_mp(p)
-    update_visibility(p, self.tiles)
-    self:push_log("Rested " .. REST_HOURS .. "h.")
+    self:refresh_view()
+    self:push_log("Rested " .. REST_HOURS .. "h" .. (fire and " by the fire." or "."))
     if p.injuries.bleeding then self:push_log("You're still bleeding. Bandage it (E on cloth).") end
     self:check_death("You bled out in your sleep.")
 end

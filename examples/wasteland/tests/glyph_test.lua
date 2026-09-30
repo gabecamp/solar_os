@@ -42,24 +42,31 @@ for key in pairs(g.tiles) do g.player.visible[key] = true; g.player.explored[key
 SPRITE_CALLS = {}
 g:draw_map(400, 300)
 local tiles = 0; for _ in pairs(g.tiles) do tiles = tiles + 1 end
--- every tile except the player's gets a glyph, plus 4 in the legend
-assert(#SPRITE_CALLS == (tiles - 1) + 4, ("expected %d sprite calls, got %d"):format(tiles - 1 + 4, #SPRITE_CALLS))
+-- the world is bigger than the screen: only the hexes in the map window
+-- around you are drawn (plus one glyph per legend entry), never all of them
+local legend = #LEGEND_ORDER
+local on_map = #SPRITE_CALLS - legend
+assert(on_map > 40 and on_map < tiles - 1,
+       ("the map window should show a screenful of the %d hexes, drew %d"):format(tiles, on_map))
 for _, c in ipairs(SPRITE_CALLS) do
     assert(c.w == GW and c.h == GH and #c.data == 20)
     assert(c.x >= 0 and c.y >= 0 and c.x + c.w <= 400 and c.y + c.h <= 300, "glyph off screen")
 end
-print(("4. full map drew %d glyphs (%d tiles - player tile + 4 legend), all on screen"):format(#SPRITE_CALLS, tiles))
+local map_glyphs = 0
+for _, c in ipairs(SPRITE_CALLS) do if c.x + c.w <= 256 then map_glyphs = map_glyphs + 1 end end
+assert(map_glyphs == on_map, "every map glyph stays inside the map area (x < 256)")
+print(("4. revealed map drew %d of %d hexes + %d legend glyphs, all inside the map window"):format(on_map, tiles, legend))
 
 -- 5. fog: an unseen tile draws nothing; an explored-only tile draws a glyph
 g = Game.new()
 g.player.visible = {}; g.player.explored = {}
 SPRITE_CALLS = {}
 g:draw_map(400, 300)
-assert(#SPRITE_CALLS == 4, "with nothing seen only the legend should draw, got " .. #SPRITE_CALLS)
+assert(#SPRITE_CALLS == #LEGEND_ORDER, "with nothing seen only the legend should draw, got " .. #SPRITE_CALLS)
 g.player.explored["1,0"] = true
 SPRITE_CALLS = {}
 g:draw_map(400, 300)
-assert(#SPRITE_CALLS == 5, "one remembered tile should add exactly one glyph")
+assert(#SPRITE_CALLS == #LEGEND_ORDER + 1, "one remembered tile should add exactly one glyph")
 print("5. unseen tiles draw no glyph; remembered tiles draw one")
 
 -- 6. layout: legend text fits the width; map's lowest pixel is above the legend;

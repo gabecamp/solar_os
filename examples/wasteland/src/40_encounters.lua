@@ -21,6 +21,7 @@ function Game:maybe_encounter(terrain_id)
         return
     end
     local chance = ENCOUNTER_CHANCE[terrain_id]
+    if chance and self:is_night() then chance = chance * WORLD.night_encounters end
     if chance and self:roll(chance * self.player.encounter_mult) then self:start_encounter(self:pick_encounter()) end
 end
 

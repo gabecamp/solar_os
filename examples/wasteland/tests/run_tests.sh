@@ -15,7 +15,7 @@ python3 make_lib.py
 export LUA_PATH="./?.lua;;"
 
 echo "== syntax ==";           luac5.4 -p ../wasteland.lua && echo OK
-for t in unit_test sprite_test bounds_test body_test glyph_test regression_test scavenge_test creator_test encounter_test portrait_test crafting_test; do
+for t in unit_test sprite_test bounds_test body_test glyph_test regression_test scavenge_test creator_test encounter_test portrait_test crafting_test world_test; do
   echo "== $t ==";             lua5.4 "$t.lua" | tail -n 2
 done
 echo "== main loop (scripted keys) =="; lua5.4 wasteland_run.lua

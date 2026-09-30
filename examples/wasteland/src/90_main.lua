@@ -114,6 +114,9 @@ local ok, err = pcall(function()
             else
                 handle_inventory_key(key)
             end
+            -- time may have passed (moving, resting, crafting...): apply cold,
+            -- night and light before the next frame
+            if game.screen ~= "creator" and game.screen ~= "dead" then game:tick() end
             dirty = true
         end
     end

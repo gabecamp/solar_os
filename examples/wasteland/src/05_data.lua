@@ -2,7 +2,7 @@
 -- Tunables
 -- ---------------------------------------------------------------------
 
-local GRID_RADIUS = 4
+local GRID_RADIUS = 12       -- 469 hexes; the map screen follows you
 local HEX_SIZE = 16          -- center-to-corner, in pixels
 local BASE_MAX_MP = 2
 local BASE_SIGHT = 2
@@ -35,9 +35,28 @@ local TERRAIN = {
     forest = {name = "Forest", cost = 2, passable = true,  shade = "LIGHT", ink = "BLACK"},
     hills  = {name = "Hills",  cost = 2, passable = true,  shade = "DARK",  ink = "WHITE"},
     water  = {name = "Water",  cost = 0, passable = false, shade = "BLACK", ink = "WHITE"},
+    -- placed by world generation, not rolled: ruins (a town and scattered
+    -- wrecks) and fords (where a river can be waded)
+    ruins  = {name = "Ruins",  cost = 1, passable = true,  shade = "WHITE", ink = "BLACK"},
+    ford   = {name = "Ford",   cost = 2, passable = true,  shade = "LIGHT", ink = "BLACK"},
 }
 local TERRAIN_WEIGHTS = {
-    {"plains", 45}, {"forest", 30}, {"hills", 18}, {"water", 7},
+    {"plains", 45}, {"forest", 30}, {"hills", 18}, {"water", 5},
+}
+
+-- Time, weather and cold, as one table (the bundle is one Lua chunk with a
+-- 200-local limit). The clock starts at start_hour on day 1; night runs
+-- from night_from to night_to. Weather is rolled per block of hours from
+-- the world seed (so it needs no saved state). Cold: you need at least
+-- need[weather] (+ night) warmth from worn clothes, or a fire, or you get
+-- cold: rest drains faster and after cold_grace hours you lose health.
+local WORLD = {
+    start_hour = 8, night_from = 20, night_to = 6, weather_block = 6,
+    weather = {{"Clear", 40}, {"Overcast", 30}, {"Rain", 20}, {"Cold snap", 10}},
+    need = {Clear = 0, Overcast = 1, Rain = 3, ["Cold snap"] = 5},
+    night_need = 2, cold_rest_drain = 3, cold_grace = 2, cold_hurt = 2,
+    night_encounters = 1.5, fire_rest_bonus = 0.5,
+    rivers = 2, town_ruins = 9, lone_ruins = 8,
 }
 
 local BACKPACK_CAP = 16      -- most bag cells any build can have (the layout's limit)
@@ -56,27 +75,27 @@ local ITEM_DB = {
     -- wear: what the item paints on the paperdoll when worn - {body part,
     -- first row, last row (exclusive), color}, rows in the figure's authored
     -- coordinates (see BODY_POLYGONS). Drawn in order, later entries on top.
-    tshirt       = {name = "T-Shirt",      slot = "shirt", consumable = nil,
+    tshirt       = {name = "T-Shirt",      slot = "shirt", consumable = nil, warmth = 1,
                     wear = {{"torso", 146, 227, "DARK"}, {"arms", 150, 184, "DARK"}}},
-    jeans        = {name = "Jeans",        slot = "pants", consumable = nil,
+    jeans        = {name = "Jeans",        slot = "pants", consumable = nil, warmth = 1,
                     wear = {{"torso", 214, 227, "DARK"}, {"legs", 224, 279, "DARK"}}},
-    boots        = {name = "Boots",        slot = "feet",  consumable = nil,
+    boots        = {name = "Boots",        slot = "feet",  consumable = nil, warmth = 1,
                     wear = {{"legs", 272, 290, "BLACK"}}},
-    cap          = {name = "Cap",          slot = "head",  consumable = nil,
+    cap          = {name = "Cap",          slot = "head",  consumable = nil, warmth = 1,
                     wear = {{"head", 116, 126, "BLACK"}}},
-    gloves       = {name = "Gloves",       slot = "hands", consumable = nil,
+    gloves       = {name = "Gloves",       slot = "hands", consumable = nil, warmth = 1,
                     wear = {{"arms", 234, 252, "BLACK"}}},
     -- optional 5th/6th wear fields: only paint where the distance from the
     -- body's center line is between them (authored units), e.g. just the
     -- sides of the head for earmuffs, or an open jacket front
-    earmuffs     = {name = "Earmuffs",     slot = "ears",  consumable = nil,
+    earmuffs     = {name = "Earmuffs",     slot = "ears",  consumable = nil, warmth = 1,
                     wear = {{"head", 118, 122, "BLACK", 0, 12},
                             {"head", 124, 136, "BLACK", 8, 12}}},
     sunglasses   = {name = "Sunglasses",   slot = "eyes",  consumable = nil,
                     wear = {{"head", 127, 131, "BLACK", 1, 9}}},
-    scarf        = {name = "Scarf",        slot = "neck",  consumable = nil,
+    scarf        = {name = "Scarf",        slot = "neck",  consumable = nil, warmth = 1,
                     wear = {{"torso", 139, 150, "BLACK", 0, 12}}},
-    jacket       = {name = "Leather Jacket", slot = "jacket", consumable = nil,
+    jacket       = {name = "Leather Jacket", slot = "jacket", consumable = nil, warmth = 3,
                     wear = {{"torso", 146, 222, "BLACK", 5, 40},
                             {"arms", 150, 232, "BLACK"}}},
     bracers      = {name = "Bracers",      slot = "wrists", consumable = nil,
@@ -139,6 +158,11 @@ local SCAVENGE_LOOT = {
               {"scrawled_notes", 1}},
     forest = {{"nothing", 7}, {"berries", 6}, {"cloth_scrap", 2}, {"water_bottle", 2},
               {"scarf", 1}, {"earmuffs", 1}, {"gloves", 1}, {"spear", 1}, {"stick", 7}},
+    -- ruins: what's left in houses and cars
+    ruins  = {{"nothing", 8}, {"canned_beans", 4}, {"water_bottle", 3}, {"cloth_scrap", 4},
+              {"scrawled_notes", 3}, {"rope", 1}, {"knife", 1}, {"pipe", 1}, {"stick", 1},
+              {"jacket", 1}, {"backpack", 1}},
+    ford   = {{"nothing", 12}, {"rock", 4}, {"stick", 2}, {"water_bottle", 1}},
     hills  = {{"nothing", 9}, {"rock", 6}, {"water_bottle", 2}, {"canned_beans", 1},
               {"jacket", 1}, {"bracers", 1}, {"boots", 1}, {"knife", 1}, {"stick", 1},
               {"scrawled_notes", 1}},
@@ -176,7 +200,7 @@ local WORLD_WEARABLES = {"cap", "gloves", "earmuffs", "sunglasses", "scarf",
 -- attribute, then the other side acts.
 -- ---------------------------------------------------------------------
 
-local ENCOUNTER_CHANCE = {plains = 10, forest = 15, hills = 12}   -- % per move onto it
+local ENCOUNTER_CHANCE = {plains = 10, forest = 15, hills = 12, ruins = 14, ford = 8}   -- % per move onto it
 local ENCOUNTER_COOLDOWN = 2   -- moves after an encounter before another can happen
 local ENCOUNTER_KINDS = {{"animal", 40}, {"mutant", 25}, {"anomaly", 20},
                          {"bandit", 12}, {"helper", 3}}

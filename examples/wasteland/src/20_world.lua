@@ -91,7 +91,113 @@ local function generate_world(seed)
             end
         end
     end
+
+    -- rivers: random walks from one edge toward the opposite one, each with
+    -- two fords where it can be waded
+    local R = GRID_RADIUS
+    for _ = 1, WORLD.rivers do
+        seed = rand_next(seed)
+        local d = AXIAL_DIRS[seed % 6 + 1]
+        local q, r = d[1] * R, d[2] * R
+        local tq, tr = -q, -r
+        local path = {}
+        for _ = 1, 4 * R do
+            if not tiles[hex_key(q, r)] then break end
+            tiles[hex_key(q, r)] = "water"
+            path[#path + 1] = {q, r}
+            if q == tq and r == tr then break end
+            -- step to a neighbor closer to the far edge, now and then sideways
+            local best, options = axial_distance(q, r, tq, tr), {}
+            for _, n in ipairs(AXIAL_DIRS) do
+                local nq, nr = q + n[1], r + n[2]
+                if tiles[hex_key(nq, nr)] and axial_distance(nq, nr, tq, tr) < best then
+                    options[#options + 1] = {nq, nr}
+                end
+            end
+            seed = rand_next(seed)
+            if #options == 0 or seed % 7 == 0 then
+                local n = AXIAL_DIRS[(seed // 7) % 6 + 1]
+                if tiles[hex_key(q + n[1], r + n[2])] then options = {{q + n[1], r + n[2]}} end
+            end
+            if #options == 0 then break end
+            local pick = options[(seed // 3) % #options + 1]
+            q, r = pick[1], pick[2]
+        end
+        for _, f in ipairs({1 / 3, 2 / 3}) do
+            local at = path[math.max(1, math.floor(#path * f))]
+            if at then tiles[hex_key(at[1], at[2])] = "ford" end
+        end
+    end
+
+    -- ruins: a town (a tight cluster) somewhere 5-9 hexes out, and wrecks
+    local keys = {}
+    for key in pairs(tiles) do keys[#keys + 1] = key end
+    table.sort(keys)
+    local function parse(key)
+        local q, r = key:match("(-?%d+),(-?%d+)")
+        return tonumber(q), tonumber(r)
+    end
+    local town
+    for _ = 1, 200 do
+        seed = rand_next(seed)
+        local q, r = parse(keys[seed % #keys + 1])
+        local dist = axial_distance(0, 0, q, r)
+        if dist >= 5 and dist <= 9 then town = {q, r}; break end
+    end
+    if town then
+        local placed = 0
+        for ring = 0, 2 do
+            for _, key in ipairs(keys) do
+                local q, r = parse(key)
+                if placed < WORLD.town_ruins and axial_distance(q, r, town[1], town[2]) == ring then
+                    seed = rand_next(seed)
+                    if ring < 2 or seed % 3 == 0 then
+                        tiles[key] = "ruins"
+                        placed = placed + 1
+                    end
+                end
+            end
+        end
+    end
+    for _ = 1, WORLD.lone_ruins do
+        seed = rand_next(seed)
+        local key = keys[seed % #keys + 1]
+        local q, r = parse(key)
+        if tiles[key] ~= "water" and axial_distance(0, 0, q, r) >= 3 then tiles[key] = "ruins" end
+    end
     tiles[hex_key(0, 0)] = "plains"
+
+    -- every walkable hex must be reachable from the start: where water cuts
+    -- some off, wade a line of fords from them back toward the start
+    local function reachable()
+        local seen, queue = {[hex_key(0, 0)] = true}, {{0, 0}}
+        local i = 1
+        while queue[i] do
+            local cur = queue[i]; i = i + 1
+            for _, n in ipairs(AXIAL_DIRS) do
+                local nq, nr = cur[1] + n[1], cur[2] + n[2]
+                local k = hex_key(nq, nr)
+                if tiles[k] and not seen[k] and TERRAIN[tiles[k]].passable then
+                    seen[k] = true
+                    queue[#queue + 1] = {nq, nr}
+                end
+            end
+        end
+        return seen
+    end
+    for _ = 1, 50 do
+        local seen, cut_off = reachable(), nil
+        for _, key in ipairs(keys) do
+            if TERRAIN[tiles[key]].passable and not seen[key] then cut_off = key; break end
+        end
+        if not cut_off then break end
+        local q, r = parse(cut_off)
+        local n = axial_distance(q, r, 0, 0)
+        for step = 1, n do
+            local lq, lr = axial_round(q + (0 - q) * step / n, r + (0 - r) * step / n)
+            if tiles[hex_key(lq, lr)] == "water" then tiles[hex_key(lq, lr)] = "ford" end
+        end
+    end
 
     local ground = {}
     ground[hex_key(0, 0)] = {
@@ -120,9 +226,11 @@ local function generate_world(seed)
         table.insert(ground[key], {item = item, qty = qty})
     end
     for _, item in ipairs(WORLD_WEARABLES) do drop(item, 1) end
-    for _, item in ipairs({"canned_beans", "canned_beans", "water_bottle",
-                           "water_bottle", "water_bottle", "cloth_scrap"}) do
-        drop(item, 1)
+    for _ = 1, 3 do   -- food/water caches, scaled for the bigger map
+        for _, item in ipairs({"canned_beans", "canned_beans", "water_bottle",
+                               "water_bottle", "water_bottle", "cloth_scrap"}) do
+            drop(item, 1)
+        end
     end
     return tiles, ground, seed
 end
@@ -243,14 +351,18 @@ local function new_player()
     }
 end
 
+-- Only the hexes within sight are visited (the world has hundreds).
+-- view_sight is sight after night/light (Game:refresh_view); sight otherwise.
 local function update_visibility(player, tiles)
     player.visible = {}
-    for key in pairs(tiles) do
-        local q, r = key:match("(-?%d+),(-?%d+)")
-        q, r = tonumber(q), tonumber(r)
-        if axial_distance(player.q, player.r, q, r) <= player.sight then
-            player.visible[key] = true
-            player.explored[key] = true
+    local s = player.view_sight or player.sight
+    for dq = -s, s do
+        for dr = math.max(-s, -dq - s), math.min(s, -dq + s) do
+            local key = hex_key(player.q + dq, player.r + dr)
+            if tiles[key] then
+                player.visible[key] = true
+                player.explored[key] = true
+            end
         end
     end
 end

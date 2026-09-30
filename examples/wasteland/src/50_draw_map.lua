@@ -25,41 +25,56 @@ end
 -- to its right (from PANEL_X); the log and key hints across the bottom.
 local MAP_W, MAP_TOP, MAP_BOTTOM = 256, 4, 236
 local PANEL_X = 262
-local LEGEND_Y = 80
-local LEGEND_ORDER = {"plains", "forest", "hills", "water"}
+local LEGEND_Y = 104
+local LEGEND_ORDER = {"plains", "forest", "hills", "ruins", "ford", "water"}
 
 function Game:draw_map(w, h)
     gfx.clear(gfx.WHITE)
 
     local p = self.player
-    local origin_x, origin_y = MAP_W // 2, (MAP_TOP + MAP_BOTTOM) // 2
+    -- the camera: your hex sits in the middle of the map area
+    local ppx, ppy = axial_to_pixel(p.q, p.r, HEX_SIZE)
+    local origin_x = MAP_W // 2 - ppx
+    local origin_y = (MAP_TOP + MAP_BOTTOM) // 2 - ppy
 
-    -- HUD
+    -- HUD: time and weather, then movement, needs, health, conditions
     gfx.color(gfx.BLACK)
     gfx.font(gfx.FONT_MONO_12)
+    local day, hour = self:clock()
+    gfx.text(PANEL_X, 14, ("Day %d %02d:00%s"):format(day, hour, self:is_night() and " Night" or ""))
+    gfx.text(PANEL_X, 28, self:weather() .. (self:fire_here() and "  Fire" or ""))
     local scav = SCAVENGE_LOOT[self.tiles[hex_key(p.q, p.r)]]
         and (self:scavenge_left() .. "/" .. SCAVENGE_TRIES) or "-"
-    gfx.text(PANEL_X, 14, "MP " .. math.max(p.mp, 0) .. "/" .. p.max_mp .. "  Hrs " .. p.hours)
-    gfx.text(PANEL_X, 28, "Sight " .. p.sight .. " Scav " .. scav)
-    gfx.text(PANEL_X, 42, "Hun " .. math.floor(p.needs.hunger)
+    gfx.text(PANEL_X, 42, "MP " .. math.max(p.mp, 0) .. "/" .. p.max_mp
+        .. " Sight " .. (p.view_sight or p.sight))
+    gfx.text(PANEL_X, 56, "Hun " .. math.floor(p.needs.hunger)
         .. " Thi " .. math.floor(p.needs.thirst))
-    gfx.text(PANEL_X, 56, "Rest " .. math.floor(p.needs.rest) .. "  HP " .. math.floor(p.health))
+    gfx.text(PANEL_X, 70, "Rest " .. math.floor(p.needs.rest) .. "  HP " .. math.floor(p.health))
     local inj = {}
     if p.injuries.bleeding then inj[#inj + 1] = "BLEEDING" end
     if p.injuries.wounded_hours > 0 then inj[#inj + 1] = "Wounded" end
-    if #inj > 0 then gfx.text(PANEL_X, 70, table.concat(inj, " ")) end
+    if (p.cold_hours or 0) > 0 then inj[#inj + 1] = "COLD" end
+    inj[#inj + 1] = "Scav " .. scav
+    gfx.text(PANEL_X, 84, table.concat(inj, " "))
 
     local reachable = {}
     for _, n in ipairs(neighbors(self.tiles, p.q, p.r)) do
         reachable[hex_key(n[1], n[2])] = true
     end
 
-    for key, terrain_id in pairs(self.tiles) do
-        local q, r = key:match("(-?%d+),(-?%d+)")
-        q, r = tonumber(q), tonumber(r)
+    -- only whole hexes inside the map area (the world is far bigger than
+    -- the screen): walk the axial box around you instead of every tile
+    local half_w = HEX_SIZE * SQRT3 / 2
+    local span = math.floor(MAP_W / (2 * half_w)) + 2   -- an integer: keys are "q,r"
+    for dr = -span, span do
+      for dq = -span - 1, span + 1 do
+        local q, r = p.q + dq, p.r + dr
+        local key = hex_key(q, r)
+        local terrain_id = self.tiles[key]
         local px, py = axial_to_pixel(q, r, HEX_SIZE)
         px, py = origin_x + px, origin_y + py
-        if py > MAP_TOP and py < MAP_BOTTOM then
+        if terrain_id and px - half_w >= 1 and px + half_w <= MAP_W - 1
+            and py - HEX_SIZE >= MAP_TOP and py + HEX_SIZE <= MAP_BOTTOM then
             local terrain = TERRAIN[terrain_id]
             local is_player = (q == p.q and r == p.r)
             if p.visible[key] then
@@ -87,6 +102,15 @@ function Game:draw_map(w, h)
                 gfx.rect(mx - 1, my - 1, 7, 7)
                 gfx.fill_rect(mx + 1, my + 1, 3, 3)
             end
+            local camp = self.camps[key]
+            if camp and p.hours < camp.until_hour and (p.visible[key] or p.explored[key]) then
+                -- a burning campfire, in the hex's lower left, on a white patch
+                local fx, fy = rnd(px) - 12, rnd(py) + 1
+                gfx.color(gfx.WHITE)
+                gfx.fill_rect(fx - 1, fy - 1, GLYPH_W + 2, GLYPH_H + 2)
+                gfx.color(gfx.BLACK)
+                draw_sprite(fx, fy, GLYPH_W, GLYPH_H, GLYPHS.campfire)
+            end
             if is_player then
                 -- white halo keeps the marker visible on dark/black tiles
                 gfx.color(gfx.WHITE)
@@ -95,7 +119,10 @@ function Game:draw_map(w, h)
                 gfx.fill_rect(rnd(px) - 3, rnd(py) - 3, 6, 6)
             end
         end
+      end
     end
+    gfx.color(gfx.BLACK)
+    gfx.rect(0, MAP_TOP - 2, MAP_W, MAP_BOTTOM - MAP_TOP + 4)   -- the map's frame
 
     self:draw_legend()
 

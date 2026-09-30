@@ -28,6 +28,10 @@ Controls:
                     makes it (uses items from your bag, hands and the ground
                     here), C/Esc goes back. Scrawled Notes (E) teach recipes.
   I               - toggle inventory screen
+  (time)          - the HUD shows day, hour and weather. Nights (20:00-06:00)
+                    cut your sight unless you hold a Torch; rain, cold snaps
+                    and nights chill you unless your clothes are warm enough
+                    or you're by a campfire (build one with C)
   Q / ESC         - quit
 
 A new game opens on the character creator: Up/Down pick a row, Left/Right
@@ -48,7 +52,7 @@ local audio = solaros.audio
 -- Tunables
 -- ---------------------------------------------------------------------
 
-local GRID_RADIUS = 4
+local GRID_RADIUS = 12       -- 469 hexes; the map screen follows you
 local HEX_SIZE = 16          -- center-to-corner, in pixels
 local BASE_MAX_MP = 2
 local BASE_SIGHT = 2
@@ -81,9 +85,28 @@ local TERRAIN = {
     forest = {name = "Forest", cost = 2, passable = true,  shade = "LIGHT", ink = "BLACK"},
     hills  = {name = "Hills",  cost = 2, passable = true,  shade = "DARK",  ink = "WHITE"},
     water  = {name = "Water",  cost = 0, passable = false, shade = "BLACK", ink = "WHITE"},
+    -- placed by world generation, not rolled: ruins (a town and scattered
+    -- wrecks) and fords (where a river can be waded)
+    ruins  = {name = "Ruins",  cost = 1, passable = true,  shade = "WHITE", ink = "BLACK"},
+    ford   = {name = "Ford",   cost = 2, passable = true,  shade = "LIGHT", ink = "BLACK"},
 }
 local TERRAIN_WEIGHTS = {
-    {"plains", 45}, {"forest", 30}, {"hills", 18}, {"water", 7},
+    {"plains", 45}, {"forest", 30}, {"hills", 18}, {"water", 5},
+}
+
+-- Time, weather and cold, as one table (the bundle is one Lua chunk with a
+-- 200-local limit). The clock starts at start_hour on day 1; night runs
+-- from night_from to night_to. Weather is rolled per block of hours from
+-- the world seed (so it needs no saved state). Cold: you need at least
+-- need[weather] (+ night) warmth from worn clothes, or a fire, or you get
+-- cold: rest drains faster and after cold_grace hours you lose health.
+local WORLD = {
+    start_hour = 8, night_from = 20, night_to = 6, weather_block = 6,
+    weather = {{"Clear", 40}, {"Overcast", 30}, {"Rain", 20}, {"Cold snap", 10}},
+    need = {Clear = 0, Overcast = 1, Rain = 3, ["Cold snap"] = 5},
+    night_need = 2, cold_rest_drain = 3, cold_grace = 2, cold_hurt = 2,
+    night_encounters = 1.5, fire_rest_bonus = 0.5,
+    rivers = 2, town_ruins = 9, lone_ruins = 8,
 }
 
 local BACKPACK_CAP = 16      -- most bag cells any build can have (the layout's limit)
@@ -102,27 +125,27 @@ local ITEM_DB = {
     -- wear: what the item paints on the paperdoll when worn - {body part,
     -- first row, last row (exclusive), color}, rows in the figure's authored
     -- coordinates (see BODY_POLYGONS). Drawn in order, later entries on top.
-    tshirt       = {name = "T-Shirt",      slot = "shirt", consumable = nil,
+    tshirt       = {name = "T-Shirt",      slot = "shirt", consumable = nil, warmth = 1,
                     wear = {{"torso", 146, 227, "DARK"}, {"arms", 150, 184, "DARK"}}},
-    jeans        = {name = "Jeans",        slot = "pants", consumable = nil,
+    jeans        = {name = "Jeans",        slot = "pants", consumable = nil, warmth = 1,
                     wear = {{"torso", 214, 227, "DARK"}, {"legs", 224, 279, "DARK"}}},
-    boots        = {name = "Boots",        slot = "feet",  consumable = nil,
+    boots        = {name = "Boots",        slot = "feet",  consumable = nil, warmth = 1,
                     wear = {{"legs", 272, 290, "BLACK"}}},
-    cap          = {name = "Cap",          slot = "head",  consumable = nil,
+    cap          = {name = "Cap",          slot = "head",  consumable = nil, warmth = 1,
                     wear = {{"head", 116, 126, "BLACK"}}},
-    gloves       = {name = "Gloves",       slot = "hands", consumable = nil,
+    gloves       = {name = "Gloves",       slot = "hands", consumable = nil, warmth = 1,
                     wear = {{"arms", 234, 252, "BLACK"}}},
     -- optional 5th/6th wear fields: only paint where the distance from the
     -- body's center line is between them (authored units), e.g. just the
     -- sides of the head for earmuffs, or an open jacket front
-    earmuffs     = {name = "Earmuffs",     slot = "ears",  consumable = nil,
+    earmuffs     = {name = "Earmuffs",     slot = "ears",  consumable = nil, warmth = 1,
                     wear = {{"head", 118, 122, "BLACK", 0, 12},
                             {"head", 124, 136, "BLACK", 8, 12}}},
     sunglasses   = {name = "Sunglasses",   slot = "eyes",  consumable = nil,
                     wear = {{"head", 127, 131, "BLACK", 1, 9}}},
-    scarf        = {name = "Scarf",        slot = "neck",  consumable = nil,
+    scarf        = {name = "Scarf",        slot = "neck",  consumable = nil, warmth = 1,
                     wear = {{"torso", 139, 150, "BLACK", 0, 12}}},
-    jacket       = {name = "Leather Jacket", slot = "jacket", consumable = nil,
+    jacket       = {name = "Leather Jacket", slot = "jacket", consumable = nil, warmth = 3,
                     wear = {{"torso", 146, 222, "BLACK", 5, 40},
                             {"arms", 150, 232, "BLACK"}}},
     bracers      = {name = "Bracers",      slot = "wrists", consumable = nil,
@@ -185,6 +208,11 @@ local SCAVENGE_LOOT = {
               {"scrawled_notes", 1}},
     forest = {{"nothing", 7}, {"berries", 6}, {"cloth_scrap", 2}, {"water_bottle", 2},
               {"scarf", 1}, {"earmuffs", 1}, {"gloves", 1}, {"spear", 1}, {"stick", 7}},
+    -- ruins: what's left in houses and cars
+    ruins  = {{"nothing", 8}, {"canned_beans", 4}, {"water_bottle", 3}, {"cloth_scrap", 4},
+              {"scrawled_notes", 3}, {"rope", 1}, {"knife", 1}, {"pipe", 1}, {"stick", 1},
+              {"jacket", 1}, {"backpack", 1}},
+    ford   = {{"nothing", 12}, {"rock", 4}, {"stick", 2}, {"water_bottle", 1}},
     hills  = {{"nothing", 9}, {"rock", 6}, {"water_bottle", 2}, {"canned_beans", 1},
               {"jacket", 1}, {"bracers", 1}, {"boots", 1}, {"knife", 1}, {"stick", 1},
               {"scrawled_notes", 1}},
@@ -222,7 +250,7 @@ local WORLD_WEARABLES = {"cap", "gloves", "earmuffs", "sunglasses", "scarf",
 -- attribute, then the other side acts.
 -- ---------------------------------------------------------------------
 
-local ENCOUNTER_CHANCE = {plains = 10, forest = 15, hills = 12}   -- % per move onto it
+local ENCOUNTER_CHANCE = {plains = 10, forest = 15, hills = 12, ruins = 14, ford = 8}   -- % per move onto it
 local ENCOUNTER_COOLDOWN = 2   -- moves after an encounter before another can happen
 local ENCOUNTER_KINDS = {{"animal", 40}, {"mutant", 25}, {"anomaly", 20},
                          {"bandit", 12}, {"helper", 3}}
@@ -1006,6 +1034,42 @@ local draw_sprite = gfx.sprite or gfx.bitmap
 local GLYPH_W, GLYPH_H = 10, 10
 
 local GLYPH_ART = {
+    ruins = {
+        "..........",
+        ".#........",
+        ".#...#....",
+        ".##..##...",
+        ".###.###..",
+        ".#.#.#.##.",
+        ".###.####.",
+        ".#.#.#..#.",
+        ".########.",
+        "..........",
+    },
+    ford = {
+        "..........",
+        "..........",
+        "##....##..",
+        "..##.#..#.",
+        "..........",
+        ".##...##..",
+        "#..#.#..#.",
+        "....#.....",
+        "..........",
+        "..........",
+    },
+    campfire = {
+        "....#.....",
+        "...##.....",
+        "...###.#..",
+        "..#####...",
+        "..##.##...",
+        "...###....",
+        ".#.....#..",
+        "..##.##...",
+        "...###....",
+        ".##...##..",
+    },
     plains = {              -- tufts of grass
         "..........",
         "..........",
@@ -1235,7 +1299,113 @@ local function generate_world(seed)
             end
         end
     end
+
+    -- rivers: random walks from one edge toward the opposite one, each with
+    -- two fords where it can be waded
+    local R = GRID_RADIUS
+    for _ = 1, WORLD.rivers do
+        seed = rand_next(seed)
+        local d = AXIAL_DIRS[seed % 6 + 1]
+        local q, r = d[1] * R, d[2] * R
+        local tq, tr = -q, -r
+        local path = {}
+        for _ = 1, 4 * R do
+            if not tiles[hex_key(q, r)] then break end
+            tiles[hex_key(q, r)] = "water"
+            path[#path + 1] = {q, r}
+            if q == tq and r == tr then break end
+            -- step to a neighbor closer to the far edge, now and then sideways
+            local best, options = axial_distance(q, r, tq, tr), {}
+            for _, n in ipairs(AXIAL_DIRS) do
+                local nq, nr = q + n[1], r + n[2]
+                if tiles[hex_key(nq, nr)] and axial_distance(nq, nr, tq, tr) < best then
+                    options[#options + 1] = {nq, nr}
+                end
+            end
+            seed = rand_next(seed)
+            if #options == 0 or seed % 7 == 0 then
+                local n = AXIAL_DIRS[(seed // 7) % 6 + 1]
+                if tiles[hex_key(q + n[1], r + n[2])] then options = {{q + n[1], r + n[2]}} end
+            end
+            if #options == 0 then break end
+            local pick = options[(seed // 3) % #options + 1]
+            q, r = pick[1], pick[2]
+        end
+        for _, f in ipairs({1 / 3, 2 / 3}) do
+            local at = path[math.max(1, math.floor(#path * f))]
+            if at then tiles[hex_key(at[1], at[2])] = "ford" end
+        end
+    end
+
+    -- ruins: a town (a tight cluster) somewhere 5-9 hexes out, and wrecks
+    local keys = {}
+    for key in pairs(tiles) do keys[#keys + 1] = key end
+    table.sort(keys)
+    local function parse(key)
+        local q, r = key:match("(-?%d+),(-?%d+)")
+        return tonumber(q), tonumber(r)
+    end
+    local town
+    for _ = 1, 200 do
+        seed = rand_next(seed)
+        local q, r = parse(keys[seed % #keys + 1])
+        local dist = axial_distance(0, 0, q, r)
+        if dist >= 5 and dist <= 9 then town = {q, r}; break end
+    end
+    if town then
+        local placed = 0
+        for ring = 0, 2 do
+            for _, key in ipairs(keys) do
+                local q, r = parse(key)
+                if placed < WORLD.town_ruins and axial_distance(q, r, town[1], town[2]) == ring then
+                    seed = rand_next(seed)
+                    if ring < 2 or seed % 3 == 0 then
+                        tiles[key] = "ruins"
+                        placed = placed + 1
+                    end
+                end
+            end
+        end
+    end
+    for _ = 1, WORLD.lone_ruins do
+        seed = rand_next(seed)
+        local key = keys[seed % #keys + 1]
+        local q, r = parse(key)
+        if tiles[key] ~= "water" and axial_distance(0, 0, q, r) >= 3 then tiles[key] = "ruins" end
+    end
     tiles[hex_key(0, 0)] = "plains"
+
+    -- every walkable hex must be reachable from the start: where water cuts
+    -- some off, wade a line of fords from them back toward the start
+    local function reachable()
+        local seen, queue = {[hex_key(0, 0)] = true}, {{0, 0}}
+        local i = 1
+        while queue[i] do
+            local cur = queue[i]; i = i + 1
+            for _, n in ipairs(AXIAL_DIRS) do
+                local nq, nr = cur[1] + n[1], cur[2] + n[2]
+                local k = hex_key(nq, nr)
+                if tiles[k] and not seen[k] and TERRAIN[tiles[k]].passable then
+                    seen[k] = true
+                    queue[#queue + 1] = {nq, nr}
+                end
+            end
+        end
+        return seen
+    end
+    for _ = 1, 50 do
+        local seen, cut_off = reachable(), nil
+        for _, key in ipairs(keys) do
+            if TERRAIN[tiles[key]].passable and not seen[key] then cut_off = key; break end
+        end
+        if not cut_off then break end
+        local q, r = parse(cut_off)
+        local n = axial_distance(q, r, 0, 0)
+        for step = 1, n do
+            local lq, lr = axial_round(q + (0 - q) * step / n, r + (0 - r) * step / n)
+            if tiles[hex_key(lq, lr)] == "water" then tiles[hex_key(lq, lr)] = "ford" end
+        end
+    end
 
     local ground = {}
     ground[hex_key(0, 0)] = {
@@ -1264,9 +1434,11 @@ local function generate_world(seed)
         table.insert(ground[key], {item = item, qty = qty})
     end
     for _, item in ipairs(WORLD_WEARABLES) do drop(item, 1) end
-    for _, item in ipairs({"canned_beans", "canned_beans", "water_bottle",
-                           "water_bottle", "water_bottle", "cloth_scrap"}) do
-        drop(item, 1)
+    for _ = 1, 3 do   -- food/water caches, scaled for the bigger map
+        for _, item in ipairs({"canned_beans", "canned_beans", "water_bottle",
+                               "water_bottle", "water_bottle", "cloth_scrap"}) do
+            drop(item, 1)
+        end
     end
     return tiles, ground, seed
 end
@@ -1387,14 +1559,18 @@ local function new_player()
     }
 end
 
+-- Only the hexes within sight are visited (the world has hundreds).
+-- view_sight is sight after night/light (Game:refresh_view); sight otherwise.
 local function update_visibility(player, tiles)
     player.visible = {}
-    for key in pairs(tiles) do
-        local q, r = key:match("(-?%d+),(-?%d+)")
-        q, r = tonumber(q), tonumber(r)
-        if axial_distance(player.q, player.r, q, r) <= player.sight then
-            player.visible[key] = true
-            player.explored[key] = true
+    local s = player.view_sight or player.sight
+    for dq = -s, s do
+        for dr = math.max(-s, -dq - s), math.min(s, -dq + s) do
+            local key = hex_key(player.q + dq, player.r + dr)
+            if tiles[key] then
+                player.visible[key] = true
+                player.explored[key] = true
+            end
         end
     end
 end
@@ -1471,6 +1647,7 @@ function Game.new()
     end
     self.tiles, self.ground, seed = generate_world(seed)
     self.seed = seed             -- RNG state for scavenging
+    self.weather_seed = seed     -- fixed per world: weather is rolled from it (Game:weather)
     self.scavenged = {}          -- tile key -> searches used
     self.camps = {}              -- tile key -> {until_hour} while a campfire burns
     self.known = {}              -- recipe id -> true once you know how to make it
@@ -1480,7 +1657,7 @@ function Game.new()
     self.craft_ui = {cursor = 1, back = "map"}   -- crafting screen state (not "craft": that is the method)
     self.player = new_player()
     recompute_stats(self.player)
-    update_visibility(self.player, self.tiles)
+    self:refresh_view()
     self.screen = "creator"      -- "creator", then "map" or "inventory"
     self.creator_cursor = 1      -- rows: attributes, then traits
     self.creator_msg = nil
@@ -1501,7 +1678,7 @@ function Game:start_game()
     recompute_stats(p)
     p.mp = p.max_mp
     p.explored = {}
-    update_visibility(p, self.tiles)
+    self:refresh_view()
     self.screen = "map"
     return true
 end
@@ -1544,7 +1721,7 @@ function Game:try_move(q, r)
     p.q, p.r = q, r
     p.hours = p.hours + terrain.cost
     apply_awake_hours(p, terrain.cost)
-    update_visibility(p, self.tiles)
+    self:refresh_view()
     self:push_log("Moved to " .. terrain.name .. " (" .. terrain.cost .. " MP)")
     local pile = self.ground[key]
     if pile and #pile > 0 then self:push_log("Something is here. (I to look)") end
@@ -1635,11 +1812,15 @@ function Game:rest()
         self:push_log("Already rested.")
         return
     end
+    local fire = self:fire_here()
     p.hours = p.hours + REST_HOURS
     apply_rest_hours(p, REST_HOURS)
+    if fire then   -- a campfire: warm, and better sleep
+        p.needs.rest = clamp(p.needs.rest + REST_HOURS * (100 / 6) * WORLD.fire_rest_bonus)
+    end
     p.mp = effective_max_mp(p)
-    update_visibility(p, self.tiles)
-    self:push_log("Rested " .. REST_HOURS .. "h.")
+    self:refresh_view()
+    self:push_log("Rested " .. REST_HOURS .. "h" .. (fire and " by the fire." or "."))
     if p.injuries.bleeding then self:push_log("You're still bleeding. Bandage it (E on cloth).") end
     self:check_death("You bled out in your sleep.")
 end
@@ -1995,6 +2176,98 @@ function Game:craft_key(key)
         self.screen = c.back == "craft" and "map" or c.back
     end
 end
+-- ---------------------------------------------------------------------
+-- Time of day, weather, cold and light
+--
+-- The clock is derived from player.hours (see WORLD in 05_data). Weather is
+-- rolled per WORLD.weather_block hours from the world's seed, so it needs no
+-- state of its own. Game:tick() runs after every key: it walks the hours
+-- that passed since the last tick and applies cold, then refreshes what you
+-- can see (night shortens sight unless you hold a torch).
+-- ---------------------------------------------------------------------
+
+-- day (1..), hour (0..23) at `hours` into the run (default: now)
+function Game:clock(hours)
+    local total = WORLD.start_hour + (hours or self.player.hours)
+    return total // 24 + 1, total % 24
+end
+
+function Game:is_night(hours)
+    local _, hour = self:clock(hours)
+    return hour >= WORLD.night_from or hour < WORLD.night_to
+end
+
+function Game:weather(hours)
+    local block = (WORLD.start_hour + (hours or self.player.hours)) // WORLD.weather_block
+    local s = (self.weather_seed + block * 7919) % 32768
+    s = rand_next(rand_next(s))
+    local _, kind = weighted_pick(s, WORLD.weather)
+    return kind
+end
+
+-- Warmth from what you wear (not what you hold).
+function Game:warmth()
+    local total = 0
+    for slot, item in pairs(self.player.equipped) do
+        if not HOLD_SLOTS[slot] then total = total + (ITEM_DB[item].warmth or 0) end
+    end
+    return total
+end
+
+function Game:cold_need(hours)
+    return WORLD.need[self:weather(hours)] + (self:is_night(hours) and WORLD.night_need or 0)
+end
+
+function Game:fire_at(hours)
+    local camp = self.camps[hex_key(self.player.q, self.player.r)]
+    return camp ~= nil and hours < camp.until_hour
+end
+
+function Game:is_cold(hours)
+    hours = hours or self.player.hours
+    return not self:fire_at(hours) and self:warmth() < self:cold_need(hours)
+end
+
+-- A lit torch in either hand.
+function Game:has_light()
+    local eq = self.player.equipped
+    return eq.rhand == "torch" or eq.lhand == "torch"
+end
+
+-- Recompute what you can see: at night sight drops by one without light.
+function Game:refresh_view()
+    local p = self.player
+    local dark = self:is_night() and not self:has_light()
+    p.view_sight = math.max(1, p.sight - (dark and 1 or 0))
+    update_visibility(p, self.tiles)
+end
+
+-- Apply the hours that passed since the last tick.
+function Game:tick()
+    local p = self.player
+    self.ticked_hour = self.ticked_hour or p.hours
+    local was_cold = (p.cold_hours or 0) > 0
+    for hour = self.ticked_hour, p.hours - 1 do
+        if self:is_cold(hour) then
+            p.cold_hours = (p.cold_hours or 0) + 1
+            p.needs.rest = clamp(p.needs.rest - WORLD.cold_rest_drain)
+            if p.cold_hours > WORLD.cold_grace then
+                p.health = clamp(p.health - WORLD.cold_hurt)
+            end
+        else
+            p.cold_hours = 0
+        end
+    end
+    self.ticked_hour = p.hours
+    local cold = (p.cold_hours or 0) > 0
+    if cold and not was_cold then
+        self:push_log("You're cold. Wear warmer clothes or build a fire.")
+    elseif cold and p.cold_hours == WORLD.cold_grace + 1 then
+        self:push_log("The cold is getting into you. (-" .. WORLD.cold_hurt .. " HP/h)")
+    end
+    self:refresh_view()
+    self:check_death("You froze to death.")
+end
 -- -- encounters -----------------------------------------------------------
 
 local ENC_COLS = 55            -- mono 12 is ~7 px/char: 55 chars fit 400 px
@@ -2018,6 +2291,7 @@ function Game:maybe_encounter(terrain_id)
         return
     end
     local chance = ENCOUNTER_CHANCE[terrain_id]
+    if chance and self:is_night() then chance = chance * WORLD.night_encounters end
     if chance and self:roll(chance * self.player.encounter_mult) then self:start_encounter(self:pick_encounter()) end
 end
 
@@ -2518,41 +2792,56 @@ end
 -- to its right (from PANEL_X); the log and key hints across the bottom.
 local MAP_W, MAP_TOP, MAP_BOTTOM = 256, 4, 236
 local PANEL_X = 262
-local LEGEND_Y = 80
-local LEGEND_ORDER = {"plains", "forest", "hills", "water"}
+local LEGEND_Y = 104
+local LEGEND_ORDER = {"plains", "forest", "hills", "ruins", "ford", "water"}
 
 function Game:draw_map(w, h)
     gfx.clear(gfx.WHITE)
 
     local p = self.player
-    local origin_x, origin_y = MAP_W // 2, (MAP_TOP + MAP_BOTTOM) // 2
+    -- the camera: your hex sits in the middle of the map area
+    local ppx, ppy = axial_to_pixel(p.q, p.r, HEX_SIZE)
+    local origin_x = MAP_W // 2 - ppx
+    local origin_y = (MAP_TOP + MAP_BOTTOM) // 2 - ppy
 
-    -- HUD
+    -- HUD: time and weather, then movement, needs, health, conditions
     gfx.color(gfx.BLACK)
     gfx.font(gfx.FONT_MONO_12)
+    local day, hour = self:clock()
+    gfx.text(PANEL_X, 14, ("Day %d %02d:00%s"):format(day, hour, self:is_night() and " Night" or ""))
+    gfx.text(PANEL_X, 28, self:weather() .. (self:fire_here() and "  Fire" or ""))
     local scav = SCAVENGE_LOOT[self.tiles[hex_key(p.q, p.r)]]
         and (self:scavenge_left() .. "/" .. SCAVENGE_TRIES) or "-"
-    gfx.text(PANEL_X, 14, "MP " .. math.max(p.mp, 0) .. "/" .. p.max_mp .. "  Hrs " .. p.hours)
-    gfx.text(PANEL_X, 28, "Sight " .. p.sight .. " Scav " .. scav)
-    gfx.text(PANEL_X, 42, "Hun " .. math.floor(p.needs.hunger)
+    gfx.text(PANEL_X, 42, "MP " .. math.max(p.mp, 0) .. "/" .. p.max_mp
+        .. " Sight " .. (p.view_sight or p.sight))
+    gfx.text(PANEL_X, 56, "Hun " .. math.floor(p.needs.hunger)
         .. " Thi " .. math.floor(p.needs.thirst))
-    gfx.text(PANEL_X, 56, "Rest " .. math.floor(p.needs.rest) .. "  HP " .. math.floor(p.health))
+    gfx.text(PANEL_X, 70, "Rest " .. math.floor(p.needs.rest) .. "  HP " .. math.floor(p.health))
     local inj = {}
     if p.injuries.bleeding then inj[#inj + 1] = "BLEEDING" end
     if p.injuries.wounded_hours > 0 then inj[#inj + 1] = "Wounded" end
-    if #inj > 0 then gfx.text(PANEL_X, 70, table.concat(inj, " ")) end
+    if (p.cold_hours or 0) > 0 then inj[#inj + 1] = "COLD" end
+    inj[#inj + 1] = "Scav " .. scav
+    gfx.text(PANEL_X, 84, table.concat(inj, " "))
 
     local reachable = {}
     for _, n in ipairs(neighbors(self.tiles, p.q, p.r)) do
         reachable[hex_key(n[1], n[2])] = true
     end
 
-    for key, terrain_id in pairs(self.tiles) do
-        local q, r = key:match("(-?%d+),(-?%d+)")
-        q, r = tonumber(q), tonumber(r)
+    -- only whole hexes inside the map area (the world is far bigger than
+    -- the screen): walk the axial box around you instead of every tile
+    local half_w = HEX_SIZE * SQRT3 / 2
+    local span = math.floor(MAP_W / (2 * half_w)) + 2   -- an integer: keys are "q,r"
+    for dr = -span, span do
+      for dq = -span - 1, span + 1 do
+        local q, r = p.q + dq, p.r + dr
+        local key = hex_key(q, r)
+        local terrain_id = self.tiles[key]
         local px, py = axial_to_pixel(q, r, HEX_SIZE)
         px, py = origin_x + px, origin_y + py
-        if py > MAP_TOP and py < MAP_BOTTOM then
+        if terrain_id and px - half_w >= 1 and px + half_w <= MAP_W - 1
+            and py - HEX_SIZE >= MAP_TOP and py + HEX_SIZE <= MAP_BOTTOM then
             local terrain = TERRAIN[terrain_id]
             local is_player = (q == p.q and r == p.r)
             if p.visible[key] then
@@ -2580,6 +2869,15 @@ function Game:draw_map(w, h)
                 gfx.rect(mx - 1, my - 1, 7, 7)
                 gfx.fill_rect(mx + 1, my + 1, 3, 3)
             end
+            local camp = self.camps[key]
+            if camp and p.hours < camp.until_hour and (p.visible[key] or p.explored[key]) then
+                -- a burning campfire, in the hex's lower left, on a white patch
+                local fx, fy = rnd(px) - 12, rnd(py) + 1
+                gfx.color(gfx.WHITE)
+                gfx.fill_rect(fx - 1, fy - 1, GLYPH_W + 2, GLYPH_H + 2)
+                gfx.color(gfx.BLACK)
+                draw_sprite(fx, fy, GLYPH_W, GLYPH_H, GLYPHS.campfire)
+            end
             if is_player then
                 -- white halo keeps the marker visible on dark/black tiles
                 gfx.color(gfx.WHITE)
@@ -2588,7 +2886,10 @@ function Game:draw_map(w, h)
                 gfx.fill_rect(rnd(px) - 3, rnd(py) - 3, 6, 6)
             end
         end
+      end
     end
+    gfx.color(gfx.BLACK)
+    gfx.rect(0, MAP_TOP - 2, MAP_W, MAP_BOTTOM - MAP_TOP + 4)   -- the map's frame
 
     self:draw_legend()
 
@@ -2734,6 +3035,7 @@ function Game:current_conditions()
     -- temperature model exists yet, so none are listed here).
     local list = {}
     if self.player.equipped.feet == nil then table.insert(list, "Barefoot") end
+    if (self.player.cold_hours or 0) > 0 then table.insert(list, "Cold") end
     if self.player.needs.hunger <= 0 then table.insert(list, "Starving") end
     if self.player.needs.thirst <= 0 then table.insert(list, "Dehydrated") end
     if self.player.needs.rest <= 0 then table.insert(list, "Exhausted") end
@@ -3948,6 +4250,9 @@ local ok, err = pcall(function()
             else
                 handle_inventory_key(key)
             end
+            -- time may have passed (moving, resting, crafting...): apply cold,
+            -- night and light before the next frame
+            if game.screen ~= "creator" and game.screen ~= "dead" then game:tick() end
             dirty = true
         end
     end

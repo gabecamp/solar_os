@@ -174,6 +174,33 @@ g.craft_ui.cursor = 5
 g:draw_craft(400, 300)
 solaros.dump("ops_craft.txt")
 
+-- Scenes 8g/8h: the big map around the town, by day and at night, with a
+-- campfire; a fixed seed so the preview is stable
+for _, st in ipairs({{"day", 2}, {"night", 13}}) do
+    os.time = function() return 4242 end
+    g = fresh(); g:start_game()
+    -- stand next to the town's first ruin and reveal a wide area
+    local best
+    for key, t in pairs(g.tiles) do
+        if t == "ruins" then
+            local q, r = key:match("(-?%d+),(-?%d+)")
+            q, r = tonumber(q), tonumber(r)
+            if not best or math.abs(q) + math.abs(r) < math.abs(best[1]) + math.abs(best[2]) then best = {q, r} end
+        end
+    end
+    g.player.q, g.player.r = best[1], best[2]
+    g.player.hours = st[2]
+    for key in pairs(g.tiles) do
+        local q, r = key:match("(-?%d+),(-?%d+)")
+        if math.abs(tonumber(q) - best[1]) + math.abs(tonumber(r) - best[2]) <= 9 then g.player.explored[key] = true end
+    end
+    g.camps[best[1] .. "," .. best[2]] = {until_hour = st[2] + 6}
+    g:refresh_view()
+    g.log = {"Moved to Ruins (1 MP)", "You build a campfire. It will burn 12h."}
+    g:draw_map(400, 300)
+    solaros.dump("ops_map_world_" .. st[1] .. ".txt")
+end
+
 -- Scene 9: a helper
 g = fresh(); g:start_game()
 start_named(g, "Old Medic")

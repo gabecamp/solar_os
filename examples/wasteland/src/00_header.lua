@@ -26,6 +26,10 @@ Controls:
                     makes it (uses items from your bag, hands and the ground
                     here), C/Esc goes back. Scrawled Notes (E) teach recipes.
   I               - toggle inventory screen
+  (time)          - the HUD shows day, hour and weather. Nights (20:00-06:00)
+                    cut your sight unless you hold a Torch; rain, cold snaps
+                    and nights chill you unless your clothes are warm enough
+                    or you're by a campfire (build one with C)
   Q / ESC         - quit
 
 A new game opens on the character creator: Up/Down pick a row, Left/Right

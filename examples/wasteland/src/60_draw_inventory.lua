@@ -57,6 +57,7 @@ function Game:current_conditions()
     -- temperature model exists yet, so none are listed here).
     local list = {}
     if self.player.equipped.feet == nil then table.insert(list, "Barefoot") end
+    if (self.player.cold_hours or 0) > 0 then table.insert(list, "Cold") end
     if self.player.needs.hunger <= 0 then table.insert(list, "Starving") end
     if self.player.needs.thirst <= 0 then table.insert(list, "Dehydrated") end
     if self.player.needs.rest <= 0 then table.insert(list, "Exhausted") end

@@ -334,6 +334,8 @@ assert(p2.encounter_mult == 0.5 and p2.sight == math.max(1, sight0 - 1))
 g2 = fresh(); p2 = g2.player
 p2.equipped.lhand = "flesh_knot"; E.recompute_stats(p2)
 p2.health = 50
+-- keep the walk on land whatever the river generation did here
+g2.tiles["1,0"], g2.tiles["0,0"], g2.tiles["-1,0"] = "plains", "plains", "plains"
 g2:try_move(1, 0); g2:try_move(0, 0); g2:try_move(-1, 0)
 assert(p2.health > 50 or g2.screen == "encounter", "the knot heals while you walk")
 g2 = fresh(); p2 = g2.player
