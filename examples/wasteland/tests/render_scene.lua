@@ -255,3 +255,28 @@ g.inv_cursor = #g:ground_list()   -- ground rows come first: this is the stone
 g:draw_inventory(400, 300)
 solaros.dump("ops_inventory_artifact.txt")
 print("scenes recorded, player at", g.player.q, g.player.r)
+
+-- Scene: standing at the edge of an anomaly field with a Geiger counter
+g = fresh()
+g:start_game()
+for k, l in pairs(g.rad) do
+    if l == 2 and g.tiles[k] ~= "water" then
+        local q, r = k:match("(-?%d+),(-?%d+)")
+        g.player.q, g.player.r = tonumber(q), tonumber(r)
+        break
+    end
+end
+g.player.inventory[#g.player.inventory + 1] = {item = "geiger", qty = 1}
+g.ticked_hour = g.player.hours
+g.player.rads = 48
+g.player.hours = g.player.hours + 1
+g:tick()
+g:draw_map(400, 300)
+solaros.dump("ops_map_radiation.txt")
+g.player.equipped.eyes = "gasmask"
+g.player.inventory[#g.player.inventory + 1] = {item = "antirad", qty = 2}
+g.player.inventory[#g.player.inventory + 1] = {item = "vodka", qty = 1}
+g.player.inventory[#g.player.inventory + 1] = {item = "bolts", qty = 5}
+g.inv_cursor = 1
+g:draw_inventory(400, 300)
+solaros.dump("ops_inventory_radiation.txt")

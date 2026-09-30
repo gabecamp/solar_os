@@ -15,7 +15,7 @@
 
 local SAVE = {version = 1, dir = "wasteland", file = "save.lua",
               fields = {"world_seed", "seed", "weather_seed", "scavenged", "camps",
-                        "known", "ground", "log", "enc_cooldown", "ticked_hour"}}
+                        "known", "ground", "log", "enc_cooldown", "ticked_hour", "rad_known"}}
 
 -- Where the save lives: <preferred storage>/wasteland/save.lua
 function SAVE.path()
@@ -105,7 +105,8 @@ function Game.read_save()
 end
 
 function Game:load_state(data)
-    self.tiles = generate_world(data.world_seed)
+    local tiles, _, _, rad = generate_world(data.world_seed)
+    self.tiles, self.rad = tiles, rad
     for _, f in ipairs(SAVE.fields) do
         if data[f] ~= nil then self[f] = data[f] end
     end

@@ -64,6 +64,8 @@ function Game:current_conditions()
     if self.player.injuries.bleeding then table.insert(list, "Bleeding") end
     if self.player.injuries.wounded_hours > 0 then table.insert(list, "Wounded") end
     if self.player.health < 50 then table.insert(list, "Hurt") end
+    local rad_stage = RAD.stages[self:rad_stage()]
+    if rad_stage then table.insert(list, rad_stage.name) end
     if #list == 0 then return "Conditions: none" end
     local text = table.concat(list, ", ")
     -- all four at once don't fit after the prefix (mono 12 is ~7px/char)

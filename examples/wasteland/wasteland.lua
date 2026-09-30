@@ -109,6 +109,24 @@ local WORLD = {
     rivers = 2, town_ruins = 9, lone_ruins = 8,
 }
 
+-- Radiation, S.T.A.L.K.E.R. style: world generation leaves `fields` hot
+-- spots (at least min_dist from the start), level 3 at the center falling
+-- off by one per hex out to a radius of 1-2, with an artifact at each
+-- center. Every hour on a hot hex adds dose[level] rads (x the worn gear's
+-- rad_armor); away from them rads fade by `decay` an hour. Enough rads make
+-- you sick (stages: HP and rest lost per hour). A carried Geiger counter
+-- shows the level around you and marks hot hexes on the map.
+local RAD = {
+    fields = 7, min_dist = 4, dose = {2, 5, 12}, decay = 0.5, max = 100,
+    level_name = {[0] = "clean", "low", "high", "deadly"},
+    stages = {{at = 25, name = "Irradiated", hurt = 0, tire = 1},
+              {at = 50, name = "Rad sick", hurt = 1, tire = 2},
+              {at = 80, name = "Rad poisoned", hurt = 3, tire = 3}},
+    artifact_find = 20,   -- % a search on a level 2+ hex also turns up an artifact
+    bolts_bonus = 2,      -- extra throws in the bolts puzzle while you carry bolts
+    world_items = {"geiger", "gasmask", "antirad", "antirad", "bolts"},   -- dropped once each
+}
+
 local BACKPACK_CAP = 16      -- most bag cells any build can have (the layout's limit)
 local POCKET_CELLS = 4       -- bag cells with nothing worn on your back
 
@@ -153,12 +171,25 @@ local ITEM_DB = {
     -- bags: bag_cells is how many bag cells you get while wearing it
     backpack     = {name = "Backpack",     slot = "back", consumable = nil, bag_cells = 12,
                     wear = {{"torso", 147, 196, "BLACK", 9, 13}}},
+    -- rad_armor multiplies the radiation you take while it's worn
+    gasmask      = {name = "Gas Mask",     slot = "eyes",  consumable = nil, warmth = 1,
+                    rad_armor = 0.5, desc = "Worn: halves radiation",
+                    wear = {{"head", 125, 139, "BLACK", 0, 10}}},
     satchel      = {name = "Satchel",      slot = "back", consumable = nil, bag_cells = 8,
                     wear = {{"torso", 147, 210, "BLACK", 12, 15}}},
     canned_beans = {name = "Canned Beans", slot = nil, consumable = {hunger = 40}},
     water_bottle = {name = "Water Bottle", slot = nil, consumable = {thirst = 50}},
     berries      = {name = "Wild Berries", slot = nil, consumable = {hunger = 15, thirst = 5}},
     strange_meat = {name = "Strange Meat", slot = nil, consumable = {hunger = 30, thirst = -5}},
+    -- rads: taken off your radiation (see RAD)
+    antirad      = {name = "Anti-Rad",     slot = nil, consumable = {rads = -50, thirst = -5},
+                    desc = "E: -50 rads"},
+    vodka        = {name = "Vodka",        slot = nil, consumable = {rads = -20, thirst = -10, rest = -10},
+                    desc = "E: -20 rads, dulls you"},
+    geiger       = {name = "Geiger Counter", slot = nil, consumable = nil,
+                    desc = "Carry it: reads radiation"},
+    bolts        = {name = "Bolts",        slot = nil, consumable = nil,
+                    desc = "Anomalies: +2 bolt throws"},
     -- weapon: used from a hand slot. dmg per hit; reach "close" (arm's
     -- length) or "near" (a spear's length); thrown ones are hurled from
     -- range and land on the ground; bleed: % chance a hit opens a wound
@@ -205,17 +236,18 @@ local SCAVENGE_LOOT = {
     plains = {{"nothing", 8}, {"rock", 3}, {"cloth_scrap", 4}, {"canned_beans", 3},
               {"water_bottle", 3}, {"cap", 1}, {"sunglasses", 1}, {"gloves", 1},
               {"satchel", 1}, {"pipe", 1}, {"knife", 1}, {"stick", 2},
-              {"scrawled_notes", 1}},
+              {"scrawled_notes", 1}, {"bolts", 1}, {"vodka", 1}},
     forest = {{"nothing", 7}, {"berries", 6}, {"cloth_scrap", 2}, {"water_bottle", 2},
               {"scarf", 1}, {"earmuffs", 1}, {"gloves", 1}, {"spear", 1}, {"stick", 7}},
     -- ruins: what's left in houses and cars
     ruins  = {{"nothing", 8}, {"canned_beans", 4}, {"water_bottle", 3}, {"cloth_scrap", 4},
               {"scrawled_notes", 3}, {"rope", 1}, {"knife", 1}, {"pipe", 1}, {"stick", 1},
-              {"jacket", 1}, {"backpack", 1}},
+              {"jacket", 1}, {"backpack", 1}, {"antirad", 2}, {"vodka", 2}, {"bolts", 2},
+              {"geiger", 1}, {"gasmask", 1}},
     ford   = {{"nothing", 12}, {"rock", 4}, {"stick", 2}, {"water_bottle", 1}},
     hills  = {{"nothing", 9}, {"rock", 6}, {"water_bottle", 2}, {"canned_beans", 1},
               {"jacket", 1}, {"bracers", 1}, {"boots", 1}, {"knife", 1}, {"stick", 1},
-              {"scrawled_notes", 1}},
+              {"scrawled_notes", 1}, {"antirad", 1}},
 }
 
 -- Crafting, NEO Scavenger style: inputs come from your bag, your hands and
@@ -397,6 +429,96 @@ end
 local SPRITE_W, SPRITE_H = 16, 16
 
 local SPRITE_ART = {
+    geiger = {
+        "................",
+        "....######......",
+        "....#....#......",
+        "..##########....",
+        "..#........#....",
+        "..#.#####..#.##.",
+        "..#.#...#..#.#..",
+        "..#.#.#.#..#.#..",
+        "..#.#..##..###..",
+        "..#.#####..#....",
+        "..#........#....",
+        "..#.##..##.#....",
+        "..#........#....",
+        "..##########....",
+        "................",
+        "................",
+    },
+    antirad = {
+        "................",
+        "....########....",
+        "....########....",
+        "................",
+        "....########....",
+        "...#........#...",
+        "...#...##...#...",
+        "...#...##...#...",
+        "...#.######.#...",
+        "...#.######.#...",
+        "...#...##...#...",
+        "...#...##...#...",
+        "...#........#...",
+        "...##########...",
+        "................",
+        "................",
+    },
+    vodka = {
+        "................",
+        ".......##.......",
+        ".......##.......",
+        ".......##.......",
+        "......####......",
+        "......#..#......",
+        ".....##..##.....",
+        ".....#....#.....",
+        ".....#....#.....",
+        ".....######.....",
+        ".....#.##.#.....",
+        ".....#.##.#.....",
+        ".....######.....",
+        ".....#....#.....",
+        ".....######.....",
+        "................",
+    },
+    bolts = {
+        "................",
+        "..###...........",
+        "..###.......##..",
+        "...#.......####.",
+        "...#........##..",
+        "...#.........#..",
+        "...#.........#..",
+        "...#....###..#..",
+        "........#.#..#..",
+        "........###.....",
+        "..##............",
+        ".####.....###...",
+        "..##......###...",
+        "...........#....",
+        "...........#....",
+        "................",
+    },
+    gasmask = {
+        "................",
+        "....########....",
+        "...#........#...",
+        "..#..........#..",
+        "..#.###..###.#..",
+        "..#.#.#..#.#.#..",
+        "..#.###..###.#..",
+        "..#..........#..",
+        "...#...##...#...",
+        "....#.####.#....",
+        ".....######.....",
+        "......####......",
+        "......#..#......",
+        "......####......",
+        "................",
+        "................",
+    },
     stick = {
         "................",
         "..............#.",
@@ -1125,6 +1247,16 @@ local GLYPHS = {}
 for terrain_id, rows in pairs(GLYPH_ART) do
     GLYPHS[terrain_id] = pack_bitmap("glyph:" .. terrain_id, rows, GLYPH_W, GLYPH_H)
 end
+-- 7x7 radiation trefoil for hot hexes on the map (not a terrain)
+GLYPHS.rad = pack_bitmap("glyph:rad", {
+    "##...##",
+    "###.###",
+    ".##.##.",
+    "...#...",
+    "..###..",
+    "..###..",
+    "..###..",
+}, 7, 7)
 for terrain_id in pairs(TERRAIN) do
     assert(GLYPHS[terrain_id], "terrain has no glyph: " .. terrain_id)
 end
@@ -1441,7 +1573,32 @@ local function generate_world(seed)
             drop(item, 1)
         end
     end
-    return tiles, ground, seed
+    for _, item in ipairs(RAD.world_items) do drop(item, 1) end
+
+    -- anomaly fields: hot spots of radiation, an artifact at each center.
+    -- rad[key] = level 1-3 (see RAD); not saved, rebuilt from the seed.
+    local rad = {}
+    local fields = 0
+    for _ = 1, 300 do
+        if fields >= RAD.fields then break end
+        seed = rand_next(seed)
+        local center = spots[seed % #spots + 1]
+        local cq, cr = parse(center)
+        if axial_distance(0, 0, cq, cr) >= RAD.min_dist and not rad[center] then
+            seed = rand_next(seed)
+            local radius = 1 + seed % 2
+            for _, key in ipairs(keys) do
+                local q, r = parse(key)
+                local d = axial_distance(q, r, cq, cr)
+                if d <= radius then rad[key] = math.max(rad[key] or 0, 3 - d) end
+            end
+            seed = rand_next(seed)
+            ground[center] = ground[center] or {}
+            table.insert(ground[center], {item = ARTIFACTS[seed % #ARTIFACTS + 1], qty = 1})
+            fields = fields + 1
+        end
+    end
+    return tiles, ground, seed, rad
 end
 
 -- ---------------------------------------------------------------------
@@ -1647,7 +1804,8 @@ function Game.new()
         seed = os.time() % 32768
     end
     self.world_seed = seed       -- the map is rebuilt from this when a save is loaded
-    self.tiles, self.ground, seed = generate_world(seed)
+    self.tiles, self.ground, seed, self.rad = generate_world(seed)
+    self.rad_known = {}          -- tile key -> rad level you've measured or felt there
     self.seed = seed             -- RNG state for scavenging
     self.weather_seed = seed     -- fixed per world: weather is rolled from it (Game:weather)
     self.scavenged = {}          -- tile key -> searches used
@@ -1803,6 +1961,7 @@ function Game:scavenge()
         self:push_log("Found: " .. table.concat(found, ", ") .. ".")
         self:push_log("Press I to pick it up.")
     end
+    self:scavenge_field()
     if p.needs.hunger <= 0 then self:push_log("You are starving!") end
     if p.needs.thirst <= 0 then self:push_log("You are dehydrated!") end
     self:check_death(p.scav_hurt > 0 and "The Hollow Star emptied you." or "You bled out.")
@@ -1973,7 +2132,11 @@ function Game:try_consume(kind, k)
         return
     end
     for need, amount in pairs(def.consumable) do
-        self.player.needs[need] = clamp(self.player.needs[need] + amount)
+        if need == "rads" then
+            self.player.rads = math.max(0, (self.player.rads or 0) + amount)
+        else
+            self.player.needs[need] = clamp(self.player.needs[need] + amount)
+        end
     end
     -- one unit per use; the stack only disappears when it runs out
     stack.qty = stack.qty - 1
@@ -2250,6 +2413,7 @@ function Game:tick()
     local p = self.player
     self.ticked_hour = self.ticked_hour or p.hours
     local was_cold = (p.cold_hours or 0) > 0
+    local rad_before, dose = self:rad_stage(), 0
     for hour = self.ticked_hour, p.hours - 1 do
         if self:is_cold(hour) then
             p.cold_hours = (p.cold_hours or 0) + 1
@@ -2260,6 +2424,7 @@ function Game:tick()
         else
             p.cold_hours = 0
         end
+        dose = dose + self:rad_hour()
     end
     self.ticked_hour = p.hours
     local cold = (p.cold_hours or 0) > 0
@@ -2268,8 +2433,10 @@ function Game:tick()
     elseif cold and p.cold_hours == WORLD.cold_grace + 1 then
         self:push_log("The cold is getting into you. (-" .. WORLD.cold_hurt .. " HP/h)")
     end
+    self:rad_news(dose, rad_before)
+    self:geiger_scan()
     self:refresh_view()
-    self:check_death("You froze to death.")
+    self:check_death(cold and "You froze to death." or "Radiation sickness took you.")
 end
 -- ---------------------------------------------------------------------
 -- Saving and continuing
@@ -2288,7 +2455,7 @@ end
 
 local SAVE = {version = 1, dir = "wasteland", file = "save.lua",
               fields = {"world_seed", "seed", "weather_seed", "scavenged", "camps",
-                        "known", "ground", "log", "enc_cooldown", "ticked_hour"}}
+                        "known", "ground", "log", "enc_cooldown", "ticked_hour", "rad_known"}}
 
 -- Where the save lives: <preferred storage>/wasteland/save.lua
 function SAVE.path()
@@ -2378,7 +2545,8 @@ function Game.read_save()
 end
 
 function Game:load_state(data)
-    self.tiles = generate_world(data.world_seed)
+    local tiles, _, _, rad = generate_world(data.world_seed)
+    self.tiles, self.rad = tiles, rad
     for _, f in ipairs(SAVE.fields) do
         if data[f] ~= nil then self[f] = data[f] end
     end
@@ -2449,6 +2617,128 @@ function Game:title_key(key)
         end
         self.title_save = nil
     end
+end
+-- ---------------------------------------------------------------------
+-- Radiation and anomaly fields
+--
+-- generate_world leaves self.rad (tile key -> level 1-3). Every hour on a
+-- hot hex adds rads (Game:tick calls rad_hour); enough rads make you sick.
+-- Anti-Rad and Vodka take rads off (consumable.rads). A carried Geiger
+-- counter reads the hexes around you, marks them on the map (rad_known,
+-- which is saved) and clicks; without one you only learn a hex was hot by
+-- the dose you took there. All numbers are in RAD (05_data).
+-- ---------------------------------------------------------------------
+
+function Game:rad_at(q, r)
+    return (self.rad and self.rad[hex_key(q, r)]) or 0
+end
+
+-- In the bag, in a hand or worn.
+function Game:carrying(item)
+    local p = self.player
+    for _, item_here in pairs(p.equipped) do
+        if item_here == item then return true end
+    end
+    for _, s in ipairs(p.inventory) do
+        if s.item == item then return true end
+    end
+    return false
+end
+
+-- What worn gear lets through (1 = everything).
+function Game:rad_armor()
+    local through = 1
+    for slot, item in pairs(self.player.equipped) do
+        if not HOLD_SLOTS[slot] then through = through * (ITEM_DB[item].rad_armor or 1) end
+    end
+    return through
+end
+
+-- 0 = fine, else the index of the worst RAD.stages reached.
+function Game:rad_stage()
+    local rads, stage = self.player.rads or 0, 0
+    for i, st in ipairs(RAD.stages) do
+        if rads >= st.at then stage = i end
+    end
+    return stage
+end
+
+-- One hour at the current hex. Returns the dose taken.
+function Game:rad_hour()
+    local p = self.player
+    local level = self:rad_at(p.q, p.r)
+    local dose = 0
+    if level > 0 then
+        dose = RAD.dose[level] * self:rad_armor()
+        p.rads = math.min(RAD.max, (p.rads or 0) + dose)
+        self.rad_known[hex_key(p.q, p.r)] = level
+    elseif (p.rads or 0) > 0 then
+        p.rads = math.max(0, p.rads - RAD.decay)
+    end
+    local st = RAD.stages[self:rad_stage()]
+    if st then
+        p.health = clamp(p.health - st.hurt)
+        p.needs.rest = clamp(p.needs.rest - st.tire)
+    end
+    return dose
+end
+
+-- The Geiger counter reads your hex and the ones next to it.
+function Game:geiger_scan()
+    if not self:carrying("geiger") then return end
+    local p = self.player
+    self.rad_known[hex_key(p.q, p.r)] = self:rad_at(p.q, p.r)
+    for _, n in ipairs(neighbors(self.tiles, p.q, p.r)) do
+        self.rad_known[hex_key(n[1], n[2])] = self:rad_at(n[1], n[2])
+    end
+end
+
+-- Log lines (and clicks) for the hours tick just applied.
+function Game:rad_news(dose, stage_before)
+    local p = self.player
+    local geiger = self:carrying("geiger")
+    if dose > 0 then
+        if geiger then
+            self:push_log(("Geiger crackles: +%d rads (%d)."):format(math.floor(dose + 0.5),
+                                                                   math.floor(p.rads)))
+            local audio = solaros.audio
+            if audio and audio.tone then
+                pcall(audio.tone, 1400 + 400 * self:rad_at(p.q, p.r), 30, 40)
+            end
+        else
+            self:push_log("Your skin prickles. A metal taste.")
+        end
+    end
+    local stage = self:rad_stage()
+    if stage > stage_before then
+        local st = RAD.stages[stage]
+        self:push_log(st.name .. (st.hurt > 0 and (": -" .. st.hurt .. " HP/h. Anti-Rad!") or ": you feel weak."))
+    elseif stage < stage_before and stage == 0 then
+        self:push_log("The radiation sickness fades.")
+    end
+end
+
+-- Map panel line: the Geiger reading, or just how sick you are.
+function Game:rad_text()
+    local p = self.player
+    local rads = math.floor(p.rads or 0)
+    if self:carrying("geiger") then
+        return "Geiger " .. RAD.level_name[self:rad_at(p.q, p.r)] .. " Rad " .. rads
+    end
+    local st = RAD.stages[self:rad_stage()]
+    return st and st.name or nil
+end
+
+-- A search on a hot hex can turn up an artifact.
+function Game:scavenge_field()
+    local p = self.player
+    if self:rad_at(p.q, p.r) < 2 then return end
+    self.seed = rand_next(self.seed)
+    if self.seed % 100 >= RAD.artifact_find then return end
+    self.seed = rand_next(self.seed)
+    local item = ARTIFACTS[self.seed % #ARTIFACTS + 1]
+    self:put_stack("ground", nil, {item = item, qty = 1})
+    self:push_log("Something glints in the hot ground: " .. ITEM_DB[item].name .. ".")
 end
 -- -- encounters -----------------------------------------------------------
 
@@ -2810,7 +3100,7 @@ function Game:start_puzzle()
             end
         until bolt_path_exists(z.haz)
         z.pos, z.visited, z.revealed = BOLT_START, {[BOLT_START] = true}, {}
-        z.bolts = math.max(1, BOLTS + per - 3)
+        z.bolts = math.max(1, BOLTS + per - 3) + (self:carrying("bolts") and RAD.bolts_bonus or 0)
     elseif kind == "sequence" then
         z.round = 1
         self:new_sequence(z)
@@ -2974,7 +3264,7 @@ end
 -- to its right (from PANEL_X); the log and key hints across the bottom.
 local MAP_W, MAP_TOP, MAP_BOTTOM = 256, 4, 236
 local PANEL_X = 262
-local LEGEND_Y = 104
+local LEGEND_Y = 116
 local LEGEND_ORDER = {"plains", "forest", "hills", "ruins", "ford", "water"}
 
 function Game:draw_map(w, h)
@@ -3005,6 +3295,8 @@ function Game:draw_map(w, h)
     if (p.cold_hours or 0) > 0 then inj[#inj + 1] = "COLD" end
     inj[#inj + 1] = "Scav " .. scav
     gfx.text(PANEL_X, 84, table.concat(inj, " "))
+    local rad_line = self:rad_text()
+    if rad_line then gfx.text(PANEL_X, 98, rad_line) end
 
     local reachable = {}
     for _, n in ipairs(neighbors(self.tiles, p.q, p.r)) do
@@ -3050,6 +3342,18 @@ function Game:draw_map(w, h)
                 gfx.color(gfx.BLACK)
                 gfx.rect(mx - 1, my - 1, 7, 7)
                 gfx.fill_rect(mx + 1, my + 1, 3, 3)
+            end
+            local hot = self.rad_known[key]
+            if hot and hot > 0 and (p.visible[key] or p.explored[key]) then
+                -- measured radiation: a trefoil in the upper left, inverted
+                -- (white on black) when deadly
+                local rx, ry = rnd(px) - 11, rnd(py) - 11
+                gfx.color(hot >= 3 and gfx.BLACK or gfx.WHITE)
+                gfx.fill_rect(rx - 1, ry - 1, 9, 9)
+                gfx.color(gfx.BLACK)
+                gfx.rect(rx - 1, ry - 1, 9, 9)
+                gfx.color(hot >= 3 and gfx.WHITE or gfx.BLACK)
+                draw_sprite(rx, ry, 7, 7, GLYPHS.rad)
             end
             local camp = self.camps[key]
             if camp and p.hours < camp.until_hour and (p.visible[key] or p.explored[key]) then
@@ -3224,6 +3528,8 @@ function Game:current_conditions()
     if self.player.injuries.bleeding then table.insert(list, "Bleeding") end
     if self.player.injuries.wounded_hours > 0 then table.insert(list, "Wounded") end
     if self.player.health < 50 then table.insert(list, "Hurt") end
+    local rad_stage = RAD.stages[self:rad_stage()]
+    if rad_stage then table.insert(list, rad_stage.name) end
     if #list == 0 then return "Conditions: none" end
     local text = table.concat(list, ", ")
     -- all four at once don't fit after the prefix (mono 12 is ~7px/char)

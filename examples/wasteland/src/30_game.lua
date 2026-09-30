@@ -17,7 +17,8 @@ function Game.new()
         seed = os.time() % 32768
     end
     self.world_seed = seed       -- the map is rebuilt from this when a save is loaded
-    self.tiles, self.ground, seed = generate_world(seed)
+    self.tiles, self.ground, seed, self.rad = generate_world(seed)
+    self.rad_known = {}          -- tile key -> rad level you've measured or felt there
     self.seed = seed             -- RNG state for scavenging
     self.weather_seed = seed     -- fixed per world: weather is rolled from it (Game:weather)
     self.scavenged = {}          -- tile key -> searches used
@@ -173,6 +174,7 @@ function Game:scavenge()
         self:push_log("Found: " .. table.concat(found, ", ") .. ".")
         self:push_log("Press I to pick it up.")
     end
+    self:scavenge_field()
     if p.needs.hunger <= 0 then self:push_log("You are starving!") end
     if p.needs.thirst <= 0 then self:push_log("You are dehydrated!") end
     self:check_death(p.scav_hurt > 0 and "The Hollow Star emptied you." or "You bled out.")
@@ -343,7 +345,11 @@ function Game:try_consume(kind, k)
         return
     end
     for need, amount in pairs(def.consumable) do
-        self.player.needs[need] = clamp(self.player.needs[need] + amount)
+        if need == "rads" then
+            self.player.rads = math.max(0, (self.player.rads or 0) + amount)
+        else
+            self.player.needs[need] = clamp(self.player.needs[need] + amount)
+        end
     end
     -- one unit per use; the stack only disappears when it runs out
     stack.qty = stack.qty - 1

@@ -358,7 +358,7 @@ function Game:start_puzzle()
             end
         until bolt_path_exists(z.haz)
         z.pos, z.visited, z.revealed = BOLT_START, {[BOLT_START] = true}, {}
-        z.bolts = math.max(1, BOLTS + per - 3)
+        z.bolts = math.max(1, BOLTS + per - 3) + (self:carrying("bolts") and RAD.bolts_bonus or 0)
     elseif kind == "sequence" then
         z.round = 1
         self:new_sequence(z)

@@ -232,7 +232,32 @@ local function generate_world(seed)
             drop(item, 1)
         end
     end
-    return tiles, ground, seed
+    for _, item in ipairs(RAD.world_items) do drop(item, 1) end
+
+    -- anomaly fields: hot spots of radiation, an artifact at each center.
+    -- rad[key] = level 1-3 (see RAD); not saved, rebuilt from the seed.
+    local rad = {}
+    local fields = 0
+    for _ = 1, 300 do
+        if fields >= RAD.fields then break end
+        seed = rand_next(seed)
+        local center = spots[seed % #spots + 1]
+        local cq, cr = parse(center)
+        if axial_distance(0, 0, cq, cr) >= RAD.min_dist and not rad[center] then
+            seed = rand_next(seed)
+            local radius = 1 + seed % 2
+            for _, key in ipairs(keys) do
+                local q, r = parse(key)
+                local d = axial_distance(q, r, cq, cr)
+                if d <= radius then rad[key] = math.max(rad[key] or 0, 3 - d) end
+            end
+            seed = rand_next(seed)
+            ground[center] = ground[center] or {}
+            table.insert(ground[center], {item = ARTIFACTS[seed % #ARTIFACTS + 1], qty = 1})
+            fields = fields + 1
+        end
+    end
+    return tiles, ground, seed, rad
 end
 
 -- ---------------------------------------------------------------------

@@ -25,7 +25,7 @@ end
 -- to its right (from PANEL_X); the log and key hints across the bottom.
 local MAP_W, MAP_TOP, MAP_BOTTOM = 256, 4, 236
 local PANEL_X = 262
-local LEGEND_Y = 104
+local LEGEND_Y = 116
 local LEGEND_ORDER = {"plains", "forest", "hills", "ruins", "ford", "water"}
 
 function Game:draw_map(w, h)
@@ -56,6 +56,8 @@ function Game:draw_map(w, h)
     if (p.cold_hours or 0) > 0 then inj[#inj + 1] = "COLD" end
     inj[#inj + 1] = "Scav " .. scav
     gfx.text(PANEL_X, 84, table.concat(inj, " "))
+    local rad_line = self:rad_text()
+    if rad_line then gfx.text(PANEL_X, 98, rad_line) end
 
     local reachable = {}
     for _, n in ipairs(neighbors(self.tiles, p.q, p.r)) do
@@ -101,6 +103,18 @@ function Game:draw_map(w, h)
                 gfx.color(gfx.BLACK)
                 gfx.rect(mx - 1, my - 1, 7, 7)
                 gfx.fill_rect(mx + 1, my + 1, 3, 3)
+            end
+            local hot = self.rad_known[key]
+            if hot and hot > 0 and (p.visible[key] or p.explored[key]) then
+                -- measured radiation: a trefoil in the upper left, inverted
+                -- (white on black) when deadly
+                local rx, ry = rnd(px) - 11, rnd(py) - 11
+                gfx.color(hot >= 3 and gfx.BLACK or gfx.WHITE)
+                gfx.fill_rect(rx - 1, ry - 1, 9, 9)
+                gfx.color(gfx.BLACK)
+                gfx.rect(rx - 1, ry - 1, 9, 9)
+                gfx.color(hot >= 3 and gfx.WHITE or gfx.BLACK)
+                draw_sprite(rx, ry, 7, 7, GLYPHS.rad)
             end
             local camp = self.camps[key]
             if camp and p.hours < camp.until_hour and (p.visible[key] or p.explored[key]) then
