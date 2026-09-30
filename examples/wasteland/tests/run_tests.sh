@@ -8,6 +8,8 @@ cd "$(dirname "$0")"
 command -v lua5.4  >/dev/null || { echo "missing lua5.4  (sudo apt-get install lua5.4)"; exit 1; }
 command -v luac5.4 >/dev/null || { echo "missing luac5.4 (sudo apt-get install lua5.4)"; exit 1; }
 
+# the game is edited in ../src/ and bundled into ../wasteland.lua: test what src/ says
+python3 ../tools/build.py
 python3 make_lib.py
 # tests/solaros.lua is a FAKE of the on-device module; this makes require("solaros") find it.
 export LUA_PATH="./?.lua;;"

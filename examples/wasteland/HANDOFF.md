@@ -5,7 +5,9 @@
 > remote=$(git ls-remote origin refs/heads/claude/new-session-ws67f3 | cut -f1)
 > [ "$remote" = "$(git rev-parse HEAD)" ] || { git fetch origin claude/new-session-ws67f3 && git merge --ff-only FETCH_HEAD; }
 > ```
-> If the fast-forward fails (both sides have new commits), merge as a continuation of GitHub's version; never force-push. The display is **400x300 landscape** (see the note below), not the 300x400 the older sections describe.
+> If the fast-forward fails (both sides have new commits), merge as a continuation of GitHub's version; never force-push.
+>
+> **The code lives in `src/` now (split 2026-09-30).** `wasteland.lua` is GENERATED: edit the parts in `src/` (`00_header`, `05_data`, `10_sprites`, `20_world`, `30_game`, `40_encounters`, `50_draw_map`, `60_draw_inventory`, `70_draw_screens`, `90_main`), then run `python3 tools/build.py` (the test runner does this first). The parts are concatenated in name order and share one scope - chapters, not modules - so a local defined in an earlier part is visible in later ones and order matters. Still ship/copy only `wasteland.lua`; `python3 tools/build.py --check` says whether it is current. The display is **400x300 landscape** (see the note below), not the 300x400 the older sections describe.
 
 *Written 2026-09-30 at the end of a long chat session. The active work is `wasteland.lua`, a single-file Lua app for a handheld running SolarOS. A parked Python/pygame version lives in `python_version/`. Read "Where We Are" bullets 17–20 before touching anything: an audit done while writing this found four real bugs, one of which makes the Lua game unplayable.*
 
