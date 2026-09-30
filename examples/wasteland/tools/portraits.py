@@ -96,7 +96,7 @@ def human_body(c, cx, top, w, tone, seed, bottom=SIZE, tex=0.0):
 # -- animals -------------------------------------------------------------------
 
 def jawhound():
-    """A dog whose lower jaw has split into three toothed forks."""
+    """Fallback only: art/jawhound.jpg (the user's picture) replaces this."""
     c = Canvas()
     c.ground_shadow(104, 172, 72, 8)
     fur = 0.62

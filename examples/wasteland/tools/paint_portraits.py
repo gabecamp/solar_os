@@ -31,7 +31,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 # sorts before 66_portraits.lua (which reads PORTRAIT_DATA) and before the
 # encounter screen in 70_draw_screens.lua (which draws them)
 OUT_LUA = ROOT / "src" / "65_portrait_data.lua"
-ART = ROOT / "art"   # optional art/<subject>.png replaces the painted version
+ART = ROOT / "art"   # optional art/<subject>.png|jpg replaces the painted version
 PREVIEWS = ROOT / "previews" / "portraits"
 TILE = 32
 
@@ -106,6 +106,74 @@ def wound_marks(bits, seed, n=14):
     return picked
 
 
+# Supplied pictures (art/<subject>.jpg|.png) - photos, renders, drawings.
+# Boxes are in the source image's pixels: far = the whole creature, near =
+# head and front (a portrait crop, bigger in the frame), close = the face.
+# gamma < 1 lifts the mid-tones so a dark subject doesn't dither to a black
+# mass; edge darkens outlines so it keeps its shape. Anything left out is
+# guessed from the subject's bounding box.
+PHOTO = {
+    "jawhound": {"far": (200, 30, 1235, 740), "near": (190, 190, 870, 750),
+                 "close": (270, 260, 600, 590), "gamma": 0.42, "edge": 0.5},
+}
+
+
+def find_art(name):
+    for ext in ("png", "jpg", "jpeg"):
+        path = ART / f"{name}.{ext}"
+        if path.exists():
+            return path
+    return None
+
+
+def subject_bbox(gray, bg=0.86):
+    a = np.asarray(gray, np.float32) / 255
+    ys, xs = np.nonzero(a < bg)
+    if len(xs) == 0:
+        return (0, 0, gray.width, gray.height)
+    return (int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1)
+
+
+def photo_view(gray, box, size, gamma, edge):
+    """One view of a supplied picture: square crop on white, smoothed (a
+    median filter flattens fine texture that would dither into noise),
+    levels + gamma, dark edges, background forced white, then Floyd-Steinberg
+    (error diffusion keeps a photo's detail better than ordered dither)."""
+    from PIL import ImageFilter
+    x0, y0, x1, y1 = box
+    side = max(x1 - x0, y1 - y0)
+    cx, cy = (x0 + x1) // 2, (y0 + y1) // 2
+    sq = Image.new("L", (side, side), 255)
+    sq.paste(gray, (-(cx - side // 2), -(cy - side // 2)))
+    src = sq.resize((size * 3, size * 3), Image.LANCZOS).filter(ImageFilter.MedianFilter(5))
+    a = np.asarray(src, np.float32) / 255
+    bg = a > 0.86
+    t = np.clip((a - 0.08) / (0.80 - 0.08), 0, 1) ** gamma
+    e = np.asarray(src.filter(ImageFilter.FIND_EDGES), np.float32) / 255
+    t = np.clip(t - edge * e * 2.0, 0, 1)
+    t[bg] = 1
+    small = Image.fromarray(np.uint8(t * 255)).resize((size, size), Image.LANCZOS)
+    bits = np.asarray(small.convert("1"), dtype=bool) == False  # noqa: E712
+    return small, bits
+
+
+def photo_views(path, name):
+    gray = Image.open(path).convert("L")
+    cfg = PHOTO.get(name, {})
+    whole = subject_bbox(gray)
+    x0, y0, x1, y1 = whole
+    guess_close = (x0, y0, x0 + (x1 - x0) // 2, y0 + (x1 - x0) // 2)
+    gamma, edge = cfg.get("gamma", 0.5), cfg.get("edge", 0.5)
+    grays, bits = {}, {}
+    for v, size, default in (("near", 96, whole), ("far", 48, whole), ("close", 96, guess_close)):
+        grays[v], bits[v] = photo_view(gray, cfg.get(v, default), size, gamma, edge)
+    master = Image.new("L", (192, 192), 255)
+    fit = gray.crop(cfg.get("far", whole))
+    fit.thumbnail((192, 192), Image.LANCZOS)
+    master.paste(fit, ((192 - fit.width) // 2, (192 - fit.height) // 2))
+    return master, bits, grays
+
+
 def lua_string(data):
     return '"' + base64.b64encode(data).decode() + '"'
 
@@ -118,18 +186,13 @@ def main():
     for name, fn in portraits.SUBJECTS.items():
         if only and name not in only:
             continue
-        canvas, close_box = fn()
-        override = ART / f"{name}.png"
-        if override.exists():
-            # a supplied picture (drawing, photo, generated image): fit it on
-            # white into the 192 master; keep the painted version's close box
-            src = Image.open(override).convert("RGBA")
-            src.thumbnail((192, 192), Image.LANCZOS)
-            bg = Image.new("RGBA", (192, 192), (255, 255, 255, 255))
-            bg.alpha_composite(src, ((192 - src.width) // 2, (192 - src.height) // 2))
-            canvas = bg.convert("L")
+        override = find_art(name)
+        if override:
+            master, bits, grays = photo_views(override, name)
             print("using", override.relative_to(ROOT), "for", name)
-        master, bits, grays = views(canvas, close_box)
+        else:
+            canvas, close_box = fn()
+            master, bits, grays = views(canvas, close_box)
         master.save(PREVIEWS / f"{name}_master.png")
         row = Image.new("L", (192 + 96 * 2 + 48 + 40, 192), 255)
         row.paste(master, (0, 0))

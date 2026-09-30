@@ -169,9 +169,9 @@ local ENEMY_FLEE_CHANCE = 30   -- % per turn a beaten enemy (hp <= flees_at) run
 -- art = its portrait in PORTRAIT_DATA (tools/paint_portraits.py paints them).
 local ENCOUNTERS = {
     {kind = "animal", name = "Jawhound", art = "jawhound", who = "jawhound",
-     intro = "A dog stands in the scrub. Its lower jaw has split into three, "
-          .. "each ringed with teeth, and all three are working. It hasn't blinked "
-          .. "since you saw it.",
+     intro = "A dog stands in the scrub, but wrong: eyes crowd its flanks and "
+          .. "back, all of them open, and wet tendrils lift and sway above it. "
+          .. "Its mouth splits back past the ears. Every eye is on you.",
      hp = 30, dmg = {6, 12}, hit = 60, speed = 4, bleed = 30, flees_at = 8, start = "far",
      loot = {{"strange_meat", 3}, {"nothing", 1}}, loot_rolls = 1},
     {kind = "animal", name = "Skinless Boar", art = "boar", who = "boar",
