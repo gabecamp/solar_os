@@ -22,21 +22,43 @@ into scar tissue", or an image editor to paint the mouth out.
 
 ## Shared style (paste after every prompt)
 
-> Photograph of a hyper-detailed practical-effects creature sculpture, full
-> body, three-quarter side view, single subject centered, plain seamless white
-> studio background, soft shadow under it, wet glossy flesh, strong clear
-> silhouette, high contrast lighting, no text, no frame.
+The game's mood is three things at once, and every prompt should carry all of
+them:
+- **Cronenberg body horror:** flesh that has changed wrongly but plausibly:
+  fused tissue, organs where they shouldn't be, wet sheen, veins, surgical
+  seams, bone breaking through. Intimate and disgusting, not cartoon gore.
+- **S.T.A.L.K.E.R. / Roadside Picnic:** a quiet, abandoned Eastern-European
+  exclusion zone. Rusted Soviet-era junk, gas masks, patched military
+  surplus, anomalies that break physics without spectacle.
+- **Lovecraftian dread:** things that are wrong in ways the mind resists.
+  Too many eyes, impossible geometry, a sense of something vast noticing you.
 
-For the **people**, use this instead:
+For **creatures**:
 
+> Cronenberg-style body horror, Lovecraftian and wrong, a mutated creature
+> from a S.T.A.L.K.E.R.-like exclusion zone. Photograph of a hyper-detailed
+> practical-effects creature sculpture, full body, three-quarter side view,
+> single subject centered, plain seamless white studio background, soft
+> shadow under it, wet glossy mutated flesh, visible veins and fused tissue,
+> strong clear silhouette, high contrast lighting, unsettling, no text, no
+> frame.
+
+For the **people**:
+
+> A survivor of a S.T.A.L.K.E.R.-like exclusion zone, subtle Cronenberg body
+> horror and Lovecraftian unease: something about them is quietly wrong.
 > Realistic portrait photograph, head and shoulders to mid-chest, facing the
 > camera slightly turned, plain seamless white studio background, hard side
-> light, gritty post-apocalyptic wear, sharp focus on the face, no text.
+> light, patched Soviet military surplus and gas-mask-era gear, grime and
+> radiation-sick skin, haunted eyes, sharp focus on the face, no text.
 
 For the **anomalies** (scenes, not creatures):
 
-> Eerie realistic photograph, simple composition with one clear subject, flat
-> empty grassland, pale overcast sky, high contrast, no text.
+> A S.T.A.L.K.E.R. / Roadside Picnic zone anomaly with Lovecraftian cosmic
+> dread: physics quietly broken in an ordinary place. Eerie realistic
+> photograph, simple composition with one clear subject, flat empty
+> grassland of an abandoned Soviet exclusion zone, rusted debris at the
+> edges, pale overcast sky, high contrast, oppressive silence, no text.
 
 ## Why this style
 
