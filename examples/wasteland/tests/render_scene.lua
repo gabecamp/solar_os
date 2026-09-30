@@ -162,6 +162,18 @@ for _, st in ipairs({{"far", 1, nil}, {"close", 1, nil}, {"near", 0.2, nil}, {"n
     solaros.dump("ops_portrait_" .. (st[3] or (st[2] < 1 and "hurt" or st[1])) .. ".txt")
 end
 
+-- Scene 8f: crafting - some materials, one recipe learned, a fire burning
+g = fresh(); g:start_game()
+g.player.inventory = {{item = "stick", qty = 4}, {item = "cloth_scrap", qty = 1},
+                      {item = "rock", qty = 1}, {item = "strange_meat", qty = 1}}
+g.known.spear = true
+g.camps[g.player.q .. "," .. g.player.r] = {until_hour = g.player.hours + 9}
+g.log = {"You build a campfire. It will burn 12h.", "Made Torch."}
+g:open_crafting()
+g.craft_ui.cursor = 5
+g:draw_craft(400, 300)
+solaros.dump("ops_craft.txt")
+
 -- Scene 9: a helper
 g = fresh(); g:start_game()
 start_named(g, "Old Medic")

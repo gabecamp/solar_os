@@ -19,6 +19,12 @@ function Game.new()
     self.tiles, self.ground, seed = generate_world(seed)
     self.seed = seed             -- RNG state for scavenging
     self.scavenged = {}          -- tile key -> searches used
+    self.camps = {}              -- tile key -> {until_hour} while a campfire burns
+    self.known = {}              -- recipe id -> true once you know how to make it
+    for _, r in ipairs(RECIPES) do
+        if r.known then self.known[r.id] = true end
+    end
+    self.craft_ui = {cursor = 1, back = "map"}   -- crafting screen state (not "craft": that is the method)
     self.player = new_player()
     recompute_stats(self.player)
     update_visibility(self.player, self.tiles)
@@ -348,6 +354,21 @@ function Game:use_item(kind, k)
     if not stack then return end
     local def = ITEM_DB[stack.item]
     local p = self.player
+    if stack.item == "bandage" then
+        p.injuries.bleeding = false
+        p.health = clamp(p.health + 15)
+        stack.qty = stack.qty - 1
+        if stack.qty <= 0 then self:remove_stack(kind, k) end
+        self:push_log("You bandage yourself up. (+15 HP)")
+        return
+    end
+    if stack.item == "scrawled_notes" then
+        if self:read_notes() then
+            stack.qty = stack.qty - 1
+            if stack.qty <= 0 then self:remove_stack(kind, k) end
+        end
+        return
+    end
     if stack.item == "cloth_scrap" and p.injuries.bleeding then
         p.injuries.bleeding = false
         stack.qty = stack.qty - 1

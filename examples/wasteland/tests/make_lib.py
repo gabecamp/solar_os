@@ -12,6 +12,7 @@ Outputs (git-ignored, regenerated on every run):
   lib_scavenge.lua   -> scavenge_test
   lib_creator.lua    -> creator_test, regression_test (stats, traits, slots)
   lib_encounter.lua  -> encounter_test, portrait_test (encounters and their art)
+  lib_crafting.lua   -> crafting_test
   wasteland_run.lua  -> full copy, run under the fake solaros by run_tests.sh / soak
 """
 import pathlib
@@ -59,5 +60,8 @@ lib = src[:cut]
           "ENC_INTRO_COLS = ENC_INTRO_COLS, PORTRAIT_DATA = PORTRAIT_DATA, "
           "PORTRAIT_CACHE = PORTRAIT_CACHE, portrait_view = portrait_view, "
           "b64_decode = b64_decode, PORTRAIT_SIZE = PORTRAIT_SIZE}\n")
+(here / "lib_crafting.lua").write_text(
+    lib + "\nreturn Game, {RECIPES = RECIPES, ITEM_DB = ITEM_DB, SPRITES = SPRITES, "
+          "SCAVENGE_LOOT = SCAVENGE_LOOT, KEY = KEY}\n")
 (here / "wasteland_run.lua").write_text(src)
 print("generated lib_*.lua, wasteland_run.lua")

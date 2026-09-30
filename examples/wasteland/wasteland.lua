@@ -24,6 +24,9 @@ Controls:
   1-7 / Up,Dn,Enter - encounter screen: pick a choice (moving can run you
                     into animals, mutants, bandits or, rarely, a helper;
                     hold a weapon in a hand to fight with it)
+  C               - map or inventory: crafting. Up/Dn pick a recipe, Enter
+                    makes it (uses items from your bag, hands and the ground
+                    here), C/Esc goes back. Scrawled Notes (E) teach recipes.
   I               - toggle inventory screen
   Q / ESC         - quit
 
@@ -62,13 +65,12 @@ local WOUND_REST_HOURS = 24   -- hours of rest before a wound stops costing 1 MP
 -- quit request from the OS is noticed.
 local POLL_MS = 250
 
-local KEY_SPACE = 32
-local KEY_ENTER = 13          -- SolarOS sends Enter as '\n' (KEY_LF); CR kept just in case
-local KEY_LF = 10
-local KEY_ESC = 27
-local KEY_A, KEY_D, KEY_S, KEY_W = 97, 100, 115, 119
-local KEY_E, KEY_F, KEY_I, KEY_Q = 101, 102, 105, 113
-local KEY_T = 116
+-- Key codes as one table, not a local each: the bundled wasteland.lua is a
+-- single Lua chunk and a chunk may have at most 200 local variables.
+-- SolarOS sends Enter as '\n' (LF); CR is kept just in case.
+local KEY = {SPACE = 32, ENTER = 13, LF = 10, ESC = 27,
+             A = 97, C = 99, D = 100, E = 101, F = 102, I = 105, Q = 113,
+             S = 115, T = 116, W = 119}
 
 -- Terrain: id -> {name, cost (MP + hours), passable, shade}
 -- shade is one of gfx.WHITE / gfx.LIGHT / gfx.DARK / gfx.BLACK, used as
@@ -146,6 +148,18 @@ local ITEM_DB = {
                     weapon = {dmg = 15, reach = "close"}},
     spear        = {name = "Spear",        slot = nil, consumable = nil,
                     weapon = {dmg = 10, reach = "near", bleed = 15}},
+    stone_club   = {name = "Stone Club",   slot = nil, consumable = nil,
+                    weapon = {dmg = 13, reach = "close"}, desc = "Weapon: 13 dmg"},
+    -- crafting materials and crafted goods (see RECIPES)
+    stick        = {name = "Stick",        slot = nil, consumable = nil, desc = "For crafting"},
+    rope         = {name = "Rope",         slot = nil, consumable = nil, desc = "For crafting"},
+    torch        = {name = "Torch",        slot = nil, consumable = nil,
+                    desc = "Hold it: light in the dark"},
+    bandage      = {name = "Bandage",      slot = nil, consumable = nil,
+                    desc = "E: stop bleeding, +15 HP"},
+    cooked_meat  = {name = "Cooked Meat",  slot = nil, consumable = {hunger = 45}},
+    scrawled_notes = {name = "Scrawled Notes", slot = nil, consumable = nil,
+                    desc = "E: read, learn a recipe"},
     -- artifacts: left by anomalies; artifact = effects while held in a hand
     -- (see recompute_stats), desc = what the inventory shows under the cursor
     weeping_stone = {name = "Weeping Stone", slot = nil, consumable = nil,
@@ -167,12 +181,36 @@ local ARTIFACTS = {"weeping_stone", "drowned_eye", "flesh_knot", "hollow_star", 
 local SCAVENGE_LOOT = {
     plains = {{"nothing", 8}, {"rock", 3}, {"cloth_scrap", 4}, {"canned_beans", 3},
               {"water_bottle", 3}, {"cap", 1}, {"sunglasses", 1}, {"gloves", 1},
-              {"satchel", 1}, {"pipe", 1}, {"knife", 1}},
+              {"satchel", 1}, {"pipe", 1}, {"knife", 1}, {"stick", 2},
+              {"scrawled_notes", 1}},
     forest = {{"nothing", 7}, {"berries", 6}, {"cloth_scrap", 2}, {"water_bottle", 2},
-              {"scarf", 1}, {"earmuffs", 1}, {"gloves", 1}, {"spear", 1}},
+              {"scarf", 1}, {"earmuffs", 1}, {"gloves", 1}, {"spear", 1}, {"stick", 7}},
     hills  = {{"nothing", 9}, {"rock", 6}, {"water_bottle", 2}, {"canned_beans", 1},
-              {"jacket", 1}, {"bracers", 1}, {"boots", 1}, {"knife", 1}},
+              {"jacket", 1}, {"bracers", 1}, {"boots", 1}, {"knife", 1}, {"stick", 1},
+              {"scrawled_notes", 1}},
 }
+
+-- Crafting, NEO Scavenger style: inputs come from your bag, your hands and
+-- the ground where you stand. inputs are used up, tools only have to be
+-- there, fire = needs a lit campfire on this tile. out = what you get (to the
+-- bag, or the ground if it's full); place = something built on the tile.
+-- known = you start knowing it; the rest are learned from Scrawled Notes.
+local RECIPES = {
+    {id = "torch", name = "Torch", inputs = {stick = 1, cloth_scrap = 1}, hours = 1,
+     out = {"torch", 1}, known = true},
+    {id = "bandage", name = "Bandage", inputs = {cloth_scrap = 2}, hours = 1,
+     out = {"bandage", 1}, known = true},
+    {id = "campfire", name = "Campfire", inputs = {stick = 3, rock = 1}, hours = 1,
+     place = "campfire", known = true},
+    {id = "cook", name = "Cooked Meat", inputs = {strange_meat = 1}, fire = true, hours = 1,
+     out = {"cooked_meat", 1}, known = true},
+    {id = "rope", name = "Rope", inputs = {cloth_scrap = 3}, hours = 1, out = {"rope", 1}},
+    {id = "spear", name = "Spear", inputs = {stick = 1, rope = 1}, tools = {"knife"},
+     hours = 2, out = {"spear", 1}},
+    {id = "club", name = "Stone Club", inputs = {stick = 1, rock = 1, rope = 1}, hours = 2,
+     out = {"stone_club", 1}},
+}
+RECIPES.campfire_hours = 12   -- a fire burns this long after it's built
 
 -- Worn gear that is scattered around the map (the starting clothes aren't).
 local WORLD_WEARABLES = {"cap", "gloves", "earmuffs", "sunglasses", "scarf",
@@ -330,6 +368,132 @@ end
 local SPRITE_W, SPRITE_H = 16, 16
 
 local SPRITE_ART = {
+    stick = {
+        "................",
+        "..............#.",
+        ".............##.",
+        "............##..",
+        "...........##...",
+        "..........##....",
+        ".........###....",
+        "........##.##...",
+        ".......##...#...",
+        "......##........",
+        ".....##.........",
+        "....##..........",
+        "...##...........",
+        "..##............",
+        ".##.............",
+        "................",
+    },
+    rope = {
+        "................",
+        ".....######.....",
+        "...##......##...",
+        "..#..######..#..",
+        ".#..#......#..#.",
+        ".#.#..####..#.#.",
+        ".#.#.#....#.#.#.",
+        ".#.#.#.##.#.#.#.",
+        ".#.#.#.##.#.#.#.",
+        ".#.#..#..#..#.#.",
+        ".#..#..##..#..#.",
+        "..#..######..#..",
+        "...##......##.##",
+        ".....######....#",
+        "...............#",
+        "................",
+    },
+    torch = {
+        ".......#........",
+        "......###.......",
+        ".....#####......",
+        "....###.###.....",
+        "....##...##.....",
+        ".....##.##......",
+        "......###.......",
+        ".....#####......",
+        ".....#.#.#......",
+        "......###.......",
+        "......###.......",
+        "......###.......",
+        "......###.......",
+        "......###.......",
+        "......###.......",
+        "................",
+    },
+    bandage = {
+        "................",
+        "................",
+        "...##########...",
+        "..#..........#..",
+        ".#..######....#.",
+        ".#..#....#....#.",
+        ".#..######....#.",
+        ".#............#.",
+        ".#.##.##.##.#.#.",
+        ".#............#.",
+        "..#..........#..",
+        "...##########...",
+        "................",
+        "................",
+        "................",
+        "................",
+    },
+    cooked_meat = {
+        "................",
+        "................",
+        "......#####.....",
+        "....##.....##...",
+        "...#..#.#...#...",
+        "..#.#.....#..#..",
+        "..#...#.#....#..",
+        "..#.#.....#.#...",
+        "...#..#.#..#....",
+        "....##....#.....",
+        "......####......",
+        ".....##.........",
+        "....##..........",
+        "...###..........",
+        "...##...........",
+        "................",
+    },
+    scrawled_notes = {
+        "................",
+        "..###########...",
+        "..#.........##..",
+        "..#.######..#.#.",
+        "..#.........####",
+        "..#.#####.#....#",
+        "..#............#",
+        "..#.###.######.#",
+        "..#............#",
+        "..#.#######.##.#",
+        "..#............#",
+        "..#.####.#####.#",
+        "..#............#",
+        "..##############",
+        "................",
+        "................",
+    },
+    stone_club = {
+        "................",
+        "..........####..",
+        ".........######.",
+        "........#######.",
+        "........######..",
+        ".......#.####...",
+        "......###.......",
+        ".....###........",
+        "....###.........",
+        "...###..........",
+        "..###...........",
+        ".###............",
+        ".##.............",
+        "................",
+        "................",
+        "................",
+    },
     tshirt = {
         "................",
         "..###......###..",
@@ -1308,6 +1472,12 @@ function Game.new()
     self.tiles, self.ground, seed = generate_world(seed)
     self.seed = seed             -- RNG state for scavenging
     self.scavenged = {}          -- tile key -> searches used
+    self.camps = {}              -- tile key -> {until_hour} while a campfire burns
+    self.known = {}              -- recipe id -> true once you know how to make it
+    for _, r in ipairs(RECIPES) do
+        if r.known then self.known[r.id] = true end
+    end
+    self.craft_ui = {cursor = 1, back = "map"}   -- crafting screen state (not "craft": that is the method)
     self.player = new_player()
     recompute_stats(self.player)
     update_visibility(self.player, self.tiles)
@@ -1637,6 +1807,21 @@ function Game:use_item(kind, k)
     if not stack then return end
     local def = ITEM_DB[stack.item]
     local p = self.player
+    if stack.item == "bandage" then
+        p.injuries.bleeding = false
+        p.health = clamp(p.health + 15)
+        stack.qty = stack.qty - 1
+        if stack.qty <= 0 then self:remove_stack(kind, k) end
+        self:push_log("You bandage yourself up. (+15 HP)")
+        return
+    end
+    if stack.item == "scrawled_notes" then
+        if self:read_notes() then
+            stack.qty = stack.qty - 1
+            if stack.qty <= 0 then self:remove_stack(kind, k) end
+        end
+        return
+    end
     if stack.item == "cloth_scrap" and p.injuries.bleeding then
         p.injuries.bleeding = false
         stack.qty = stack.qty - 1
@@ -1660,6 +1845,156 @@ function Game:use_item(kind, k)
     end
 end
 
+-- ---------------------------------------------------------------------
+-- Crafting and campfires
+--
+-- Inputs come from your bag, your hands and the ground where you stand
+-- (NEO Scavenger style). A recipe's inputs are used up; its tools only have
+-- to be there. Crafting takes hours, and hours drain your needs.
+-- ---------------------------------------------------------------------
+
+-- How many of an item you can reach right now.
+function Game:count_item(item)
+    local n = 0
+    for _, s in ipairs(self.player.inventory) do
+        if s.item == item then n = n + s.qty end
+    end
+    for _, s in ipairs(self:ground_list()) do
+        if s.item == item then n = n + s.qty end
+    end
+    for _, slot in ipairs({"rhand", "lhand"}) do
+        if self.player.equipped[slot] == item then n = n + 1 end
+    end
+    return n
+end
+
+-- Use up qty of an item: the ground first, then the bag, your hands last
+-- (so a weapon you're holding is the last thing to go).
+function Game:take_items(item, qty)
+    local function from_list(list)
+        local i = 1
+        while qty > 0 and i <= #list do
+            local s = list[i]
+            if s.item == item then
+                local take = math.min(qty, s.qty)
+                s.qty, qty = s.qty - take, qty - take
+                if s.qty <= 0 then table.remove(list, i) else i = i + 1 end
+            else
+                i = i + 1
+            end
+        end
+    end
+    from_list(self:ground_list())
+    from_list(self.player.inventory)
+    for _, slot in ipairs({"rhand", "lhand"}) do
+        if qty > 0 and self.player.equipped[slot] == item then
+            self.player.equipped[slot] = nil
+            qty = qty - 1
+        end
+    end
+    return qty == 0
+end
+
+function Game:fire_here()
+    local camp = self.camps[hex_key(self.player.q, self.player.r)]
+    return camp ~= nil and self.player.hours < camp.until_hour
+end
+
+-- The recipe's inputs in a fixed order (pairs() order isn't stable).
+-- (A field, not a top-level local: the bundled file is one Lua chunk and
+-- a chunk may have at most 200 locals.)
+function Game.recipe_inputs(r)
+    local list = {}
+    for item, qty in pairs(r.inputs) do list[#list + 1] = {item, qty} end
+    table.sort(list, function(a, b) return a[1] < b[1] end)
+    return list
+end
+
+-- nil if you can make it now, else the reason you can't.
+function Game:craft_blocker(r)
+    if not self.known[r.id] then return "You don't know how to make that." end
+    for _, iq in ipairs(Game.recipe_inputs(r)) do
+        if self:count_item(iq[1]) < iq[2] then
+            return "Need " .. iq[2] .. " " .. ITEM_DB[iq[1]].name .. "."
+        end
+    end
+    for _, tool in ipairs(r.tools or {}) do
+        if self:count_item(tool) < 1 then return "Need a " .. ITEM_DB[tool].name .. " to work with." end
+    end
+    if r.fire and not self:fire_here() then return "Needs a fire. Build a campfire here." end
+    if r.place == "campfire" and self:fire_here() then return "A fire already burns here." end
+    return nil
+end
+
+function Game:craft(r)
+    local why = self:craft_blocker(r)
+    if why then
+        self:push_log(why)
+        return false
+    end
+    local p = self.player
+    for _, iq in ipairs(Game.recipe_inputs(r)) do self:take_items(iq[1], iq[2]) end
+    p.hours = p.hours + r.hours
+    apply_awake_hours(p, r.hours)
+    if r.place == "campfire" then
+        self.camps[hex_key(p.q, p.r)] = {until_hour = p.hours + RECIPES.campfire_hours}
+        self:push_log("You build a campfire. It will burn " .. RECIPES.campfire_hours .. "h.")
+    else
+        local stack = {item = r.out[1], qty = r.out[2]}
+        if not self:put_stack("inventory", nil, stack) then
+            self:put_stack("ground", nil, stack)
+            self:push_log("Made " .. r.name .. " (left on the ground).")
+        else
+            self:push_log("Made " .. r.name .. ".")
+        end
+    end
+    self:check_death("You bled out.")
+    return true
+end
+
+-- Scrawled Notes: learn a recipe you don't know yet (the notes are used up).
+function Game:read_notes()
+    local unknown = {}
+    for _, r in ipairs(RECIPES) do
+        if not self.known[r.id] then unknown[#unknown + 1] = r end
+    end
+    if #unknown == 0 then
+        self:push_log("Nothing in these notes you don't already know.")
+        return false
+    end
+    local r = unknown[self:rand(#unknown) + 1]
+    self.known[r.id] = true
+    self:push_log("You puzzle out the notes: how to make " .. r.name .. ".")
+    return true
+end
+
+function Game:known_recipes()
+    local list = {}
+    for _, r in ipairs(RECIPES) do
+        if self.known[r.id] then list[#list + 1] = r end
+    end
+    return list
+end
+
+function Game:open_crafting()
+    self.craft_ui.back = self.screen
+    self.craft_ui.cursor = math.min(self.craft_ui.cursor, #self:known_recipes())
+    self.screen = "craft"
+end
+
+function Game:craft_key(key)
+    local list = self:known_recipes()
+    local c = self.craft_ui
+    if key == gfx.KEY_UP or key == KEY.W then
+        c.cursor = math.max(1, c.cursor - 1)
+    elseif key == gfx.KEY_DOWN or key == KEY.S then
+        c.cursor = math.min(#list, c.cursor + 1)
+    elseif key == KEY.ENTER or key == KEY.LF or key == KEY.SPACE then
+        if list[c.cursor] then self:craft(list[c.cursor]) end
+    elseif key == KEY.C or key == gfx.KEY_ESCAPE or key == KEY.I then
+        self.screen = c.back == "craft" and "map" or c.back
+    end
+end
 -- -- encounters -----------------------------------------------------------
 
 local ENC_COLS = 55            -- mono 12 is ~7 px/char: 55 chars fit 400 px
@@ -2087,13 +2422,13 @@ end
 
 function Game:puzzle_key(key)
     local z = self.puz
-    if key == gfx.KEY_ESCAPE or key == KEY_Q then return self:finish_puzzle("backed_off") end
-    local dir = (key == gfx.KEY_UP or key == KEY_W) and "up"
-        or (key == gfx.KEY_DOWN or key == KEY_S) and "down"
-        or (key == gfx.KEY_LEFT or key == KEY_A) and "left"
-        or (key == gfx.KEY_RIGHT or key == KEY_D) and "right"
+    if key == gfx.KEY_ESCAPE or key == KEY.Q then return self:finish_puzzle("backed_off") end
+    local dir = (key == gfx.KEY_UP or key == KEY.W) and "up"
+        or (key == gfx.KEY_DOWN or key == KEY.S) and "down"
+        or (key == gfx.KEY_LEFT or key == KEY.A) and "left"
+        or (key == gfx.KEY_RIGHT or key == KEY.D) and "right"
     if z.kind == "bolts" then
-        if key == KEY_T then
+        if key == KEY.T then
             z.aiming = z.bolts > 0 and not z.aiming
             z.msg = z.aiming and "Throw which way?" or (z.bolts > 0 and "" or "No bolts left.")
             return
@@ -2143,11 +2478,11 @@ function Game:encounter_key(key)
     local pick
     if key >= 49 and key < 49 + #opts then          -- '1'..
         pick = key - 48
-    elseif key == gfx.KEY_UP or key == KEY_W then
+    elseif key == gfx.KEY_UP or key == KEY.W then
         e.cursor = math.max(1, e.cursor - 1)
-    elseif key == gfx.KEY_DOWN or key == KEY_S then
+    elseif key == gfx.KEY_DOWN or key == KEY.S then
         e.cursor = math.min(#opts, e.cursor + 1)
-    elseif key == KEY_ENTER or key == KEY_LF or key == KEY_SPACE then
+    elseif key == KEY.ENTER or key == KEY.LF or key == KEY.SPACE then
         pick = e.cursor
     end
     if pick and opts[pick] then
@@ -2265,7 +2600,7 @@ function Game:draw_map(w, h)
         gfx.text(6, ly, line)
         ly = ly + 14
     end
-    gfx.text(6, h - 8, "Arrows Spc:rest F:scavenge I:inv Q:quit")
+    gfx.text(6, h - 8, "Arrows Spc:rest F:scavenge C:craft I:inv Q:quit")
 
     gfx.refresh()
 end
@@ -2748,7 +3083,7 @@ function Game:draw_inventory(w, h)
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
     gfx.font(gfx.FONT_MONO_12)
-    gfx.text(4, 12, "Up/Dn Enter:move E:use I:map")
+    gfx.text(4, 12, "Up/Dn Enter:move E:use C:craft I:map")
 
     INV_ROWS = {}
     INV_POS = {}
@@ -3075,9 +3410,11 @@ local PORTRAIT_DATA = {
 
 local PORTRAIT_SIZE = 96
 
-local B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-local B64_VAL = {}
-for i = 1, #B64 do B64_VAL[B64:byte(i)] = i - 1 end
+local B64_VAL = {}   -- base64 digit -> value
+do
+    local digits = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+    for i = 1, #digits do B64_VAL[digits:byte(i)] = i - 1 end
+end
 
 local function b64_decode(text)
     local out, n = {}, 0
@@ -3093,8 +3430,7 @@ local function b64_decode(text)
     return table.concat(out)
 end
 
-local PORTRAIT_CACHE = {who = nil, views = {}}
-local EMPTY_TILE = string.rep("\0", 128)
+local PORTRAIT_CACHE = {who = nil, views = {}, empty = string.rep("\0", 128)}
 
 -- The tiles of one view ({x, y, data} per non-empty 32x32 tile), decoded on
 -- first use. Returns nil for a subject with no art.
@@ -3113,7 +3449,7 @@ local function portrait_view(who, view)
         for tx = 0, v.tw - 1 do
             local k = (ty * v.tw + tx) * 128
             local tile = bytes:sub(k + 1, k + 128)
-            if tile ~= EMPTY_TILE then
+            if tile ~= PORTRAIT_CACHE.empty then
                 tiles[#tiles + 1] = {x = tx * 32, y = ty * 32, data = tile}
             end
         end
@@ -3125,7 +3461,7 @@ end
 
 -- How many wound marks to show for a fraction of health left (the same
 -- bands as Game:enemy_condition: unhurt > 0.75, hurt > 0.4, else badly).
-local function wound_count(frac)
+function Game.wound_count(frac)
     if frac > 0.75 then return 0 elseif frac > 0.4 then return 5 end
     return 11
 end
@@ -3161,7 +3497,7 @@ function Game:draw_portrait(e, x, y)
         end
         -- wounds: small dark blots on the creature, more as it weakens
         local frac = fights and math.max(0, e.hp / e.def.hp) or 1
-        local n = e.outcome == "dead" and #v.marks // 2 or wound_count(frac)
+        local n = e.outcome == "dead" and #v.marks // 2 or Game.wound_count(frac)
         local r = view == "far" and 1 or 2
         for i = 1, math.min(n, #v.marks // 2) do
             local mx, my = v.marks[2 * i - 1], v.marks[2 * i]
@@ -3195,14 +3531,14 @@ function Game:creator_key(key)
     local p = self.player
     local row = self.creator_cursor
     self.creator_msg = nil
-    if key == gfx.KEY_UP or key == KEY_W then
+    if key == gfx.KEY_UP or key == KEY.W then
         self.creator_cursor = math.max(1, row - 1)
-    elseif key == gfx.KEY_DOWN or key == KEY_S then
+    elseif key == gfx.KEY_DOWN or key == KEY.S then
         self.creator_cursor = math.min(CREATOR_ROWS, row + 1)
-    elseif (key == gfx.KEY_LEFT or key == KEY_A or key == gfx.KEY_RIGHT or key == KEY_D)
+    elseif (key == gfx.KEY_LEFT or key == KEY.A or key == gfx.KEY_RIGHT or key == KEY.D)
         and row <= #ATTRIBUTES then
         local name = ATTRIBUTES[row]
-        local up = key == gfx.KEY_RIGHT or key == KEY_D
+        local up = key == gfx.KEY_RIGHT or key == KEY.D
         if up and p.attrs[name] < ATTR_MAX and attr_points_left(p.attrs) > 0 then
             p.attrs[name] = p.attrs[name] + 1
         elseif up and attr_points_left(p.attrs) <= 0 then
@@ -3211,11 +3547,11 @@ function Game:creator_key(key)
             p.attrs[name] = p.attrs[name] - 1
         end
         recompute_stats(p)
-    elseif key == KEY_SPACE and row > #ATTRIBUTES then
+    elseif key == KEY.SPACE and row > #ATTRIBUTES then
         local t = TRAITS[row - #ATTRIBUTES]
         p.traits[t.name] = not p.traits[t.name] or nil
         recompute_stats(p)
-    elseif key == KEY_ENTER or key == KEY_LF then
+    elseif key == KEY.ENTER or key == KEY.LF then
         self:start_game()
     end
 end
@@ -3411,6 +3747,92 @@ function Game:draw_dead(w, h)
 end
 
 -- ---------------------------------------------------------------------
+-- Crafting screen (400x300): known recipes on the left, the selected one's
+-- needs on the right (have/need for each input), then the log and keys.
+-- ---------------------------------------------------------------------
+
+local CRAFT_UI = {list_y = 38, row_h = 15, detail_x = 196}   -- one local: see the 200-local note in 35_crafting
+
+function Game:draw_craft(w, h)
+    local list = self:known_recipes()
+    local c = self.craft_ui
+    c.cursor = math.max(1, math.min(c.cursor, #list))
+    gfx.clear(gfx.WHITE)
+    gfx.color(gfx.BLACK)
+    gfx.font(gfx.FONT_BOLD_14)
+    gfx.text(6, 16, "Crafting")
+    gfx.font(gfx.FONT_MONO_12)
+    local camp = self.camps[hex_key(self.player.q, self.player.r)]
+    local fire = self:fire_here()
+        and ("Fire here: " .. (camp.until_hour - self.player.hours) .. "h left") or "No fire here"
+    gfx.text(w - 6 - 7 * #fire, 16, fire)
+    gfx.line(6, 22, w - 6, 22)
+
+    -- the list: a mark for what you can make right now
+    for i, r in ipairs(list) do
+        local y = CRAFT_UI.list_y + (i - 1) * CRAFT_UI.row_h
+        local ready = self:craft_blocker(r) == nil
+        if i == c.cursor then
+            gfx.fill_rect(4, y - 11, CRAFT_UI.detail_x - 12, CRAFT_UI.row_h - 1)
+            gfx.color(gfx.WHITE)
+        end
+        gfx.text(8, y, (ready and "+ " or "  ") .. r.name)
+        gfx.color(gfx.BLACK)
+    end
+    local unknown = #RECIPES - #list
+    local ly = CRAFT_UI.list_y + #list * CRAFT_UI.row_h + 8
+    if unknown > 0 then
+        gfx.text(8, ly, unknown .. " more unknown:")
+        gfx.text(8, ly + 13, "read Scrawled Notes")
+    end
+    gfx.line(CRAFT_UI.detail_x - 4, 26, CRAFT_UI.detail_x - 4, h - 60)
+
+    -- the selected recipe
+    local r = list[c.cursor]
+    if r then
+        local x, y = CRAFT_UI.detail_x + 4, CRAFT_UI.list_y
+        local icon = r.out and SPRITES[r.out[1]]
+        if icon and draw_sprite then
+            draw_sprite(w - 26, y - 12, SPRITE_W, SPRITE_H, icon)
+        end
+        gfx.text(x, y, r.out and ("Makes: " .. ITEM_DB[r.out[1]].name) or "Builds a campfire here")
+        y = y + 18
+        gfx.text(x, y, "Uses:")
+        for _, iq in ipairs(Game.recipe_inputs(r)) do
+            y = y + 13
+            local have = self:count_item(iq[1])
+            gfx.text(x + 7, y, ITEM_DB[iq[1]].name .. " " .. math.min(have, 99) .. "/" .. iq[2]
+                .. (have >= iq[2] and "" or "  x"))
+        end
+        for _, tool in ipairs(r.tools or {}) do
+            y = y + 13
+            gfx.text(x, y, "Tool: " .. ITEM_DB[tool].name .. (self:count_item(tool) > 0 and "" or "  x"))
+        end
+        if r.fire then
+            y = y + 13
+            gfx.text(x, y, "Needs a fire" .. (self:fire_here() and "" or "  x"))
+        end
+        y = y + 18
+        gfx.text(x, y, "Takes " .. r.hours .. "h")
+        y = y + 18
+        local why = self:craft_blocker(r)
+        for i, line in ipairs(wrap(why or "Ready: Enter to make it.", (w - x - 6) // 7)) do
+            gfx.text(x, y + (i - 1) * 13, line)
+        end
+    end
+
+    -- log and keys
+    gfx.line(6, h - 52, w - 6, h - 52)
+    local start_i = math.max(1, #self.log - 1)
+    local yy = h - 36
+    for i = start_i, #self.log do
+        gfx.text(6, yy, self.log[i])
+        yy = yy + 13
+    end
+    gfx.text(6, h - 6, "Up/Dn pick  Enter make  C/Esc back  Q quit")
+    gfx.refresh()
+end
+-- ---------------------------------------------------------------------
 -- Main loop
 -- ---------------------------------------------------------------------
 
@@ -3421,21 +3843,23 @@ local ok, err = pcall(function()
     local w, h = gfx.size()
 
     local function handle_map_key(key)
-        if key == gfx.KEY_ESCAPE or key == KEY_Q then
+        if key == gfx.KEY_ESCAPE or key == KEY.Q then
             game.quit = true
-        elseif key == gfx.KEY_LEFT or key == KEY_A then
+        elseif key == gfx.KEY_LEFT or key == KEY.A then
             game:move_dir(-1, 0)
-        elseif key == gfx.KEY_RIGHT or key == KEY_D then
+        elseif key == gfx.KEY_RIGHT or key == KEY.D then
             game:move_dir(1, 0)
-        elseif key == gfx.KEY_UP or key == KEY_W then
+        elseif key == gfx.KEY_UP or key == KEY.W then
             game:move_dir(0, -1)
-        elseif key == gfx.KEY_DOWN or key == KEY_S then
+        elseif key == gfx.KEY_DOWN or key == KEY.S then
             game:move_dir(0, 1)
-        elseif key == KEY_SPACE then
+        elseif key == KEY.SPACE then
             game:rest()
-        elseif key == KEY_F then
+        elseif key == KEY.F then
             game:scavenge()
-        elseif key == KEY_I then
+        elseif key == KEY.C then
+            game:open_crafting()
+        elseif key == KEY.I then
             game.screen = "inventory"
             game.inv_cursor = 1
             game.inv_selected = nil
@@ -3443,22 +3867,25 @@ local ok, err = pcall(function()
     end
 
     local function handle_inventory_key(key)
-        if key == gfx.KEY_ESCAPE or key == KEY_Q then
+        if key == gfx.KEY_ESCAPE or key == KEY.Q then
             game.quit = true
-        elseif key == KEY_I then
+        elseif key == KEY.I then
             game.screen = "map"
-        elseif key == gfx.KEY_UP or key == KEY_W or key == gfx.KEY_LEFT or key == KEY_A then
+        elseif key == KEY.C then
+            game.inv_selected = nil
+            game:open_crafting()
+        elseif key == gfx.KEY_UP or key == KEY.W or key == gfx.KEY_LEFT or key == KEY.A then
             game.inv_cursor = math.max(1, game.inv_cursor - 1)
-        elseif key == gfx.KEY_DOWN or key == KEY_S or key == gfx.KEY_RIGHT or key == KEY_D then
+        elseif key == gfx.KEY_DOWN or key == KEY.S or key == gfx.KEY_RIGHT or key == KEY.D then
             game.inv_cursor = math.min(#INV_ROWS, game.inv_cursor + 1)
-        elseif key == KEY_E then
+        elseif key == KEY.E then
             local row = INV_ROWS[game.inv_cursor]
             if row then
                 game:use_item(row[1], row[2])
                 -- the stack may be gone or shifted; don't keep a stale pick
                 game.inv_selected = nil
             end
-        elseif key == KEY_ENTER or key == KEY_LF or key == KEY_SPACE then
+        elseif key == KEY.ENTER or key == KEY.LF or key == KEY.SPACE then
             local row = INV_ROWS[game.inv_cursor]
             if row then
                 if game.inv_selected == nil then
@@ -3486,6 +3913,8 @@ local ok, err = pcall(function()
                 game:draw_encounter(w, h)
             elseif game.screen == "puzzle" then
                 game:draw_puzzle(w, h)
+            elseif game.screen == "craft" then
+                game:draw_craft(w, h)
             elseif game.screen == "map" then
                 game:draw_map(w, h)
             else
@@ -3497,7 +3926,7 @@ local ok, err = pcall(function()
         local key = gfx.getch(POLL_MS)
         if key ~= nil then
             if game.screen == "creator" then
-                if key == gfx.KEY_ESCAPE or key == KEY_Q then
+                if key == gfx.KEY_ESCAPE or key == KEY.Q then
                     game.quit = true
                 else
                     game:creator_key(key)
@@ -3506,10 +3935,12 @@ local ok, err = pcall(function()
                 game:encounter_key(key)
             elseif game.screen == "puzzle" then
                 game:puzzle_key(key)
+            elseif game.screen == "craft" then
+                if key == KEY.Q then game.quit = true else game:craft_key(key) end
             elseif game.screen == "dead" then
-                if key == gfx.KEY_ESCAPE or key == KEY_Q then
+                if key == gfx.KEY_ESCAPE or key == KEY.Q then
                     game.quit = true
-                elseif key == KEY_ENTER or key == KEY_LF then
+                elseif key == KEY.ENTER or key == KEY.LF then
                     game = Game.new()   -- a fresh world and the creator
                 end
             elseif game.screen == "map" then

@@ -9,21 +9,23 @@ local ok, err = pcall(function()
     local w, h = gfx.size()
 
     local function handle_map_key(key)
-        if key == gfx.KEY_ESCAPE or key == KEY_Q then
+        if key == gfx.KEY_ESCAPE or key == KEY.Q then
             game.quit = true
-        elseif key == gfx.KEY_LEFT or key == KEY_A then
+        elseif key == gfx.KEY_LEFT or key == KEY.A then
             game:move_dir(-1, 0)
-        elseif key == gfx.KEY_RIGHT or key == KEY_D then
+        elseif key == gfx.KEY_RIGHT or key == KEY.D then
             game:move_dir(1, 0)
-        elseif key == gfx.KEY_UP or key == KEY_W then
+        elseif key == gfx.KEY_UP or key == KEY.W then
             game:move_dir(0, -1)
-        elseif key == gfx.KEY_DOWN or key == KEY_S then
+        elseif key == gfx.KEY_DOWN or key == KEY.S then
             game:move_dir(0, 1)
-        elseif key == KEY_SPACE then
+        elseif key == KEY.SPACE then
             game:rest()
-        elseif key == KEY_F then
+        elseif key == KEY.F then
             game:scavenge()
-        elseif key == KEY_I then
+        elseif key == KEY.C then
+            game:open_crafting()
+        elseif key == KEY.I then
             game.screen = "inventory"
             game.inv_cursor = 1
             game.inv_selected = nil
@@ -31,22 +33,25 @@ local ok, err = pcall(function()
     end
 
     local function handle_inventory_key(key)
-        if key == gfx.KEY_ESCAPE or key == KEY_Q then
+        if key == gfx.KEY_ESCAPE or key == KEY.Q then
             game.quit = true
-        elseif key == KEY_I then
+        elseif key == KEY.I then
             game.screen = "map"
-        elseif key == gfx.KEY_UP or key == KEY_W or key == gfx.KEY_LEFT or key == KEY_A then
+        elseif key == KEY.C then
+            game.inv_selected = nil
+            game:open_crafting()
+        elseif key == gfx.KEY_UP or key == KEY.W or key == gfx.KEY_LEFT or key == KEY.A then
             game.inv_cursor = math.max(1, game.inv_cursor - 1)
-        elseif key == gfx.KEY_DOWN or key == KEY_S or key == gfx.KEY_RIGHT or key == KEY_D then
+        elseif key == gfx.KEY_DOWN or key == KEY.S or key == gfx.KEY_RIGHT or key == KEY.D then
             game.inv_cursor = math.min(#INV_ROWS, game.inv_cursor + 1)
-        elseif key == KEY_E then
+        elseif key == KEY.E then
             local row = INV_ROWS[game.inv_cursor]
             if row then
                 game:use_item(row[1], row[2])
                 -- the stack may be gone or shifted; don't keep a stale pick
                 game.inv_selected = nil
             end
-        elseif key == KEY_ENTER or key == KEY_LF or key == KEY_SPACE then
+        elseif key == KEY.ENTER or key == KEY.LF or key == KEY.SPACE then
             local row = INV_ROWS[game.inv_cursor]
             if row then
                 if game.inv_selected == nil then
@@ -74,6 +79,8 @@ local ok, err = pcall(function()
                 game:draw_encounter(w, h)
             elseif game.screen == "puzzle" then
                 game:draw_puzzle(w, h)
+            elseif game.screen == "craft" then
+                game:draw_craft(w, h)
             elseif game.screen == "map" then
                 game:draw_map(w, h)
             else
@@ -85,7 +92,7 @@ local ok, err = pcall(function()
         local key = gfx.getch(POLL_MS)
         if key ~= nil then
             if game.screen == "creator" then
-                if key == gfx.KEY_ESCAPE or key == KEY_Q then
+                if key == gfx.KEY_ESCAPE or key == KEY.Q then
                     game.quit = true
                 else
                     game:creator_key(key)
@@ -94,10 +101,12 @@ local ok, err = pcall(function()
                 game:encounter_key(key)
             elseif game.screen == "puzzle" then
                 game:puzzle_key(key)
+            elseif game.screen == "craft" then
+                if key == KEY.Q then game.quit = true else game:craft_key(key) end
             elseif game.screen == "dead" then
-                if key == gfx.KEY_ESCAPE or key == KEY_Q then
+                if key == gfx.KEY_ESCAPE or key == KEY.Q then
                     game.quit = true
-                elseif key == KEY_ENTER or key == KEY_LF then
+                elseif key == KEY.ENTER or key == KEY.LF then
                     game = Game.new()   -- a fresh world and the creator
                 end
             elseif game.screen == "map" then

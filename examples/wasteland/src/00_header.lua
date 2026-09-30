@@ -22,6 +22,9 @@ Controls:
   1-7 / Up,Dn,Enter - encounter screen: pick a choice (moving can run you
                     into animals, mutants, bandits or, rarely, a helper;
                     hold a weapon in a hand to fight with it)
+  C               - map or inventory: crafting. Up/Dn pick a recipe, Enter
+                    makes it (uses items from your bag, hands and the ground
+                    here), C/Esc goes back. Scrawled Notes (E) teach recipes.
   I               - toggle inventory screen
   Q / ESC         - quit
 

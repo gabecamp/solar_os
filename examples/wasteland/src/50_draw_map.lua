@@ -107,7 +107,7 @@ function Game:draw_map(w, h)
         gfx.text(6, ly, line)
         ly = ly + 14
     end
-    gfx.text(6, h - 8, "Arrows Spc:rest F:scavenge I:inv Q:quit")
+    gfx.text(6, h - 8, "Arrows Spc:rest F:scavenge C:craft I:inv Q:quit")
 
     gfx.refresh()
 end

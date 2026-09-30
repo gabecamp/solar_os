@@ -13,14 +13,14 @@ function Game:creator_key(key)
     local p = self.player
     local row = self.creator_cursor
     self.creator_msg = nil
-    if key == gfx.KEY_UP or key == KEY_W then
+    if key == gfx.KEY_UP or key == KEY.W then
         self.creator_cursor = math.max(1, row - 1)
-    elseif key == gfx.KEY_DOWN or key == KEY_S then
+    elseif key == gfx.KEY_DOWN or key == KEY.S then
         self.creator_cursor = math.min(CREATOR_ROWS, row + 1)
-    elseif (key == gfx.KEY_LEFT or key == KEY_A or key == gfx.KEY_RIGHT or key == KEY_D)
+    elseif (key == gfx.KEY_LEFT or key == KEY.A or key == gfx.KEY_RIGHT or key == KEY.D)
         and row <= #ATTRIBUTES then
         local name = ATTRIBUTES[row]
-        local up = key == gfx.KEY_RIGHT or key == KEY_D
+        local up = key == gfx.KEY_RIGHT or key == KEY.D
         if up and p.attrs[name] < ATTR_MAX and attr_points_left(p.attrs) > 0 then
             p.attrs[name] = p.attrs[name] + 1
         elseif up and attr_points_left(p.attrs) <= 0 then
@@ -29,11 +29,11 @@ function Game:creator_key(key)
             p.attrs[name] = p.attrs[name] - 1
         end
         recompute_stats(p)
-    elseif key == KEY_SPACE and row > #ATTRIBUTES then
+    elseif key == KEY.SPACE and row > #ATTRIBUTES then
         local t = TRAITS[row - #ATTRIBUTES]
         p.traits[t.name] = not p.traits[t.name] or nil
         recompute_stats(p)
-    elseif key == KEY_ENTER or key == KEY_LF then
+    elseif key == KEY.ENTER or key == KEY.LF then
         self:start_game()
     end
 end

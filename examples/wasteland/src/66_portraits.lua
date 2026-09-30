@@ -13,9 +13,11 @@
 
 local PORTRAIT_SIZE = 96
 
-local B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-local B64_VAL = {}
-for i = 1, #B64 do B64_VAL[B64:byte(i)] = i - 1 end
+local B64_VAL = {}   -- base64 digit -> value
+do
+    local digits = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+    for i = 1, #digits do B64_VAL[digits:byte(i)] = i - 1 end
+end
 
 local function b64_decode(text)
     local out, n = {}, 0
@@ -31,8 +33,7 @@ local function b64_decode(text)
     return table.concat(out)
 end
 
-local PORTRAIT_CACHE = {who = nil, views = {}}
-local EMPTY_TILE = string.rep("\0", 128)
+local PORTRAIT_CACHE = {who = nil, views = {}, empty = string.rep("\0", 128)}
 
 -- The tiles of one view ({x, y, data} per non-empty 32x32 tile), decoded on
 -- first use. Returns nil for a subject with no art.
@@ -51,7 +52,7 @@ local function portrait_view(who, view)
         for tx = 0, v.tw - 1 do
             local k = (ty * v.tw + tx) * 128
             local tile = bytes:sub(k + 1, k + 128)
-            if tile ~= EMPTY_TILE then
+            if tile ~= PORTRAIT_CACHE.empty then
                 tiles[#tiles + 1] = {x = tx * 32, y = ty * 32, data = tile}
             end
         end
@@ -63,7 +64,7 @@ end
 
 -- How many wound marks to show for a fraction of health left (the same
 -- bands as Game:enemy_condition: unhurt > 0.75, hurt > 0.4, else badly).
-local function wound_count(frac)
+function Game.wound_count(frac)
     if frac > 0.75 then return 0 elseif frac > 0.4 then return 5 end
     return 11
 end
@@ -99,7 +100,7 @@ function Game:draw_portrait(e, x, y)
         end
         -- wounds: small dark blots on the creature, more as it weakens
         local frac = fights and math.max(0, e.hp / e.def.hp) or 1
-        local n = e.outcome == "dead" and #v.marks // 2 or wound_count(frac)
+        local n = e.outcome == "dead" and #v.marks // 2 or Game.wound_count(frac)
         local r = view == "far" and 1 or 2
         for i = 1, math.min(n, #v.marks // 2) do
             local mx, my = v.marks[2 * i - 1], v.marks[2 * i]

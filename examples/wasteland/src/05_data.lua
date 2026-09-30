@@ -19,13 +19,12 @@ local WOUND_REST_HOURS = 24   -- hours of rest before a wound stops costing 1 MP
 -- quit request from the OS is noticed.
 local POLL_MS = 250
 
-local KEY_SPACE = 32
-local KEY_ENTER = 13          -- SolarOS sends Enter as '\n' (KEY_LF); CR kept just in case
-local KEY_LF = 10
-local KEY_ESC = 27
-local KEY_A, KEY_D, KEY_S, KEY_W = 97, 100, 115, 119
-local KEY_E, KEY_F, KEY_I, KEY_Q = 101, 102, 105, 113
-local KEY_T = 116
+-- Key codes as one table, not a local each: the bundled wasteland.lua is a
+-- single Lua chunk and a chunk may have at most 200 local variables.
+-- SolarOS sends Enter as '\n' (LF); CR is kept just in case.
+local KEY = {SPACE = 32, ENTER = 13, LF = 10, ESC = 27,
+             A = 97, C = 99, D = 100, E = 101, F = 102, I = 105, Q = 113,
+             S = 115, T = 116, W = 119}
 
 -- Terrain: id -> {name, cost (MP + hours), passable, shade}
 -- shade is one of gfx.WHITE / gfx.LIGHT / gfx.DARK / gfx.BLACK, used as
@@ -103,6 +102,18 @@ local ITEM_DB = {
                     weapon = {dmg = 15, reach = "close"}},
     spear        = {name = "Spear",        slot = nil, consumable = nil,
                     weapon = {dmg = 10, reach = "near", bleed = 15}},
+    stone_club   = {name = "Stone Club",   slot = nil, consumable = nil,
+                    weapon = {dmg = 13, reach = "close"}, desc = "Weapon: 13 dmg"},
+    -- crafting materials and crafted goods (see RECIPES)
+    stick        = {name = "Stick",        slot = nil, consumable = nil, desc = "For crafting"},
+    rope         = {name = "Rope",         slot = nil, consumable = nil, desc = "For crafting"},
+    torch        = {name = "Torch",        slot = nil, consumable = nil,
+                    desc = "Hold it: light in the dark"},
+    bandage      = {name = "Bandage",      slot = nil, consumable = nil,
+                    desc = "E: stop bleeding, +15 HP"},
+    cooked_meat  = {name = "Cooked Meat",  slot = nil, consumable = {hunger = 45}},
+    scrawled_notes = {name = "Scrawled Notes", slot = nil, consumable = nil,
+                    desc = "E: read, learn a recipe"},
     -- artifacts: left by anomalies; artifact = effects while held in a hand
     -- (see recompute_stats), desc = what the inventory shows under the cursor
     weeping_stone = {name = "Weeping Stone", slot = nil, consumable = nil,
@@ -124,12 +135,36 @@ local ARTIFACTS = {"weeping_stone", "drowned_eye", "flesh_knot", "hollow_star", 
 local SCAVENGE_LOOT = {
     plains = {{"nothing", 8}, {"rock", 3}, {"cloth_scrap", 4}, {"canned_beans", 3},
               {"water_bottle", 3}, {"cap", 1}, {"sunglasses", 1}, {"gloves", 1},
-              {"satchel", 1}, {"pipe", 1}, {"knife", 1}},
+              {"satchel", 1}, {"pipe", 1}, {"knife", 1}, {"stick", 2},
+              {"scrawled_notes", 1}},
     forest = {{"nothing", 7}, {"berries", 6}, {"cloth_scrap", 2}, {"water_bottle", 2},
-              {"scarf", 1}, {"earmuffs", 1}, {"gloves", 1}, {"spear", 1}},
+              {"scarf", 1}, {"earmuffs", 1}, {"gloves", 1}, {"spear", 1}, {"stick", 7}},
     hills  = {{"nothing", 9}, {"rock", 6}, {"water_bottle", 2}, {"canned_beans", 1},
-              {"jacket", 1}, {"bracers", 1}, {"boots", 1}, {"knife", 1}},
+              {"jacket", 1}, {"bracers", 1}, {"boots", 1}, {"knife", 1}, {"stick", 1},
+              {"scrawled_notes", 1}},
 }
+
+-- Crafting, NEO Scavenger style: inputs come from your bag, your hands and
+-- the ground where you stand. inputs are used up, tools only have to be
+-- there, fire = needs a lit campfire on this tile. out = what you get (to the
+-- bag, or the ground if it's full); place = something built on the tile.
+-- known = you start knowing it; the rest are learned from Scrawled Notes.
+local RECIPES = {
+    {id = "torch", name = "Torch", inputs = {stick = 1, cloth_scrap = 1}, hours = 1,
+     out = {"torch", 1}, known = true},
+    {id = "bandage", name = "Bandage", inputs = {cloth_scrap = 2}, hours = 1,
+     out = {"bandage", 1}, known = true},
+    {id = "campfire", name = "Campfire", inputs = {stick = 3, rock = 1}, hours = 1,
+     place = "campfire", known = true},
+    {id = "cook", name = "Cooked Meat", inputs = {strange_meat = 1}, fire = true, hours = 1,
+     out = {"cooked_meat", 1}, known = true},
+    {id = "rope", name = "Rope", inputs = {cloth_scrap = 3}, hours = 1, out = {"rope", 1}},
+    {id = "spear", name = "Spear", inputs = {stick = 1, rope = 1}, tools = {"knife"},
+     hours = 2, out = {"spear", 1}},
+    {id = "club", name = "Stone Club", inputs = {stick = 1, rock = 1, rope = 1}, hours = 2,
+     out = {"stone_club", 1}},
+}
+RECIPES.campfire_hours = 12   -- a fire burns this long after it's built
 
 -- Worn gear that is scattered around the map (the starting clothes aren't).
 local WORLD_WEARABLES = {"cap", "gloves", "earmuffs", "sunglasses", "scarf",

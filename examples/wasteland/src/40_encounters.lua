@@ -425,13 +425,13 @@ end
 
 function Game:puzzle_key(key)
     local z = self.puz
-    if key == gfx.KEY_ESCAPE or key == KEY_Q then return self:finish_puzzle("backed_off") end
-    local dir = (key == gfx.KEY_UP or key == KEY_W) and "up"
-        or (key == gfx.KEY_DOWN or key == KEY_S) and "down"
-        or (key == gfx.KEY_LEFT or key == KEY_A) and "left"
-        or (key == gfx.KEY_RIGHT or key == KEY_D) and "right"
+    if key == gfx.KEY_ESCAPE or key == KEY.Q then return self:finish_puzzle("backed_off") end
+    local dir = (key == gfx.KEY_UP or key == KEY.W) and "up"
+        or (key == gfx.KEY_DOWN or key == KEY.S) and "down"
+        or (key == gfx.KEY_LEFT or key == KEY.A) and "left"
+        or (key == gfx.KEY_RIGHT or key == KEY.D) and "right"
     if z.kind == "bolts" then
-        if key == KEY_T then
+        if key == KEY.T then
             z.aiming = z.bolts > 0 and not z.aiming
             z.msg = z.aiming and "Throw which way?" or (z.bolts > 0 and "" or "No bolts left.")
             return
@@ -481,11 +481,11 @@ function Game:encounter_key(key)
     local pick
     if key >= 49 and key < 49 + #opts then          -- '1'..
         pick = key - 48
-    elseif key == gfx.KEY_UP or key == KEY_W then
+    elseif key == gfx.KEY_UP or key == KEY.W then
         e.cursor = math.max(1, e.cursor - 1)
-    elseif key == gfx.KEY_DOWN or key == KEY_S then
+    elseif key == gfx.KEY_DOWN or key == KEY.S then
         e.cursor = math.min(#opts, e.cursor + 1)
-    elseif key == KEY_ENTER or key == KEY_LF or key == KEY_SPACE then
+    elseif key == KEY.ENTER or key == KEY.LF or key == KEY.SPACE then
         pick = e.cursor
     end
     if pick and opts[pick] then
