@@ -9,7 +9,8 @@ block look used in the desktop/Pi version of this game. That's a
 deliberate simplification for this hardware, not a missing feature.
 
 Controls:
-  Arrows / WASD   - move on the map screen, move cursor on inventory screen
+  Arrows / WASD   - move on the map screen; on the inventory screen any
+                    direction steps the cursor (ground, body top-down, bag)
   Space           - rest (map screen)
   Enter / Space   - inventory: pick up the item under the cursor, then press
                     again on a ground cell, bag cell or body slot to move it
@@ -63,17 +64,26 @@ local TERRAIN_WEIGHTS = {
 
 local BACKPACK_CAP = 16      -- stacks; the bag strip shows all of them
 
+-- Also the cursor order on the paperdoll: top of the body to the bottom.
 local EQUIP_SLOTS = {
-    "head", "ears", "eyes", "neck", "shirt",
-    "jacket", "hands", "wrists", "pants", "feet",
+    "head", "ears", "eyes", "neck", "jacket",
+    "shirt", "hands", "wrists", "pants", "feet",
 }
 
 local ITEM_DB = {
-    tshirt       = {name = "T-Shirt",      slot = "shirt", consumable = nil},
-    jeans        = {name = "Jeans",        slot = "pants", consumable = nil},
-    boots        = {name = "Boots",        slot = "feet",  consumable = nil},
-    cap          = {name = "Cap",          slot = "head",  consumable = nil},
-    gloves       = {name = "Gloves",       slot = "hands", consumable = nil},
+    -- wear: what the item paints on the paperdoll when worn - {body part,
+    -- first row, last row (exclusive), color}, rows in the figure's authored
+    -- coordinates (see BODY_POLYGONS). Drawn in order, later entries on top.
+    tshirt       = {name = "T-Shirt",      slot = "shirt", consumable = nil,
+                    wear = {{"torso", 146, 227, "DARK"}, {"arms", 150, 184, "DARK"}}},
+    jeans        = {name = "Jeans",        slot = "pants", consumable = nil,
+                    wear = {{"torso", 214, 227, "DARK"}, {"legs", 224, 279, "DARK"}}},
+    boots        = {name = "Boots",        slot = "feet",  consumable = nil,
+                    wear = {{"legs", 272, 290, "BLACK"}}},
+    cap          = {name = "Cap",          slot = "head",  consumable = nil,
+                    wear = {{"head", 116, 126, "BLACK"}}},
+    gloves       = {name = "Gloves",       slot = "hands", consumable = nil,
+                    wear = {{"arms", 234, 252, "BLACK"}}},
     canned_beans = {name = "Canned Beans", slot = nil, consumable = {hunger = 40}},
     water_bottle = {name = "Water Bottle", slot = nil, consumable = {thirst = 50}},
     rock         = {name = "Rock",         slot = nil, consumable = nil},
@@ -905,22 +915,34 @@ end
 local INV_ROWS = {}  -- rebuilt each draw: {kind, key, label} - only selectable item rows
 local INV_POS = {}   -- rebuilt each draw: row_index -> {x, y, w, h} - where that row draws
 
--- Equip slots are positioned near their body region rather than listed
--- top-to-bottom, echoing the reference screenshot's paperdoll layout.
--- Screen is 300x400 - a narrow portrait target, so slots flank the
--- silhouette in two columns instead of surrounding it freely.
-local EQUIP_COL_X = {head = 14, ears = 14, eyes = 14, neck = 14, shirt = 14,
-                      jacket = 264, hands = 264, wrists = 264, pants = 264, feet = 264}
-local EQUIP_ROW_Y = {head = 120, ears = 150, eyes = 180, neck = 210, shirt = 240,
-                      jacket = 120, hands = 150, wrists = 180, pants = 210, feet = 240}
-local EQUIP_ABBR = {head = "Hd", ears = "Ea", eyes = "Ey", neck = "Nk", shirt = "Sh",
-                     jacket = "Ja", hands = "Hn", wrists = "Wr", pants = "Pt", feet = "Ft"}
-local EQUIP_BOX = 22
+-- Equip slots sit ON the body part they dress, NEO Scavenger style: a box over
+-- the head, the face, the torso, the legs, a hand... sized to that part, with
+-- the worn item painted onto the body and its icon drawn inside the box.
+-- {x, y, w, h} in screen pixels, laid out against the silhouette below
+-- (BODY_SCALE 1.25, head top at y 72). Boxes never touch each other.
+local EQUIP_RECT = {
+    head   = {139,  64, 22, 18},   -- top of the head (a hat sits here)
+    ears   = {118,  84, 20, 18},   -- against the side of the head
+    eyes   = {140,  84, 20, 18},   -- the face
+    neck   = {140, 105, 20, 18},   -- throat / collar
+    jacket = {116, 126, 68, 38},   -- chest and shoulders
+    shirt  = {124, 167, 52, 36},   -- belly
+    hands  = { 73, 219, 22, 22},   -- the left hand
+    wrists = {205, 202, 22, 20},   -- the right wrist
+    pants  = {122, 206, 56, 58},   -- hips and legs
+    feet   = {120, 267, 60, 20},   -- both feet
+}
+-- shown inside an empty slot; the long form when it fits the box
+local EQUIP_NAME = {head = "Head", ears = "Ears", eyes = "Eyes", neck = "Neck",
+                    jacket = "Jacket", shirt = "Shirt", hands = "Hands",
+                    wrists = "Wrists", pants = "Pants", feet = "Feet"}
+local EQUIP_ABBR = {head = "Hd", ears = "Ea", eyes = "Ey", neck = "Nk", jacket = "Jk",
+                    shirt = "Sh", hands = "Hn", wrists = "Wr", pants = "Pt", feet = "Ft"}
 
-local GROUND_GRID_COLS = 6
-local GROUND_GRID_ROWS = 2   -- visible rows; the grid scrolls to follow the cursor
-local GROUND_CELL, GROUND_GAP = 40, 3
-local GROUND_Y = 32
+local GROUND_GRID_COLS = 9
+local GROUND_GRID_ROWS = 1   -- visible rows; the grid scrolls to follow the cursor
+local GROUND_CELL, GROUND_GAP = 30, 2
+local GROUND_Y = 30
 -- bag: BACKPACK_CAP cells in two rows, all visible
 local BACKPACK_COLS = 8
 local BACKPACK_CELL, BACKPACK_GAP = 26, 2
@@ -990,7 +1012,11 @@ end
 -- ---------------------------------------------------------------------
 
 local BODY_CX = 150
-local BODY_TOP, BODY_BOTTOM = 117, 289   -- rows; bottom exclusive
+-- The figure is authored in the coordinates below (head top at y 117, feet at
+-- 289) and scaled by BODY_SCALE about its top, landing at BODY_Y0.
+local BODY_SCALE, BODY_SRC_Y0, BODY_Y0 = 1.25, 117, 72
+local BODY_TOP = BODY_Y0
+local BODY_BOTTOM = BODY_Y0 + math.ceil((289 - BODY_SRC_Y0) * BODY_SCALE)   -- exclusive
 
 local function mirror_x(pts)
     local out = {}
@@ -1024,29 +1050,43 @@ local function ellipse_points(cy, rx, ry, n)
 end
 
 local BODY_POLYGONS = {}
+local BODY_PART
+local function add_body_polygon(pts)
+    local out = {}
+    for i = 1, #pts, 2 do
+        out[i] = pts[i] * BODY_SCALE
+        out[i + 1] = BODY_Y0 + (pts[i + 1] - BODY_SRC_Y0) * BODY_SCALE
+    end
+    BODY_POLYGONS[#BODY_POLYGONS + 1] = out
+end
 
--- head
-BODY_POLYGONS[#BODY_POLYGONS + 1] = ellipse_points(128, 9, 11, 24)
+-- head (which part each polygon is: BODY_PART[i], used to paint worn clothes)
+BODY_PART = {}
+local function add_part(part, pts)
+    add_body_polygon(pts)
+    BODY_PART[#BODY_POLYGONS] = part
+end
+add_part("head", ellipse_points(130, 11, 13, 28))
 -- neck, sloped shoulders, tapered torso down to the hips
-BODY_POLYGONS[#BODY_POLYGONS + 1] = symmetric({
+add_part("torso", symmetric({
     0, 139,  4, 139,  4, 146,  14, 148,  27, 151,  31, 156,  30, 164,
     25, 170,  22, 182,  19, 200,  21, 214,  23, 226,  0, 226,
-})
+}))
 -- arms hang slightly away from the body and end in hands
 local ARM = {
     30, 151,  38, 154,  42, 175,  46, 195,  50, 215,  53, 230,
     56, 238,  56, 246,  52, 250,  48, 246,  47, 238,  47, 230,
     43, 215,  37, 195,  31, 178,  27, 166,  28, 158,
 }
-BODY_POLYGONS[#BODY_POLYGONS + 1] = ARM
-BODY_POLYGONS[#BODY_POLYGONS + 1] = mirror_x(ARM)
+add_part("arms", ARM)
+add_part("arms", mirror_x(ARM))
 -- legs: thigh, knee, calf, ankle, and a foot angled outward
 local LEG = {
     1, 224,  23, 224,  22, 240,  20, 254,  18, 266,  15, 278,
     20, 284,  21, 288,  3, 288,  3, 282,  5, 270,  4, 254,  2, 240,
 }
-BODY_POLYGONS[#BODY_POLYGONS + 1] = LEG
-BODY_POLYGONS[#BODY_POLYGONS + 1] = mirror_x(LEG)
+add_part("legs", LEG)
+add_part("legs", mirror_x(LEG))
 
 -- x-intervals [a, b) covered by one polygon on the pixel row whose center is yc
 local function polygon_row_spans(pts, yc)
@@ -1073,13 +1113,16 @@ local function polygon_row_spans(pts, yc)
     return spans
 end
 
-local function build_body_blocks()
+-- part: only that body part's polygons (nil = the whole figure)
+local function build_body_blocks(part)
     local blocks, prev_key = {}, nil
     for y = BODY_TOP, BODY_BOTTOM - 1 do
         local all = {}
-        for _, poly in ipairs(BODY_POLYGONS) do
-            for _, sp in ipairs(polygon_row_spans(poly, y + 0.5)) do
-                all[#all + 1] = sp
+        for i, poly in ipairs(BODY_POLYGONS) do
+            if part == nil or BODY_PART[i] == part then
+                for _, sp in ipairs(polygon_row_spans(poly, y + 0.5)) do
+                    all[#all + 1] = sp
+                end
             end
         end
         table.sort(all, function(p, q) return p[1] < q[1] end)
@@ -1106,6 +1149,32 @@ local function build_body_blocks()
 end
 
 local BODY_BLOCKS = build_body_blocks()
+local PART_BLOCKS = {}
+for _, part in ipairs({"head", "torso", "arms", "legs"}) do
+    PART_BLOCKS[part] = build_body_blocks(part)
+end
+
+local function body_row(src_y)
+    return BODY_Y0 + math.floor((src_y - BODY_SRC_Y0) * BODY_SCALE + 0.5)
+end
+
+-- Paint one body part between two authored rows (clothing on the doll).
+local function paint_part(part, src_y0, src_y1, color)
+    local y0, y1 = body_row(src_y0), body_row(src_y1)
+    gfx.color(color)
+    for _, b in ipairs(PART_BLOCKS[part]) do
+        local top, bottom = math.max(b.y, y0), math.min(b.y + b.h, y1)
+        if bottom > top then
+            for _, sp in ipairs(b.spans) do
+                gfx.fill_rect(sp[1], top, sp[2] - sp[1], bottom - top)
+            end
+        end
+    end
+end
+
+-- Draw order for painting worn items: under-layers before over-layers.
+local WEAR_ORDER = {"shirt", "pants", "jacket", "feet", "hands", "head", "neck",
+                    "wrists", "eyes", "ears"}
 
 function Game:draw_silhouette()
     -- pass 1: outline (every block grown by 1px, black)
@@ -1122,9 +1191,92 @@ function Game:draw_silhouette()
             gfx.fill_rect(sp[1], b.y, sp[2] - sp[1], b.h)
         end
     end
-    -- waistband
+    -- pass 3: worn clothes painted onto the body, inner layers first
+    for _, slot in ipairs(WEAR_ORDER) do
+        local item = self.player.equipped[slot]
+        local wear = item and ITEM_DB[item].wear
+        if wear then
+            for _, w in ipairs(wear) do
+                paint_part(w[1], w[2], w[3], gfx[w[4]])
+            end
+        end
+    end
+end
+
+-- Dashed outline: a slot's frame on the doll (the cursor gets a solid one).
+local function dashed_rect(x, y, w, h)
+    for dx = 0, w - 1, 4 do
+        local len = math.min(2, w - dx) - 1
+        gfx.line(x + dx, y, x + dx + len, y)
+        gfx.line(x + dx, y + h - 1, x + dx + len, y + h - 1)
+    end
+    for dy = 0, h - 1, 4 do
+        local len = math.min(2, h - dy) - 1
+        gfx.line(x, y + dy, x, y + dy + len)
+        gfx.line(x + w - 1, y + dy, x + w - 1, y + dy + len)
+    end
+end
+
+local HALO = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}}
+
+-- One paperdoll slot, framed by a dashed outline over the body part. Worn:
+-- the clothes are already painted on the doll (draw_silhouette); the item's
+-- icon sits on top. Empty: the slot's name on a small white tag so it reads
+-- on the dithered gray.
+function Game:draw_equip_slot(slot, x, y, w, h, is_cursor, is_selected)
+    local item = self.player.equipped[slot]
+    gfx.font(gfx.FONT_MONO_12)
+    if item then
+        -- the item sits on the (painted) body: black icon with a 1px white
+        -- halo so it reads on any fill, inside the slot's dashed frame
+        local sprite = SPRITES[item]
+        local sx, sy = x + (w - SPRITE_W) // 2, y + (h - SPRITE_H) // 2
+        if sprite and draw_sprite then
+            gfx.color(gfx.WHITE)
+            for _, d in ipairs(HALO) do
+                draw_sprite(sx + d[1], sy + d[2], SPRITE_W, SPRITE_H, sprite)
+            end
+            gfx.color(gfx.BLACK)
+            draw_sprite(sx, sy, SPRITE_W, SPRITE_H, sprite)
+        else
+            gfx.color(gfx.WHITE)
+            gfx.fill_rect(sx + 3, sy + 2, 11, 13)
+            gfx.color(gfx.BLACK)
+            gfx.text(sx + 5, sy + 12, item_abbr(item))
+        end
+        gfx.color(gfx.BLACK)
+        dashed_rect(x, y, w, h)
+    else
+        local label = EQUIP_NAME[slot]
+        if 7 * #label + 4 > w then label = EQUIP_ABBR[slot] end
+        local tw = 7 * #label
+        local tx, ty = x + (w - tw) // 2, y + h // 2 + 4
+        gfx.color(gfx.WHITE)
+        gfx.fill_rect(tx - 1, ty - 9, tw + 2, 11)
+        gfx.color(gfx.BLACK)
+        gfx.text(tx, ty, label)
+        dashed_rect(x, y, w, h)
+    end
     gfx.color(gfx.BLACK)
-    gfx.line(BODY_CX - 18, 205, BODY_CX + 18, 205)
+    if is_selected then
+        gfx.rect(x - 2, y - 2, w + 4, h + 4)
+    elseif is_cursor then
+        gfx.rect(x - 1, y - 1, w + 2, h + 2)
+    end
+end
+
+-- What the cursor is on, e.g. "Head: Cap" or "Bag: Rock x3".
+function Game:cursor_description()
+    local row = INV_ROWS[self.inv_cursor]
+    if not row then return "" end
+    local kind, key = row[1], row[2]
+    local stack = self:get_stack(kind, key)
+    local where = kind == "ground" and "Ground" or kind == "inventory" and "Bag"
+        or EQUIP_NAME[key]
+    if not stack then return where .. ": empty" end
+    local text = where .. ": " .. ITEM_DB[stack.item].name
+    if stack.qty > 1 then text = text .. " x" .. stack.qty end
+    return text
 end
 
 function Game:draw_inventory(w, h)
@@ -1161,7 +1313,7 @@ function Game:draw_inventory(w, h)
     local total_rows = (#ground + GROUND_GRID_COLS - 1) // GROUND_GRID_COLS
     off = math.max(0, math.min(off, (total_rows - GROUND_GRID_ROWS) * GROUND_GRID_COLS))
     self.ground_off = off
-    local label = "Items on the ground here"
+    local label = "Ground"
     if #ground > per_page then
         label = label .. " " .. (off + 1) .. "-" .. math.min(#ground, off + per_page)
             .. "/" .. #ground
@@ -1181,7 +1333,8 @@ function Game:draw_inventory(w, h)
 
     -- equipped slots (positioned near the body, not listed)
     for _, slot in ipairs(EQUIP_SLOTS) do
-        add_row("equip", slot, EQUIP_COL_X[slot], EQUIP_ROW_Y[slot], EQUIP_BOX, EQUIP_BOX)
+        local r = EQUIP_RECT[slot]
+        add_row("equip", slot, r[1], r[2], r[3], r[4])
     end
 
     -- backpack: two rows of cells
@@ -1214,22 +1367,18 @@ function Game:draw_inventory(w, h)
     for i, row in ipairs(INV_ROWS) do
         if row[1] == "equip" then
             local pos = INV_POS[i]
-            local stack = self:get_stack(row[1], row[2])
-            self:draw_slot_box(pos.x, pos.y, pos.w, pos.h, stack,
+            self:draw_equip_slot(row[2], pos.x, pos.y, pos.w, pos.h,
                 i == self.inv_cursor,
                 self.inv_selected and self.inv_selected[1] == row[1] and self.inv_selected[2] == row[2])
-            gfx.color(gfx.BLACK)
-            -- Label goes beside the box, on the side facing the silhouette.
-            -- (Under the box it collided with the next slot: 30px spacing
-            -- can't hold a 22px box plus a text line.) Mono 12 is ~7px/char.
-            local abbr = EQUIP_ABBR[row[2]]
-            if pos.x < 150 then
-                gfx.text(pos.x + pos.w + 4, pos.y + 15, abbr)
-            else
-                gfx.text(pos.x - 4 - 7 * #abbr, pos.y + 15, abbr)
-            end
         end
     end
+
+    -- what the cursor is on, right-aligned on the "Ground" line
+    gfx.color(gfx.BLACK)
+    local desc = self:cursor_description()
+    local max_chars = (296 - 4 - 7 * 15) // 7   -- leave room for "Ground 10-18/18"
+    if #desc > max_chars then desc = desc:sub(1, max_chars) end
+    gfx.text(296 - 7 * #desc, 26, desc)
 
     gfx.color(gfx.BLACK)
     gfx.text(6, BACKPACK_Y - 5, "Bag " .. #self.player.inventory .. "/" .. BACKPACK_CAP)
@@ -1281,9 +1430,9 @@ local ok, err = pcall(function()
             game.quit = true
         elseif key == KEY_I then
             game.screen = "map"
-        elseif key == gfx.KEY_UP or key == KEY_W then
+        elseif key == gfx.KEY_UP or key == KEY_W or key == gfx.KEY_LEFT or key == KEY_A then
             game.inv_cursor = math.max(1, game.inv_cursor - 1)
-        elseif key == gfx.KEY_DOWN or key == KEY_S then
+        elseif key == gfx.KEY_DOWN or key == KEY_S or key == gfx.KEY_RIGHT or key == KEY_D then
             game.inv_cursor = math.min(#INV_ROWS, game.inv_cursor + 1)
         elseif key == KEY_E then
             local row = INV_ROWS[game.inv_cursor]

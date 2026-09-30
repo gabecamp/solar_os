@@ -11,6 +11,8 @@
 > - **Checked against firmware source:** `gfx.KEY_UP/DOWN/LEFT/RIGHT/ESCAPE` exist (0x80–0x83, 0x1b); Enter arrives as `\n`; the Lua runtime does **not** load `os`, so the seed now comes from `solaros.time.uptime_ms()`; `require` is a shim for `solaros` only, so the app stays one file.
 > - Layout tests (`bounds_test`, `body_test`) now read the game's constants through the generated `lib_layout.lua` (gap 25 fixed).
 > - Still unverified on the device: everything since "it works!".
+>
+> **Paperdoll rework (same day, user asked for "slots overlay the body part, like NEO Scavenger"):** the two slot columns are gone. Each slot is a dashed frame *on* its body part (`EQUIP_RECT`); worn clothes are painted onto the figure via `ITEM_DB[...].wear` (part, row range, color) using per-part body blocks (`PART_BLOCKS`), and the item icon sits on top with a white halo. Empty slots show their name on a white tag. The figure is 1.25× bigger (`BODY_SCALE`) with a larger head; to make room the ground grid is one scrolling row of 9 × 30px cells. The cursor's item is named on the "Ground" line. Left/right also step the cursor on this screen. `body_test` now checks every slot is on the body and no two slots touch. Only 5 slots have items that fit (head/hands/shirt/pants/feet); ears/eyes/neck/jacket/wrists still have none.
 
 ---
 

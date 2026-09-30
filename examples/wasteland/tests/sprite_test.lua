@@ -65,9 +65,10 @@ for _, c in ipairs(SPRITE_CALLS) do
     assert(c.x >= 0 and c.y >= 0 and c.x + c.w <= 300 and c.y + c.h <= 400,
         ("sprite off screen at %d,%d"):format(c.x, c.y))
 end
--- expected: ground 4 + equipped (tshirt,jeans,boots,cap,gloves)=5 + backpack 2 = 11
-assert(#SPRITE_CALLS == 11, "expected 11 sprites, got " .. #SPRITE_CALLS)
-print("   count matches: 4 ground + 5 equipped + 2 backpack = 11, all on screen")
+-- expected: ground 4 + backpack 2 + equipped (tshirt,jeans,boots,cap,gloves)
+-- 5 x 5 (each worn icon is drawn 4x in white as a halo, then once in black)
+assert(#SPRITE_CALLS == 31, "expected 31 sprites, got " .. #SPRITE_CALLS)
+print("   count matches: 4 ground + 2 backpack + 5 worn x 5 (halo) = 31, all on screen")
 
 -- 5. an item with no art must fall back to a letter, not crash
 ITEM_DB.mystery = {name = "Mystery", slot = nil, consumable = nil}

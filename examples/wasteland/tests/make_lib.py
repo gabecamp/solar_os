@@ -26,8 +26,8 @@ lib = src[:cut]
 # Layout constants as a table, so layout tests check the game's real numbers
 # instead of copies that go stale.
 (here / "lib_layout.lua").write_text(
-    lib + "\nreturn Game, {EQUIP_SLOTS = EQUIP_SLOTS, EQUIP_COL_X = EQUIP_COL_X, "
-          "EQUIP_ROW_Y = EQUIP_ROW_Y, EQUIP_BOX = EQUIP_BOX, "
+    lib + "\nreturn Game, {EQUIP_SLOTS = EQUIP_SLOTS, EQUIP_RECT = EQUIP_RECT, "
+          "BODY_BLOCKS = BODY_BLOCKS, PART_BLOCKS = PART_BLOCKS, "
           "GROUND_GRID_COLS = GROUND_GRID_COLS, GROUND_GRID_ROWS = GROUND_GRID_ROWS, "
           "GROUND_CELL = GROUND_CELL, GROUND_GAP = GROUND_GAP, GROUND_Y = GROUND_Y, "
           "BACKPACK_CAP = BACKPACK_CAP, BACKPACK_COLS = BACKPACK_COLS, "

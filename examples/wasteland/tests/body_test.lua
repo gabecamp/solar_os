@@ -49,20 +49,12 @@ print(("4. figure extents incl. outline: x %d..%d  y %d..%d"):format(minx, maxx,
 local _, L = dofile("lib_layout.lua")
 local grid_w = L.GROUND_GRID_COLS * (L.GROUND_CELL + L.GROUND_GAP) - L.GROUND_GAP
 local grid_h = L.GROUND_GRID_ROWS * (L.GROUND_CELL + L.GROUND_GAP) - L.GROUND_GAP
+-- the figure must stay clear of these (equip slots overlay it on purpose)
 local obstacles = {
-    {"ground grid, worst case (all visible rows full)", 6, L.GROUND_Y, 6 + grid_w, L.GROUND_Y + grid_h},
+    {"ground grid + cursor ring", 4, L.GROUND_Y - 2, 8 + grid_w, L.GROUND_Y + grid_h + 2},
     {"conditions text", 4, L.CONDITIONS_Y - 9, 300, L.CONDITIONS_Y + 3},
     {"bag label", 6, L.BACKPACK_Y - 14, 80, L.BACKPACK_Y - 2},
 }
-for _, slot in ipairs(L.EQUIP_SLOTS) do
-    local cx, ry, box = L.EQUIP_COL_X[slot], L.EQUIP_ROW_Y[slot], L.EQUIP_BOX
-    table.insert(obstacles, {"equip box " .. slot, cx - 2, ry - 2, cx + box + 2, ry + box + 2})
-    if cx < 150 then
-        table.insert(obstacles, {"equip label " .. slot, cx + box + 4, ry + 5, cx + box + 22, ry + 19})
-    else
-        table.insert(obstacles, {"equip label " .. slot, cx - 20, ry + 5, cx - 2, ry + 19})
-    end
-end
 local hits = 0
 for _, o in ipairs(obstacles) do
     for _, r in ipairs(body_rects) do
@@ -72,5 +64,43 @@ for _, o in ipairs(obstacles) do
     end
 end
 print("   overlaps with other UI:", hits)
-assert(asym == 0 and hits == 0, "body test failed")
+
+-- 5. every equip slot sits on the body (covers or touches it), stays
+--    clear of the ground row and conditions line, and no two slots (with the
+--    2px selection ring) touch
+local body_px = {}
+for _, b in ipairs(BODY_BLOCKS) do
+    for y = b.y, b.y + b.h - 1 do
+        for _, sp in ipairs(b.spans) do
+            for x = sp[1], sp[2] - 1 do body_px[y * 1000 + x] = true end
+        end
+    end
+end
+local slot_problems = 0
+for _, slot in ipairs(L.EQUIP_SLOTS) do
+    local r = L.EQUIP_RECT[slot]
+    local covered = 0
+    for y = r[2] - 2, r[2] + r[4] + 1 do        -- touching the body counts (ears)
+        for x = r[1] - 2, r[1] + r[3] + 1 do
+            if body_px[y * 1000 + x] then covered = covered + 1 end
+        end
+    end
+    if covered == 0 then print("   slot not on the body: " .. slot); slot_problems = slot_problems + 1 end
+    if r[1] - 2 < 0 or r[1] + r[3] + 2 > 300 then print("   slot off screen: " .. slot); slot_problems = slot_problems + 1 end
+    for _, o in ipairs(obstacles) do
+        if r[1] - 2 < o[4] and r[1] + r[3] + 2 > o[2] and r[2] - 2 < o[5] and r[2] + r[4] + 2 > o[3] then
+            print("   slot " .. slot .. " hits " .. o[1]); slot_problems = slot_problems + 1
+        end
+    end
+    for _, other in ipairs(L.EQUIP_SLOTS) do
+        local o = L.EQUIP_RECT[other]
+        if other > slot and r[1] - 2 < o[1] + o[3] and r[1] + r[3] + 2 > o[1]
+            and r[2] - 2 < o[2] + o[4] and r[2] + r[4] + 2 > o[2] then
+            print("   slots too close: " .. slot .. " / " .. other); slot_problems = slot_problems + 1
+        end
+    end
+end
+print("5. equip slots on the body, clear of other UI, none touching:", slot_problems == 0)
+
+assert(asym == 0 and hits == 0 and slot_problems == 0, "body test failed")
 print("\nBODY TESTS PASSED")
