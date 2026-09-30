@@ -46,6 +46,7 @@ def replay(ops_path, out_path):
     framed.paste(img, (4, 4))
     framed.save(out_path)
 
-for name in ("inventory", "inventory_barefoot", "inventory_full", "inventory_dressed", "inventory_hands", "creator", "map", "map_explored", "map_scavenge", "map_full"):
-    replay(f"ops_{name}.txt", f"preview_{name}.png")
+import glob
+for ops in sorted(glob.glob("ops_*.txt")):
+    replay(ops, "preview_" + ops[4:-4] + ".png")
 print("ok")

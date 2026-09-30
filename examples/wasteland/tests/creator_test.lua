@@ -16,7 +16,8 @@ end
 print("1. a new game starts on the creator with a valid default build")
 local g = Game.new()
 assert(g.screen == "creator")
-assert(C.attr_points_left(g.player.attrs) == 0 and C.trait_points_left(g.player.traits) == 0)
+assert(C.attr_points_left(g.player.attrs) == 0 and C.trait_points_left(g.player.traits) == 5,
+       "5 trait points to spend at the start")
 assert(g.player.max_mp == 2 and g.player.sight == 2 and g.player.scav_rolls == 2)
 print("   OK")
 
@@ -37,13 +38,13 @@ print("3. traits: positives spend, negatives give back; start refused below 0")
 g = Game.new()
 local quick = #C.ATTRIBUTES + 1                   -- first trait row
 g.creator_cursor = quick
-press(g, SPACE)                                   -- Quick (-3 points)
-assert(C.trait_points_left(g.player.traits) == -3 and g.player.max_mp == 3)
+press(g, SPACE, DOWN, SPACE)                      -- Quick + Hawk-Eyed (-6 of 5)
+assert(C.trait_points_left(g.player.traits) == -1 and g.player.max_mp == 3)
 press(g, ENTER)
 assert(g.screen == "creator", "must not start with trait points below 0")
 g.creator_cursor = #C.ATTRIBUTES + 6              -- Asthmatic (+3)
 press(g, SPACE)
-assert(C.trait_points_left(g.player.traits) == 0 and g.player.max_mp == 2)
+assert(C.trait_points_left(g.player.traits) == 2 and g.player.max_mp == 2)
 press(g, SPACE)                                   -- toggling off works too
 assert(not g.player.traits.Asthmatic)
 print("   OK")

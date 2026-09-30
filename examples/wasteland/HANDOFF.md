@@ -22,6 +22,8 @@
 >
 > **Save/load is blocked by the firmware:** Lua has no way to write a file (`solaros.storage` has `read_file` but no write; `io`/`os` aren't loaded, `src/apps/solar_os_lua.c:556-568`). It needs a new `storage.write_file` binding in the fork plus a reflash. The user hasn't decided yet.
 >
+> **Encounters plan, step 1 of 3 done (trait points, health, weapons).** The plan is in `C:\Users\Gabe\.claude\plans\for-the-next-part-snuggly-popcorn.md`. Steps 2 (encounter engine and combat: mutant animals and humans, bandits, rare helpers) and 3 (anomalies with random puzzles, artifacts) come next. Step 1: `TRAIT_START_POINTS = 5`; `player.health` (100) and `player.injuries` (`bleeding`: −4 HP/h awake or resting; `wounded_hours`: −1 MP until 24 h of rest); rest heals +3 HP/h (Endurance scales it) unless bleeding; E on a Cloth Scrap while bleeding bandages; HP 0 → `"dead"` screen → Enter → `Game.new()`. Map panel shows HP plus an injury line (legend moved to y 80). Weapons: `ITEM_DB[..].weapon = {dmg, reach, thrown, bleed}` on rock, knife, pipe, spear (sprites and loot entries added); nothing uses them until step 2. New `tests/encounter_test.lua`; `replay.py` now renders every recorded `ops_*.txt`.
+>
 > **Running the tests on Windows:** Lua 5.4 (`winget install DEVCOM.Lua`) and Python 3.12 are installed; the suite runs under Git Bash with small wrapper scripts named `lua5.4`, `luac5.4`, `python3` on `PATH` (they live in `%TEMP%\claude\wbin`, outside the repo). Previews there use a proportional PC font, so text widths look different from the device's mono font.
 
 ---

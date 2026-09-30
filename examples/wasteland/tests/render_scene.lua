@@ -110,6 +110,16 @@ g.tiles["0,1"] = "water"
 g.tiles["-1,1"] = "plains"
 for key in pairs(g.tiles) do g.player.visible[key] = true; g.player.explored[key] = true end
 g.log = {"Moved to Hills (2 MP)", "Rested 4h."}
+g.player.injuries.bleeding = true
+g.player.injuries.wounded_hours = 10
+g.player.health = 41
 g:draw_map(400, 300)
 solaros.dump("ops_map_full.txt")
+
+-- Scene 6: death screen
+g = fresh()
+g.player.hours = 57
+g.death_cause = "You bled out."
+g:draw_dead(400, 300)
+solaros.dump("ops_dead.txt")
 print("scenes recorded, player at", g.player.q, g.player.r)

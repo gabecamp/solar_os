@@ -11,6 +11,7 @@ Outputs (git-ignored, regenerated on every run):
   lib_layout.lua     -> bounds_test, regression_test (layout constants + INV_ROWS/INV_POS)
   lib_scavenge.lua   -> scavenge_test
   lib_creator.lua    -> creator_test, regression_test (stats, traits, slots)
+  lib_encounter.lua  -> encounter_test (health, injuries, weapons, encounters)
   wasteland_run.lua  -> full copy, run under the fake solaros by run_tests.sh / soak
 """
 import pathlib
@@ -49,3 +50,7 @@ lib = src[:cut]
           "POCKET_CELLS = POCKET_CELLS, BACKPACK_CAP = BACKPACK_CAP}\n")
 (here / "wasteland_run.lua").write_text(src)
 print("generated lib_*.lua, wasteland_run.lua")
+(here / "lib_encounter.lua").write_text(
+    lib + "\nreturn Game, {ITEM_DB = ITEM_DB, MAX_HEALTH = MAX_HEALTH, "
+          "BLEED_PER_HOUR = BLEED_PER_HOUR, WOUND_REST_HOURS = WOUND_REST_HOURS, "
+          "effective_max_mp = effective_max_mp, trait_points_left = trait_points_left}\n")

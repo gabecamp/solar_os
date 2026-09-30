@@ -17,12 +17,15 @@ Controls:
   Enter / Space   - inventory: pick up the item under the cursor, then press
                     again on a ground cell, bag cell or body slot to move it
   E               - inventory: use the item under the cursor - eat/drink one,
-                    wear it, hold it in a free hand, or take it off
-  I               - toggle inventory screen
+                    wear it, hold it in a free hand, or take it off; on a
+                    Cloth Scrap while bleeding: bandage the wound
+  I             - toggle inventory screen
   Q / ESC         - quit
 
 A new game opens on the character creator: Up/Down pick a row, Left/Right
-change an attribute, Space toggles a trait, Enter starts.
+change an attribute, Space toggles a trait, Enter starts. You get 5 trait
+points; negative traits give more. Health 0 ends the run (death screen,
+Enter makes a new survivor).
 
 This is a single self-contained script, matching the SolarOS Playground
 convention (see the bundled Snake example) - no extra require()s beyond
@@ -45,6 +48,10 @@ local REST_HOURS = 4
 local SCAVENGE_HOURS = 1      -- also costs this many MP
 local SCAVENGE_TRIES = 3      -- searches per tile before it's picked clean
 local SCAVENGE_ROLLS = 2      -- loot-table rolls per search
+local MAX_HEALTH = 100
+local BLEED_PER_HOUR = 4      -- HP lost per hour while bleeding (awake or resting)
+local REST_HEAL_PER_HOUR = 3  -- HP back per hour of rest (not while bleeding), at Endurance 3
+local WOUND_REST_HOURS = 24   -- hours of rest before a wound stops costing 1 MP
 -- gfx.getch timeout. The screen is only redrawn after a key was handled, so
 -- idle wakeups just check should_exit(); this only bounds how quickly a
 -- quit request from the OS is noticed.
@@ -120,8 +127,18 @@ local ITEM_DB = {
     canned_beans = {name = "Canned Beans", slot = nil, consumable = {hunger = 40}},
     water_bottle = {name = "Water Bottle", slot = nil, consumable = {thirst = 50}},
     berries      = {name = "Wild Berries", slot = nil, consumable = {hunger = 15, thirst = 5}},
-    rock         = {name = "Rock",         slot = nil, consumable = nil},
-    cloth_scrap  = {name = "Cloth Scrap",  slot = nil, consumable = nil},
+    -- weapon: used from a hand slot. dmg per hit; reach "close" (arm's
+    -- length) or "near" (a spear's length); thrown ones are hurled from
+    -- range and land on the ground; bleed: % chance a hit opens a wound
+    rock         = {name = "Rock",         slot = nil, consumable = nil,
+                    weapon = {dmg = 6, reach = "close", thrown = true}},
+    cloth_scrap  = {name = "Cloth Scrap",  slot = nil, consumable = nil},   -- E: bandage
+    knife        = {name = "Knife",        slot = nil, consumable = nil,
+                    weapon = {dmg = 12, reach = "close", bleed = 30}},
+    pipe         = {name = "Lead Pipe",    slot = nil, consumable = nil,
+                    weapon = {dmg = 15, reach = "close"}},
+    spear        = {name = "Spear",        slot = nil, consumable = nil,
+                    weapon = {dmg = 10, reach = "near", bleed = 15}},
 }
 
 -- What scavenging can turn up, per terrain: {item, weight}. "nothing" is a
@@ -130,11 +147,11 @@ local ITEM_DB = {
 local SCAVENGE_LOOT = {
     plains = {{"nothing", 8}, {"rock", 3}, {"cloth_scrap", 4}, {"canned_beans", 3},
               {"water_bottle", 3}, {"cap", 1}, {"sunglasses", 1}, {"gloves", 1},
-              {"satchel", 1}},
+              {"satchel", 1}, {"pipe", 1}, {"knife", 1}},
     forest = {{"nothing", 7}, {"berries", 6}, {"cloth_scrap", 2}, {"water_bottle", 2},
-              {"scarf", 1}, {"earmuffs", 1}, {"gloves", 1}},
+              {"scarf", 1}, {"earmuffs", 1}, {"gloves", 1}, {"spear", 1}},
     hills  = {{"nothing", 9}, {"rock", 6}, {"water_bottle", 2}, {"canned_beans", 1},
-              {"jacket", 1}, {"bracers", 1}, {"boots", 1}},
+              {"jacket", 1}, {"bracers", 1}, {"boots", 1}, {"knife", 1}},
 }
 
 -- Worn gear that is scattered around the map (the starting clothes aren't).
@@ -459,6 +476,60 @@ local SPRITE_ART = {
         "................",
         "................",
     },
+    knife = {
+        "................",
+        ".............##.",
+        "............###.",
+        "...........###..",
+        "..........###...",
+        ".........###....",
+        "........###.....",
+        ".......###......",
+        "......###.......",
+        "....#.##........",
+        ".....#..........",
+        "....#.#.........",
+        "...###..........",
+        "..###...........",
+        ".###............",
+        "................",
+    },
+    pipe = {
+        "................",
+        "............###.",
+        "...........#####",
+        "...........#####",
+        "..........#####.",
+        ".........####...",
+        "........####....",
+        ".......####.....",
+        "......####......",
+        ".....####.......",
+        "....####........",
+        "...####.........",
+        "..####..........",
+        ".####...........",
+        ".###............",
+        "................",
+    },
+    spear = {
+        "..............#.",
+        ".............###",
+        "............####",
+        "...........####.",
+        "...........##...",
+        "..........#.#...",
+        ".........#......",
+        "........#.......",
+        ".......#........",
+        "......#.........",
+        ".....#..........",
+        "....#...........",
+        "...#............",
+        "..#.............",
+        ".#..............",
+        "................",
+    },
 }
 
 -- Pack one ASCII bitmap (w x h) into the binary string gfx.sprite wants.
@@ -733,9 +804,11 @@ local function attr_points_left(attrs)
     return ATTR_POINTS - used
 end
 
--- trait points left: negatives add, positives spend; must be >= 0 to start
+-- trait points left: everyone gets TRAIT_START_POINTS, negatives add more,
+-- positives spend; must be >= 0 to start
+local TRAIT_START_POINTS = 5
 local function trait_points_left(traits)
-    local left = 0
+    local left = TRAIT_START_POINTS
     for _, t in ipairs(TRAITS) do
         if traits[t.name] then left = left - t.cost end
     end
@@ -775,6 +848,8 @@ local function new_player()
         sight = BASE_SIGHT,
         hours = 0,
         needs = {hunger = 100, thirst = 100, rest = 100},
+        health = MAX_HEALTH,
+        injuries = {bleeding = false, wounded_hours = 0},
         equipped = {shirt = "tshirt", pants = "jeans", feet = "boots", back = "backpack"},
         inventory = {
             {item = "water_bottle", qty = 1},
@@ -805,12 +880,23 @@ local function apply_awake_hours(player, hours)
     player.needs.hunger = clamp(player.needs.hunger - hours * (100 / 72) * player.hunger_mult)
     player.needs.thirst = clamp(player.needs.thirst - hours * (100 / 48))
     player.needs.rest = clamp(player.needs.rest - hours * (100 / 18) * player.rest_drain_mult)
+    if player.injuries.bleeding then
+        player.health = clamp(player.health - hours * BLEED_PER_HOUR)
+    end
 end
 
 local function apply_rest_hours(player, hours)
     player.needs.hunger = clamp(player.needs.hunger - hours * (100 / 72) * 0.5 * player.hunger_mult)
     player.needs.thirst = clamp(player.needs.thirst - hours * (100 / 48) * 0.5)
     player.needs.rest = clamp(player.needs.rest + hours * (100 / 6) * player.rest_gain_mult)
+    local inj = player.injuries
+    if inj.bleeding then
+        player.health = clamp(player.health - hours * BLEED_PER_HOUR)
+    else
+        local heal = REST_HEAL_PER_HOUR * (1 + 0.1 * (player.attrs.Endurance - 3))
+        player.health = clamp(player.health + hours * heal)
+        inj.wounded_hours = math.max(0, inj.wounded_hours - hours)
+    end
 end
 
 local function effective_max_mp(player)
@@ -818,6 +904,7 @@ local function effective_max_mp(player)
     if player.needs.hunger <= 0 then penalty = penalty + 1 end
     if player.needs.thirst <= 0 then penalty = penalty + 1 end
     if player.needs.rest <= 0 then penalty = penalty + 1 end
+    if player.injuries.wounded_hours > 0 then penalty = penalty + 1 end
     return math.max(1, player.max_mp - penalty)
 end
 
@@ -870,6 +957,14 @@ function Game:start_game()
     return true
 end
 
+-- Health at 0 ends the run: the death screen, then a new character.
+function Game:check_death(cause)
+    if self.player.health > 0 then return false end
+    self.screen = "dead"
+    self.death_cause = cause
+    return true
+end
+
 function Game:push_log(text)
     table.insert(self.log, text)
     while #self.log > 3 do table.remove(self.log, 1) end
@@ -906,6 +1001,7 @@ function Game:try_move(q, r)
     if pile and #pile > 0 then self:push_log("Something is here. (I to look)") end
     if p.needs.hunger <= 0 then self:push_log("You are starving!") end
     if p.needs.thirst <= 0 then self:push_log("You are dehydrated!") end
+    self:check_death("You bled out.")
 end
 
 function Game:move_dir(dq, dr)
@@ -976,6 +1072,7 @@ function Game:scavenge()
     end
     if p.needs.hunger <= 0 then self:push_log("You are starving!") end
     if p.needs.thirst <= 0 then self:push_log("You are dehydrated!") end
+    self:check_death("You bled out.")
 end
 
 function Game:rest()
@@ -990,6 +1087,8 @@ function Game:rest()
     p.mp = effective_max_mp(p)
     update_visibility(p, self.tiles)
     self:push_log("Rested " .. REST_HOURS .. "h.")
+    if p.injuries.bleeding then self:push_log("You're still bleeding. Bandage it (E on cloth).") end
+    self:check_death("You bled out in your sleep.")
 end
 
 -- -- inventory transfer -------------------------------------------------
@@ -1154,6 +1253,13 @@ function Game:use_item(kind, k)
     if not stack then return end
     local def = ITEM_DB[stack.item]
     local p = self.player
+    if stack.item == "cloth_scrap" and p.injuries.bleeding then
+        p.injuries.bleeding = false
+        stack.qty = stack.qty - 1
+        if stack.qty <= 0 then self:remove_stack(kind, k) end
+        self:push_log("You bind the wound. The bleeding stops.")
+        return
+    end
     if kind == "equip" then
         if def.consumable and HOLD_SLOTS[k] then
             self:try_consume(kind, k)
@@ -1197,7 +1303,7 @@ end
 -- to its right (from PANEL_X); the log and key hints across the bottom.
 local MAP_W, MAP_TOP, MAP_BOTTOM = 256, 4, 236
 local PANEL_X = 262
-local LEGEND_Y = 72
+local LEGEND_Y = 80
 local LEGEND_ORDER = {"plains", "forest", "hills", "water"}
 
 function Game:draw_map(w, h)
@@ -1215,7 +1321,11 @@ function Game:draw_map(w, h)
     gfx.text(PANEL_X, 28, "Sight " .. p.sight .. " Scav " .. scav)
     gfx.text(PANEL_X, 42, "Hun " .. math.floor(p.needs.hunger)
         .. " Thi " .. math.floor(p.needs.thirst))
-    gfx.text(PANEL_X, 56, "Rest " .. math.floor(p.needs.rest))
+    gfx.text(PANEL_X, 56, "Rest " .. math.floor(p.needs.rest) .. "  HP " .. math.floor(p.health))
+    local inj = {}
+    if p.injuries.bleeding then inj[#inj + 1] = "BLEEDING" end
+    if p.injuries.wounded_hours > 0 then inj[#inj + 1] = "Wounded" end
+    if #inj > 0 then gfx.text(PANEL_X, 70, table.concat(inj, " ")) end
 
     local reachable = {}
     for _, n in ipairs(neighbors(self.tiles, p.q, p.r)) do
@@ -1412,6 +1522,9 @@ function Game:current_conditions()
     if self.player.needs.hunger <= 0 then table.insert(list, "Starving") end
     if self.player.needs.thirst <= 0 then table.insert(list, "Dehydrated") end
     if self.player.needs.rest <= 0 then table.insert(list, "Exhausted") end
+    if self.player.injuries.bleeding then table.insert(list, "Bleeding") end
+    if self.player.injuries.wounded_hours > 0 then table.insert(list, "Wounded") end
+    if self.player.health < 50 then table.insert(list, "Hurt") end
     if #list == 0 then return "Conditions: none" end
     local text = table.concat(list, ", ")
     -- all four at once don't fit after the prefix (mono 12 is ~7px/char)
@@ -1974,6 +2087,18 @@ function Game:draw_creator(w, h)
     gfx.refresh()
 end
 
+function Game:draw_dead(w, h)
+    gfx.clear(gfx.WHITE)
+    gfx.color(gfx.BLACK)
+    gfx.font(gfx.FONT_BOLD_14)
+    gfx.text(6, 40, "You are dead.")
+    gfx.font(gfx.FONT_MONO_12)
+    gfx.text(6, 70, self.death_cause or "")
+    gfx.text(6, 90, "You lasted " .. self.player.hours .. " hours in the wasteland.")
+    gfx.text(6, h - 8, "Enter: new survivor  Q: quit")
+    gfx.refresh()
+end
+
 -- ---------------------------------------------------------------------
 -- Main loop
 -- ---------------------------------------------------------------------
@@ -2044,6 +2169,8 @@ local ok, err = pcall(function()
         if dirty then
             if game.screen == "creator" then
                 game:draw_creator(w, h)
+            elseif game.screen == "dead" then
+                game:draw_dead(w, h)
             elseif game.screen == "map" then
                 game:draw_map(w, h)
             else
@@ -2059,6 +2186,12 @@ local ok, err = pcall(function()
                     game.quit = true
                 else
                     game:creator_key(key)
+                end
+            elseif game.screen == "dead" then
+                if key == gfx.KEY_ESCAPE or key == KEY_Q then
+                    game.quit = true
+                elseif key == KEY_ENTER or key == KEY_LF then
+                    game = Game.new()   -- a fresh world and the creator
                 end
             elseif game.screen == "map" then
                 handle_map_key(key)
