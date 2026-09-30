@@ -56,6 +56,27 @@ g.log = {"Moved Leather Jacket.", "Moved Scarf."}
 g:draw_inventory(300, 400)
 solaros.dump("ops_inventory_dressed.txt")
 
+-- Scene 2d: holding a rock and a bottle, satchel on the back, 392px panel
+g = fresh()
+g.player.equipped.back = "satchel"
+g.player.equipped.rhand = "rock"
+g.player.equipped.lhand = "water_bottle"
+g.inv_cursor = #g:ground_list() + 1 + 11      -- L Hand
+g.log = {"Moved Satchel.", "Moved Rock."}
+g:draw_inventory(300, 392)
+solaros.dump("ops_inventory_hands.txt")
+
+-- Scene 2e: character creator, Perception raised, a trait picked
+g = fresh()
+local gfx = solaros.gfx
+g.creator_cursor = 1; g:creator_key(gfx.KEY_LEFT)    -- Strength 3 -> 2
+g.creator_cursor = 3; g:creator_key(gfx.KEY_RIGHT)   -- Perception 3 -> 4
+g.creator_cursor = 7; g:creator_key(32)              -- Scrounger
+g.creator_cursor = 13; g:creator_key(32)             -- Big Eater
+g.creator_cursor = 3
+g:draw_creator(300, 400)
+solaros.dump("ops_creator.txt")
+
 -- Scene 3: the map screen
 g = fresh()
 g:draw_map(300, 400)

@@ -2,6 +2,7 @@ tests/lib_only.lua
 tests/lib_map.lua
 tests/lib_layout.lua
 tests/lib_scavenge.lua
+tests/lib_creator.lua
 tests/wasteland_run.lua
 tests/ops_*.txt
 tests/preview_*.png

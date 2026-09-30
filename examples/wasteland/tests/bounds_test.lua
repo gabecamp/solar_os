@@ -2,6 +2,7 @@
 -- slot filled. Checks every cell is on screen and that the cell/text regions
 -- never overlap each other. Positions are read back from the INV_POS table
 -- the game itself fills while drawing, and constants from lib_layout.lua.
+-- Runs at 400 and 392 px tall: the log follows the reported height.
 package.path = "./?.lua;" .. package.path
 local solaros = require("solaros")
 local gfx = solaros.gfx
@@ -12,6 +13,7 @@ local Game, L, rows_pos = dofile("lib_layout.lua")
 local W, H = 300, 400
 local game = Game.new()
 game.player.q, game.player.r = 0, 0
+game.player.bag_bonus = 16   -- widest possible bag: every one of BACKPACK_CAP cells
 
 -- full bag (distinct fake items so nothing merges), 15 ground stacks
 game.player.inventory = {}
@@ -24,6 +26,7 @@ local problems = 0
 local function fail(msg) print("  " .. msg); problems = problems + 1 end
 
 local function check_frame(label)
+    label = label .. " @" .. H .. "px"
     game:draw_inventory(W, H)
     local INV_ROWS, INV_POS = rows_pos()
     local rects = {}
@@ -46,9 +49,10 @@ local function check_frame(label)
     end
     -- text lines (approximate glyph box: baseline-9 .. baseline+3)
     rects[#rects + 1] = {"conditions", 0, L.CONDITIONS_Y - 9, W, L.CONDITIONS_Y + 3}
-    rects[#rects + 1] = {"bag label", 0, L.BACKPACK_Y - 14, W, L.BACKPACK_Y - 2}
+    rects[#rects + 1] = {"bag name", L.BAG_LABEL_X, L.BACKPACK_Y + 7, W, L.BACKPACK_Y + 19}
+    rects[#rects + 1] = {"bag count", L.BAG_LABEL_X, L.BACKPACK_Y + 33, W, L.BACKPACK_Y + 45}
     for k = 0, L.INV_LOG_LINES - 1 do
-        local y = L.INV_LOG_Y + 12 * k
+        local y = H - 8 - 12 * (L.INV_LOG_LINES - 1 - k)
         if y + 3 > H then fail(label .. ": log line " .. (k + 1) .. " below the screen") end
         rects[#rects + 1] = {"log" .. (k + 1), 0, y - 9, W, y + 3}
     end
@@ -64,20 +68,23 @@ local function check_frame(label)
     return shown
 end
 
-game.inv_cursor = 1
-local shown = check_frame("cursor on first ground stack")
-print("bag cells drawn:", shown.inventory, "of", #game.player.inventory)
-assert(shown.inventory == L.BACKPACK_CAP, "every bag stack must be drawn")
-print("ground cells drawn:", shown.ground, "of", #ground)
-assert(shown.ground == L.GROUND_GRID_COLS * L.GROUND_GRID_ROWS)
+for _, height in ipairs({400, 392}) do
+    H = height
+    game.inv_cursor = 1
+    local shown = check_frame("cursor on first ground stack")
+    print("bag cells drawn:", shown.inventory, "of", #game.player.inventory)
+    assert(shown.inventory == L.BACKPACK_CAP, "every bag stack must be drawn")
+    print("ground cells drawn:", shown.ground, "of", #ground + 1)
+    assert(shown.ground == L.GROUND_GRID_COLS * L.GROUND_GRID_ROWS)
 
-game.inv_cursor = #ground   -- last ground stack: grid must scroll to it
-check_frame("cursor on last ground stack")
-print("ground window after scrolling to the end starts at", game.ground_off + 1)
+    game.inv_cursor = #ground + 1   -- the empty drop cell after the last stack
+    check_frame("cursor on the ground drop cell")
+    print("ground window after scrolling to the end starts at", game.ground_off + 1)
 
-game.inv_cursor = 1         -- and back
-check_frame("cursor back on first ground stack")
-assert(game.ground_off == 0, "grid should scroll back to the top")
+    game.inv_cursor = 1             -- and back
+    check_frame("cursor back on first ground stack")
+    assert(game.ground_off == 0, "grid should scroll back to the top")
+end
 
 print("\nproblems found:", problems)
 assert(problems == 0, "inventory layout problems")

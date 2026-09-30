@@ -10,6 +10,7 @@ Outputs (git-ignored, regenerated on every run):
   lib_map.lua        -> glyph_test
   lib_layout.lua     -> bounds_test, regression_test (layout constants + INV_ROWS/INV_POS)
   lib_scavenge.lua   -> scavenge_test
+  lib_creator.lua    -> creator_test, regression_test (stats, traits, slots)
   wasteland_run.lua  -> full copy, run under the fake solaros by run_tests.sh / soak
 """
 import pathlib
@@ -34,11 +35,17 @@ lib = src[:cut]
           "BACKPACK_CAP = BACKPACK_CAP, BACKPACK_COLS = BACKPACK_COLS, "
           "BACKPACK_CELL = BACKPACK_CELL, BACKPACK_GAP = BACKPACK_GAP, "
           "BACKPACK_Y = BACKPACK_Y, CONDITIONS_Y = CONDITIONS_Y, "
-          "INV_LOG_Y = INV_LOG_Y, INV_LOG_LINES = INV_LOG_LINES, "
+          "BAG_LABEL_X = BAG_LABEL_X, INV_LOG_LINES = INV_LOG_LINES, "
           "BODY_CX = BODY_CX, BODY_TOP = BODY_TOP, BODY_BOTTOM = BODY_BOTTOM}, "
           "function() return INV_ROWS, INV_POS end\n")
 (here / "lib_scavenge.lua").write_text(
     lib + "\nreturn Game, ITEM_DB, SCAVENGE_LOOT, SCAVENGE_TRIES, SCAVENGE_ROLLS, "
           "SCAVENGE_HOURS, TERRAIN\n")
+(here / "lib_creator.lua").write_text(
+    lib + "\nreturn Game, {ATTRIBUTES = ATTRIBUTES, TRAITS = TRAITS, ATTR_POINTS = ATTR_POINTS, "
+          "ATTR_MIN = ATTR_MIN, ATTR_MAX = ATTR_MAX, recompute_stats = recompute_stats, "
+          "trait_points_left = trait_points_left, attr_points_left = attr_points_left, "
+          "dud_percent = dud_percent, ITEM_DB = ITEM_DB, HOLD_SLOTS = HOLD_SLOTS, "
+          "POCKET_CELLS = POCKET_CELLS, BACKPACK_CAP = BACKPACK_CAP}\n")
 (here / "wasteland_run.lua").write_text(src)
 print("generated lib_*.lua, wasteland_run.lua")

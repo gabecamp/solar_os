@@ -77,9 +77,32 @@ for terrain, table_ in pairs(LOOT) do
 end
 print("   OK")
 
+print("4b. Perception: more finds per search and fewer duds as it rises")
+local _, C = dofile("lib_creator.lua")
+local function finds_per_search(per)
+    local g2 = fresh("hills")   -- the table with the most duds
+    g2.player.attrs.Perception = per
+    C.recompute_stats(g2.player)
+    for _ = 1, 600 do
+        g2.scavenged = {}
+        g2.player.mp = 2
+        g2:scavenge()
+    end
+    return count(g2:ground_list()) / 600, g2.player.scav_rolls
+end
+local low, low_rolls = finds_per_search(1)
+local mid, mid_rolls = finds_per_search(3)
+local high, high_rolls = finds_per_search(6)
+print(("   Per 1: %d rolls, %.2f items/search   Per 3: %d, %.2f   Per 6: %d, %.2f")
+      :format(low_rolls, low, mid_rolls, mid, high_rolls, high))
+assert(low_rolls == 1 and mid_rolls == ROLLS and high_rolls == ROLLS + 1)
+assert(low < mid and mid < high, "higher Perception should find more")
+assert(C.dud_percent(3) == 100 and C.dud_percent(6) == 25 and C.dud_percent(1) == 150)
+print("   OK")
+
 print("5. F on the map screen scavenges (real main loop)")
 local i, texts = 0, {}
-local keys = {102}
+local keys = {10, 102}   -- Enter: start with the default build, then F
 local saved_getch, saved_exit, saved_text = gfx.getch, fake.should_exit, gfx.text
 gfx.getch = function() i = i + 1; if i > #keys then return 113 end; return keys[i] end
 fake.should_exit = function() return i > #keys + 5 end

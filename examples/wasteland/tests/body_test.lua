@@ -53,7 +53,7 @@ local grid_h = L.GROUND_GRID_ROWS * (L.GROUND_CELL + L.GROUND_GAP) - L.GROUND_GA
 local obstacles = {
     {"ground grid + cursor ring", 4, L.GROUND_Y - 2, 8 + grid_w, L.GROUND_Y + grid_h + 2},
     {"conditions text", 4, L.CONDITIONS_Y - 9, 300, L.CONDITIONS_Y + 3},
-    {"bag label", 6, L.BACKPACK_Y - 14, 80, L.BACKPACK_Y - 2},
+    {"bag grid + label", 4, L.BACKPACK_Y - 2, 300, L.BACKPACK_Y + 2 * L.BACKPACK_CELL + L.BACKPACK_GAP + 2},
 }
 local hits = 0
 for _, o in ipairs(obstacles) do
@@ -65,7 +65,7 @@ for _, o in ipairs(obstacles) do
 end
 print("   overlaps with other UI:", hits)
 
--- 5. every equip slot sits on the body (covers or touches it), stays
+-- 5. every equip slot but the back sits on the body (covers or touches it), stays
 --    clear of the ground row and conditions line, and no two slots (with the
 --    2px selection ring) touch
 local body_px = {}
@@ -85,7 +85,8 @@ for _, slot in ipairs(L.EQUIP_SLOTS) do
             if body_px[y * 1000 + x] then covered = covered + 1 end
         end
     end
-    if covered == 0 then print("   slot not on the body: " .. slot); slot_problems = slot_problems + 1 end
+    -- the back slot is your back: drawn beside the shoulder, not over the front
+    if covered == 0 and slot ~= "back" then print("   slot not on the body: " .. slot); slot_problems = slot_problems + 1 end
     if r[1] - 2 < 0 or r[1] + r[3] + 2 > 300 then print("   slot off screen: " .. slot); slot_problems = slot_problems + 1 end
     for _, o in ipairs(obstacles) do
         if r[1] - 2 < o[4] and r[1] + r[3] + 2 > o[2] and r[2] - 2 < o[5] and r[2] + r[4] + 2 > o[3] then
