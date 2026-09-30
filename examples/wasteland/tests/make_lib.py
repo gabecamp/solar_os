@@ -1,0 +1,40 @@
+"""Generate the test-only copies of ../wasteland.lua that the tests load.
+
+wasteland.lua is a script: everything before the '-- Main loop' marker defines
+the game (Game class, item db, sprites, hex math...), everything after runs the
+loop. The tests need the definitions WITHOUT the loop, so we cut at the marker
+and append a `return` that exports the locals a given test wants.
+
+Outputs (git-ignored, regenerated on every run):
+  lib_only.lua       -> unit_test, sprite_test, bounds_test, body_test, render_scene
+  lib_map.lua        -> glyph_test
+  lib_layout.lua     -> bounds_test, regression_test (layout constants + INV_ROWS/INV_POS)
+  wasteland_run.lua  -> full copy, run under the fake solaros by run_tests.sh / soak
+"""
+import pathlib
+
+here = pathlib.Path(__file__).resolve().parent
+src = (here.parent / "wasteland.lua").read_text()
+cut = src.index("-- Main loop")
+lib = src[:cut]
+
+(here / "lib_only.lua").write_text(
+    lib + "\nreturn Game, ITEM_DB, EQUIP_SLOTS, TERRAIN, SPRITES, SPRITE_ART\n")
+(here / "lib_map.lua").write_text(
+    lib + "\nreturn Game, TERRAIN, GLYPHS, GLYPH_ART, GLYPH_W, GLYPH_H, "
+          "LEGEND_ORDER, LEGEND_Y, MAP_TOP, HEX_SIZE\n")
+# Layout constants as a table, so layout tests check the game's real numbers
+# instead of copies that go stale.
+(here / "lib_layout.lua").write_text(
+    lib + "\nreturn Game, {EQUIP_SLOTS = EQUIP_SLOTS, EQUIP_COL_X = EQUIP_COL_X, "
+          "EQUIP_ROW_Y = EQUIP_ROW_Y, EQUIP_BOX = EQUIP_BOX, "
+          "GROUND_GRID_COLS = GROUND_GRID_COLS, GROUND_GRID_ROWS = GROUND_GRID_ROWS, "
+          "GROUND_CELL = GROUND_CELL, GROUND_GAP = GROUND_GAP, GROUND_Y = GROUND_Y, "
+          "BACKPACK_CAP = BACKPACK_CAP, BACKPACK_COLS = BACKPACK_COLS, "
+          "BACKPACK_CELL = BACKPACK_CELL, BACKPACK_GAP = BACKPACK_GAP, "
+          "BACKPACK_Y = BACKPACK_Y, CONDITIONS_Y = CONDITIONS_Y, "
+          "INV_LOG_Y = INV_LOG_Y, INV_LOG_LINES = INV_LOG_LINES, "
+          "BODY_CX = BODY_CX, BODY_TOP = BODY_TOP, BODY_BOTTOM = BODY_BOTTOM}, "
+          "function() return INV_ROWS, INV_POS end\n")
+(here / "wasteland_run.lua").write_text(src)
+print("generated lib_only.lua, lib_map.lua, lib_layout.lua, wasteland_run.lua")
