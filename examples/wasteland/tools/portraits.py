@@ -201,7 +201,7 @@ def crows():
 
 
 def stag():
-    """A stag on seven legs, antlers grown back into its skull, human eyes."""
+    """Fallback only: art/stag.jpg (the user's picture) replaces this."""
     c = Canvas()
     c.ground_shadow(104, 176, 74, 8)
     hide = 0.66

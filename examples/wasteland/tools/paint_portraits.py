@@ -121,6 +121,10 @@ def wound_marks(bits, seed, n=14):
 PHOTO = {
     "jawhound": {"far": (200, 30, 1235, 740), "near": (190, 190, 870, 750),
                  "close": (270, 260, 600, 590), "gamma": 0.42, "edge": 0.5},
+    # a pale subject: no mid-tone lift (gamma 1), stronger edges; close is
+    # the head with its hand-antlers (the face alone blurs at 96 px)
+    "stag": {"far": (285, 25, 1215, 735), "near": (560, 20, 1230, 740),
+             "close": (860, 10, 1230, 480), "gamma": 1.0, "edge": 0.8},
 }
 
 

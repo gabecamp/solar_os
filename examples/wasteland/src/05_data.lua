@@ -245,8 +245,9 @@ local ENCOUNTERS = {
      hp = 20, dmg = {3, 8}, hit = 70, speed = 5, bleed = 20, flees_at = 5, start = "near",
      loot = {{"strange_meat", 1}, {"nothing", 2}}, loot_rolls = 1},
     {kind = "animal", name = "Crawling Stag", art = "stag", who = "stag",
-     intro = "A stag picks its way toward you on seven legs. Its antlers have grown "
-          .. "back into its skull, and the eyes beneath them look almost human.",
+     intro = "A stag picks its way toward you, flayed to the ribs and dripping. "
+          .. "Eyes crowd its neck, all watching. Its antlers end in hands that open "
+          .. "and close, and its mouth is full of teeth.",
      hp = 40, dmg = {8, 18}, hit = 45, speed = 3, bleed = 15, flees_at = 10, start = "far",
      loot = {{"strange_meat", 2}, {"nothing", 1}}, loot_rolls = 2},
     {kind = "mutant", name = "The Fused", art = "fused", who = "fused pair",

@@ -201,6 +201,15 @@ for _, st in ipairs({{"day", 2}, {"night", 13}}) do
     solaros.dump("ops_map_world_" .. st[1] .. ".txt")
 end
 
+-- Scenes 8i-8k: the stag (the user's picture) at each range
+for _, range in ipairs({"far", "near", "close"}) do
+    g = fresh(); g:start_game()
+    start_named(g, "Crawling Stag")
+    g.enc.range = range
+    g:draw_encounter(400, 300)
+    solaros.dump("ops_stag_" .. range .. ".txt")
+end
+
 -- Scene 9: a helper
 g = fresh(); g:start_game()
 start_named(g, "Old Medic")
