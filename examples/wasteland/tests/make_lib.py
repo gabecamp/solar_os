@@ -16,6 +16,7 @@ Outputs (git-ignored, regenerated on every run):
   lib_world.lua      -> world_test
   lib_save.lua       -> save_test
   lib_rad.lua        -> radiation_test
+  lib_survive.lua    -> survival_test
   wasteland_run.lua  -> full copy, run under the fake solaros by run_tests.sh / soak
 """
 import pathlib
@@ -76,5 +77,8 @@ lib = src[:cut]
     lib + "\nreturn Game, {RAD = RAD, ITEM_DB = ITEM_DB, ARTIFACTS = ARTIFACTS, "
           "SCAVENGE_LOOT = SCAVENGE_LOOT, SPRITES = SPRITES, GLYPHS = GLYPHS, "
           "generate_world = generate_world, BOLTS = BOLTS}\n")
+(here / "lib_survive.lua").write_text(
+    lib + "\nreturn Game, {SURVIVE = SURVIVE, ITEM_DB = ITEM_DB, RECIPES = RECIPES, "
+          "SCAVENGE_LOOT = SCAVENGE_LOOT, SPRITES = SPRITES, WORLD = WORLD}\n")
 (here / "wasteland_run.lua").write_text(src)
 print("generated lib_*.lua, wasteland_run.lua")

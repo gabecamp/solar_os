@@ -196,6 +196,7 @@ function Game:rest()
     p.mp = effective_max_mp(p)
     self:refresh_view()
     self:push_log("Rested " .. REST_HOURS .. "h" .. (fire and " by the fire." or "."))
+    if self:weather() == "Rain" then self:rain_fill() end
     if p.injuries.bleeding then self:push_log("You're still bleeding. Bandage it (E on cloth).") end
     self:check_death("You bled out in your sleep.")
 end
@@ -357,6 +358,7 @@ function Game:try_consume(kind, k)
         self:remove_stack(kind, k)
     end
     self:push_log("Consumed " .. def.name .. ".")
+    self:after_consume(def, kind, k)
 end
 
 -- E on the inventory screen: the obvious thing for the item under the cursor.

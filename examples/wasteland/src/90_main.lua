@@ -29,6 +29,8 @@ local ok, err = pcall(function()
             game:rest()
         elseif key == KEY.F then
             game:scavenge()
+        elseif key == KEY.E then
+            game:water_action()
         elseif key == KEY.C then
             game:open_crafting()
         elseif key == KEY.I then

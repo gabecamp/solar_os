@@ -77,6 +77,21 @@ local RAD = {
     world_items = {"geiger", "gasmask", "antirad", "antirad", "bolts"},   -- dropped once each
 }
 
+-- Water and the survival loop. Bottles are containers: drinking leaves an
+-- Empty Bottle, E on the map by a river (or on a ford) fills them with Dirty
+-- Water (or, with none, you drink straight from it), resting in the rain
+-- fills them clean, and boiling at a fire (a recipe) cleans dirty water.
+-- Items with `sick` can make you ill (that % chance): while sick you lose
+-- `sick` per hour. `perish` items go bad: each carried unit has a
+-- 1-in-hours chance per hour of turning into `into`. At 0 thirst or
+-- hunger you lose HP every hour.
+local SURVIVE = {
+    sick_hours = {12, 24},
+    sick = {thirst = 3, hunger = 2, hurt = 1, rest = 1},
+    drink_here = 30, drink_hours = 1,
+    thirst_hurt = 2, hunger_hurt = 1,
+}
+
 local BACKPACK_CAP = 16      -- most bag cells any build can have (the layout's limit)
 local POCKET_CELLS = 4       -- bag cells with nothing worn on your back
 
@@ -128,9 +143,18 @@ local ITEM_DB = {
     satchel      = {name = "Satchel",      slot = "back", consumable = nil, bag_cells = 8,
                     wear = {{"torso", 147, 210, "BLACK", 12, 15}}},
     canned_beans = {name = "Canned Beans", slot = nil, consumable = {hunger = 40}},
-    water_bottle = {name = "Water Bottle", slot = nil, consumable = {thirst = 50}},
+    -- empty: what is left in your hands after drinking (see SURVIVE)
+    water_bottle = {name = "Water Bottle", slot = nil, consumable = {thirst = 50},
+                    empty = "empty_bottle"},
+    dirty_water  = {name = "Dirty Water",  slot = nil, consumable = {thirst = 50},
+                    empty = "empty_bottle", sick = 40, desc = "Boil it at a fire (C)"},
+    empty_bottle = {name = "Empty Bottle", slot = nil, consumable = nil,
+                    desc = "E on the map by water: fill"},
+    rotten_meat  = {name = "Rotten Meat",  slot = nil, consumable = {hunger = 20},
+                    sick = 70, desc = "Gone bad. Risky"},
     berries      = {name = "Wild Berries", slot = nil, consumable = {hunger = 15, thirst = 5}},
-    strange_meat = {name = "Strange Meat", slot = nil, consumable = {hunger = 30, thirst = -5}},
+    strange_meat = {name = "Strange Meat", slot = nil, consumable = {hunger = 30, thirst = -5},
+                    sick = 25, perish = {hours = 36, into = "rotten_meat"}, desc = "Cook it (C at a fire)"},
     -- rads: taken off your radiation (see RAD)
     antirad      = {name = "Anti-Rad",     slot = nil, consumable = {rads = -50, thirst = -5},
                     desc = "E: -50 rads"},
@@ -161,7 +185,8 @@ local ITEM_DB = {
                     desc = "Hold it: light in the dark"},
     bandage      = {name = "Bandage",      slot = nil, consumable = nil,
                     desc = "E: stop bleeding, +15 HP"},
-    cooked_meat  = {name = "Cooked Meat",  slot = nil, consumable = {hunger = 45}},
+    cooked_meat  = {name = "Cooked Meat",  slot = nil, consumable = {hunger = 45},
+                    perish = {hours = 72, into = "rotten_meat"}},
     scrawled_notes = {name = "Scrawled Notes", slot = nil, consumable = nil,
                     desc = "E: read, learn a recipe"},
     -- artifacts: left by anomalies; artifact = effects while held in a hand
@@ -186,14 +211,14 @@ local SCAVENGE_LOOT = {
     plains = {{"nothing", 8}, {"rock", 3}, {"cloth_scrap", 4}, {"canned_beans", 3},
               {"water_bottle", 3}, {"cap", 1}, {"sunglasses", 1}, {"gloves", 1},
               {"satchel", 1}, {"pipe", 1}, {"knife", 1}, {"stick", 2},
-              {"scrawled_notes", 1}, {"bolts", 1}, {"vodka", 1}},
+              {"scrawled_notes", 1}, {"bolts", 1}, {"vodka", 1}, {"empty_bottle", 2}},
     forest = {{"nothing", 7}, {"berries", 6}, {"cloth_scrap", 2}, {"water_bottle", 2},
               {"scarf", 1}, {"earmuffs", 1}, {"gloves", 1}, {"spear", 1}, {"stick", 7}},
     -- ruins: what's left in houses and cars
     ruins  = {{"nothing", 8}, {"canned_beans", 4}, {"water_bottle", 3}, {"cloth_scrap", 4},
               {"scrawled_notes", 3}, {"rope", 1}, {"knife", 1}, {"pipe", 1}, {"stick", 1},
               {"jacket", 1}, {"backpack", 1}, {"antirad", 2}, {"vodka", 2}, {"bolts", 2},
-              {"geiger", 1}, {"gasmask", 1}},
+              {"geiger", 1}, {"gasmask", 1}, {"empty_bottle", 2}},
     ford   = {{"nothing", 12}, {"rock", 4}, {"stick", 2}, {"water_bottle", 1}},
     hills  = {{"nothing", 9}, {"rock", 6}, {"water_bottle", 2}, {"canned_beans", 1},
               {"jacket", 1}, {"bracers", 1}, {"boots", 1}, {"knife", 1}, {"stick", 1},
@@ -214,6 +239,8 @@ local RECIPES = {
      place = "campfire", known = true},
     {id = "cook", name = "Cooked Meat", inputs = {strange_meat = 1}, fire = true, hours = 1,
      out = {"cooked_meat", 1}, known = true},
+    {id = "boil", name = "Boil Water", inputs = {dirty_water = 1}, fire = true, hours = 1,
+     out = {"water_bottle", 1}, known = true},
     {id = "rope", name = "Rope", inputs = {cloth_scrap = 3}, hours = 1, out = {"rope", 1}},
     {id = "spear", name = "Spear", inputs = {stick = 1, rope = 1}, tools = {"knife"},
      hours = 2, out = {"spear", 1}},

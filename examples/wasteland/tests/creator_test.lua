@@ -85,7 +85,7 @@ gfx.getch, fake.should_exit, gfx.text = saved_getch, saved_exit, saved_text
 local saw_creator, saw_map = false, false
 for _, s in ipairs(texts) do
     if s == "Create your survivor" then saw_creator = true end
-    if s:find("F:scavenge", 1, true) then saw_map = true end
+    if s:find("F:search", 1, true) then saw_map = true end
 end
 assert(saw_creator and saw_map, "creator then map")
 print("   OK")

@@ -54,6 +54,7 @@ function Game:draw_map(w, h)
     if p.injuries.bleeding then inj[#inj + 1] = "BLEEDING" end
     if p.injuries.wounded_hours > 0 then inj[#inj + 1] = "Wounded" end
     if (p.cold_hours or 0) > 0 then inj[#inj + 1] = "COLD" end
+    if (p.sick_hours or 0) > 0 then inj[#inj + 1] = "SICK" end
     inj[#inj + 1] = "Scav " .. scav
     gfx.text(PANEL_X, 84, table.concat(inj, " "))
     local rad_line = self:rad_text()
@@ -148,7 +149,7 @@ function Game:draw_map(w, h)
         gfx.text(6, ly, line)
         ly = ly + 14
     end
-    gfx.text(6, h - 8, "Arrows Spc:rest F:scavenge C:craft I:inv Q:quit")
+    gfx.text(6, h - 8, "Arrows Spc:rest F:search E:water C:craft I:inv Q:quit")
 
     gfx.refresh()
 end

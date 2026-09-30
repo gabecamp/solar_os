@@ -113,10 +113,8 @@ end
 function Game:scavenge_field()
     local p = self.player
     if self:rad_at(p.q, p.r) < 2 then return end
-    self.seed = rand_next(self.seed)
-    if self.seed % 100 >= RAD.artifact_find then return end
-    self.seed = rand_next(self.seed)
-    local item = ARTIFACTS[self.seed % #ARTIFACTS + 1]
+    if not self:roll(RAD.artifact_find) then return end
+    local item = ARTIFACTS[self:rand(#ARTIFACTS) + 1]
     self:put_stack("ground", nil, {item = item, qty = 1})
     self:push_log("Something glints in the hot ground: " .. ITEM_DB[item].name .. ".")
 end

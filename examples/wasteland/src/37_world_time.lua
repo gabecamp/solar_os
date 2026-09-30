@@ -81,6 +81,7 @@ function Game:tick()
             p.cold_hours = 0
         end
         dose = dose + self:rad_hour()
+        self:survive_hour()
     end
     self.ticked_hour = p.hours
     local cold = (p.cold_hours or 0) > 0
@@ -90,7 +91,8 @@ function Game:tick()
         self:push_log("The cold is getting into you. (-" .. WORLD.cold_hurt .. " HP/h)")
     end
     self:rad_news(dose, rad_before)
+    self:survive_news()
     self:geiger_scan()
     self:refresh_view()
-    self:check_death(cold and "You froze to death." or "Radiation sickness took you.")
+    self:check_death(self:death_reason())
 end

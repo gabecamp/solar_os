@@ -127,6 +127,21 @@ local RAD = {
     world_items = {"geiger", "gasmask", "antirad", "antirad", "bolts"},   -- dropped once each
 }
 
+-- Water and the survival loop. Bottles are containers: drinking leaves an
+-- Empty Bottle, E on the map by a river (or on a ford) fills them with Dirty
+-- Water (or, with none, you drink straight from it), resting in the rain
+-- fills them clean, and boiling at a fire (a recipe) cleans dirty water.
+-- Items with `sick` can make you ill (that % chance): while sick you lose
+-- `sick` per hour. `perish` items go bad: each carried unit has a
+-- 1-in-hours chance per hour of turning into `into`. At 0 thirst or
+-- hunger you lose HP every hour.
+local SURVIVE = {
+    sick_hours = {12, 24},
+    sick = {thirst = 3, hunger = 2, hurt = 1, rest = 1},
+    drink_here = 30, drink_hours = 1,
+    thirst_hurt = 2, hunger_hurt = 1,
+}
+
 local BACKPACK_CAP = 16      -- most bag cells any build can have (the layout's limit)
 local POCKET_CELLS = 4       -- bag cells with nothing worn on your back
 
@@ -178,9 +193,18 @@ local ITEM_DB = {
     satchel      = {name = "Satchel",      slot = "back", consumable = nil, bag_cells = 8,
                     wear = {{"torso", 147, 210, "BLACK", 12, 15}}},
     canned_beans = {name = "Canned Beans", slot = nil, consumable = {hunger = 40}},
-    water_bottle = {name = "Water Bottle", slot = nil, consumable = {thirst = 50}},
+    -- empty: what is left in your hands after drinking (see SURVIVE)
+    water_bottle = {name = "Water Bottle", slot = nil, consumable = {thirst = 50},
+                    empty = "empty_bottle"},
+    dirty_water  = {name = "Dirty Water",  slot = nil, consumable = {thirst = 50},
+                    empty = "empty_bottle", sick = 40, desc = "Boil it at a fire (C)"},
+    empty_bottle = {name = "Empty Bottle", slot = nil, consumable = nil,
+                    desc = "E on the map by water: fill"},
+    rotten_meat  = {name = "Rotten Meat",  slot = nil, consumable = {hunger = 20},
+                    sick = 70, desc = "Gone bad. Risky"},
     berries      = {name = "Wild Berries", slot = nil, consumable = {hunger = 15, thirst = 5}},
-    strange_meat = {name = "Strange Meat", slot = nil, consumable = {hunger = 30, thirst = -5}},
+    strange_meat = {name = "Strange Meat", slot = nil, consumable = {hunger = 30, thirst = -5},
+                    sick = 25, perish = {hours = 36, into = "rotten_meat"}, desc = "Cook it (C at a fire)"},
     -- rads: taken off your radiation (see RAD)
     antirad      = {name = "Anti-Rad",     slot = nil, consumable = {rads = -50, thirst = -5},
                     desc = "E: -50 rads"},
@@ -211,7 +235,8 @@ local ITEM_DB = {
                     desc = "Hold it: light in the dark"},
     bandage      = {name = "Bandage",      slot = nil, consumable = nil,
                     desc = "E: stop bleeding, +15 HP"},
-    cooked_meat  = {name = "Cooked Meat",  slot = nil, consumable = {hunger = 45}},
+    cooked_meat  = {name = "Cooked Meat",  slot = nil, consumable = {hunger = 45},
+                    perish = {hours = 72, into = "rotten_meat"}},
     scrawled_notes = {name = "Scrawled Notes", slot = nil, consumable = nil,
                     desc = "E: read, learn a recipe"},
     -- artifacts: left by anomalies; artifact = effects while held in a hand
@@ -236,14 +261,14 @@ local SCAVENGE_LOOT = {
     plains = {{"nothing", 8}, {"rock", 3}, {"cloth_scrap", 4}, {"canned_beans", 3},
               {"water_bottle", 3}, {"cap", 1}, {"sunglasses", 1}, {"gloves", 1},
               {"satchel", 1}, {"pipe", 1}, {"knife", 1}, {"stick", 2},
-              {"scrawled_notes", 1}, {"bolts", 1}, {"vodka", 1}},
+              {"scrawled_notes", 1}, {"bolts", 1}, {"vodka", 1}, {"empty_bottle", 2}},
     forest = {{"nothing", 7}, {"berries", 6}, {"cloth_scrap", 2}, {"water_bottle", 2},
               {"scarf", 1}, {"earmuffs", 1}, {"gloves", 1}, {"spear", 1}, {"stick", 7}},
     -- ruins: what's left in houses and cars
     ruins  = {{"nothing", 8}, {"canned_beans", 4}, {"water_bottle", 3}, {"cloth_scrap", 4},
               {"scrawled_notes", 3}, {"rope", 1}, {"knife", 1}, {"pipe", 1}, {"stick", 1},
               {"jacket", 1}, {"backpack", 1}, {"antirad", 2}, {"vodka", 2}, {"bolts", 2},
-              {"geiger", 1}, {"gasmask", 1}},
+              {"geiger", 1}, {"gasmask", 1}, {"empty_bottle", 2}},
     ford   = {{"nothing", 12}, {"rock", 4}, {"stick", 2}, {"water_bottle", 1}},
     hills  = {{"nothing", 9}, {"rock", 6}, {"water_bottle", 2}, {"canned_beans", 1},
               {"jacket", 1}, {"bracers", 1}, {"boots", 1}, {"knife", 1}, {"stick", 1},
@@ -264,6 +289,8 @@ local RECIPES = {
      place = "campfire", known = true},
     {id = "cook", name = "Cooked Meat", inputs = {strange_meat = 1}, fire = true, hours = 1,
      out = {"cooked_meat", 1}, known = true},
+    {id = "boil", name = "Boil Water", inputs = {dirty_water = 1}, fire = true, hours = 1,
+     out = {"water_bottle", 1}, known = true},
     {id = "rope", name = "Rope", inputs = {cloth_scrap = 3}, hours = 1, out = {"rope", 1}},
     {id = "spear", name = "Spear", inputs = {stick = 1, rope = 1}, tools = {"knife"},
      hours = 2, out = {"spear", 1}},
@@ -429,6 +456,60 @@ end
 local SPRITE_W, SPRITE_H = 16, 16
 
 local SPRITE_ART = {
+    empty_bottle = {
+        "................",
+        "......####......",
+        "......#..#......",
+        "......####......",
+        ".....#....#.....",
+        "....#......#....",
+        "....#......#....",
+        "....#......#....",
+        "....#......#....",
+        "....#......#....",
+        "....#......#....",
+        "....#......#....",
+        "....#......#....",
+        "....#......#....",
+        "....########....",
+        "................",
+    },
+    dirty_water = {
+        "................",
+        "......####......",
+        "......####......",
+        "......####......",
+        ".....#....#.....",
+        "....#......#....",
+        "....#......#....",
+        "....########....",
+        "....#.#.##.#....",
+        "....##.#..##....",
+        "....#.##.#.#....",
+        "....##..#.##....",
+        "....#.#.##.#....",
+        "....##.#..##....",
+        "....########....",
+        "................",
+    },
+    rotten_meat = {
+        "..#.......#.....",
+        ".#.#.....#.#....",
+        "..#..#......#...",
+        ".....######.....",
+        "...###..#####...",
+        "..##.##.##.###..",
+        ".#.###.#.###.##.",
+        ".##.#.##.#.#.##.",
+        "#.###.#.###.#.##",
+        "##.#.###.#.###.#",
+        ".#.###.#.###.##.",
+        "..##.#.###.#.#..",
+        "...###.#.####...",
+        ".....######.....",
+        "................",
+        "................",
+    },
     geiger = {
         "................",
         "....######......",
@@ -1983,6 +2064,7 @@ function Game:rest()
     p.mp = effective_max_mp(p)
     self:refresh_view()
     self:push_log("Rested " .. REST_HOURS .. "h" .. (fire and " by the fire." or "."))
+    if self:weather() == "Rain" then self:rain_fill() end
     if p.injuries.bleeding then self:push_log("You're still bleeding. Bandage it (E on cloth).") end
     self:check_death("You bled out in your sleep.")
 end
@@ -2144,6 +2226,7 @@ function Game:try_consume(kind, k)
         self:remove_stack(kind, k)
     end
     self:push_log("Consumed " .. def.name .. ".")
+    self:after_consume(def, kind, k)
 end
 
 -- E on the inventory screen: the obvious thing for the item under the cursor.
@@ -2343,6 +2426,165 @@ function Game:craft_key(key)
     end
 end
 -- ---------------------------------------------------------------------
+-- Water and the survival loop
+--
+-- Bottles are containers (ITEM_DB[..].empty): drinking leaves an Empty
+-- Bottle where the full one was. E on the map by a river or on a ford fills
+-- every empty bottle you carry with Dirty Water, or with none you drink
+-- straight from it. Resting in the rain fills them clean; the Boil Water
+-- recipe cleans dirty water at a fire. Some food and water can make you
+-- sick (ITEM_DB[..].sick), meat goes bad (perish), and at 0 thirst or
+-- hunger you lose HP every hour. Numbers are in SURVIVE (05_data).
+-- ---------------------------------------------------------------------
+
+-- After eating/drinking one unit of def (the stack was at kind/k):
+-- the empty container, and maybe sickness.
+function Game:after_consume(def, kind, k)
+    local p = self.player
+    if def.empty then
+        local empty = {item = def.empty, qty = 1}
+        if kind == "equip" and p.equipped[k] == nil then
+            p.equipped[k] = def.empty                       -- still in your hand
+        elseif not self:put_stack("inventory", nil, empty) then
+            self:put_stack("ground", nil, empty)
+        end
+    end
+    if def.sick and self:roll(def.sick) then self:make_sick() end
+end
+
+function Game:make_sick()
+    local p = self.player
+    local lo, hi = SURVIVE.sick_hours[1], SURVIVE.sick_hours[2]
+    p.sick_hours = math.max(p.sick_hours or 0, lo + self:rand(hi - lo + 1))
+    self:push_log("Your gut twists. You're sick. (" .. p.sick_hours .. "h)")
+end
+
+-- On a ford, or next to open water.
+function Game:near_water()
+    local p = self.player
+    if self.tiles[hex_key(p.q, p.r)] == "ford" then return true end
+    for _, n in ipairs(neighbors(self.tiles, p.q, p.r)) do
+        if self.tiles[hex_key(n[1], n[2])] == "water" then return true end
+    end
+    return false
+end
+
+-- Turn every carried empty bottle into `into`. Returns how many.
+function Game:fill_bottles(into)
+    local p = self.player
+    local n = 0
+    for slot, item in pairs(p.equipped) do
+        if item == "empty_bottle" then p.equipped[slot] = into; n = n + 1 end
+    end
+    for i = #p.inventory, 1, -1 do
+        local s = p.inventory[i]
+        if s.item == "empty_bottle" then
+            n = n + s.qty
+            local qty = s.qty
+            table.remove(p.inventory, i)
+            -- merges into an existing stack or takes the freed cell, so it fits
+            self:put_stack("inventory", nil, {item = into, qty = qty})
+        end
+    end
+    return n
+end
+
+-- E on the map.
+function Game:water_action()
+    local p = self.player
+    if not self:near_water() then
+        self:push_log("No water here. Find a river or a ford.")
+        return
+    end
+    local n = self:fill_bottles("dirty_water")
+    if n > 0 then
+        self:push_log(("Filled %d bottle%s. Boil it before drinking."):format(n, n > 1 and "s" or ""))
+        return
+    end
+    p.needs.thirst = clamp(p.needs.thirst + SURVIVE.drink_here)
+    p.hours = p.hours + SURVIVE.drink_hours
+    apply_awake_hours(p, SURVIVE.drink_hours)
+    self:push_log("You drink from the river. It tastes of iron.")
+    local risk = ITEM_DB.dirty_water.sick
+    if risk and self:roll(risk) then self:make_sick() end
+end
+
+-- Resting in the rain: empty bottles fill clean.
+function Game:rain_fill()
+    local n = self:fill_bottles("water_bottle")
+    if n > 0 then self:push_log(("The rain filled %d bottle%s."):format(n, n > 1 and "s" or "")) end
+end
+
+-- n units of a stack go bad.
+function Game:spoil(stack, per, n)
+    stack.qty = stack.qty - n
+    local rot = {item = per.into, qty = n}
+    if not self:put_stack("inventory", nil, rot) then self:put_stack("ground", nil, rot) end
+    self.spoiled = self.spoiled or {}
+    self.spoiled[ITEM_DB[stack.item].name] = true
+end
+
+-- One hour: sickness, hunger and thirst damage, food going bad.
+function Game:survive_hour()
+    local p = self.player
+    local hurt = 0
+    if (p.sick_hours or 0) > 0 then
+        local s = SURVIVE.sick
+        p.sick_hours = p.sick_hours - 1
+        p.needs.thirst = clamp(p.needs.thirst - s.thirst)
+        p.needs.hunger = clamp(p.needs.hunger - s.hunger)
+        p.needs.rest = clamp(p.needs.rest - s.rest)
+        hurt = hurt + s.hurt
+        if p.sick_hours == 0 then self:push_log("The sickness passes.") end
+    end
+    if p.needs.thirst <= 0 then hurt = hurt + SURVIVE.thirst_hurt end
+    if p.needs.hunger <= 0 then hurt = hurt + SURVIVE.hunger_hurt end
+    p.health = clamp(p.health - hurt)
+
+    for i = #p.inventory, 1, -1 do
+        local s = p.inventory[i]
+        local per = ITEM_DB[s.item].perish
+        if per then
+            local n = 0   -- each unit: a 1-in-hours chance
+            for _ = 1, s.qty do
+                if self:rand(per.hours) == 0 then n = n + 1 end
+            end
+            if n > 0 then
+                self:spoil(s, per, n)
+                if s.qty <= 0 then table.remove(p.inventory, i) end
+            end
+        end
+    end
+    for slot, item in pairs(p.equipped) do
+        local per = ITEM_DB[item].perish
+        if per and self:rand(per.hours) == 0 then
+            p.equipped[slot] = per.into
+            self.spoiled = self.spoiled or {}
+            self.spoiled[ITEM_DB[item].name] = true
+        end
+    end
+end
+
+function Game:survive_news()
+    if not self.spoiled then return end
+    local names = {}
+    for name in pairs(self.spoiled) do names[#names + 1] = name end
+    table.sort(names)
+    self:push_log(table.concat(names, ", ") .. " went bad.")
+    self.spoiled = nil
+end
+
+-- What killed you, when it happened with time passing.
+function Game:death_reason()
+    local p = self.player
+    if (p.cold_hours or 0) > WORLD.cold_grace then return "You froze to death." end
+    if self:rad_stage() >= 2 then return "Radiation sickness took you." end
+    if (p.sick_hours or 0) > 0 then return "The sickness took you." end
+    if p.needs.thirst <= 0 then return "You died of thirst." end
+    if p.needs.hunger <= 0 then return "You starved." end
+    return "Your body gave out."
+end
+-- ---------------------------------------------------------------------
 -- Time of day, weather, cold and light
 --
 -- The clock is derived from player.hours (see WORLD in 05_data). Weather is
@@ -2425,6 +2667,7 @@ function Game:tick()
             p.cold_hours = 0
         end
         dose = dose + self:rad_hour()
+        self:survive_hour()
     end
     self.ticked_hour = p.hours
     local cold = (p.cold_hours or 0) > 0
@@ -2434,9 +2677,10 @@ function Game:tick()
         self:push_log("The cold is getting into you. (-" .. WORLD.cold_hurt .. " HP/h)")
     end
     self:rad_news(dose, rad_before)
+    self:survive_news()
     self:geiger_scan()
     self:refresh_view()
-    self:check_death(cold and "You froze to death." or "Radiation sickness took you.")
+    self:check_death(self:death_reason())
 end
 -- ---------------------------------------------------------------------
 -- Saving and continuing
@@ -2733,10 +2977,8 @@ end
 function Game:scavenge_field()
     local p = self.player
     if self:rad_at(p.q, p.r) < 2 then return end
-    self.seed = rand_next(self.seed)
-    if self.seed % 100 >= RAD.artifact_find then return end
-    self.seed = rand_next(self.seed)
-    local item = ARTIFACTS[self.seed % #ARTIFACTS + 1]
+    if not self:roll(RAD.artifact_find) then return end
+    local item = ARTIFACTS[self:rand(#ARTIFACTS) + 1]
     self:put_stack("ground", nil, {item = item, qty = 1})
     self:push_log("Something glints in the hot ground: " .. ITEM_DB[item].name .. ".")
 end
@@ -3293,6 +3535,7 @@ function Game:draw_map(w, h)
     if p.injuries.bleeding then inj[#inj + 1] = "BLEEDING" end
     if p.injuries.wounded_hours > 0 then inj[#inj + 1] = "Wounded" end
     if (p.cold_hours or 0) > 0 then inj[#inj + 1] = "COLD" end
+    if (p.sick_hours or 0) > 0 then inj[#inj + 1] = "SICK" end
     inj[#inj + 1] = "Scav " .. scav
     gfx.text(PANEL_X, 84, table.concat(inj, " "))
     local rad_line = self:rad_text()
@@ -3387,7 +3630,7 @@ function Game:draw_map(w, h)
         gfx.text(6, ly, line)
         ly = ly + 14
     end
-    gfx.text(6, h - 8, "Arrows Spc:rest F:scavenge C:craft I:inv Q:quit")
+    gfx.text(6, h - 8, "Arrows Spc:rest F:search E:water C:craft I:inv Q:quit")
 
     gfx.refresh()
 end
@@ -3528,6 +3771,7 @@ function Game:current_conditions()
     if self.player.injuries.bleeding then table.insert(list, "Bleeding") end
     if self.player.injuries.wounded_hours > 0 then table.insert(list, "Wounded") end
     if self.player.health < 50 then table.insert(list, "Hurt") end
+    if (self.player.sick_hours or 0) > 0 then table.insert(list, "Sick") end
     local rad_stage = RAD.stages[self:rad_stage()]
     if rad_stage then table.insert(list, rad_stage.name) end
     if #list == 0 then return "Conditions: none" end
@@ -4653,6 +4897,8 @@ local ok, err = pcall(function()
             game:rest()
         elseif key == KEY.F then
             game:scavenge()
+        elseif key == KEY.E then
+            game:water_action()
         elseif key == KEY.C then
             game:open_crafting()
         elseif key == KEY.I then
