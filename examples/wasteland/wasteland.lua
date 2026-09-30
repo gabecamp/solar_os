@@ -19,7 +19,10 @@ Controls:
   E               - inventory: use the item under the cursor - eat/drink one,
                     wear it, hold it in a free hand, or take it off; on a
                     Cloth Scrap while bleeding: bandage the wound
-  I             - toggle inventory screen
+  1-7 / Up,Dn,Enter - encounter screen: pick a choice (moving can run you
+                    into animals, mutants, bandits or, rarely, a helper;
+                    hold a weapon in a hand to fight with it)
+  I               - toggle inventory screen
   Q / ESC         - quit
 
 A new game opens on the character creator: Up/Down pick a row, Left/Right
@@ -63,6 +66,7 @@ local KEY_LF = 10
 local KEY_ESC = 27
 local KEY_A, KEY_D, KEY_S, KEY_W = 97, 100, 115, 119
 local KEY_E, KEY_F, KEY_I, KEY_Q = 101, 102, 105, 113
+local KEY_T = 116
 
 -- Terrain: id -> {name, cost (MP + hours), passable, shade}
 -- shade is one of gfx.WHITE / gfx.LIGHT / gfx.DARK / gfx.BLACK, used as
@@ -140,7 +144,20 @@ local ITEM_DB = {
                     weapon = {dmg = 15, reach = "close"}},
     spear        = {name = "Spear",        slot = nil, consumable = nil,
                     weapon = {dmg = 10, reach = "near", bleed = 15}},
+    -- artifacts: left by anomalies; artifact = effects while held in a hand
+    -- (see recompute_stats), desc = what the inventory shows under the cursor
+    weeping_stone = {name = "Weeping Stone", slot = nil, consumable = nil,
+                     artifact = {mp = 1, thirst = 1.5}, desc = "+1 MP, thirst x1.5"},
+    drowned_eye   = {name = "Drowned Eye",   slot = nil, consumable = nil,
+                     artifact = {sight = 1, rest_drain = 1.3}, desc = "+1 sight, tire x1.3"},
+    flesh_knot    = {name = "Flesh Knot",    slot = nil, consumable = nil,
+                     artifact = {heal = 2, hunger = 1.5}, desc = "+2 HP/h, hunger x1.5"},
+    hollow_star   = {name = "Hollow Star",   slot = nil, consumable = nil,
+                     artifact = {scav = 1, scav_hurt = 3}, desc = "+1 find, -3 HP/search"},
+    quiet_shell   = {name = "Quiet Shell",   slot = nil, consumable = nil,
+                     artifact = {encounter = 0.5, sight = -1}, desc = "half encounters, -1 sight"},
 }
+local ARTIFACTS = {"weeping_stone", "drowned_eye", "flesh_knot", "hollow_star", "quiet_shell"}
 
 -- What scavenging can turn up, per terrain: {item, weight}. "nothing" is a
 -- dud roll. Plains are old roadside junk, forest is food and cold-weather
@@ -259,6 +276,39 @@ local ENCOUNTERS = {
           .. "them out there.'",
      start = "near"},
 }
+-- anomalies: no fight. Investigate opens a random puzzle; finishing it has
+-- ARTIFACT_CHANCE of leaving an artifact, failing it hurts in odd ways.
+local ANOMALIES = {
+    {kind = "anomaly", name = "The Humming Hollow", who = "humming hollow",
+     intro = "The grass in this dip lies flat in a perfect spiral, and the air above "
+          .. "it hums at a pitch you feel in your teeth. A crow lands at the edge and "
+          .. "is folded into nothing without a sound."},
+    {kind = "anomaly", name = "The Drowned Bell", who = "drowned bell",
+     intro = "A bell tolls somewhere beneath your feet, though there is no church for "
+          .. "miles. With every stroke the ground ripples like water, and something "
+          .. "far below answers it."},
+    {kind = "anomaly", name = "Wrong Stars", who = "wrong stars",
+     intro = "At midday a patch of sky above you goes black and fills with stars in "
+          .. "shapes no one has named. You have the strong feeling that something up "
+          .. "there has noticed you looking."},
+    {kind = "anomaly", name = "The Stillness", who = "stillness",
+     intro = "Ahead, birds hang motionless in mid-flight and dust floats unmoving in "
+          .. "the light. When you reach toward it, every sound stops, even your own "
+          .. "heartbeat."},
+    {kind = "anomaly", name = "The Door in the Field", who = "door",
+     intro = "A door frame stands alone in the field, no walls around it. Through it "
+          .. "you see this same field, but at night, and someone standing in it, "
+          .. "waiting for you."},
+}
+for _, a in ipairs(ANOMALIES) do ENCOUNTERS[#ENCOUNTERS + 1] = a end
+local ARTIFACT_CHANCE = 25     -- % after a finished puzzle, +5 per Perception over 3
+local BOLT_N, BOLT_HAZARDS = 5, 6               -- grid side, deadly cells
+local BOLT_START, BOLT_GOAL = BOLT_N * (BOLT_N - 1) + 3, 3   -- bottom and top middle
+local BOLTS = 3                -- bolts to throw, +1 per Perception over 3 (min 1)
+local SEQ_LENGTHS = {3, 4, 5}  -- sequence puzzle rounds
+local RUNE_N, RUNE_SCRAMBLE = 5, 3
+local RUNE_MOVES = 6           -- presses allowed, +1 per Perception over 3 (min RUNE_SCRAMBLE)
+
 local ENCOUNTERS_BY_KIND = {}
 for _, e in ipairs(ENCOUNTERS) do
     ENCOUNTERS_BY_KIND[e.kind] = ENCOUNTERS_BY_KIND[e.kind] or {}
@@ -583,6 +633,96 @@ local SPRITE_ART = {
         "................",
         "................",
     },
+    weeping_stone = {
+        "................",
+        "......####......",
+        "....########....",
+        "...##########...",
+        "..###.####.###..",
+        "..###.####.###..",
+        "..############..",
+        "..############..",
+        "...##########...",
+        "....########....",
+        "......####......",
+        "...#........#...",
+        "...#........#...",
+        "..###......###..",
+        "...#........#...",
+        "................",
+    },
+    drowned_eye = {
+        "................",
+        "................",
+        "......####......",
+        "...##########...",
+        "..###......###..",
+        ".##....##....##.",
+        "##....####....##",
+        "##...######...##",
+        "##....####....##",
+        ".##....##....##.",
+        "..###......###..",
+        "...##########...",
+        "......####......",
+        "................",
+        "................",
+        "................",
+    },
+    flesh_knot = {
+        "................",
+        "....###..###....",
+        "...#####.####...",
+        "..##..####..##..",
+        "..#..##..##..#..",
+        "..#.##....##.#..",
+        "..###..##..###..",
+        "...#..####..#...",
+        "...#..####..#...",
+        "..###..##..###..",
+        "..#.##....##.#..",
+        "..#..##..##..#..",
+        "..##..####..##..",
+        "...####.#####...",
+        "....###..###....",
+        "................",
+    },
+    hollow_star = {
+        "........#.......",
+        ".......###......",
+        "...#...#.#...#..",
+        "....#.#...#.#...",
+        ".....#.....#....",
+        "....#.......#...",
+        ".###.........###",
+        "....#.......#...",
+        ".....#.....#....",
+        "....#.#...#.#...",
+        "...#...#.#...#..",
+        ".......###......",
+        "........#.......",
+        "................",
+        "................",
+        "................",
+    },
+    quiet_shell = {
+        "................",
+        "......#####.....",
+        "....##.....##...",
+        "...#..####...#..",
+        "..#..#....#...#.",
+        "..#.#..##..#..#.",
+        "..#.#.#..#.#..#.",
+        "..#.#..#.#.#..#.",
+        "..#..#..##.#..#.",
+        "...#..#...#..#..",
+        "....#..###..#...",
+        ".....##...##....",
+        ".......###......",
+        "................",
+        "................",
+        "................",
+    },
     strange_meat = {
         "................",
         "................",
@@ -756,6 +896,84 @@ end
 for terrain_id in pairs(TERRAIN) do
     assert(GLYPHS[terrain_id], "terrain has no glyph: " .. terrain_id)
 end
+
+-- The four sigils of the sequence puzzle (16x16, keys 1-4).
+local SIGIL_ART = {
+    {
+        ".......##.......",
+        "......#..#......",
+        "......#..#......",
+        ".....#....#.....",
+        ".....#.##.#.....",
+        "....#.####.#....",
+        "....#.####.#....",
+        "...#...##...#...",
+        "...#........#...",
+        "..#..........#..",
+        "..#..........#..",
+        ".#............#.",
+        ".##############.",
+        "................",
+        "................",
+        "................",
+    },
+    {
+        "................",
+        "...#########....",
+        "..#.........#...",
+        ".#..#######..#..",
+        ".#.#.......#.#..",
+        ".#.#..###..#.#..",
+        ".#.#.#...#.#.#..",
+        ".#.#.#.#.#.#.#..",
+        ".#.#.#.##..#.#..",
+        ".#.#..#....#.#..",
+        ".#..#.....#..#..",
+        "..#..#####..#...",
+        "...#.......#....",
+        "....#######.....",
+        "................",
+        "................",
+    },
+    {
+        "......####......",
+        ".....######.....",
+        "......####......",
+        ".......##.......",
+        "...#...##...#...",
+        "....#..##..#....",
+        ".....#.##.#.....",
+        "....#..##..#....",
+        "...#...##...#...",
+        "....#..##..#....",
+        ".....#.##.#.....",
+        "......####......",
+        ".....#.##.#.....",
+        "....#..##..#....",
+        "...#...##...#...",
+        "................",
+    },
+    {
+        "................",
+        ".....######.....",
+        "...##......##...",
+        "..#....##....#..",
+        ".#.....##.....#.",
+        ".#.....##.......",
+        "#......##.......",
+        "################",
+        ".......##......#",
+        ".......##......#",
+        ".#.....##.....#.",
+        ".#.....##.....#.",
+        "..#....##....#..",
+        "...##......##...",
+        ".....######.....",
+        "................",
+    },
+}
+local SIGILS = {}
+for i, rows in ipairs(SIGIL_ART) do SIGILS[i] = pack_bitmap("sigil" .. i, rows, 16, 16) end
 
 -- ---------------------------------------------------------------------
 -- Small deterministic RNG (avoids depending on math.randomseed behaving
@@ -941,14 +1159,24 @@ local function trait_points_left(traits)
 end
 
 -- Derived stats from attributes + traits, stored on the player.
+local FX_MULT = {hunger = true, rest_gain = true, thirst = true, rest_drain = true,
+                 encounter = true}
 local function recompute_stats(player)
-    local a, fx = player.attrs, {mp = 0, sight = 0, scav = 0, bag = 0, hunger = 1, rest_gain = 1}
-    for _, t in ipairs(TRAITS) do
-        if player.traits[t.name] then
-            for k, v in pairs(t.fx) do
-                if k == "hunger" or k == "rest_gain" then fx[k] = fx[k] * v else fx[k] = fx[k] + v end
-            end
+    local a = player.attrs
+    local fx = {mp = 0, sight = 0, scav = 0, bag = 0, heal = 0, scav_hurt = 0,
+                hunger = 1, rest_gain = 1, thirst = 1, rest_drain = 1, encounter = 1}
+    local function add(effects)
+        for k, v in pairs(effects) do
+            if FX_MULT[k] then fx[k] = fx[k] * v else fx[k] = fx[k] + v end
         end
+    end
+    for _, t in ipairs(TRAITS) do
+        if player.traits[t.name] then add(t.fx) end
+    end
+    -- artifacts work while held
+    for _, slot in ipairs({"lhand", "rhand"}) do
+        local item = player.equipped[slot]
+        if item and ITEM_DB[item].artifact then add(ITEM_DB[item].artifact) end
     end
     player.max_mp = math.max(1, BASE_MAX_MP + (a.Speed - 3) // 2 + fx.mp)
     player.sight = math.max(1, BASE_SIGHT + (a.Perception - 3) // 2 + fx.sight)
@@ -956,7 +1184,12 @@ local function recompute_stats(player)
     player.bag_bonus = (a.Strength - 3) + fx.bag
     player.hunger_mult = fx.hunger
     player.rest_gain_mult = fx.rest_gain
-    player.rest_drain_mult = 1 - 0.1 * (a.Endurance - 3)
+    player.rest_drain_mult = (1 - 0.1 * (a.Endurance - 3)) * fx.rest_drain
+    player.thirst_mult = fx.thirst
+    player.heal_per_hour = fx.heal
+    player.encounter_mult = fx.encounter
+    player.scav_hurt = fx.scav_hurt
+    if player.mp and player.mp > player.max_mp then player.mp = player.max_mp end
 end
 
 -- Perception scales how often a search roll comes up empty: 100% at 3,
@@ -1020,8 +1253,9 @@ end
 
 local function apply_awake_hours(player, hours)
     player.needs.hunger = clamp(player.needs.hunger - hours * (100 / 72) * player.hunger_mult)
-    player.needs.thirst = clamp(player.needs.thirst - hours * (100 / 48))
+    player.needs.thirst = clamp(player.needs.thirst - hours * (100 / 48) * player.thirst_mult)
     player.needs.rest = clamp(player.needs.rest - hours * (100 / 18) * player.rest_drain_mult)
+    player.health = clamp(player.health + hours * player.heal_per_hour)
     if player.injuries.bleeding then
         player.health = clamp(player.health - hours * BLEED_PER_HOUR)
     end
@@ -1029,7 +1263,7 @@ end
 
 local function apply_rest_hours(player, hours)
     player.needs.hunger = clamp(player.needs.hunger - hours * (100 / 72) * 0.5 * player.hunger_mult)
-    player.needs.thirst = clamp(player.needs.thirst - hours * (100 / 48) * 0.5)
+    player.needs.thirst = clamp(player.needs.thirst - hours * (100 / 48) * 0.5 * player.thirst_mult)
     player.needs.rest = clamp(player.needs.rest + hours * (100 / 6) * player.rest_gain_mult)
     local inj = player.injuries
     if inj.bleeding then
@@ -1189,6 +1423,10 @@ function Game:scavenge()
     p.hours = p.hours + SCAVENGE_HOURS
     apply_awake_hours(p, SCAVENGE_HOURS)
     self.scavenged[key] = (self.scavenged[key] or 0) + 1
+    if p.scav_hurt > 0 then
+        p.health = clamp(p.health - p.scav_hurt)
+        self:push_log("The star in your hand drinks from you. (-" .. p.scav_hurt .. " HP)")
+    end
 
     -- Perception: fewer dud rolls (and, via scav_rolls, more of them)
     local table_ = {}
@@ -1214,7 +1452,7 @@ function Game:scavenge()
     end
     if p.needs.hunger <= 0 then self:push_log("You are starving!") end
     if p.needs.thirst <= 0 then self:push_log("You are dehydrated!") end
-    self:check_death("You bled out.")
+    self:check_death(p.scav_hurt > 0 and "The Hollow Star emptied you." or "You bled out.")
 end
 
 function Game:rest()
@@ -1364,6 +1602,7 @@ function Game:try_transfer(source, dest)
         self.ground[hex_key(p.q, p.r)] = saved_ground
         return false
     end
+    recompute_stats(p)   -- held artifacts change stats
     self:push_log("Moved " .. ITEM_DB[stack.item].name .. ".")
     return true
 end
@@ -1439,7 +1678,7 @@ function Game:maybe_encounter(terrain_id)
         return
     end
     local chance = ENCOUNTER_CHANCE[terrain_id]
-    if chance and self:roll(chance) then self:start_encounter(self:pick_encounter()) end
+    if chance and self:roll(chance * self.player.encounter_mult) then self:start_encounter(self:pick_encounter()) end
 end
 
 -- A kind by ENCOUNTER_KINDS weight (skipping kinds with no entries), then
@@ -1509,6 +1748,7 @@ function Game:encounter_options()
     if e.over then return {{"Continue", "leave"}} end
     local kind = e.def.kind
     if kind == "helper" then return {{"Talk", "talk"}, {"Walk on", "leave_quietly"}} end
+    if kind == "anomaly" then return {{"Investigate", "investigate"}, {"Walk away", "leave_quietly"}} end
     if e.demanding then
         local o = {}
         if self:food_index() then o[#o + 1] = {"Give them some food", "give"} end
@@ -1631,7 +1871,9 @@ end
 function Game:encounter_action(action)
     local e, p = self.enc, self.player
     e.msg = {}
-    if action == "leave" or action == "leave_quietly" then
+    if action == "investigate" then
+        return self:start_puzzle()
+    elseif action == "leave" or action == "leave_quietly" then
         if action == "leave_quietly" then
             self.enc_cooldown = ENCOUNTER_COOLDOWN
             self:push_log("You nod and walk on.")
@@ -1675,6 +1917,7 @@ function Game:encounter_action(action)
         local item = p.equipped[slot]
         local w = ITEM_DB[item].weapon
         p.equipped[slot] = nil
+        recompute_stats(p)
         self:put_stack("ground", nil, {item = item, qty = 1})
         if self:roll(THROW_HIT + 8 * (p.attrs.Perception - 3) + e.aim) then
             self:enc_hit(w.dmg, w.bleed, "Your " .. ITEM_DB[item].name:lower() .. " strikes the " .. e.def.who)
@@ -1708,6 +1951,183 @@ function Game:encounter_action(action)
         self:enc_say("You try to run, but it cuts you off.")
     end
     if not e.over then self:enemy_turn() end
+end
+
+-- -- anomaly puzzles ---------------------------------------------------------
+
+local function bolt_neighbors(c)
+    local out, row, col = {}, (c - 1) // BOLT_N, (c - 1) % BOLT_N
+    if row > 0 then out[#out + 1] = c - BOLT_N end
+    if row < BOLT_N - 1 then out[#out + 1] = c + BOLT_N end
+    if col > 0 then out[#out + 1] = c - 1 end
+    if col < BOLT_N - 1 then out[#out + 1] = c + 1 end
+    return out
+end
+
+-- the cell one step from c in a direction (nil off the grid)
+local function bolt_step(c, dir)
+    local row, col = (c - 1) // BOLT_N, (c - 1) % BOLT_N
+    if dir == "up" and row > 0 then return c - BOLT_N end
+    if dir == "down" and row < BOLT_N - 1 then return c + BOLT_N end
+    if dir == "left" and col > 0 then return c - 1 end
+    if dir == "right" and col < BOLT_N - 1 then return c + 1 end
+end
+
+local function bolt_path_exists(haz)
+    local seen, queue, head = {[BOLT_START] = true}, {BOLT_START}, 1
+    while queue[head] do
+        local c = queue[head]
+        head = head + 1
+        if c == BOLT_GOAL then return true end
+        for _, n in ipairs(bolt_neighbors(c)) do
+            if not haz[n] and not seen[n] then
+                seen[n] = true
+                queue[#queue + 1] = n
+            end
+        end
+    end
+    return false
+end
+
+local function bolt_count(haz, c)
+    local n = 0
+    for _, nb in ipairs(bolt_neighbors(c)) do if haz[nb] then n = n + 1 end end
+    return n
+end
+
+function Game:start_puzzle()
+    local per = self.player.attrs.Perception
+    local kind = ({"bolts", "sequence", "runes"})[self:rand(3) + 1]
+    local z = {kind = kind, msg = ""}
+    if kind == "bolts" then
+        repeat
+            z.haz = {}
+            local placed = 0
+            while placed < BOLT_HAZARDS do
+                local c = self:rand(BOLT_N * BOLT_N) + 1
+                if c ~= BOLT_START and c ~= BOLT_GOAL and not z.haz[c] then
+                    z.haz[c] = true
+                    placed = placed + 1
+                end
+            end
+        until bolt_path_exists(z.haz)
+        z.pos, z.visited, z.revealed = BOLT_START, {[BOLT_START] = true}, {}
+        z.bolts = math.max(1, BOLTS + per - 3)
+    elseif kind == "sequence" then
+        z.round = 1
+        self:new_sequence(z)
+    else
+        z.target = {}
+        for i = 1, RUNE_N do z.target[i] = self:rand(4) end
+        repeat
+            z.cur, z.scramble = {}, {}
+            for i = 1, RUNE_N do z.cur[i] = z.target[i] end
+            for k = 1, RUNE_SCRAMBLE do
+                local i = self:rand(RUNE_N) + 1
+                z.scramble[k] = i
+                -- a press turns rune i and its neighbours forward; scramble backward
+                for j = math.max(1, i - 1), math.min(RUNE_N, i + 1) do z.cur[j] = (z.cur[j] + 3) % 4 end
+            end
+            local same = true
+            for i = 1, RUNE_N do if z.cur[i] ~= z.target[i] then same = false end end
+        until not same
+        z.moves = math.max(RUNE_SCRAMBLE, RUNE_MOVES + per - 3)
+    end
+    self.puz = z
+    self.screen = "puzzle"
+end
+
+function Game:new_sequence(z)
+    z.seq, z.typed, z.showing = {}, 0, true
+    for i = 1, SEQ_LENGTHS[z.round] do z.seq[i] = self:rand(4) + 1 end
+end
+
+-- Leave the anomaly: success may leave an artifact, failure hurts.
+function Game:finish_puzzle(result)
+    local p, who = self.player, self.enc.def.who
+    self.enc, self.puz = nil, nil
+    self.enc_cooldown = ENCOUNTER_COOLDOWN
+    self.screen = "map"
+    if result == "backed_off" then
+        self:push_log("You back away from the " .. who .. ".")
+    elseif result == "solved" then
+        if self:roll(ARTIFACT_CHANCE + 5 * (p.attrs.Perception - 3)) then
+            local id = ARTIFACTS[self:rand(#ARTIFACTS) + 1]
+            self:put_stack("ground", nil, {item = id, qty = 1})
+            self:push_log("The " .. who .. " fades. It left something:")
+            self:push_log(ITEM_DB[id].name .. ". (I to pick it up)")
+        else
+            self:push_log("The " .. who .. " fades. Nothing remains.")
+        end
+    else
+        local r = self:rand(3)
+        if r == 0 then
+            local dmg = 10 + self:rand(16)
+            p.health = clamp(p.health - dmg)
+            self:push_log("The " .. who .. " tears at you. (-" .. dmg .. " HP)")
+        elseif r == 1 then
+            p.injuries.bleeding = true
+            self:push_log("Your nose and ears begin to bleed.")
+        else
+            local hours = 4 + self:rand(5)
+            p.hours = p.hours + hours
+            apply_awake_hours(p, hours)
+            self:push_log("You come to. The sun has moved. (" .. hours .. "h lost)")
+        end
+        self:check_death("Taken by the " .. who .. ".")
+    end
+end
+
+function Game:puzzle_key(key)
+    local z = self.puz
+    if key == gfx.KEY_ESCAPE or key == KEY_Q then return self:finish_puzzle("backed_off") end
+    local dir = (key == gfx.KEY_UP or key == KEY_W) and "up"
+        or (key == gfx.KEY_DOWN or key == KEY_S) and "down"
+        or (key == gfx.KEY_LEFT or key == KEY_A) and "left"
+        or (key == gfx.KEY_RIGHT or key == KEY_D) and "right"
+    if z.kind == "bolts" then
+        if key == KEY_T then
+            z.aiming = z.bolts > 0 and not z.aiming
+            z.msg = z.aiming and "Throw which way?" or (z.bolts > 0 and "" or "No bolts left.")
+            return
+        end
+        if not dir then return end
+        local c = bolt_step(z.pos, dir)
+        if not c then return end
+        if z.aiming then
+            z.aiming = false
+            z.bolts = z.bolts - 1
+            z.revealed[c] = true
+            z.msg = z.haz[c] and "The bolt is snatched from the air and crushed."
+                or "The bolt lands and lies still."
+            return
+        end
+        if z.haz[c] then return self:finish_puzzle("failed") end
+        z.pos, z.visited[c], z.msg = c, true, ""
+        if c == BOLT_GOAL then return self:finish_puzzle("solved") end
+    elseif z.kind == "sequence" then
+        if z.showing then
+            z.showing = false
+            return
+        end
+        if key < 49 or key > 52 then return end
+        if key - 48 ~= z.seq[z.typed + 1] then return self:finish_puzzle("failed") end
+        z.typed = z.typed + 1
+        if z.typed == #z.seq then
+            z.round = z.round + 1
+            if z.round > #SEQ_LENGTHS then return self:finish_puzzle("solved") end
+            self:new_sequence(z)
+        end
+    else
+        if key < 49 or key >= 49 + RUNE_N then return end
+        local i = key - 48
+        for j = math.max(1, i - 1), math.min(RUNE_N, i + 1) do z.cur[j] = (z.cur[j] + 1) % 4 end
+        z.moves = z.moves - 1
+        local done = true
+        for k = 1, RUNE_N do if z.cur[k] ~= z.target[k] then done = false end end
+        if done then return self:finish_puzzle("solved") end
+        if z.moves <= 0 then return self:finish_puzzle("failed") end
+    end
 end
 
 function Game:encounter_key(key)
@@ -2430,6 +2850,10 @@ function Game:draw_inventory(w, h)
     local max_chars = (w - INV_COL_X - 2) // 7
     if #desc > max_chars then desc = desc:sub(1, max_chars) end
     gfx.text(INV_COL_X, CURSOR_DESC_Y, desc)
+    local row = INV_ROWS[self.inv_cursor]
+    local stack = row and self:get_stack(row[1], row[2])
+    local effect = stack and ITEM_DB[stack.item].desc
+    if effect then gfx.text(INV_COL_X, CURSOR_DESC_Y + 14, effect:sub(1, max_chars)) end
 
     local back = self.player.equipped.back
     gfx.text(INV_COL_X, BAG_LABEL_Y, (back and ITEM_DB[back].name or "Pockets")
@@ -2554,7 +2978,7 @@ function Game:draw_encounter(w, h)
     for i, line in ipairs(e.msg) do gfx.text(6, 116 + 13 * i, line) end
     local status = "You " .. math.floor(p.health) .. " HP"
     if p.injuries.bleeding then status = status .. " bleeding" end
-    if e.def.kind ~= "helper" then
+    if e.def.hp then
         status = "Range " .. RANGE_NAME[e.range] .. "   " .. status
             .. "   It: " .. (e.seen and self:enemy_condition() or "?")
     end
@@ -2562,6 +2986,101 @@ function Game:draw_encounter(w, h)
     gfx.line(6, 192, w - 6, 192)
     for i, o in ipairs(self:encounter_options()) do
         gfx.text(6, 194 + 13 * i, (i == e.cursor and ">" or " ") .. i .. " " .. o[1])
+    end
+    gfx.refresh()
+end
+
+-- A rune: a box with a needle pointing up/right/down/left (0-3).
+local function draw_rune(x, y, size, dir)
+    gfx.rect(x, y, size, size)
+    local cx, cy, r = x + size // 2, y + size // 2, size // 2 - 4
+    local dx, dy = ({0, 1, 0, -1})[dir + 1], ({-1, 0, 1, 0})[dir + 1]
+    gfx.fill_rect(cx - 2, cy - 2, 5, 5)
+    for t = -1, 1 do
+        gfx.line(cx + t * dy, cy + t * dx, cx + dx * r + t * dy, cy + dy * r + t * dx)
+    end
+end
+
+function Game:draw_puzzle(w, h)
+    local z = self.puz
+    gfx.clear(gfx.WHITE)
+    gfx.color(gfx.BLACK)
+    gfx.font(gfx.FONT_BOLD_14)
+    gfx.text(6, 16, self.enc.def.name)
+    gfx.font(gfx.FONT_MONO_12)
+    if z.kind == "bolts" then
+        gfx.text(6, 34, "Your detector clicks once for each deadly spot")
+        gfx.text(6, 47, "next to you. Reach the glint at the top.")
+        local cell = 32
+        local x0, y0 = (w - cell * BOLT_N) // 2, 58
+        for c = 1, BOLT_N * BOLT_N do
+            local x = x0 + ((c - 1) % BOLT_N) * cell
+            local y = y0 + ((c - 1) // BOLT_N) * cell
+            gfx.color(gfx.BLACK)
+            gfx.rect(x, y, cell + 1, cell + 1)
+            if z.revealed[c] and z.haz[c] then
+                gfx.color(gfx.DARK)
+                gfx.fill_rect(x + 2, y + 2, cell - 3, cell - 3)
+            elseif z.visited[c] and c ~= z.pos then
+                gfx.text(x + 13, y + 21, tostring(bolt_count(z.haz, c)))
+            elseif z.revealed[c] then
+                gfx.fill_rect(x + 14, y + 14, 5, 5)
+            end
+            if c == BOLT_GOAL then
+                gfx.color(gfx.BLACK)
+                gfx.rect(x + 8, y + 8, 17, 17)
+                gfx.rect(x + 12, y + 12, 9, 9)
+            end
+        end
+        local px = x0 + ((z.pos - 1) % BOLT_N) * cell
+        local py = y0 + ((z.pos - 1) // BOLT_N) * cell
+        gfx.color(gfx.BLACK)
+        gfx.fill_rect(px + 6, py + 6, cell - 11, cell - 11)
+        gfx.color(gfx.WHITE)
+        gfx.text(px + 13, py + 21, tostring(bolt_count(z.haz, z.pos)))
+        gfx.color(gfx.BLACK)
+        gfx.text(6, 238, "Bolts: " .. z.bolts .. (z.aiming and "   (aiming)" or ""))
+        gfx.text(6, 254, z.msg)
+        gfx.text(6, h - 8, "Arrows move  T+arrow throw a bolt  Esc back away")
+    elseif z.kind == "sequence" then
+        gfx.text(6, 34, z.showing and "The signs burn in this order. Remember them."
+            or "Press the keys for the signs, in order.")
+        gfx.text(6, 47, "Round " .. z.round .. " of " .. #SEQ_LENGTHS)
+        local n, box = #z.seq, 30
+        local x0 = (w - n * (box + 6)) // 2
+        for i = 1, n do
+            local x = x0 + (i - 1) * (box + 6)
+            gfx.rect(x, 80, box, box)
+            local shown = z.showing and z.seq[i] or (i <= z.typed and z.seq[i])
+            if shown then
+                draw_sprite(x + 7, 87, 16, 16, SIGILS[shown])
+            else
+                gfx.text(x + 12, 100, "?")
+            end
+        end
+        gfx.text(6, 150, "The signs and their keys:")
+        for i = 1, 4 do
+            local x = 60 + (i - 1) * 80
+            gfx.rect(x, 162, 30, 30)
+            draw_sprite(x + 7, 169, 16, 16, SIGILS[i])
+            gfx.text(x + 12, 208, tostring(i))
+        end
+        gfx.text(6, h - 8, z.showing and "Any key: hide them   Esc back away" or "Keys 1-4   Esc back away")
+    else
+        gfx.text(6, 34, "Runes are cut into the stone. Pressing one turns")
+        gfx.text(6, 47, "it and its neighbours. Match the carving above.")
+        local size, gap = 40, 12
+        local x0 = (w - RUNE_N * size - (RUNE_N - 1) * gap) // 2
+        gfx.text(6, 72, "Carving:")
+        for i = 1, RUNE_N do draw_rune(x0 + (i - 1) * (size + gap), 80, size, z.target[i]) end
+        gfx.text(6, 150, "Stone:")
+        for i = 1, RUNE_N do
+            local x = x0 + (i - 1) * (size + gap)
+            draw_rune(x, 158, size, z.cur[i])
+            gfx.text(x + 17, 214, tostring(i))
+        end
+        gfx.text(6, 244, "Presses left: " .. z.moves)
+        gfx.text(6, h - 8, "Keys 1-" .. RUNE_N .. "   Esc back away")
     end
     gfx.refresh()
 end
@@ -2652,6 +3171,8 @@ local ok, err = pcall(function()
                 game:draw_dead(w, h)
             elseif game.screen == "encounter" then
                 game:draw_encounter(w, h)
+            elseif game.screen == "puzzle" then
+                game:draw_puzzle(w, h)
             elseif game.screen == "map" then
                 game:draw_map(w, h)
             else
@@ -2670,6 +3191,8 @@ local ok, err = pcall(function()
                 end
             elseif game.screen == "encounter" then
                 game:encounter_key(key)
+            elseif game.screen == "puzzle" then
+                game:puzzle_key(key)
             elseif game.screen == "dead" then
                 if key == gfx.KEY_ESCAPE or key == KEY_Q then
                     game.quit = true

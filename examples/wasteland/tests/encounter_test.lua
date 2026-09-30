@@ -208,4 +208,138 @@ print(("   %d encounters in 3000 forest moves"):format(started))
 assert(started > 200 and started < 450)
 print("   OK")
 
+-- anomalies ------------------------------------------------------------
+local UP, DOWN, LEFT, RIGHT, ESC = gfx.KEY_UP, gfx.KEY_DOWN, gfx.KEY_LEFT, gfx.KEY_RIGHT, gfx.KEY_ESCAPE
+local function puzzle(kind, seed)
+    for s = seed or 1, (seed or 1) + 500 do
+        local g2 = fresh()
+        g2.seed = s
+        g2:start_encounter(def_named("The Stillness"))
+        act(g2, "investigate")
+        if g2.puz.kind == kind then return g2 end
+    end
+    error("never rolled a " .. kind .. " puzzle")
+end
+-- shortest safe route through the bolt grid, as direction keys
+local function safe_route(z)
+    local N = E.BOLT_N
+    local prev, queue, head = {[E.BOLT_START] = 0}, {E.BOLT_START}, 1
+    while queue[head] do
+        local c = queue[head]; head = head + 1
+        local r, col = (c - 1) // N, (c - 1) % N
+        for _, step in ipairs({{-N, UP, r > 0}, {N, DOWN, r < N - 1}, {-1, LEFT, col > 0}, {1, RIGHT, col < N - 1}}) do
+            local n = c + step[1]
+            if step[3] and not z.haz[n] and not prev[n] then prev[n] = {c, step[2]}; queue[#queue + 1] = n end
+        end
+    end
+    local keys, c = {}, E.BOLT_GOAL
+    while c ~= E.BOLT_START do table.insert(keys, 1, prev[c][2]); c = prev[c][1] end
+    return keys
+end
+local function ground_has(g2, id)
+    for _, st in ipairs(g2:ground_list()) do if st.item == id then return true end end
+end
+local function hurt(g2, hp, hours)
+    return g2.player.health < hp or g2.player.injuries.bleeding or g2.player.hours > hours
+end
+
+print("14. bolts: every board is walkable, and walking the safe route solves it")
+for s = 1, 60 do
+    local g2 = puzzle("bolts", s * 7)
+    local z = g2.puz
+    local n = 0; for _ in pairs(z.haz) do n = n + 1 end
+    assert(n == E.BOLT_HAZARDS and not z.haz[E.BOLT_START] and not z.haz[E.BOLT_GOAL])
+    for _, k in ipairs(safe_route(z)) do g2:puzzle_key(k) end
+    assert(g2.screen == "map" and g2.puz == nil, "reaching the glint solves it")
+end
+print("   OK")
+
+print("15. bolts: a thrown bolt reveals a cell; stepping on a hazard fails and hurts")
+local g2 = puzzle("bolts", 3)
+local z = g2.puz
+local bolts = z.bolts
+g2:puzzle_key(116); g2:puzzle_key(UP)
+assert(z.bolts == bolts - 1 and z.revealed[E.BOLT_START - E.BOLT_N] and z.pos == E.BOLT_START)
+local hazard_dir
+for s = 1, 500 do
+    g2 = puzzle("bolts", s)
+    for _, d in ipairs({{-E.BOLT_N, UP}, {-1, LEFT}, {1, RIGHT}}) do
+        if g2.puz.haz[E.BOLT_START + d[1]] then hazard_dir = d[2] end
+    end
+    if hazard_dir then break end
+end
+local hp, hours = g2.player.health, g2.player.hours
+g2:puzzle_key(hazard_dir)
+assert(g2.screen ~= "puzzle" and hurt(g2, hp, hours))
+print("   OK")
+
+print("16. sequence: typing the signs in order solves it; a wrong sign fails")
+g2 = puzzle("sequence")
+for _ = 1, #E.SEQ_LENGTHS do
+    local seq = g2.puz.seq
+    g2:puzzle_key(32)                              -- hide the signs
+    for _, sign in ipairs(seq) do g2:puzzle_key(48 + sign) end
+end
+assert(g2.screen == "map" and g2.puz == nil)
+g2 = puzzle("sequence")
+hp, hours = g2.player.health, g2.player.hours
+g2:puzzle_key(32)
+g2:puzzle_key(48 + (g2.puz.seq[1] % 4) + 1)
+assert(g2.screen ~= "puzzle" and hurt(g2, hp, hours))
+print("   OK")
+
+print("17. runes: always scrambled, solvable within the presses; running out fails")
+for s = 1, 60 do
+    g2 = puzzle("runes", s * 5)
+    z = g2.puz
+    assert(#z.scramble <= z.moves)
+    for _, i in ipairs(z.scramble) do g2:puzzle_key(48 + i) end
+    assert(g2.screen == "map", "replaying the scramble solves it")
+end
+g2 = puzzle("runes")
+hp, hours = g2.player.health, g2.player.hours
+for _ = 1, 40 do if g2.screen == "puzzle" then g2:puzzle_key(49) end end
+assert(g2.screen ~= "puzzle")
+print("   OK")
+
+print("18. Esc backs away with no harm; solved puzzles leave artifacts ~25% of the time")
+g2 = puzzle("runes")
+hp, hours = g2.player.health, g2.player.hours
+g2:puzzle_key(ESC)
+assert(g2.screen == "map" and not hurt(g2, hp, hours))
+local got, tries = 0, 2000
+for s = 1, tries do
+    g2 = fresh(); g2.seed = s
+    g2:start_encounter(def_named("Wrong Stars"))
+    g2.puz = {kind = "runes"}
+    g2.screen = "puzzle"
+    g2:finish_puzzle("solved")
+    for _, id in ipairs(E.ARTIFACTS) do if ground_has(g2, id) then got = got + 1 end end
+end
+print(("   artifacts: %.1f%%"):format(100 * got / tries))
+assert(math.abs(got / tries - 0.25) < 0.03)
+
+print("19. artifacts work while held and stop when put away")
+g2 = fresh()
+local p2 = g2.player
+local mp0, sight0 = p2.max_mp, p2.sight
+p2.inventory = {{item = "weeping_stone", qty = 1}, {item = "quiet_shell", qty = 1}}
+g2:try_transfer({"inventory", 1}, {"equip", "rhand"})
+assert(p2.max_mp == mp0 + 1 and p2.thirst_mult == 1.5)
+g2:try_transfer({"equip", "rhand"}, {"inventory"})
+assert(p2.max_mp == mp0 and p2.thirst_mult == 1)
+g2:try_transfer({"inventory", 1}, {"equip", "lhand"})   -- the shell (now first)
+assert(p2.encounter_mult == 0.5 and p2.sight == math.max(1, sight0 - 1))
+g2 = fresh(); p2 = g2.player
+p2.equipped.lhand = "flesh_knot"; E.recompute_stats(p2)
+p2.health = 50
+g2:try_move(1, 0); g2:try_move(0, 0); g2:try_move(-1, 0)
+assert(p2.health > 50 or g2.screen == "encounter", "the knot heals while you walk")
+g2 = fresh(); p2 = g2.player
+p2.equipped.rhand = "hollow_star"; E.recompute_stats(p2)
+g2.tiles["0,0"] = "plains"
+g2:scavenge()
+assert(p2.health == E.MAX_HEALTH - 3)
+print("   OK")
+
 print("\nENCOUNTER TESTS PASSED")

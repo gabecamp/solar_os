@@ -53,6 +53,8 @@ lib = src[:cut]
           "BLEED_PER_HOUR = BLEED_PER_HOUR, WOUND_REST_HOURS = WOUND_REST_HOURS, "
           "effective_max_mp = effective_max_mp, trait_points_left = trait_points_left, "
           "ENCOUNTERS = ENCOUNTERS, ENCOUNTER_KINDS = ENCOUNTER_KINDS, ENC_COLS = ENC_COLS, "
-          "wrap = wrap}\n")
+          "wrap = wrap, ARTIFACTS = ARTIFACTS, BOLT_N = BOLT_N, BOLT_START = BOLT_START, "
+          "BOLT_GOAL = BOLT_GOAL, BOLT_HAZARDS = BOLT_HAZARDS, SEQ_LENGTHS = SEQ_LENGTHS, "
+          "RUNE_N = RUNE_N, recompute_stats = recompute_stats}\n")
 (here / "wasteland_run.lua").write_text(src)
 print("generated lib_*.lua, wasteland_run.lua")

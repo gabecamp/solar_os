@@ -157,4 +157,43 @@ g = fresh(); g:start_game()
 start_named(g, "Old Medic")
 g:draw_encounter(400, 300)
 solaros.dump("ops_encounter_helper.txt")
+
+-- Scenes 10-13: an anomaly and each of its puzzle types, part-way through
+g = fresh(); g:start_game()
+start_named(g, "The Door in the Field")
+g:draw_encounter(400, 300)
+solaros.dump("ops_anomaly.txt")
+local function puzzle_of(kind)
+    for s = 1, 500 do
+        local g2 = fresh(); g2:start_game(); g2.seed = s
+        start_named(g2, "The Stillness")
+        g2:encounter_action("investigate")
+        if g2.puz.kind == kind then return g2 end
+    end
+end
+g = puzzle_of("bolts")
+g:puzzle_key(116); g:puzzle_key(solaros.gfx.KEY_UP)   -- throw a bolt ahead
+for _, k in ipairs({solaros.gfx.KEY_LEFT, solaros.gfx.KEY_RIGHT}) do
+    local c = g.puz.pos + (k == solaros.gfx.KEY_LEFT and -1 or 1)
+    if not g.puz.haz[c] then g:puzzle_key(k); break end
+end
+g:draw_puzzle(400, 300)
+solaros.dump("ops_puzzle_bolts.txt")
+g = puzzle_of("sequence")
+g:draw_puzzle(400, 300)
+solaros.dump("ops_puzzle_sequence.txt")
+g:puzzle_key(32); g:puzzle_key(48 + g.puz.seq[1])
+g:draw_puzzle(400, 300)
+solaros.dump("ops_puzzle_sequence_input.txt")
+g = puzzle_of("runes")
+g:draw_puzzle(400, 300)
+solaros.dump("ops_puzzle_runes.txt")
+
+-- Scene 14: inventory with an artifact under the cursor (its effect shows)
+g = fresh(); g:start_game()
+g.player.equipped.rhand = "drowned_eye"
+g:put_stack("ground", nil, {item = "weeping_stone", qty = 1})
+g.inv_cursor = #g:ground_list()   -- ground rows come first: this is the stone
+g:draw_inventory(400, 300)
+solaros.dump("ops_inventory_artifact.txt")
 print("scenes recorded, player at", g.player.q, g.player.r)

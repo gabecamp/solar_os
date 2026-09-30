@@ -1,6 +1,6 @@
 package.path = "./?.lua;" .. package.path
 local fake = require("solaros")
-local keys = {100, 97, 119, 115, 32, 102, 105, 13, 10, 101, 0x80, 0x81, 0x82, 0x83, 49, 50, 51, 52, 53}
+local keys = {100, 97, 119, 115, 32, 102, 105, 13, 10, 101, 0x80, 0x81, 0x82, 0x83, 49, 50, 51, 52, 53, 54, 55, 116}
 local n, seed = 0, 12345
 local orig_getch = fake.gfx.getch
 fake.gfx.getch = function()
