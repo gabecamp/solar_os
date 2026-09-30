@@ -8,7 +8,17 @@ python3 tools/paint_portraits.py   # converts art/ into the game's 1-bit portrai
 python3 tools/build.py             # rebuilds wasteland.lua
 ```
 
-Done so far: `jawhound.jpg`, `stag.jpg`.
+Done so far: `jawhound.jpg`, `stag.jpg` (the user's own); `boar.jpg`, `crows.jpg`,
+`fused.jpg`, `bloom.jpg`, `bandits.jpg` (generated with Z-Image Turbo through
+the Hugging Face connector, seeds 1001/1003/1004/1006/1007, from the prompts
+below). Still to make: mouthless, tollman, medic, wanderer and the five
+anomalies. The free Hugging Face GPU quota ran out after 7 images; it refills
+over time.
+
+Note: the model wouldn't leave out the Mouthless Man's mouth (two tries,
+seeds 1005 and 1015, both drew one), so he keeps his painted portrait for now.
+Wording to try next: "the skin of the lower face is stitched shut and healed
+into scar tissue", or an image editor to paint the mouth out.
 
 ## Shared style (paste after every prompt)
 

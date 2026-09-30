@@ -125,6 +125,18 @@ PHOTO = {
     # the head with its hand-antlers (the face alone blurs at 96 px)
     "stag": {"far": (285, 25, 1215, 735), "near": (560, 20, 1230, 740),
              "close": (860, 10, 1230, 480), "gamma": 1.0, "edge": 0.8},
+    # generated with Z-Image Turbo (Hugging Face) from art/PROMPTS.md; their
+    # backgrounds are light gray, not white, hence bg 0.78 where it shows
+    "boar": {"far": (52, 131, 1087, 853), "near": (520, 130, 1110, 790),
+             "close": (720, 130, 1110, 560), "gamma": 1.0, "edge": 0.8},
+    "crows": {"far": (111, 122, 928, 944), "near": (111, 100, 928, 800),
+              "close": (260, 110, 920, 560), "gamma": 0.4, "edge": 0.6},
+    "fused": {"far": (0, 0, 1024, 1024), "near": (40, 40, 990, 990),
+              "close": (140, 40, 900, 560), "gamma": 1.0, "edge": 0.7, "bg": 0.78},
+    "bloom": {"far": (0, 36, 1024, 1024), "near": (130, 20, 900, 790),
+              "close": (250, 30, 800, 580), "gamma": 1.0, "edge": 0.7, "bg": 0.78},
+    "bandits": {"far": (0, 95, 1024, 1024), "near": (220, 80, 860, 760),
+                "close": (440, 90, 740, 390), "gamma": 0.5, "edge": 0.5, "bg": 0.78},
 }
 
 
@@ -144,7 +156,7 @@ def subject_bbox(gray, bg=0.86):
     return (int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1)
 
 
-def photo_view(gray, box, size, gamma, edge):
+def photo_view(gray, box, size, gamma, edge, bg_level=0.86):
     """One view of a supplied picture: square crop on white, smoothed (a
     median filter flattens fine texture that would dither into noise),
     levels + gamma, dark edges, background forced white, then Floyd-Steinberg
@@ -157,7 +169,7 @@ def photo_view(gray, box, size, gamma, edge):
     sq.paste(gray, (-(cx - side // 2), -(cy - side // 2)))
     src = sq.resize((size * 3, size * 3), Image.LANCZOS).filter(ImageFilter.MedianFilter(5))
     a = np.asarray(src, np.float32) / 255
-    bg = a > 0.86
+    bg = a > bg_level   # anything this light counts as background (forced white)
     t = np.clip((a - 0.08) / (0.80 - 0.08), 0, 1) ** gamma
     e = np.asarray(src.filter(ImageFilter.FIND_EDGES), np.float32) / 255
     t = np.clip(t - edge * e * 2.0, 0, 1)
@@ -176,7 +188,8 @@ def photo_views(path, name):
     gamma, edge = cfg.get("gamma", 0.5), cfg.get("edge", 0.5)
     grays, bits = {}, {}
     for v, size, default in (("near", 96, whole), ("far", 48, whole), ("close", 96, guess_close)):
-        grays[v], bits[v] = photo_view(gray, cfg.get(v, default), size, gamma, edge)
+        grays[v], bits[v] = photo_view(gray, cfg.get(v, default), size, gamma, edge,
+                                       cfg.get("bg", 0.86))
     master = Image.new("L", (192, 192), 255)
     fit = gray.crop(cfg.get("far", whole))
     fit.thumbnail((192, 192), Image.LANCZOS)

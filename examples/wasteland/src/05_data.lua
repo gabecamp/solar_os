@@ -251,9 +251,9 @@ local ENCOUNTERS = {
      hp = 40, dmg = {8, 18}, hit = 45, speed = 3, bleed = 15, flees_at = 10, start = "far",
      loot = {{"strange_meat", 2}, {"nothing", 1}}, loot_rolls = 2},
     {kind = "mutant", name = "The Fused", art = "fused", who = "fused pair",
-     intro = "Two people walk as one, joined at the ribs by a bridge of shared skin. "
-          .. "They are whispering to each other about you. They agree on something, "
-          .. "and turn.",
+     intro = "Two people walk as one, joined at the ribs by a bridge of bare bone "
+          .. "that creaks when they breathe. They are whispering to each other "
+          .. "about you. They agree on something, and turn.",
      talk = "Both mouths answer at once, in words that aren't words.",
      hp = 50, dmg = {8, 14}, hit = 50, speed = 2, bleed = 10, start = "far",
      loot = {{"cloth_scrap", 3}, {"canned_beans", 1}, {"nothing", 2}}, loot_rolls = 2},
@@ -265,9 +265,9 @@ local ENCOUNTERS = {
      hp = 35, dmg = {6, 12}, hit = 60, speed = 4, bleed = 15, start = "far",
      loot = {{"knife", 1}, {"cloth_scrap", 2}, {"nothing", 2}}, loot_rolls = 1},
     {kind = "mutant", name = "The Bloom", art = "bloom", who = "bloom",
-     intro = "A woman sits in the grass, covered in soft pink growths that swell "
-          .. "and shrink as she breathes. She smiles with half a face, then stands "
-          .. "up far too quickly.",
+     intro = "A woman stands in the grass, covered head to chest in soft pink "
+          .. "growths that swell and shrink as she breathes. She smiles at you "
+          .. "through them, then steps closer far too quickly.",
      talk = "'Stay,' she says, from somewhere inside the growths. 'Grow with us.'",
      hp = 40, dmg = {5, 10}, hit = 65, speed = 2, bleed = 0, start = "near",
      loot = {{"berries", 2}, {"water_bottle", 1}, {"nothing", 2}}, loot_rolls = 1},
