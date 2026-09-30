@@ -48,9 +48,11 @@ lib = src[:cut]
           "trait_points_left = trait_points_left, attr_points_left = attr_points_left, "
           "dud_percent = dud_percent, ITEM_DB = ITEM_DB, HOLD_SLOTS = HOLD_SLOTS, "
           "POCKET_CELLS = POCKET_CELLS, BACKPACK_CAP = BACKPACK_CAP}\n")
-(here / "wasteland_run.lua").write_text(src)
-print("generated lib_*.lua, wasteland_run.lua")
 (here / "lib_encounter.lua").write_text(
     lib + "\nreturn Game, {ITEM_DB = ITEM_DB, MAX_HEALTH = MAX_HEALTH, "
           "BLEED_PER_HOUR = BLEED_PER_HOUR, WOUND_REST_HOURS = WOUND_REST_HOURS, "
-          "effective_max_mp = effective_max_mp, trait_points_left = trait_points_left}\n")
+          "effective_max_mp = effective_max_mp, trait_points_left = trait_points_left, "
+          "ENCOUNTERS = ENCOUNTERS, ENCOUNTER_KINDS = ENCOUNTER_KINDS, ENC_COLS = ENC_COLS, "
+          "wrap = wrap}\n")
+(here / "wasteland_run.lua").write_text(src)
+print("generated lib_*.lua, wasteland_run.lua")

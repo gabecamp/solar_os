@@ -127,6 +127,7 @@ local ITEM_DB = {
     canned_beans = {name = "Canned Beans", slot = nil, consumable = {hunger = 40}},
     water_bottle = {name = "Water Bottle", slot = nil, consumable = {thirst = 50}},
     berries      = {name = "Wild Berries", slot = nil, consumable = {hunger = 15, thirst = 5}},
+    strange_meat = {name = "Strange Meat", slot = nil, consumable = {hunger = 30, thirst = -5}},
     -- weapon: used from a hand slot. dmg per hit; reach "close" (arm's
     -- length) or "near" (a spear's length); thrown ones are hurled from
     -- range and land on the ground; bleed: % chance a hit opens a wound
@@ -157,6 +158,112 @@ local SCAVENGE_LOOT = {
 -- Worn gear that is scattered around the map (the starting clothes aren't).
 local WORLD_WEARABLES = {"cap", "gloves", "earmuffs", "sunglasses", "scarf",
                          "jacket", "bracers", "satchel"}
+
+-- ---------------------------------------------------------------------
+-- Encounters: rolled after each move. A fight is a series of choices at a
+-- range (far -> near -> close); every choice is a dice roll against an
+-- attribute, then the other side acts.
+-- ---------------------------------------------------------------------
+
+local ENCOUNTER_CHANCE = {plains = 10, forest = 15, hills = 12}   -- % per move onto it
+local ENCOUNTER_COOLDOWN = 2   -- moves after an encounter before another can happen
+local ENCOUNTER_KINDS = {{"animal", 40}, {"mutant", 25}, {"anomaly", 20},
+                         {"bandit", 12}, {"helper", 3}}
+local RANGE_NAME = {far = "Far", near = "Near", close = "Close"}
+local CLOSER = {far = "near", near = "close"}
+local FARTHER = {close = "near", near = "far"}
+local FISTS = {dmg = 4, reach = "close"}
+local PLAYER_HIT = 55          -- % to hit, +8 per Speed over 3
+local WATCH_AIM = 15           -- extra % on your next hit after a good look
+local THROW_HIT = 50           -- % to hit with a throw, +8 per Perception over 3
+local WATCH_CHANCE = 60        -- % to read the enemy, +10 per Perception over 3
+local HIDE_CHANCE = 35         -- % at Far, +10 per Perception over 3, -10 vs animals
+local FLEE_CHANCE = {far = 70, near = 50, close = 30}   -- +10 per Speed over the enemy's
+local ADVANCE_CHANCE = 60      -- % an enemy closes in per turn, +10 per speed over yours
+local ENEMY_DODGE = 5          -- enemy hit % lost per point of your Speed over 3
+local WOUND_DAMAGE = 12        -- one enemy hit this hard leaves a wound
+local ENEMY_BLEED_DMG = 3      -- per turn while an enemy bleeds
+local ENEMY_FLEE_CHANCE = 30   -- % per turn a beaten enemy (hp <= flees_at) runs
+
+-- kind: animal / mutant (hostile, can't be reasoned with), bandit (demands
+-- food first), helper (never fights), anomaly (step 3). hp, dmg {lo, hi},
+-- hit %, speed (1-6 like your Speed), bleed % per hit, flees_at (hp), start
+-- range, loot {item, weight} rolled loot_rolls times, who = how the log and
+-- the fight text name it.
+local ENCOUNTERS = {
+    {kind = "animal", name = "Jawhound", who = "jawhound",
+     intro = "A dog stands in the scrub. Its lower jaw has split into three, "
+          .. "each ringed with teeth, and all three are working. It hasn't blinked "
+          .. "since you saw it.",
+     hp = 30, dmg = {6, 12}, hit = 60, speed = 4, bleed = 30, flees_at = 8, start = "far",
+     loot = {{"strange_meat", 3}, {"nothing", 1}}, loot_rolls = 1},
+    {kind = "animal", name = "Skinless Boar", who = "boar",
+     intro = "Something big roots in the dirt, wet and red all over: a boar with "
+          .. "no hide, only muscle and gristle shining in the light. It smells you "
+          .. "and lifts its head.",
+     hp = 45, dmg = {8, 16}, hit = 50, speed = 3, bleed = 10, flees_at = 10, start = "far",
+     loot = {{"strange_meat", 1}}, loot_rolls = 2},
+    {kind = "animal", name = "Knotted Crows", who = "crow-knot",
+     intro = "What you took for a bush is a mass of crows grown together at the "
+          .. "wings. One body, dozens of heads, all of them turning toward you at once.",
+     hp = 20, dmg = {3, 8}, hit = 70, speed = 5, bleed = 20, flees_at = 5, start = "near",
+     loot = {{"strange_meat", 1}, {"nothing", 2}}, loot_rolls = 1},
+    {kind = "animal", name = "Crawling Stag", who = "stag",
+     intro = "A stag picks its way toward you on seven legs. Its antlers have grown "
+          .. "back into its skull, and the eyes beneath them look almost human.",
+     hp = 40, dmg = {8, 18}, hit = 45, speed = 3, bleed = 15, flees_at = 10, start = "far",
+     loot = {{"strange_meat", 2}, {"nothing", 1}}, loot_rolls = 2},
+    {kind = "mutant", name = "The Fused", who = "fused pair",
+     intro = "Two people walk as one, joined at the ribs by a bridge of shared skin. "
+          .. "They are whispering to each other about you. They agree on something, "
+          .. "and turn.",
+     talk = "Both mouths answer at once, in words that aren't words.",
+     hp = 50, dmg = {8, 14}, hit = 50, speed = 2, bleed = 10, start = "far",
+     loot = {{"cloth_scrap", 3}, {"canned_beans", 1}, {"nothing", 2}}, loot_rolls = 2},
+    {kind = "mutant", name = "Mouthless Man", who = "mouthless man",
+     intro = "A man in a rotted raincoat. Where his mouth should be the skin has "
+          .. "healed over smooth. He breathes through wet slits in his neck, faster "
+          .. "now that he has seen you.",
+     talk = "He tries to answer. The slits in his neck flutter uselessly.",
+     hp = 35, dmg = {6, 12}, hit = 60, speed = 4, bleed = 15, start = "far",
+     loot = {{"knife", 1}, {"cloth_scrap", 2}, {"nothing", 2}}, loot_rolls = 1},
+    {kind = "mutant", name = "The Bloom", who = "bloom",
+     intro = "A woman sits in the grass, covered in soft pink growths that swell "
+          .. "and shrink as she breathes. She smiles with half a face, then stands "
+          .. "up far too quickly.",
+     talk = "'Stay,' she says, from somewhere inside the growths. 'Grow with us.'",
+     hp = 40, dmg = {5, 10}, hit = 65, speed = 2, bleed = 0, start = "near",
+     loot = {{"berries", 2}, {"water_bottle", 1}, {"nothing", 2}}, loot_rolls = 1},
+    {kind = "bandit", name = "Road Bandits", who = "bandit",
+     intro = "Two figures step out from behind a wrecked car, one holding a knife "
+          .. "low. 'Easy,' says the taller one. 'Nobody has to get hurt. That part "
+          .. "is up to you.'",
+     demand = "'Food. Hand some over and walk away.'",
+     hp = 35, dmg = {6, 12}, hit = 55, speed = 3, bleed = 25, flees_at = 8, start = "near",
+     loot = {{"knife", 2}, {"canned_beans", 3}, {"water_bottle", 3}, {"jacket", 1},
+             {"cloth_scrap", 2}}, loot_rolls = 2},
+    {kind = "bandit", name = "Toll Man", who = "toll man",
+     intro = "A thin man in a welding mask blocks the path, tapping a lead pipe "
+          .. "against his leg. 'Toll road,' he says. 'Pay up or bleed.'",
+     demand = "'Something to eat. That's the toll.'",
+     hp = 30, dmg = {7, 14}, hit = 55, speed = 3, bleed = 5, flees_at = 6, start = "near",
+     loot = {{"pipe", 3}, {"canned_beans", 2}, {"sunglasses", 1}}, loot_rolls = 2},
+    {kind = "helper", name = "Old Medic", who = "medic", help = "medic",
+     intro = "An old woman with a red cross painted on her pack waves you over. Her "
+          .. "eyes are clear and her hands are steady. 'You look like you could use "
+          .. "some help.'",
+     start = "near"},
+    {kind = "helper", name = "Wanderer", who = "wanderer", help = "wanderer",
+     intro = "A man with a walking stick sits by a small fire and raises a hand. No "
+          .. "weapon in sight. 'Sit a minute. I don't bite. Not like the rest of "
+          .. "them out there.'",
+     start = "near"},
+}
+local ENCOUNTERS_BY_KIND = {}
+for _, e in ipairs(ENCOUNTERS) do
+    ENCOUNTERS_BY_KIND[e.kind] = ENCOUNTERS_BY_KIND[e.kind] or {}
+    table.insert(ENCOUNTERS_BY_KIND[e.kind], e)
+end
 
 -- ---------------------------------------------------------------------
 -- Item sprites (16x16, 1-bit)
@@ -476,6 +583,24 @@ local SPRITE_ART = {
         "................",
         "................",
     },
+    strange_meat = {
+        "................",
+        "................",
+        ".....######.....",
+        "...##########...",
+        "..####.#######..",
+        ".######.#####.#.",
+        ".#######.###.##.",
+        "################",
+        "##.#############",
+        "###.######.#####",
+        ".####.###.#####.",
+        "..############..",
+        "...##########...",
+        ".....######.....",
+        "................",
+        "................",
+    },
     knife = {
         "................",
         ".............##.",
@@ -645,7 +770,7 @@ local function weighted_pick(seed, weights)
     seed = rand_next(seed)
     local total = 0
     for _, w in ipairs(weights) do total = total + w[2] end
-    local roll = seed % total
+    local roll = seed * total // 32768   -- high bits; the LCG's low bits cycle fast
     local acc = 0
     for _, w in ipairs(weights) do
         acc = acc + w[2]
@@ -876,6 +1001,23 @@ end
 
 local function clamp(v) return math.max(0, math.min(100, v)) end
 
+-- Split text into lines of at most cols characters, breaking at spaces.
+local function wrap(text, cols)
+    local lines, line = {}, ""
+    for word in text:gmatch("%S+") do
+        if line == "" then
+            line = word
+        elseif #line + 1 + #word <= cols then
+            line = line .. " " .. word
+        else
+            lines[#lines + 1] = line
+            line = word
+        end
+    end
+    if line ~= "" then lines[#lines + 1] = line end
+    return lines
+end
+
 local function apply_awake_hours(player, hours)
     player.needs.hunger = clamp(player.needs.hunger - hours * (100 / 72) * player.hunger_mult)
     player.needs.thirst = clamp(player.needs.thirst - hours * (100 / 48))
@@ -1001,7 +1143,7 @@ function Game:try_move(q, r)
     if pile and #pile > 0 then self:push_log("Something is here. (I to look)") end
     if p.needs.hunger <= 0 then self:push_log("You are starving!") end
     if p.needs.thirst <= 0 then self:push_log("You are dehydrated!") end
-    self:check_death("You bled out.")
+    if not self:check_death("You bled out.") then self:maybe_encounter(terrain_id) end
 end
 
 function Game:move_dir(dq, dr)
@@ -1273,6 +1415,317 @@ function Game:use_item(kind, k)
     else
         local hand = (not p.equipped.rhand and "rhand") or (not p.equipped.lhand and "lhand") or "rhand"
         self:try_transfer({kind, k}, {"equip", hand})
+    end
+end
+
+-- -- encounters -----------------------------------------------------------
+
+local ENC_COLS = 55            -- mono 12 is ~7 px/char: 55 chars fit 400 px
+local ENC_MSG_LINES = 4
+
+-- 0..n-1 from the LCG's high bits
+function Game:rand(n)
+    self.seed = rand_next(self.seed)
+    return self.seed * n // 32768
+end
+
+function Game:roll(pct)
+    return self:rand(100) < pct
+end
+
+function Game:maybe_encounter(terrain_id)
+    if (self.enc_cooldown or 0) > 0 then
+        self.enc_cooldown = self.enc_cooldown - 1
+        return
+    end
+    local chance = ENCOUNTER_CHANCE[terrain_id]
+    if chance and self:roll(chance) then self:start_encounter(self:pick_encounter()) end
+end
+
+-- A kind by ENCOUNTER_KINDS weight (skipping kinds with no entries), then
+-- one of its entries at random.
+function Game:pick_encounter()
+    local kinds = {}
+    for _, k in ipairs(ENCOUNTER_KINDS) do
+        if ENCOUNTERS_BY_KIND[k[1]] then kinds[#kinds + 1] = k end
+    end
+    local kind
+    self.seed, kind = weighted_pick(self.seed, kinds)
+    local list = ENCOUNTERS_BY_KIND[kind]
+    return list[self:rand(#list) + 1]
+end
+
+function Game:start_encounter(def)
+    self.enc = {def = def, hp = def.hp, range = def.start or "far", msg = {},
+                intro = wrap(def.intro, ENC_COLS), cursor = 1, aim = 0,
+                demanding = def.kind == "bandit"}
+    if def.kind == "bandit" then self:enc_say(def.demand) end
+    self.screen = "encounter"
+end
+
+function Game:enc_say(text)
+    for _, line in ipairs(wrap(text, ENC_COLS)) do table.insert(self.enc.msg, line) end
+    while #self.enc.msg > ENC_MSG_LINES do table.remove(self.enc.msg, 1) end
+end
+
+function Game:end_encounter(summary)
+    self.enc.over = true
+    self.enc_cooldown = ENCOUNTER_COOLDOWN
+    if summary then self:push_log(summary) end
+end
+
+-- The weapon in your hands (right first), its name and slot; fists if none.
+function Game:weapon()
+    for _, slot in ipairs({"rhand", "lhand"}) do
+        local item = self.player.equipped[slot]
+        if item and ITEM_DB[item].weapon then return ITEM_DB[item].weapon, ITEM_DB[item].name, slot end
+    end
+    return FISTS, "Fists"
+end
+
+function Game:thrown_slot()
+    for _, slot in ipairs({"rhand", "lhand"}) do
+        local item = self.player.equipped[slot]
+        if item and ITEM_DB[item].weapon and ITEM_DB[item].weapon.thrown then return slot end
+    end
+end
+
+-- First food/drink in the bag, for paying off bandits.
+function Game:food_index()
+    for i, stack in ipairs(self.player.inventory) do
+        if ITEM_DB[stack.item].consumable then return i end
+    end
+end
+
+function Game:enemy_condition()
+    local f = self.enc.hp / self.enc.def.hp
+    if f > 0.75 then return "unhurt" elseif f > 0.4 then return "hurt" end
+    return "badly hurt"
+end
+
+-- What you can do now, as {label, action}.
+function Game:encounter_options()
+    local e = self.enc
+    if e.over then return {{"Continue", "leave"}} end
+    local kind = e.def.kind
+    if kind == "helper" then return {{"Talk", "talk"}, {"Walk on", "leave_quietly"}} end
+    if e.demanding then
+        local o = {}
+        if self:food_index() then o[#o + 1] = {"Give them some food", "give"} end
+        o[#o + 1] = {"Refuse", "refuse"}
+        o[#o + 1] = {"Run for it", "flee"}
+        return o
+    end
+    local o = {}
+    local w, wname = self:weapon()
+    if e.range == "far" then
+        o[#o + 1] = {"Approach", "approach"}
+    elseif e.range == "near" then
+        if w.reach == "near" then o[#o + 1] = {"Attack (" .. wname .. ")", "attack"} end
+        o[#o + 1] = {"Close in", "approach"}
+    else
+        o[#o + 1] = {"Attack (" .. wname .. ")", "attack"}
+    end
+    local ts = self:thrown_slot()
+    if ts and e.range ~= "close" then
+        o[#o + 1] = {"Throw the " .. ITEM_DB[self.player.equipped[ts]].name:lower(), "throw"}
+    end
+    if e.range ~= "far" then o[#o + 1] = {"Back off", "back"} end
+    if not e.seen then o[#o + 1] = {"Watch it", "watch"} end
+    if e.range == "far" then o[#o + 1] = {"Hide", "hide"} end
+    if kind == "mutant" and not e.talked then o[#o + 1] = {"Talk", "talk"} end
+    o[#o + 1] = {"Flee", "flee"}
+    return o
+end
+
+function Game:enemy_dies()
+    local e = self.enc
+    local found = {}
+    for _ = 1, e.def.loot_rolls or 1 do
+        local item
+        self.seed, item = weighted_pick(self.seed, e.def.loot)
+        if item ~= "nothing" then
+            self:put_stack("ground", nil, {item = item, qty = 1})
+            found[#found + 1] = ITEM_DB[item].name
+        end
+    end
+    self:enc_say("The " .. e.def.who .. " goes still.")
+    if #found > 0 then self:enc_say("Left behind: " .. table.concat(found, ", ") .. ".") end
+    self:end_encounter("You killed the " .. e.def.who .. ".")
+end
+
+-- The other side's turn: bleed, flee when beaten, close in, or strike.
+function Game:enemy_turn()
+    local e, p, d = self.enc, self.player, self.enc.def
+    if e.over or self.screen ~= "encounter" then return end
+    if e.bleeding then
+        e.hp = e.hp - ENEMY_BLEED_DMG
+        if e.hp <= 0 then return self:enemy_dies() end
+    end
+    if d.flees_at and e.hp <= d.flees_at and self:roll(ENEMY_FLEE_CHANCE) then
+        self:enc_say("The " .. d.who .. " breaks away and flees.")
+        return self:end_encounter("The " .. d.who .. " fled.")
+    end
+    if e.range ~= "close" then
+        if self:roll(ADVANCE_CHANCE + 10 * (d.speed - p.attrs.Speed)) then
+            e.range = CLOSER[e.range]
+            self:enc_say("The " .. d.who .. " closes in.")
+        else
+            self:enc_say("The " .. d.who .. " circles, watching you.")
+        end
+        return
+    end
+    if not self:roll(d.hit - ENEMY_DODGE * (p.attrs.Speed - 3)) then
+        self:enc_say("The " .. d.who .. " lunges and misses.")
+        return
+    end
+    local dmg = d.dmg[1] + self:rand(d.dmg[2] - d.dmg[1] + 1)
+    p.health = clamp(p.health - dmg)
+    local text = "The " .. d.who .. " hits you (-" .. dmg .. " HP)."
+    if d.bleed and d.bleed > 0 and not p.injuries.bleeding and self:roll(d.bleed) then
+        p.injuries.bleeding = true
+        text = text .. " You're bleeding."
+    end
+    if dmg >= WOUND_DAMAGE and p.injuries.wounded_hours == 0 then
+        p.injuries.wounded_hours = WOUND_REST_HOURS
+        text = text .. " It leaves a deep wound."
+    end
+    self:enc_say(text)
+    self:check_death("Killed by the " .. d.name .. ".")
+end
+
+function Game:enc_hit(dmg, bleed, how)
+    local e = self.enc
+    e.hp = e.hp - dmg
+    local text = how .. " (-" .. dmg .. ")."
+    if bleed and self:roll(bleed) and not e.bleeding then
+        e.bleeding = true
+        text = text .. " It's bleeding."
+    end
+    self:enc_say(text)
+    if e.hp <= 0 then self:enemy_dies() end
+end
+
+function Game:helper_talk()
+    local p, d = self.player, self.enc.def
+    if d.help == "medic" then
+        p.injuries.bleeding = false
+        p.injuries.wounded_hours = p.injuries.wounded_hours // 2
+        p.health = clamp(p.health + 25)
+        self:put_stack("ground", nil, {item = "cloth_scrap", qty = 2})
+        self:enc_say("She cleans and binds your hurts without a word, and leaves you "
+            .. "two clean strips of cloth. (+25 HP)")
+        self:end_encounter("The medic patched you up.")
+    else
+        for key in pairs(self.tiles) do
+            local q, r = key:match("(-?%d+),(-?%d+)")
+            if axial_distance(p.q, p.r, tonumber(q), tonumber(r)) <= 3 then p.explored[key] = true end
+        end
+        self:put_stack("ground", nil, {item = "water_bottle", qty = 1})
+        self:enc_say("He draws the land around you in the dirt and hands you a bottle of "
+            .. "clean water. 'Stay off the roads at night.'")
+        self:end_encounter("The wanderer shared water and directions.")
+    end
+end
+
+function Game:encounter_action(action)
+    local e, p = self.enc, self.player
+    e.msg = {}
+    if action == "leave" or action == "leave_quietly" then
+        if action == "leave_quietly" then
+            self.enc_cooldown = ENCOUNTER_COOLDOWN
+            self:push_log("You nod and walk on.")
+        end
+        self.enc = nil
+        self.screen = "map"
+        return
+    elseif action == "talk" then
+        if e.def.kind == "helper" then return self:helper_talk() end
+        e.talked = true
+        self:enc_say(e.def.talk)
+    elseif action == "give" then
+        local i = self:food_index()
+        local stack = p.inventory[i]
+        local name = ITEM_DB[stack.item].name
+        stack.qty = stack.qty - 1
+        if stack.qty <= 0 then table.remove(p.inventory, i) end
+        self:enc_say("They take the " .. name:lower() .. " and back off into the ruins.")
+        return self:end_encounter("You paid the " .. e.def.who .. " off.")
+    elseif action == "refuse" then
+        e.demanding = false
+        self:enc_say("'Wrong answer.'")
+    elseif action == "approach" then
+        e.range = CLOSER[e.range]
+        self:enc_say("You move in. Range: " .. RANGE_NAME[e.range] .. ".")
+    elseif action == "back" then
+        e.range = FARTHER[e.range]
+        self:enc_say("You back away. Range: " .. RANGE_NAME[e.range] .. ".")
+    elseif action == "attack" then
+        local w, wname = self:weapon()
+        local hit = PLAYER_HIT + 8 * (p.attrs.Speed - 3) + e.aim
+        e.aim = 0
+        if self:roll(hit) then
+            local dmg = math.max(1, w.dmg - self:rand(w.dmg // 4 + 1) + 2 * (p.attrs.Strength - 3))
+            self:enc_hit(dmg, w.bleed, "You hit the " .. e.def.who .. " (" .. wname:lower() .. ")")
+        else
+            self:enc_say("You swing at the " .. e.def.who .. " and miss.")
+        end
+    elseif action == "throw" then
+        local slot = self:thrown_slot()
+        local item = p.equipped[slot]
+        local w = ITEM_DB[item].weapon
+        p.equipped[slot] = nil
+        self:put_stack("ground", nil, {item = item, qty = 1})
+        if self:roll(THROW_HIT + 8 * (p.attrs.Perception - 3) + e.aim) then
+            self:enc_hit(w.dmg, w.bleed, "Your " .. ITEM_DB[item].name:lower() .. " strikes the " .. e.def.who)
+        else
+            self:enc_say("Your " .. ITEM_DB[item].name:lower() .. " sails wide.")
+        end
+        e.aim = 0
+    elseif action == "watch" then
+        if self:roll(WATCH_CHANCE + 10 * (p.attrs.Perception - 3)) then
+            e.seen = true
+            e.aim = WATCH_AIM
+            self:enc_say("You study how it moves. It looks " .. self:enemy_condition()
+                .. ", and you see an opening.")
+        else
+            self:enc_say("You can't make out much.")
+        end
+    elseif action == "hide" then
+        local chance = HIDE_CHANCE + 10 * (p.attrs.Perception - 3)
+        if e.def.kind == "animal" then chance = chance - 10 end
+        if self:roll(chance) then
+            self:enc_say("You drop into cover and keep very still. It passes you by.")
+            return self:end_encounter("You hid from the " .. e.def.who .. ".")
+        end
+        self:enc_say("It has seen where you went.")
+    elseif action == "flee" then
+        if self:roll(FLEE_CHANCE[e.range] + 10 * (p.attrs.Speed - e.def.speed)) then
+            p.mp = p.mp - 1
+            self:enc_say("You run until your lungs burn. It doesn't follow. (-1 MP)")
+            return self:end_encounter("You ran from the " .. e.def.who .. ".")
+        end
+        self:enc_say("You try to run, but it cuts you off.")
+    end
+    if not e.over then self:enemy_turn() end
+end
+
+function Game:encounter_key(key)
+    local opts = self:encounter_options()
+    local e = self.enc
+    local pick
+    if key >= 49 and key < 49 + #opts then          -- '1'..
+        pick = key - 48
+    elseif key == gfx.KEY_UP or key == KEY_W then
+        e.cursor = math.max(1, e.cursor - 1)
+    elseif key == gfx.KEY_DOWN or key == KEY_S then
+        e.cursor = math.min(#opts, e.cursor + 1)
+    elseif key == KEY_ENTER or key == KEY_LF or key == KEY_SPACE then
+        pick = e.cursor
+    end
+    if pick and opts[pick] then
+        e.cursor = 1
+        self:encounter_action(opts[pick][2])
     end
 end
 
@@ -2087,6 +2540,32 @@ function Game:draw_creator(w, h)
     gfx.refresh()
 end
 
+-- Encounter screen: name, description, what just happened, status, and the
+-- numbered choices (at most 7 rows fit above the bottom edge).
+function Game:draw_encounter(w, h)
+    local e, p = self.enc, self.player
+    gfx.clear(gfx.WHITE)
+    gfx.color(gfx.BLACK)
+    gfx.font(gfx.FONT_BOLD_14)
+    gfx.text(6, 16, e.def.name)
+    gfx.font(gfx.FONT_MONO_12)
+    for i, line in ipairs(e.intro) do gfx.text(6, 22 + 13 * i, line) end
+    gfx.line(6, 114, w - 6, 114)
+    for i, line in ipairs(e.msg) do gfx.text(6, 116 + 13 * i, line) end
+    local status = "You " .. math.floor(p.health) .. " HP"
+    if p.injuries.bleeding then status = status .. " bleeding" end
+    if e.def.kind ~= "helper" then
+        status = "Range " .. RANGE_NAME[e.range] .. "   " .. status
+            .. "   It: " .. (e.seen and self:enemy_condition() or "?")
+    end
+    gfx.text(6, 186, status)
+    gfx.line(6, 192, w - 6, 192)
+    for i, o in ipairs(self:encounter_options()) do
+        gfx.text(6, 194 + 13 * i, (i == e.cursor and ">" or " ") .. i .. " " .. o[1])
+    end
+    gfx.refresh()
+end
+
 function Game:draw_dead(w, h)
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
@@ -2171,6 +2650,8 @@ local ok, err = pcall(function()
                 game:draw_creator(w, h)
             elseif game.screen == "dead" then
                 game:draw_dead(w, h)
+            elseif game.screen == "encounter" then
+                game:draw_encounter(w, h)
             elseif game.screen == "map" then
                 game:draw_map(w, h)
             else
@@ -2187,6 +2668,8 @@ local ok, err = pcall(function()
                 else
                     game:creator_key(key)
                 end
+            elseif game.screen == "encounter" then
+                game:encounter_key(key)
             elseif game.screen == "dead" then
                 if key == gfx.KEY_ESCAPE or key == KEY_Q then
                     game.quit = true

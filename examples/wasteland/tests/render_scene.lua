@@ -122,4 +122,39 @@ g.player.hours = 57
 g.death_cause = "You bled out."
 g:draw_dead(400, 300)
 solaros.dump("ops_dead.txt")
+
+-- Encounters: roll until the named one comes up (the table is local to the game)
+local function start_named(g2, name)
+    local i = 0
+    repeat
+        i = i + 1
+        local d = g2:pick_encounter()
+        if d.name == name then g2:start_encounter(d); return end
+    until i > 5000
+    error("never rolled " .. name)
+end
+
+-- Scene 7: bandits demanding food
+g = fresh(); g:start_game()
+start_named(g, "Road Bandits")
+g:draw_encounter(400, 300)
+solaros.dump("ops_encounter_bandit.txt")
+
+-- Scene 8: mid-fight at Near with a spear and a rock: the most options at once
+g = fresh(); g:start_game()
+g.player.equipped.rhand, g.player.equipped.lhand = "spear", "rock"
+g.player.health = 58; g.player.injuries.bleeding = true
+start_named(g, "Mouthless Man")
+g.enc.range = "near"
+g:enc_say("You hit the mouthless man (spear) (-9). It's bleeding.")
+g:enc_say("The mouthless man hits you (-11 HP). You're bleeding.")
+g.enc.cursor = 2
+g:draw_encounter(400, 300)
+solaros.dump("ops_encounter_fight.txt")
+
+-- Scene 9: a helper
+g = fresh(); g:start_game()
+start_named(g, "Old Medic")
+g:draw_encounter(400, 300)
+solaros.dump("ops_encounter_helper.txt")
 print("scenes recorded, player at", g.player.q, g.player.r)
