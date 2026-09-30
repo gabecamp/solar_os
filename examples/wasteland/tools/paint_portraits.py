@@ -57,9 +57,15 @@ def dither(gray, lo=0.15, hi=0.85, gamma=0.8):
     return a <= t
 
 
-def views(canvas, close_box):
+def views(canvas, close_box, near_box=None):
+    """near_box (x, y, size): a tighter crop for the near view (people: head
+    and shoulders, so a face gets more than a quarter of the frame)."""
     master = canvas if isinstance(canvas, Image.Image) else canvas.image()
-    near = master.resize((96, 96), Image.LANCZOS)
+    if near_box:
+        nx, ny, ns = near_box
+        near = master.crop((nx, ny, nx + ns, ny + ns)).resize((96, 96), Image.LANCZOS)
+    else:
+        near = master.resize((96, 96), Image.LANCZOS)
     far = tone_curve(master.resize((48, 48), Image.LANCZOS), gamma=1.15)
     x, y, s = close_box
     close = master.crop((x, y, x + s, y + s)).resize((96, 96), Image.LANCZOS)
@@ -191,8 +197,8 @@ def main():
             master, bits, grays = photo_views(override, name)
             print("using", override.relative_to(ROOT), "for", name)
         else:
-            canvas, close_box = fn()
-            master, bits, grays = views(canvas, close_box)
+            painted = fn()
+            master, bits, grays = views(*painted)
         master.save(PREVIEWS / f"{name}_master.png")
         row = Image.new("L", (192 + 96 * 2 + 48 + 40, 192), 255)
         row.paste(master, (0, 0))

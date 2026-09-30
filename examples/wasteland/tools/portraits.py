@@ -86,10 +86,17 @@ def human_head(c, cx, cy, s=1.0, tone=0.93, seed=1, jaw=1.0, hair="short",
 
 
 def human_body(c, cx, top, w, tone, seed, bottom=SIZE, tex=0.0):
-    """Shoulders and chest, cropped by the frame bottom."""
-    torso = poly([(cx - w, bottom), (cx - w, top + 22), (cx - w + 14, top + 4), (cx - 10, top),
-                  (cx + 10, top), (cx + w - 14, top + 4), (cx + w, top + 22), (cx + w, bottom)])
+    """Shoulders and chest, cropped by the frame bottom: the trapezius slopes
+    down from the neck to rounded deltoids, so the neck reads short."""
+    torso = union(
+        poly([(cx - w, bottom), (cx - w, top + 26), (cx - w + 6, top + 13), (cx - 15, top + 3),
+              (cx - 8, top), (cx + 8, top), (cx + 15, top + 3), (cx + w - 6, top + 13),
+              (cx + w, top + 26), (cx + w, bottom)]),
+        ellipse(cx - w + 9, top + 22, 11, 13), ellipse(cx + w - 9, top + 22, 11, 13))
     c.body(torso, tone, soft=12, tex=tex, tex_scale=8, grit=0.05, seed=seed)
+    # where the arms meet the chest
+    for sgn in (-1, 1):
+        c.darken(blur(stroke([(cx + sgn * (w - 18), top + 30), (cx + sgn * (w - 16), top + 60)], 2), 2), 0.3)
     return torso
 
 
@@ -233,7 +240,7 @@ def fused():
     c = Canvas()
     c.ground_shadow(96, 184, 80, 6)
     for i, cx in enumerate((62, 130)):
-        human_body(c, cx, 92, 34, 0.5, 80 + i, tex=0.15)
+        human_body(c, cx, 88, 34, 0.5, 80 + i, tex=0.15)
     # the bridge of skin between them, stretched and veined
     bridge = poly([(92, 118), (100, 112), (106, 118), (104, 160), (94, 164), (88, 158)])
     c.body(bridge, 0.80, soft=5, spec=0.3, seed=83)
@@ -241,23 +248,23 @@ def fused():
         c.darken(blur(stroke([(90, y), (98, y - 3), (104, y)], 1), 0.8), 0.5)
     # heads turned toward each other, whispering
     for i, (cx, look) in enumerate(((62, 2), (130, -2))):
-        c.body(tapered([(cx, 96), (cx, 80)], 16, 14), 0.78, soft=4, seed=84 + i)
+        c.body(tapered([(cx, 94), (cx, 80)], 20, 18), 0.78, soft=4, seed=84 + i)
         ey = human_head(c, cx, 58, 0.95, seed=86 + i * 5, hair="short")
         eye(c, cx - 8, ey, 3.4, 2.4, look=(look, 0))
         eye(c, cx + 8, ey, 3.4, 2.4, look=(look, 0))
     c.outline(0.9)
-    return c, (48, 22, 96)
+    return c, (48, 22, 96), (22, 12, 148)
 
 
 def mouthless():
     """A man in a rotted raincoat; his mouth has healed over; gills in his neck."""
     c = Canvas()
-    coat = human_body(c, 96, 118, 78, 0.55, 20, tex=0.2)
+    coat = human_body(c, 96, 112, 78, 0.55, 20, tex=0.2)
     for x0, x1 in ((50, 58), (142, 134), (92, 96)):
         c.darken(blur(stroke([(x0, 128), (x1, 192)], 2.5), 1.5), 0.5)      # creases
     c.darken(blur(poly([(60, 150), (70, 160), (62, 176)]), 2), 0.6)       # rot holes
     c.darken(blur(ellipse(140, 170, 6, 4), 1.5), 0.6)
-    c.body(tapered([(96, 138), (96, 94)], 36, 32), 0.80, soft=6, spec=0.25, seed=21)
+    c.body(tapered([(96, 130), (96, 96)], 40, 36), 0.80, soft=6, spec=0.25, seed=21)
     for i in range(3):   # wet slits in the neck, fluttering
         y = 110 + i * 8
         for sgn in (-1, 1):
@@ -273,13 +280,13 @@ def mouthless():
     c.lighten(blur(ellipse(96, ey + 28, 13, 6), 3), 0.35)
     c.darken(blur(stroke([(86, ey + 29), (106, ey + 28)], 1), 1.2), 0.2)
     c.outline(0.85)
-    return c, (48, 20, 96)
+    return c, (48, 20, 96), (24, 10, 144)
 
 
 def bloom():
     """A woman covered in soft growths that swell as she breathes; half a face."""
     c = Canvas()
-    body = human_body(c, 96, 112, 60, 0.32, 100)   # dark dress so the pale growths stand out
+    body = human_body(c, 96, 106, 60, 0.32, 100)   # dark dress so the pale growths stand out
     ey = human_head(c, 96, 70, 1.1, seed=101, hair="long", hair_tone=0.2, mouth=False)
     eye(c, 86, ey, 4, 2.8, look=(1, 0))
     c.darken(blur(stroke([(82, ey + 25), (90, ey + 27), (97, ey + 25)], 1.4), 0.7), 0.75)  # half a smile
@@ -295,7 +302,7 @@ def bloom():
         c.darken(blur(ellipse(x + 2, y + 3, r, r * 0.9), 2), 0.4)        # contact shadow
         c.body(ellipse(x, y, r, r * 0.9), 0.93, soft=r * 0.5, spec=0.9, shine=20, seed=110 + i)
     c.outline(0.85)
-    return c, (48, 26, 96)
+    return c, (48, 26, 96), (24, 16, 144)
 
 
 # -- people ----------------------------------------------------------------------
@@ -327,7 +334,7 @@ def bandits():
     c.body(ellipse(30, 170, 12, 8), 0.2, soft=3, seed=133)
     c.darken(blur(ellipse(120, 176, 30, 6), 3), 0.5)                        # rust stain
     c.outline(0.85)
-    return c, (22, 30, 96)
+    return c, (22, 30, 96), (8, 20, 164)
 
 
 def tollman():
@@ -348,7 +355,7 @@ def tollman():
     c.body(ellipse(150, 110, 7, 7), 0.3, soft=2, seed=145)
     c.body(union(ellipse(58, 166, 11, 9), ellipse(112, 136, 11, 9)), 0.78, soft=4, seed=146)   # hands
     c.outline(0.85)
-    return c, (48, 26, 96)
+    return c, (48, 26, 96), (24, 16, 144)
 
 
 def medic():
@@ -358,9 +365,9 @@ def medic():
     c.body(poly([(120, 80), (182, 80), (186, 170), (126, 176)]), 0.55, soft=8, grit=0.08, seed=150)
     c.flat(union(poly([(146, 104), (160, 104), (160, 144), (146, 144)]),
                  poly([(134, 118), (172, 118), (172, 130), (134, 130)])), 0.12)
-    human_body(c, 84, 112, 58, 0.62, 151, tex=0.12)
+    human_body(c, 84, 104, 58, 0.62, 151, tex=0.12)
     c.body(tapered([(114, 116), (100, 192)], 10, 10), 0.35, soft=3, seed=152)   # strap
-    c.body(tapered([(84, 124), (84, 98)], 22, 20), 0.8, soft=4, seed=153)
+    c.body(tapered([(84, 112), (84, 96)], 26, 24), 0.8, soft=4, seed=153)
     ey = human_head(c, 84, 70, 1.05, seed=154, hair="bun", hair_tone=0.88)   # grey hair in a bun
     eye(c, 75, ey, 3.6, 2.6)
     eye(c, 93, ey, 3.6, 2.6)
@@ -369,19 +376,19 @@ def medic():
         c.darken(blur(stroke([(84 + sgn * 8, ey + 14), (84 + sgn * 10, ey + 22)], 0.8), 0.7), 0.35)
     c.darken(blur(stroke([(77, ey + 23), (84, ey + 25), (91, ey + 23)], 1.3), 0.7), 0.6)
     c.outline(0.85)
-    return c, (36, 22, 96)
+    return c, (36, 22, 96), (26, 8, 164)   # wide enough for the cross on her pack
 
 
 def wanderer():
     """A man with a walking stick sitting by a small fire, hand raised."""
     c = Canvas()
     c.ground_shadow(96, 178, 86, 8, 0.2)
-    human_body(c, 84, 104, 44, 0.5, 160, bottom=176, tex=0.25)
+    human_body(c, 84, 98, 44, 0.5, 160, bottom=176, tex=0.25)
     c.body(poly([(40, 176), (130, 176), (140, 186), (36, 186)]), 0.45, soft=4, seed=161)  # legs folded
     c.body(tapered([(150, 30), (138, 186)], 6, 6), 0.55, soft=2, grit=0.2, seed=162)       # stick
     c.body(tapered([(120, 120), (142, 96), (146, 80)], 12, 9), 0.5, soft=4, seed=163)     # raised arm
     c.body(ellipse(146, 74, 8, 9), 0.82, soft=3, seed=164)                                 # open hand
-    c.body(tapered([(84, 110), (84, 90)], 18, 16), 0.78, soft=4, seed=165)
+    c.body(tapered([(84, 104), (84, 90)], 22, 20), 0.78, soft=4, seed=165)
     ey = human_head(c, 84, 66, 0.95, seed=166, hair="bald", mouth=False)
     beard = poly([(64, 74), (104, 74), (100, 104), (84, 112), (68, 104)])
     c.body(beard, 0.4, soft=4, seed=167)
@@ -396,7 +403,7 @@ def wanderer():
     c.flat(blur(flame, 3), 0.98)
     c.lighten(blur(ellipse(150, 150, 50, 40), 18), 0.5)
     c.outline(0.8)
-    return c, (36, 20, 96)
+    return c, (36, 20, 96), (14, 10, 170)
 
 
 # -- anomalies (whole scenes; no fight) ----------------------------------------------
