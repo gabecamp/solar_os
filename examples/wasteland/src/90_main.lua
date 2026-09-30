@@ -7,6 +7,12 @@ gfx.begin()
 local ok, err = pcall(function()
     local game = Game.new()
     local w, h = gfx.size()
+    local saved = Game.read_save()
+    if saved then
+        game.screen = "title"
+        game.title_save = saved
+        game.title_cursor = 1
+    end
 
     local function handle_map_key(key)
         if key == gfx.KEY_ESCAPE or key == KEY.Q then
@@ -71,7 +77,9 @@ local ok, err = pcall(function()
     local dirty = true
     while not game.quit and not solaros.should_exit() do
         if dirty then
-            if game.screen == "creator" then
+            if game.screen == "title" then
+                game:draw_title(w, h)
+            elseif game.screen == "creator" then
                 game:draw_creator(w, h)
             elseif game.screen == "dead" then
                 game:draw_dead(w, h)
@@ -91,7 +99,13 @@ local ok, err = pcall(function()
 
         local key = gfx.getch(POLL_MS)
         if key ~= nil then
-            if game.screen == "creator" then
+            if game.screen == "title" then
+                if key == gfx.KEY_ESCAPE or key == KEY.Q then
+                    game.quit = true
+                else
+                    game:title_key(key)
+                end
+            elseif game.screen == "creator" then
                 if key == gfx.KEY_ESCAPE or key == KEY.Q then
                     game.quit = true
                 else
@@ -116,10 +130,16 @@ local ok, err = pcall(function()
             end
             -- time may have passed (moving, resting, crafting...): apply cold,
             -- night and light before the next frame
-            if game.screen ~= "creator" and game.screen ~= "dead" then game:tick() end
+            if game.screen ~= "creator" and game.screen ~= "dead" and game.screen ~= "title" then
+                game:tick()
+            end
+            game:autosave()
             dirty = true
         end
     end
+    -- quitting mid-run keeps it (a run on the title or creator isn't started yet)
+    game.force_save = true
+    game:autosave()
 end)
 
 -- Per SolarOS convention: cleanup must run even when drawing/logic fails,

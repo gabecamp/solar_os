@@ -14,6 +14,7 @@ Outputs (git-ignored, regenerated on every run):
   lib_encounter.lua  -> encounter_test, portrait_test (encounters and their art)
   lib_crafting.lua   -> crafting_test
   lib_world.lua      -> world_test
+  lib_save.lua       -> save_test
   wasteland_run.lua  -> full copy, run under the fake solaros by run_tests.sh / soak
 """
 import pathlib
@@ -68,5 +69,7 @@ lib = src[:cut]
     lib + "\nreturn Game, {WORLD = WORLD, GRID_RADIUS = GRID_RADIUS, TERRAIN = TERRAIN, "
           "AXIAL_DIRS = AXIAL_DIRS, generate_world = generate_world, ITEM_DB = ITEM_DB, "
           "REST_HOURS = REST_HOURS}\n")
+(here / "lib_save.lua").write_text(
+    lib + "\nreturn Game, {SAVE = SAVE, KEY = KEY, generate_world = generate_world}\n")
 (here / "wasteland_run.lua").write_text(src)
 print("generated lib_*.lua, wasteland_run.lua")

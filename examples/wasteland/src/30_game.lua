@@ -16,6 +16,7 @@ function Game.new()
     elseif os and os.time then
         seed = os.time() % 32768
     end
+    self.world_seed = seed       -- the map is rebuilt from this when a save is loaded
     self.tiles, self.ground, seed = generate_world(seed)
     self.seed = seed             -- RNG state for scavenging
     self.weather_seed = seed     -- fixed per world: weather is rolled from it (Game:weather)
@@ -58,6 +59,7 @@ end
 function Game:check_death(cause)
     if self.player.health > 0 then return false end
     self.screen = "dead"
+    Game.delete_save()           -- one life: a dead survivor can't be continued
     self.death_cause = cause
     return true
 end

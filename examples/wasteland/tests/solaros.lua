@@ -87,4 +87,29 @@ end
 
 function M.audio.tone(freq, ms, vol) end
 
+-- In-memory storage with the real API's shape (read_file raises on a missing
+-- file, like the device). write_file is the new call from firmware/; tests set
+-- M.storage.write_file = nil to play an older SolarOS that can't save.
+FAKE_FILES, FAKE_DIRS = {}, {}
+M.storage = {}
+function M.storage.mount_point() return "/sd" end
+function M.storage.exists(path) return FAKE_FILES[path] ~= nil or FAKE_DIRS[path] ~= nil end
+function M.storage.makedirs(path) FAKE_DIRS[path] = true end
+function M.storage.remove(path)
+    if FAKE_FILES[path] == nil then error("no such file: " .. path) end
+    FAKE_FILES[path] = nil
+end
+function M.storage.read_file(path, max)
+    local data = FAKE_FILES[path]
+    if data == nil then error("no such file: " .. path) end
+    return data:sub(1, max or 4096)
+end
+function M.storage.write_file(path, data, append)
+    assert(type(data) == "string", "write_file data must be a string")
+    assert(#data <= 65536, "write_file over 64 KiB")
+    local dir = path:match("^(.*)/[^/]+$")
+    if not FAKE_DIRS[dir] then error("no such directory: " .. dir) end
+    FAKE_FILES[path] = (append and FAKE_FILES[path] or "") .. data
+end
+
 return M
