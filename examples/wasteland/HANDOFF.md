@@ -1,5 +1,7 @@
 # Handoff: NEO Scavenger-style survival game (SolarOS Lua app + Python/pygame version)
 
+> **Read first:** more than one Claude session works on this branch. Before editing, run `git fetch origin claude/new-session-ws67f3` and fast-forward/merge onto it; the GitHub branch is the source of truth. The display is **400x300 landscape** (see the note below), not the 300x400 the older sections describe.
+
 *Written 2026-09-30 at the end of a long chat session. The active work is `wasteland.lua`, a single-file Lua app for a handheld running SolarOS. A parked Python/pygame version lives in `python_version/`. Read "Where We Are" bullets 17–20 before touching anything: an audit done while writing this found four real bugs, one of which makes the Lua game unplayable.*
 
 > **Update 2026-09-30 (second session, now in `gabecamp/solar_os` at `examples/wasteland/`):**
