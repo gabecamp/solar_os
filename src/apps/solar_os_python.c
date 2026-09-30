@@ -1504,6 +1504,26 @@ MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(solaros_storage_read_file_obj,
                                     2,
                                     solaros_storage_read_file);
 
+// write_file(path, data[, append]): data is bytes or str. Replaces the file
+// atomically, or appends when append is true.
+static mp_obj_t solaros_storage_write_file(size_t n_args, const mp_obj_t *args)
+{
+    char path[SOLAR_OS_STORAGE_PATH_MAX];
+    python_resolve_path_obj(args[0], path, sizeof(path));
+    mp_buffer_info_t data;
+    mp_get_buffer_raise(args[1], &data, MP_BUFFER_READ);
+    const bool append = n_args > 2 && mp_obj_is_true(args[2]);
+    if (data.len > SOLAR_OS_STORAGE_WRITE_MAX_BYTES) {
+        mp_raise_ValueError(MP_ERROR_TEXT("data must be at most 65536 bytes"));
+    }
+    python_check_esp(solar_os_storage_write_file(path, data.buf, data.len, append));
+    return mp_const_none;
+}
+MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(solaros_storage_write_file_obj,
+                                    2,
+                                    3,
+                                    solaros_storage_write_file);
+
 static mp_obj_t solaros_storage_rescan(void)
 {
     python_check_esp(solar_os_storage_rescan());

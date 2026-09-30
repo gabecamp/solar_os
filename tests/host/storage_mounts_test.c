@@ -253,6 +253,55 @@ static void assert_replace_file(void)
         active, ".too-long", staged, 4U) == ESP_ERR_INVALID_SIZE);
 }
 
+static void assert_write_file(void)
+{
+    char dir[] = "/tmp/solaros-storage-write-XXXXXX";
+    assert(mkdtemp(dir) != NULL);
+    char path[SOLAR_OS_STORAGE_PATH_MAX];
+    char staged[SOLAR_OS_STORAGE_PATH_MAX];
+    snprintf(path, sizeof(path), "%s/save.dat", dir);
+    assert(solar_os_storage_sibling_path(path, ".tmp", staged, sizeof(staged)) == ESP_OK);
+
+    // create, then replace: the old contents are gone, no staging file left
+    assert(solar_os_storage_write_file(path, "first save", 10, false) == ESP_OK);
+    assert_file_text(path, "first save");
+    assert(solar_os_storage_write_file(path, "second", 6, false) == ESP_OK);
+    assert_file_text(path, "second");
+    assert(access(staged, F_OK) != 0);
+
+    // append adds to the end, and creates a missing file
+    assert(solar_os_storage_write_file(path, " more", 5, true) == ESP_OK);
+    assert_file_text(path, "second more");
+    char log_path[SOLAR_OS_STORAGE_PATH_MAX];
+    snprintf(log_path, sizeof(log_path), "%s/log.txt", dir);
+    assert(solar_os_storage_write_file(log_path, "a", 1, true) == ESP_OK);
+    assert_file_text(log_path, "a");
+
+    // binary data (with NUL bytes) round-trips through read_file
+    const char bin[4] = {'x', '\0', 'y', '\0'};
+    assert(solar_os_storage_write_file(path, bin, sizeof(bin), false) == ESP_OK);
+    char buf[16];
+    size_t got = 0;
+    assert(solar_os_storage_read_file(path, buf, sizeof(buf), &got) == ESP_OK);
+    assert(got == sizeof(bin) && memcmp(buf, bin, sizeof(bin)) == 0);
+
+    // an empty write leaves an empty file
+    assert(solar_os_storage_write_file(path, NULL, 0, false) == ESP_OK);
+    assert(solar_os_storage_read_file(path, buf, sizeof(buf), &got) == ESP_OK && got == 0);
+
+    // refusals: too big, bad arguments, a directory, a missing parent
+    assert(solar_os_storage_write_file(path, buf, SOLAR_OS_STORAGE_WRITE_MAX_BYTES + 1U, false) ==
+           ESP_ERR_INVALID_SIZE);
+    assert(solar_os_storage_write_file(NULL, "x", 1, false) == ESP_ERR_INVALID_ARG);
+    assert(solar_os_storage_write_file(path, NULL, 1, false) == ESP_ERR_INVALID_ARG);
+    assert(solar_os_storage_write_file(dir, "x", 1, false) == ESP_ERR_INVALID_STATE);
+    char orphan[SOLAR_OS_STORAGE_PATH_MAX];
+    snprintf(orphan, sizeof(orphan), "%s/no-such-dir/save.dat", dir);
+    assert(solar_os_storage_write_file(orphan, "x", 1, false) == ESP_FAIL);
+
+    assert(remove(path) == 0 && remove(log_path) == 0 && rmdir(dir) == 0);
+}
+
 static void assert_storage_discovery(void)
 {
     char root[] = "/tmp/solaros-storage-scan-XXXXXX";
@@ -369,6 +418,7 @@ int main(void)
     assert_copy_progress();
     assert_copy_cancel();
     assert_replace_file();
+    assert_write_file();
     assert_storage_discovery();
 
     puts("storage mount tests: ok");

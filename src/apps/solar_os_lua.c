@@ -1492,6 +1492,21 @@ static int solua_storage_read_file(lua_State *L)
     return 1;
 }
 
+// write_file(path, data[, append]): data is a Lua string (binary-safe).
+// Replaces the file atomically, or appends when append is true.
+static int solua_storage_write_file(lua_State *L)
+{
+    char path[SOLAR_OS_STORAGE_PATH_MAX];
+    solua_resolve_path(L, 1, path, sizeof(path));
+    size_t len = 0;
+    const char *data = luaL_checklstring(L, 2, &len);
+    const bool append = !lua_isnoneornil(L, 3) && lua_toboolean(L, 3);
+    if (len > SOLAR_OS_STORAGE_WRITE_MAX_BYTES) {
+        return luaL_error(L, "data must be at most 65536 bytes");
+    }
+    return solua_check_esp(L, solar_os_storage_write_file(path, data, len, append));
+}
+
 static int solua_storage_rescan(lua_State *L)
 {
     return solua_check_esp(L, solar_os_storage_rescan());
