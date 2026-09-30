@@ -92,6 +92,33 @@ local SURVIVE = {
     thirst_hurt = 2, hunger_hurt = 1,
 }
 
+-- Traders and the way out. A trader keeps a stall on the town's center hex
+-- (sites.trader); the Checkpoint (sites.checkpoint) sits on the far edge of
+-- the map, the only way out of the Zone. Barter: every item is worth
+-- value[item] (default 1); the trader gives full value for what you bring
+-- and asks markup x the value of what you take. Stock restocks every
+-- restock_hours with a couple of `restock` items.
+local TRADE = {
+    markup = 1.5, restock_hours = 48, restock_n = 2,
+    value = {
+        canned_beans = 6, water_bottle = 5, dirty_water = 2, empty_bottle = 2, berries = 2,
+        strange_meat = 3, cooked_meat = 7, rotten_meat = 0, bandage = 6, cloth_scrap = 1,
+        rope = 4, torch = 3, stick = 0, rock = 0, scrawled_notes = 5,
+        knife = 12, pipe = 10, spear = 8, stone_club = 8,
+        antirad = 15, vodka = 8, geiger = 30, gasmask = 25, bolts = 1,
+        jacket = 20, backpack = 25, satchel = 12, boots = 8, gloves = 5, cap = 3,
+        earmuffs = 4, sunglasses = 4, scarf = 4, bracers = 5, tshirt = 2, jeans = 3,
+        weeping_stone = 35, drowned_eye = 35, flesh_knot = 35, hollow_star = 35,
+        quiet_shell = 35, permit = 120,
+    },
+    stock = {{"antirad", 3}, {"water_bottle", 4}, {"canned_beans", 4}, {"bandage", 2},
+             {"vodka", 2}, {"empty_bottle", 3}, {"geiger", 1}, {"gasmask", 1},
+             {"knife", 1}, {"permit", 1}},
+    restock = {"canned_beans", "water_bottle", "antirad", "bandage", "vodka", "empty_bottle"},
+}
+-- The guards let you through with a Zone Permit, or for `bribe` artifacts.
+local GOAL = {bribe = 3}
+
 local BACKPACK_CAP = 16      -- most bag cells any build can have (the layout's limit)
 local POCKET_CELLS = 4       -- bag cells with nothing worn on your back
 
@@ -162,6 +189,8 @@ local ITEM_DB = {
                     desc = "E: -20 rads, dulls you"},
     geiger       = {name = "Geiger Counter", slot = nil, consumable = nil,
                     desc = "Carry it: reads radiation"},
+    permit       = {name = "Zone Permit",  slot = nil, consumable = nil,
+                    desc = "Gets you past the Checkpoint"},
     bolts        = {name = "Bolts",        slot = nil, consumable = nil,
                     desc = "Anomalies: +2 bolt throws"},
     -- weapon: used from a hand slot. dmg per hit; reach "close" (arm's

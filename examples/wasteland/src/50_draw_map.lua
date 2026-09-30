@@ -25,7 +25,7 @@ end
 -- to its right (from PANEL_X); the log and key hints across the bottom.
 local MAP_W, MAP_TOP, MAP_BOTTOM = 256, 4, 236
 local PANEL_X = 262
-local LEGEND_Y = 116
+local LEGEND_Y = 130
 local LEGEND_ORDER = {"plains", "forest", "hills", "ruins", "ford", "water"}
 
 function Game:draw_map(w, h)
@@ -59,6 +59,10 @@ function Game:draw_map(w, h)
     gfx.text(PANEL_X, 84, table.concat(inj, " "))
     local rad_line = self:rad_text()
     if rad_line then gfx.text(PANEL_X, 98, rad_line) end
+    local goal_line = self:goal_text()
+    if goal_line then gfx.text(PANEL_X, 112, goal_line) end
+    local site_at = {}
+    for name, key in pairs(self.sites) do site_at[key] = name end
 
     local reachable = {}
     for _, n in ipairs(neighbors(self.tiles, p.q, p.r)) do
@@ -104,6 +108,15 @@ function Game:draw_map(w, h)
                 gfx.color(gfx.BLACK)
                 gfx.rect(mx - 1, my - 1, 7, 7)
                 gfx.fill_rect(mx + 1, my + 1, 3, 3)
+            end
+            local site = site_at[key]
+            if site and not is_player and (p.visible[key] or p.explored[key]) then
+                -- the trader's stall / the Checkpoint, on a white patch
+                gfx.color(gfx.WHITE)
+                gfx.fill_rect(rnd(px) - 6, rnd(py) - 6, 12, 12)
+                gfx.color(gfx.BLACK)
+                gfx.rect(rnd(px) - 7, rnd(py) - 7, 14, 14)
+                draw_glyph(site, px, py, gfx.BLACK)
             end
             local hot = self.rad_known[key]
             if hot and hot > 0 and (p.visible[key] or p.explored[key]) then

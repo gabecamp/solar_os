@@ -111,6 +111,10 @@ function Game:read_notes()
     for _, r in ipairs(RECIPES) do
         if not self.known[r.id] then unknown[#unknown + 1] = r end
     end
+    -- some notes (and all of them once you know every recipe) sketch the way out
+    if not self.sites_known.checkpoint and (#unknown == 0 or self:rand(3) == 0) then
+        return self:hear_of_exit("A sketch in the notes")
+    end
     if #unknown == 0 then
         self:push_log("Nothing in these notes you don't already know.")
         return false

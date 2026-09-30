@@ -167,6 +167,30 @@ local function generate_world(seed)
     end
     tiles[hex_key(0, 0)] = "plains"
 
+    -- sites: the trader on the town's center, and the Checkpoint on the map's
+    -- edge, at the edge hex farthest from the trader (the long way round)
+    local sites = {}
+    local trader = town and hex_key(town[1], town[2])
+    for _, key in ipairs(keys) do
+        if trader then break end
+        if tiles[key] == "ruins" then trader = key end
+    end
+    trader = trader or hex_key(3, 0)
+    tiles[trader] = "ruins"
+    sites.trader = trader
+    local tq, tr = parse(trader)
+    local exit, exit_d
+    for _, key in ipairs(keys) do
+        local q, r = parse(key)
+        if axial_distance(0, 0, q, r) == GRID_RADIUS and tiles[key] ~= "water" then
+            local d = axial_distance(q, r, tq, tr)
+            if not exit or d > exit_d then exit, exit_d = key, d end
+        end
+    end
+    exit = exit or hex_key(GRID_RADIUS, 0)
+    if tiles[exit] == "water" then tiles[exit] = "plains" end
+    sites.checkpoint = exit
+
     -- every walkable hex must be reachable from the start: where water cuts
     -- some off, wade a line of fords from them back toward the start
     local function reachable()
@@ -243,7 +267,12 @@ local function generate_world(seed)
         seed = rand_next(seed)
         local center = spots[seed % #spots + 1]
         local cq, cr = parse(center)
-        if axial_distance(0, 0, cq, cr) >= RAD.min_dist and not rad[center] then
+        local clear = axial_distance(0, 0, cq, cr) >= RAD.min_dist and not rad[center]
+        for _, site in pairs(sites) do
+            local sq, sr = parse(site)
+            if axial_distance(cq, cr, sq, sr) < RAD.min_dist then clear = false end
+        end
+        if clear then
             seed = rand_next(seed)
             local radius = 1 + seed % 2
             for _, key in ipairs(keys) do
@@ -257,7 +286,7 @@ local function generate_world(seed)
             fields = fields + 1
         end
     end
-    return tiles, ground, seed, rad
+    return tiles, ground, seed, rad, sites
 end
 
 -- ---------------------------------------------------------------------

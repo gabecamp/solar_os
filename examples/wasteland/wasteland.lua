@@ -142,6 +142,33 @@ local SURVIVE = {
     thirst_hurt = 2, hunger_hurt = 1,
 }
 
+-- Traders and the way out. A trader keeps a stall on the town's center hex
+-- (sites.trader); the Checkpoint (sites.checkpoint) sits on the far edge of
+-- the map, the only way out of the Zone. Barter: every item is worth
+-- value[item] (default 1); the trader gives full value for what you bring
+-- and asks markup x the value of what you take. Stock restocks every
+-- restock_hours with a couple of `restock` items.
+local TRADE = {
+    markup = 1.5, restock_hours = 48, restock_n = 2,
+    value = {
+        canned_beans = 6, water_bottle = 5, dirty_water = 2, empty_bottle = 2, berries = 2,
+        strange_meat = 3, cooked_meat = 7, rotten_meat = 0, bandage = 6, cloth_scrap = 1,
+        rope = 4, torch = 3, stick = 0, rock = 0, scrawled_notes = 5,
+        knife = 12, pipe = 10, spear = 8, stone_club = 8,
+        antirad = 15, vodka = 8, geiger = 30, gasmask = 25, bolts = 1,
+        jacket = 20, backpack = 25, satchel = 12, boots = 8, gloves = 5, cap = 3,
+        earmuffs = 4, sunglasses = 4, scarf = 4, bracers = 5, tshirt = 2, jeans = 3,
+        weeping_stone = 35, drowned_eye = 35, flesh_knot = 35, hollow_star = 35,
+        quiet_shell = 35, permit = 120,
+    },
+    stock = {{"antirad", 3}, {"water_bottle", 4}, {"canned_beans", 4}, {"bandage", 2},
+             {"vodka", 2}, {"empty_bottle", 3}, {"geiger", 1}, {"gasmask", 1},
+             {"knife", 1}, {"permit", 1}},
+    restock = {"canned_beans", "water_bottle", "antirad", "bandage", "vodka", "empty_bottle"},
+}
+-- The guards let you through with a Zone Permit, or for `bribe` artifacts.
+local GOAL = {bribe = 3}
+
 local BACKPACK_CAP = 16      -- most bag cells any build can have (the layout's limit)
 local POCKET_CELLS = 4       -- bag cells with nothing worn on your back
 
@@ -212,6 +239,8 @@ local ITEM_DB = {
                     desc = "E: -20 rads, dulls you"},
     geiger       = {name = "Geiger Counter", slot = nil, consumable = nil,
                     desc = "Carry it: reads radiation"},
+    permit       = {name = "Zone Permit",  slot = nil, consumable = nil,
+                    desc = "Gets you past the Checkpoint"},
     bolts        = {name = "Bolts",        slot = nil, consumable = nil,
                     desc = "Anomalies: +2 bolt throws"},
     -- weapon: used from a hand slot. dmg per hit; reach "close" (arm's
@@ -456,6 +485,24 @@ end
 local SPRITE_W, SPRITE_H = 16, 16
 
 local SPRITE_ART = {
+    permit = {
+        "................",
+        "..###########...",
+        "..#.........##..",
+        "..#.#######.#.#.",
+        "..#.........####",
+        "..#.######.....#",
+        "..#............#",
+        "..#.#######....#",
+        "..#............#",
+        "..#......###...#",
+        "..#.....#...#..#",
+        "..#.....#.#.#..#",
+        "..#.....#...#..#",
+        "..#......###...#",
+        "..##############",
+        "................",
+    },
     empty_bottle = {
         "................",
         "......####......",
@@ -1262,6 +1309,30 @@ local GLYPH_ART = {
         "..........",
         "..........",
     },
+    trader = {
+        "..........",
+        ".########.",
+        "#.#.#.#.##",
+        "##########",
+        ".#......#.",
+        ".#.####.#.",
+        ".#.#..#.#.",
+        ".########.",
+        ".#......#.",
+        "..........",
+    },
+    checkpoint = {
+        "..###.....",
+        "..#.#.....",
+        "..###.....",
+        "..#.#.....",
+        "..#.#.....",
+        "..#.######",
+        "..#.#.#.#.",
+        "..#.######",
+        "..#.#.....",
+        ".#####....",
+    },
     campfire = {
         "....#.....",
         "...##.....",
@@ -1589,6 +1660,30 @@ local function generate_world(seed)
     end
     tiles[hex_key(0, 0)] = "plains"
 
+    -- sites: the trader on the town's center, and the Checkpoint on the map's
+    -- edge, at the edge hex farthest from the trader (the long way round)
+    local sites = {}
+    local trader = town and hex_key(town[1], town[2])
+    for _, key in ipairs(keys) do
+        if trader then break end
+        if tiles[key] == "ruins" then trader = key end
+    end
+    trader = trader or hex_key(3, 0)
+    tiles[trader] = "ruins"
+    sites.trader = trader
+    local tq, tr = parse(trader)
+    local exit, exit_d
+    for _, key in ipairs(keys) do
+        local q, r = parse(key)
+        if axial_distance(0, 0, q, r) == GRID_RADIUS and tiles[key] ~= "water" then
+            local d = axial_distance(q, r, tq, tr)
+            if not exit or d > exit_d then exit, exit_d = key, d end
+        end
+    end
+    exit = exit or hex_key(GRID_RADIUS, 0)
+    if tiles[exit] == "water" then tiles[exit] = "plains" end
+    sites.checkpoint = exit
+
     -- every walkable hex must be reachable from the start: where water cuts
     -- some off, wade a line of fords from them back toward the start
     local function reachable()
@@ -1665,7 +1760,12 @@ local function generate_world(seed)
         seed = rand_next(seed)
         local center = spots[seed % #spots + 1]
         local cq, cr = parse(center)
-        if axial_distance(0, 0, cq, cr) >= RAD.min_dist and not rad[center] then
+        local clear = axial_distance(0, 0, cq, cr) >= RAD.min_dist and not rad[center]
+        for _, site in pairs(sites) do
+            local sq, sr = parse(site)
+            if axial_distance(cq, cr, sq, sr) < RAD.min_dist then clear = false end
+        end
+        if clear then
             seed = rand_next(seed)
             local radius = 1 + seed % 2
             for _, key in ipairs(keys) do
@@ -1679,7 +1779,7 @@ local function generate_world(seed)
             fields = fields + 1
         end
     end
-    return tiles, ground, seed, rad
+    return tiles, ground, seed, rad, sites
 end
 
 -- ---------------------------------------------------------------------
@@ -1885,7 +1985,12 @@ function Game.new()
         seed = os.time() % 32768
     end
     self.world_seed = seed       -- the map is rebuilt from this when a save is loaded
-    self.tiles, self.ground, seed, self.rad = generate_world(seed)
+    self.tiles, self.ground, seed, self.rad, self.sites = generate_world(seed)
+    self.trader = {stock = {}, restocked = 0}   -- what the trader has now (it changes as you trade)
+    for _, st in ipairs(TRADE.stock) do
+        self.trader.stock[#self.trader.stock + 1] = {item = st[1], qty = st[2]}
+    end
+    self.sites_known = {}        -- site name -> true once you know where it is
     self.rad_known = {}          -- tile key -> rad level you've measured or felt there
     self.seed = seed             -- RNG state for scavenging
     self.weather_seed = seed     -- fixed per world: weather is rolled from it (Game:weather)
@@ -1969,7 +2074,9 @@ function Game:try_move(q, r)
     if pile and #pile > 0 then self:push_log("Something is here. (I to look)") end
     if p.needs.hunger <= 0 then self:push_log("You are starving!") end
     if p.needs.thirst <= 0 then self:push_log("You are dehydrated!") end
-    if not self:check_death("You bled out.") then self:maybe_encounter(terrain_id) end
+    if not self:check_death("You bled out.") and not self:arrive_site() then
+        self:maybe_encounter(terrain_id)
+    end
 end
 
 function Game:move_dir(dq, dr)
@@ -2388,6 +2495,10 @@ function Game:read_notes()
     for _, r in ipairs(RECIPES) do
         if not self.known[r.id] then unknown[#unknown + 1] = r end
     end
+    -- some notes (and all of them once you know every recipe) sketch the way out
+    if not self.sites_known.checkpoint and (#unknown == 0 or self:rand(3) == 0) then
+        return self:hear_of_exit("A sketch in the notes")
+    end
     if #unknown == 0 then
         self:push_log("Nothing in these notes you don't already know.")
         return false
@@ -2699,7 +2810,8 @@ end
 
 local SAVE = {version = 1, dir = "wasteland", file = "save.lua",
               fields = {"world_seed", "seed", "weather_seed", "scavenged", "camps",
-                        "known", "ground", "log", "enc_cooldown", "ticked_hour", "rad_known"}}
+                        "known", "ground", "log", "enc_cooldown", "ticked_hour", "rad_known",
+                        "trader", "sites_known"}}
 
 -- Where the save lives: <preferred storage>/wasteland/save.lua
 function SAVE.path()
@@ -2789,8 +2901,8 @@ function Game.read_save()
 end
 
 function Game:load_state(data)
-    local tiles, _, _, rad = generate_world(data.world_seed)
-    self.tiles, self.rad = tiles, rad
+    local tiles, _, _, rad, sites = generate_world(data.world_seed)
+    self.tiles, self.rad, self.sites = tiles, rad, sites
     for _, f in ipairs(SAVE.fields) do
         if data[f] ~= nil then self[f] = data[f] end
     end
@@ -3195,6 +3307,9 @@ function Game:helper_talk()
         self:enc_say("He draws the land around you in the dirt and hands you a bottle of "
             .. "clean water. 'Stay off the roads at night.'")
         self:end_encounter("The wanderer shared water and directions.")
+        if not self:hear_of_exit("The wanderer") and self:learn_site("trader") then
+            self:push_log("The wanderer: a trader in the town, " .. self:site_bearing("trader") .. ".")
+        end
     end
 end
 
@@ -3480,6 +3595,267 @@ function Game:encounter_key(key)
 end
 
 -- ---------------------------------------------------------------------
+-- Traders and the way out
+--
+-- self.sites (from generate_world): trader = the town's center hex,
+-- checkpoint = an edge hex far from it. You learn where they are from the
+-- trader (who tells you about the Checkpoint), the wanderer, scrawled notes
+-- or by walking there (sites_known, saved); the panel then points the way.
+-- T on the trader's hex opens barter (self.trader, saved); T at the
+-- Checkpoint opens the gate: a Zone Permit or GOAL.bribe artifacts get you
+-- out of the Zone, which ends the run.
+-- ---------------------------------------------------------------------
+
+function Game:site_here()
+    local here = hex_key(self.player.q, self.player.r)
+    for name, key in pairs(self.sites) do
+        if key == here then return name end
+    end
+end
+
+-- Returns true the first time.
+function Game:learn_site(name)
+    if self.sites_known[name] then return false end
+    self.sites_known[name] = true
+    self.player.explored[self.sites[name]] = true
+    return true
+end
+
+-- "NE 9": compass direction (up = north) and hexes from you to a site.
+function Game:site_bearing(name)
+    local p = self.player
+    local q, r = self.sites[name]:match("(-?%d+),(-?%d+)")
+    q, r = tonumber(q), tonumber(r)
+    local d = axial_distance(p.q, p.r, q, r)
+    if d == 0 then return "here" end
+    local x0, y0 = axial_to_pixel(p.q, p.r, 1)
+    local x1, y1 = axial_to_pixel(q, r, 1)
+    local octant = math.floor(math.atan(y0 - y1, x1 - x0) / (math.pi / 4) + 0.5) % 8
+    return ({"E", "NE", "N", "NW", "W", "SW", "S", "SE"})[octant + 1] .. " " .. d
+end
+
+-- Map panel line: where to go next.
+function Game:goal_text()
+    if self.sites_known.checkpoint then return "Exit " .. self:site_bearing("checkpoint") end
+    if self.sites_known.trader then return "Trader " .. self:site_bearing("trader") end
+end
+
+-- Someone (or something) tells you where the way out is.
+function Game:hear_of_exit(who)
+    if self:learn_site("checkpoint") then
+        self:push_log(who .. ": a checkpoint out of the Zone, " .. self:site_bearing("checkpoint") .. ".")
+        return true
+    end
+    return false
+end
+
+-- After a move: sites are safe (no encounters) and announce themselves.
+function Game:arrive_site()
+    local site = self:site_here()
+    if site == "trader" then
+        self:learn_site("trader")
+        self:push_log("A trader's stall behind a barricade. T to trade.")
+        self:hear_of_exit("Trader")
+        return true
+    elseif site == "checkpoint" then
+        self:learn_site("checkpoint")
+        self:push_log("The Checkpoint. Guards watch from the tower. T.")
+        return true
+    end
+    return false
+end
+
+-- T on the map.
+function Game:site_action()
+    local site = self:site_here()
+    if site == "trader" then
+        self:open_trade()
+    elseif site == "checkpoint" then
+        self:open_gate()
+    else
+        self:push_log("Nobody here. (T trades at a trader)")
+    end
+end
+
+-- -- barter -------------------------------------------------------------
+
+function Game.item_value(item)
+    return TRADE.value[item] or 1
+end
+
+function Game:open_trade()
+    local t, p = self.trader, self.player
+    while p.hours - t.restocked >= TRADE.restock_hours do
+        t.restocked = t.restocked + TRADE.restock_hours
+        for _ = 1, TRADE.restock_n do
+            add_to_list(t.stock, {item = TRADE.restock[self:rand(#TRADE.restock) + 1], qty = 1})
+        end
+    end
+    self.trade_ui = {col = "mine", cursor = {mine = 1, theirs = 1}, give = {}, get = {},
+                     msg = "Pick what you give and take, then T."}
+    self.screen = "trade"
+end
+
+-- The two columns: your bag and the trader's stock.
+function Game:trade_rows(col)
+    return col == "mine" and self.player.inventory or self.trader.stock
+end
+
+-- What you offer, and what the trader asks for what you picked.
+function Game:trade_totals()
+    local u = self.trade_ui
+    local give, get = 0, 0
+    for item, n in pairs(u.give) do give = give + Game.item_value(item) * n end
+    for item, n in pairs(u.get) do get = get + Game.item_value(item) * n end
+    return give, math.ceil(get * TRADE.markup)
+end
+
+-- Take n units of item out of a stack list.
+local function take_units(list, item, n)
+    for i, s in ipairs(list) do
+        if s.item == item then
+            s.qty = s.qty - n
+            if s.qty <= 0 then table.remove(list, i) end
+            return
+        end
+    end
+end
+
+function Game:make_deal()
+    local u, t = self.trade_ui, self.trader
+    local give, ask = self:trade_totals()
+    if next(u.get) == nil then
+        u.msg = "Pick something to take (Right, Enter)."
+        return false
+    end
+    if give < ask then
+        u.msg = ("Not enough. They want %d, you offer %d."):format(ask, give)
+        return false
+    end
+    for item, n in pairs(u.give) do
+        take_units(self.player.inventory, item, n)
+        add_to_list(t.stock, {item = item, qty = n})
+    end
+    local dropped = false
+    for item, n in pairs(u.get) do
+        take_units(t.stock, item, n)
+        if not self:put_stack("inventory", nil, {item = item, qty = n}) then
+            self:put_stack("ground", nil, {item = item, qty = n})
+            dropped = true
+        end
+    end
+    u.give, u.get = {}, {}
+    u.msg = dropped and "Deal. Your bag is full: some is on the ground." or "Deal."
+    self:push_log("You traded with the trader.")
+    for col, c in pairs(u.cursor) do
+        u.cursor[col] = math.max(1, math.min(c, #self:trade_rows(col)))
+    end
+    return true
+end
+
+function Game:trade_key(key)
+    local u = self.trade_ui
+    local rows = self:trade_rows(u.col)
+    local c = u.cursor[u.col]
+    local pick = u.col == "mine" and u.give or u.get
+    local row = rows[c]
+    if key == KEY.Q or key == gfx.KEY_ESCAPE then
+        self.trade_ui = nil
+        self.screen = "map"
+    elseif key == gfx.KEY_UP or key == KEY.W then
+        u.cursor[u.col] = math.max(1, c - 1)
+    elseif key == gfx.KEY_DOWN or key == KEY.S then
+        u.cursor[u.col] = math.max(1, math.min(#rows, c + 1))
+    elseif key == gfx.KEY_LEFT or key == KEY.A then
+        u.col = "mine"
+    elseif key == gfx.KEY_RIGHT or key == KEY.D then
+        u.col = "theirs"
+    elseif key == KEY.ENTER or key == KEY.LF or key == KEY.SPACE then
+        if row and (pick[row.item] or 0) < row.qty then pick[row.item] = (pick[row.item] or 0) + 1 end
+    elseif key == KEY.E then
+        if row and pick[row.item] then
+            pick[row.item] = pick[row.item] > 1 and pick[row.item] - 1 or nil
+        end
+    elseif key == KEY.T then
+        self:make_deal()
+    end
+end
+
+-- -- the Checkpoint and the end ---------------------------------------------
+
+-- Artifacts in your bag and hands.
+function Game:artifact_count()
+    local p, n = self.player, 0
+    for _, s in ipairs(p.inventory) do
+        if ITEM_DB[s.item].artifact then n = n + s.qty end
+    end
+    for _, slot in ipairs({"lhand", "rhand"}) do
+        local item = p.equipped[slot]
+        if item and ITEM_DB[item].artifact then n = n + 1 end
+    end
+    return n
+end
+
+function Game:open_gate()
+    local opts = {}
+    if self:count_item("permit") > 0 then opts[#opts + 1] = {"Show the Zone Permit", "permit"} end
+    if self:artifact_count() >= GOAL.bribe then
+        opts[#opts + 1] = {("Offer %d artifacts"):format(GOAL.bribe), "bribe"}
+    end
+    opts[#opts + 1] = {"Walk away", "leave"}
+    self.gate_ui = {cursor = 1, opts = opts}
+    self.screen = "gate"
+end
+
+function Game:pay_bribe()
+    local p, left = self.player, GOAL.bribe
+    for i = #p.inventory, 1, -1 do
+        local s = p.inventory[i]
+        if left > 0 and ITEM_DB[s.item].artifact then
+            local n = math.min(left, s.qty)
+            left = left - n
+            s.qty = s.qty - n
+            if s.qty <= 0 then table.remove(p.inventory, i) end
+        end
+    end
+    for _, slot in ipairs({"lhand", "rhand"}) do
+        local item = p.equipped[slot]
+        if left > 0 and item and ITEM_DB[item].artifact then
+            p.equipped[slot] = nil
+            left = left - 1
+        end
+    end
+    recompute_stats(p)
+end
+
+function Game:gate_key(key)
+    local u = self.gate_ui
+    if key == KEY.Q or key == gfx.KEY_ESCAPE then
+        self.screen = "map"
+    elseif key == gfx.KEY_UP or key == KEY.W then
+        u.cursor = math.max(1, u.cursor - 1)
+    elseif key == gfx.KEY_DOWN or key == KEY.S then
+        u.cursor = math.min(#u.opts, u.cursor + 1)
+    elseif key == KEY.ENTER or key == KEY.LF or key == KEY.SPACE then
+        local choice = u.opts[u.cursor][2]
+        if choice == "leave" then
+            self:push_log("You step back from the barrier.")
+            self.screen = "map"
+        else
+            if choice == "bribe" then self:pay_bribe() end
+            self:finish_run(choice)
+        end
+    end
+end
+
+-- Out of the Zone: the run is over (and so is its save).
+function Game:finish_run(how)
+    self.ending = {how = how, day = (self:clock()), hours = self.player.hours,
+                   artifacts = self:artifact_count()}
+    self.screen = "ending"
+    Game.delete_save()
+end
+-- ---------------------------------------------------------------------
 -- Rendering
 -- ---------------------------------------------------------------------
 
@@ -3506,7 +3882,7 @@ end
 -- to its right (from PANEL_X); the log and key hints across the bottom.
 local MAP_W, MAP_TOP, MAP_BOTTOM = 256, 4, 236
 local PANEL_X = 262
-local LEGEND_Y = 116
+local LEGEND_Y = 130
 local LEGEND_ORDER = {"plains", "forest", "hills", "ruins", "ford", "water"}
 
 function Game:draw_map(w, h)
@@ -3540,6 +3916,10 @@ function Game:draw_map(w, h)
     gfx.text(PANEL_X, 84, table.concat(inj, " "))
     local rad_line = self:rad_text()
     if rad_line then gfx.text(PANEL_X, 98, rad_line) end
+    local goal_line = self:goal_text()
+    if goal_line then gfx.text(PANEL_X, 112, goal_line) end
+    local site_at = {}
+    for name, key in pairs(self.sites) do site_at[key] = name end
 
     local reachable = {}
     for _, n in ipairs(neighbors(self.tiles, p.q, p.r)) do
@@ -3585,6 +3965,15 @@ function Game:draw_map(w, h)
                 gfx.color(gfx.BLACK)
                 gfx.rect(mx - 1, my - 1, 7, 7)
                 gfx.fill_rect(mx + 1, my + 1, 3, 3)
+            end
+            local site = site_at[key]
+            if site and not is_player and (p.visible[key] or p.explored[key]) then
+                -- the trader's stall / the Checkpoint, on a white patch
+                gfx.color(gfx.WHITE)
+                gfx.fill_rect(rnd(px) - 6, rnd(py) - 6, 12, 12)
+                gfx.color(gfx.BLACK)
+                gfx.rect(rnd(px) - 7, rnd(py) - 7, 14, 14)
+                draw_glyph(site, px, py, gfx.BLACK)
             end
             local hot = self.rad_known[key]
             if hot and hot > 0 and (p.visible[key] or p.explored[key]) then
@@ -4867,6 +5256,115 @@ function Game:draw_craft(w, h)
     gfx.refresh()
 end
 -- ---------------------------------------------------------------------
+-- Trade, Checkpoint and ending screens
+-- ---------------------------------------------------------------------
+
+local TRADE_UI = {rows = 12, row_h = 14, top = 50, col_x = {mine = 6, theirs = 204}, col_w = 190,
+                  gate_intro = "Concrete blocks, razor wire, a tower whose searchlight never "
+                      .. "switches off. A sergeant in a gas mask watches you come. 'Nobody "
+                      .. "leaves the Zone without paper. Or without paying.'",
+                  ending = {
+                      permit = "The sergeant reads the permit twice, stamps it without looking "
+                          .. "at you and lifts the barrier. On the far side the grass is only "
+                          .. "grass. Behind you something vast and patient hums, and you know "
+                          .. "you will dream of it every night.",
+                      bribe = "The guards weigh the artifacts in their gloved hands. One of "
+                          .. "them starts to cry and doesn't know why. They wave you through "
+                          .. "without a word, and the barrier drops behind you like a closing eye.",
+                  }}
+
+function Game:draw_trade(w, h)
+    local u, L = self.trade_ui, TRADE_UI
+    gfx.clear(gfx.WHITE)
+    gfx.color(gfx.BLACK)
+    gfx.font(gfx.FONT_BOLD_14)
+    gfx.text(6, 16, "Trader")
+    gfx.font(gfx.FONT_MONO_12)
+    gfx.text(110, 16, ("They ask x%.1f value"):format(TRADE.markup))
+    for _, col in ipairs({"mine", "theirs"}) do
+        local x = L.col_x[col]
+        local rows = self:trade_rows(col)
+        local pick = col == "mine" and u.give or u.get
+        gfx.color(gfx.BLACK)
+        gfx.text(x, 36, col == "mine" and "Your bag  (you give)" or "Trader  (you take)")
+        local c = u.cursor[col]
+        local first = math.max(1, c - L.rows + 1)
+        for i = first, math.min(#rows, first + L.rows - 1) do
+            local s = rows[i]
+            local y = L.top + (i - first) * L.row_h
+            local n = pick[s.item]
+            local text = ("%-13s x%-2d %3d%s"):format(ITEM_DB[s.item].name:sub(1, 13), s.qty,
+                                                    Game.item_value(s.item), n and (" +" .. n) or "")
+            if i == c and col == u.col then
+                gfx.color(gfx.BLACK)
+                gfx.fill_rect(x - 2, y - 11, L.col_w, L.row_h)
+                gfx.color(gfx.WHITE)
+            elseif i == c then
+                gfx.color(gfx.BLACK)
+                gfx.rect(x - 2, y - 11, L.col_w, L.row_h)
+            end
+            gfx.text(x, y, text)
+            gfx.color(gfx.BLACK)
+        end
+        if #rows == 0 then gfx.text(x, L.top, "(nothing)") end
+    end
+    gfx.color(gfx.BLACK)
+    gfx.line(200, 26, 200, L.top + L.rows * L.row_h - 10)
+    local give, ask = self:trade_totals()
+    gfx.text(6, 234, ("You give %d   They ask %d"):format(give, ask))
+    gfx.text(6, 252, u.msg or "")
+    gfx.text(6, h - 8, "Arrows Enter:+1 E:-1 T:deal Q:leave")
+    gfx.refresh()
+end
+
+function Game:draw_gate(w, h)
+    local u = self.gate_ui
+    gfx.clear(gfx.WHITE)
+    gfx.color(gfx.BLACK)
+    gfx.font(gfx.FONT_BOLD_14)
+    gfx.text(6, 22, "The Checkpoint")
+    gfx.font(gfx.FONT_MONO_12)
+    local y = 48
+    for _, line in ipairs(wrap(TRADE_UI.gate_intro, 54)) do
+        gfx.text(6, y, line)
+        y = y + 14
+    end
+    y = y + 16
+    for i, opt in ipairs(u.opts) do
+        if i == u.cursor then
+            gfx.fill_rect(4, y - 11, 240, 15)
+            gfx.color(gfx.WHITE)
+        end
+        gfx.text(10, y, opt[1])
+        gfx.color(gfx.BLACK)
+        y = y + 20
+    end
+    if #u.opts == 1 then
+        gfx.text(6, y + 10, ("You need a Zone Permit or %d artifacts."):format(GOAL.bribe))
+    end
+    gfx.text(6, h - 8, "Up/Dn pick  Enter choose  Q back")
+    gfx.refresh()
+end
+
+function Game:draw_ending(w, h)
+    local e = self.ending
+    gfx.clear(gfx.WHITE)
+    gfx.color(gfx.BLACK)
+    gfx.font(gfx.FONT_BOLD_14)
+    gfx.text(6, 30, "You left the Zone.")
+    gfx.font(gfx.FONT_MONO_12)
+    local y = 60
+    for _, line in ipairs(wrap(TRADE_UI.ending[e.how] or "", 54)) do
+        gfx.text(6, y, line)
+        y = y + 14
+    end
+    y = y + 14
+    gfx.text(6, y, ("Day %d. %d hours in the Zone."):format(e.day, e.hours))
+    gfx.text(6, y + 16, ("Artifacts carried out: %d"):format(e.artifacts))
+    gfx.text(6, h - 8, "Enter: new survivor  Q: quit")
+    gfx.refresh()
+end
+-- ---------------------------------------------------------------------
 -- Main loop
 -- ---------------------------------------------------------------------
 
@@ -4899,6 +5397,8 @@ local ok, err = pcall(function()
             game:scavenge()
         elseif key == KEY.E then
             game:water_action()
+        elseif key == KEY.T then
+            game:site_action()
         elseif key == KEY.C then
             game:open_crafting()
         elseif key == KEY.I then
@@ -4953,6 +5453,12 @@ local ok, err = pcall(function()
                 game:draw_creator(w, h)
             elseif game.screen == "dead" then
                 game:draw_dead(w, h)
+            elseif game.screen == "ending" then
+                game:draw_ending(w, h)
+            elseif game.screen == "trade" then
+                game:draw_trade(w, h)
+            elseif game.screen == "gate" then
+                game:draw_gate(w, h)
             elseif game.screen == "encounter" then
                 game:draw_encounter(w, h)
             elseif game.screen == "puzzle" then
@@ -4987,7 +5493,11 @@ local ok, err = pcall(function()
                 game:puzzle_key(key)
             elseif game.screen == "craft" then
                 if key == KEY.Q then game.quit = true else game:craft_key(key) end
-            elseif game.screen == "dead" then
+            elseif game.screen == "trade" then
+                game:trade_key(key)
+            elseif game.screen == "gate" then
+                game:gate_key(key)
+            elseif game.screen == "dead" or game.screen == "ending" then
                 if key == gfx.KEY_ESCAPE or key == KEY.Q then
                     game.quit = true
                 elseif key == KEY.ENTER or key == KEY.LF then
@@ -5000,7 +5510,8 @@ local ok, err = pcall(function()
             end
             -- time may have passed (moving, resting, crafting...): apply cold,
             -- night and light before the next frame
-            if game.screen ~= "creator" and game.screen ~= "dead" and game.screen ~= "title" then
+            if game.screen ~= "creator" and game.screen ~= "dead" and game.screen ~= "title"
+                and game.screen ~= "ending" then
                 game:tick()
             end
             game:autosave()

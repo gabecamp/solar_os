@@ -280,3 +280,32 @@ g.player.inventory[#g.player.inventory + 1] = {item = "bolts", qty = 5}
 g.inv_cursor = 1
 g:draw_inventory(400, 300)
 solaros.dump("ops_inventory_radiation.txt")
+
+-- Scenes: the trader (map next to the stall, barter), the Checkpoint, the ending
+g = fresh()
+g:start_game()
+local tq, tr = g.sites.trader:match("(-?%d+),(-?%d+)")
+g.player.q, g.player.r = tonumber(tq) + 1, tonumber(tr)
+g:learn_site("trader")
+g:learn_site("checkpoint")
+g:refresh_view()
+g.log = {"Moved to Ruins (1 MP)", "Trader: a checkpoint out of the Zone, NE 17."}
+g:draw_map(400, 300)
+solaros.dump("ops_map_trader.txt")
+g.player.q, g.player.r = tonumber(tq), tonumber(tr)
+g.player.inventory = {{item = "weeping_stone", qty = 2}, {item = "canned_beans", qty = 3},
+                      {item = "dirty_water", qty = 2}, {item = "knife", qty = 1}}
+g:open_trade()
+g.trade_ui.give = {weeping_stone = 1}
+g.trade_ui.get = {antirad = 1}
+g.trade_ui.col = "theirs"
+g.trade_ui.cursor.theirs = 1
+g:draw_trade(400, 300)
+solaros.dump("ops_trade.txt")
+g.player.inventory = {{item = "permit", qty = 1}, {item = "weeping_stone", qty = 3}}
+g:open_gate()
+g:draw_gate(400, 300)
+solaros.dump("ops_gate.txt")
+g:finish_run("permit")
+g:draw_ending(400, 300)
+solaros.dump("ops_ending.txt")

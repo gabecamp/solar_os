@@ -31,6 +31,8 @@ local ok, err = pcall(function()
             game:scavenge()
         elseif key == KEY.E then
             game:water_action()
+        elseif key == KEY.T then
+            game:site_action()
         elseif key == KEY.C then
             game:open_crafting()
         elseif key == KEY.I then
@@ -85,6 +87,12 @@ local ok, err = pcall(function()
                 game:draw_creator(w, h)
             elseif game.screen == "dead" then
                 game:draw_dead(w, h)
+            elseif game.screen == "ending" then
+                game:draw_ending(w, h)
+            elseif game.screen == "trade" then
+                game:draw_trade(w, h)
+            elseif game.screen == "gate" then
+                game:draw_gate(w, h)
             elseif game.screen == "encounter" then
                 game:draw_encounter(w, h)
             elseif game.screen == "puzzle" then
@@ -119,7 +127,11 @@ local ok, err = pcall(function()
                 game:puzzle_key(key)
             elseif game.screen == "craft" then
                 if key == KEY.Q then game.quit = true else game:craft_key(key) end
-            elseif game.screen == "dead" then
+            elseif game.screen == "trade" then
+                game:trade_key(key)
+            elseif game.screen == "gate" then
+                game:gate_key(key)
+            elseif game.screen == "dead" or game.screen == "ending" then
                 if key == gfx.KEY_ESCAPE or key == KEY.Q then
                     game.quit = true
                 elseif key == KEY.ENTER or key == KEY.LF then
@@ -132,7 +144,8 @@ local ok, err = pcall(function()
             end
             -- time may have passed (moving, resting, crafting...): apply cold,
             -- night and light before the next frame
-            if game.screen ~= "creator" and game.screen ~= "dead" and game.screen ~= "title" then
+            if game.screen ~= "creator" and game.screen ~= "dead" and game.screen ~= "title"
+                and game.screen ~= "ending" then
                 game:tick()
             end
             game:autosave()

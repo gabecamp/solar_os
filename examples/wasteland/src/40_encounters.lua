@@ -211,6 +211,9 @@ function Game:helper_talk()
         self:enc_say("He draws the land around you in the dirt and hands you a bottle of "
             .. "clean water. 'Stay off the roads at night.'")
         self:end_encounter("The wanderer shared water and directions.")
+        if not self:hear_of_exit("The wanderer") and self:learn_site("trader") then
+            self:push_log("The wanderer: a trader in the town, " .. self:site_bearing("trader") .. ".")
+        end
     end
 end
 

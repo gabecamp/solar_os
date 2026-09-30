@@ -17,7 +17,12 @@ function Game.new()
         seed = os.time() % 32768
     end
     self.world_seed = seed       -- the map is rebuilt from this when a save is loaded
-    self.tiles, self.ground, seed, self.rad = generate_world(seed)
+    self.tiles, self.ground, seed, self.rad, self.sites = generate_world(seed)
+    self.trader = {stock = {}, restocked = 0}   -- what the trader has now (it changes as you trade)
+    for _, st in ipairs(TRADE.stock) do
+        self.trader.stock[#self.trader.stock + 1] = {item = st[1], qty = st[2]}
+    end
+    self.sites_known = {}        -- site name -> true once you know where it is
     self.rad_known = {}          -- tile key -> rad level you've measured or felt there
     self.seed = seed             -- RNG state for scavenging
     self.weather_seed = seed     -- fixed per world: weather is rolled from it (Game:weather)
@@ -101,7 +106,9 @@ function Game:try_move(q, r)
     if pile and #pile > 0 then self:push_log("Something is here. (I to look)") end
     if p.needs.hunger <= 0 then self:push_log("You are starving!") end
     if p.needs.thirst <= 0 then self:push_log("You are dehydrated!") end
-    if not self:check_death("You bled out.") then self:maybe_encounter(terrain_id) end
+    if not self:check_death("You bled out.") and not self:arrive_site() then
+        self:maybe_encounter(terrain_id)
+    end
 end
 
 function Game:move_dir(dq, dr)
