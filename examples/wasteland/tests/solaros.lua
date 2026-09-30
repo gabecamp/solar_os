@@ -47,7 +47,7 @@ function gfx.fill_circle(x, y, r) end
 function gfx.pixel(x, y) end
 REFRESH_COUNT = 0
 function gfx.refresh() REFRESH_COUNT = REFRESH_COUNT + 1 end
-function gfx.size() return 300, 400 end
+function gfx.size() return 400, 300 end
 
 -- D=100 right, A=97 left, W=119 up, S=115 down, Space=32 rest,
 -- I=105 inventory toggle, Enter=10 confirm (SolarOS sends '\n'), E=101 eat/drink,

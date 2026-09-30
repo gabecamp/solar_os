@@ -2,7 +2,7 @@
 -- slot filled. Checks every cell is on screen and that the cell/text regions
 -- never overlap each other. Positions are read back from the INV_POS table
 -- the game itself fills while drawing, and constants from lib_layout.lua.
--- Runs at 400 and 392 px tall: the log follows the reported height.
+-- Runs at the device size, 400x300.
 package.path = "./?.lua;" .. package.path
 local solaros = require("solaros")
 local gfx = solaros.gfx
@@ -10,7 +10,7 @@ gfx.begin()
 
 local Game, L, rows_pos = dofile("lib_layout.lua")
 
-local W, H = 300, 400
+local W, H = 400, 300
 local game = Game.new()
 game.player.q, game.player.r = 0, 0
 game.player.bag_bonus = 16   -- widest possible bag: every one of BACKPACK_CAP cells
@@ -49,8 +49,10 @@ local function check_frame(label)
     end
     -- text lines (approximate glyph box: baseline-9 .. baseline+3)
     rects[#rects + 1] = {"conditions", 0, L.CONDITIONS_Y - 9, W, L.CONDITIONS_Y + 3}
-    rects[#rects + 1] = {"bag name", L.BAG_LABEL_X, L.BACKPACK_Y + 7, W, L.BACKPACK_Y + 19}
-    rects[#rects + 1] = {"bag count", L.BAG_LABEL_X, L.BACKPACK_Y + 33, W, L.BACKPACK_Y + 45}
+    rects[#rects + 1] = {"bag label", L.INV_COL_X, L.BAG_LABEL_Y - 9, W, L.BAG_LABEL_Y + 3}
+    rects[#rects + 1] = {"ground label", L.INV_COL_X, L.GROUND_Y - 14, W, L.GROUND_Y - 2}
+    rects[#rects + 1] = {"cursor line", L.INV_COL_X, L.CURSOR_DESC_Y - 9, W, L.CURSOR_DESC_Y + 3}
+    rects[#rects + 1] = {"key hint", 0, 0, W, 15}
     for k = 0, L.INV_LOG_LINES - 1 do
         local y = H - 8 - 12 * (L.INV_LOG_LINES - 1 - k)
         if y + 3 > H then fail(label .. ": log line " .. (k + 1) .. " below the screen") end
@@ -68,7 +70,7 @@ local function check_frame(label)
     return shown
 end
 
-for _, height in ipairs({400, 392}) do
+for _, height in ipairs({300}) do
     H = height
     game.inv_cursor = 1
     local shown = check_frame("cursor on first ground stack")

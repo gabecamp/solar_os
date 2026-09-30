@@ -24,7 +24,7 @@ lib = src[:cut]
     lib + "\nreturn Game, ITEM_DB, EQUIP_SLOTS, TERRAIN, SPRITES, SPRITE_ART\n")
 (here / "lib_map.lua").write_text(
     lib + "\nreturn Game, TERRAIN, GLYPHS, GLYPH_ART, GLYPH_W, GLYPH_H, "
-          "LEGEND_ORDER, LEGEND_Y, MAP_TOP, HEX_SIZE\n")
+          "LEGEND_ORDER, LEGEND_Y, MAP_TOP, HEX_SIZE, MAP_W, MAP_BOTTOM, PANEL_X\n")
 # Layout constants as a table, so layout tests check the game's real numbers
 # instead of copies that go stale.
 (here / "lib_layout.lua").write_text(
@@ -35,7 +35,7 @@ lib = src[:cut]
           "BACKPACK_CAP = BACKPACK_CAP, BACKPACK_COLS = BACKPACK_COLS, "
           "BACKPACK_CELL = BACKPACK_CELL, BACKPACK_GAP = BACKPACK_GAP, "
           "BACKPACK_Y = BACKPACK_Y, CONDITIONS_Y = CONDITIONS_Y, "
-          "BAG_LABEL_X = BAG_LABEL_X, INV_LOG_LINES = INV_LOG_LINES, "
+          "BAG_LABEL_Y = BAG_LABEL_Y, INV_COL_X = INV_COL_X, CURSOR_DESC_Y = CURSOR_DESC_Y, INV_LOG_LINES = INV_LOG_LINES, "
           "BODY_CX = BODY_CX, BODY_TOP = BODY_TOP, BODY_BOTTOM = BODY_BOTTOM}, "
           "function() return INV_ROWS, INV_POS end\n")
 (here / "lib_scavenge.lua").write_text(

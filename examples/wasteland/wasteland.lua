@@ -1,8 +1,8 @@
 --[[
 Wasteland Survivor - a NEO Scavenger-style hex survival game for SolarOS.
 
-Written for a small monochrome/grayscale portrait display (designed and
-tested against 300x400) with no polygon-fill primitive available - hex
+Written for a small monochrome landscape display (400x300, the Waveshare
+RLCD's logical size under SolarOS) with no polygon-fill primitive - hex
 tiles are drawn as outlines (gfx.line x6) with an optional gfx.fill_rect
 bounding-box wash underneath for shading, rather than the isometric 3D
 block look used in the desktop/Pi version of this game. That's a
@@ -1192,31 +1192,30 @@ local function draw_glyph(terrain_id, cx, cy, color)
     draw_sprite(rnd(cx) - GLYPH_W // 2, rnd(cy) - GLYPH_H // 2, GLYPH_W, GLYPH_H, GLYPHS[terrain_id])
 end
 
--- Vertical layout of the map screen (300x400): HUD text above MAP_TOP, the
--- hex map centered between MAP_TOP and the legend, then the legend (two rows
--- of 14px swatches), the message log, and the key hints on the last line.
-local MAP_TOP = 58
-local LEGEND_Y = 306
+-- Map screen (400x300 landscape): the hex map in the left MAP_W pixels
+-- between MAP_TOP and MAP_BOTTOM; the HUD and the terrain legend in a panel
+-- to its right (from PANEL_X); the log and key hints across the bottom.
+local MAP_W, MAP_TOP, MAP_BOTTOM = 256, 4, 236
+local PANEL_X = 262
+local LEGEND_Y = 72
 local LEGEND_ORDER = {"plains", "forest", "hills", "water"}
 
 function Game:draw_map(w, h)
     gfx.clear(gfx.WHITE)
 
     local p = self.player
-    local origin_x, origin_y = w // 2, (MAP_TOP + LEGEND_Y - 4) // 2
+    local origin_x, origin_y = MAP_W // 2, (MAP_TOP + MAP_BOTTOM) // 2
 
     -- HUD
     gfx.color(gfx.BLACK)
-    gfx.font(gfx.FONT_BOLD_14)
-    gfx.text(6, 16, "Wasteland Survivor")
     gfx.font(gfx.FONT_MONO_12)
     local scav = SCAVENGE_LOOT[self.tiles[hex_key(p.q, p.r)]]
         and (self:scavenge_left() .. "/" .. SCAVENGE_TRIES) or "-"
-    gfx.text(6, 34, "MP " .. math.max(p.mp, 0) .. "/" .. p.max_mp
-        .. "  Hrs " .. p.hours .. "  Sight " .. p.sight .. "  Scav " .. scav)
-    gfx.text(6, 50, "Hun " .. math.floor(p.needs.hunger)
-        .. " Thi " .. math.floor(p.needs.thirst)
-        .. " Rst " .. math.floor(p.needs.rest))
+    gfx.text(PANEL_X, 14, "MP " .. math.max(p.mp, 0) .. "/" .. p.max_mp .. "  Hrs " .. p.hours)
+    gfx.text(PANEL_X, 28, "Sight " .. p.sight .. " Scav " .. scav)
+    gfx.text(PANEL_X, 42, "Hun " .. math.floor(p.needs.hunger)
+        .. " Thi " .. math.floor(p.needs.thirst))
+    gfx.text(PANEL_X, 56, "Rest " .. math.floor(p.needs.rest))
 
     local reachable = {}
     for _, n in ipairs(neighbors(self.tiles, p.q, p.r)) do
@@ -1228,7 +1227,7 @@ function Game:draw_map(w, h)
         q, r = tonumber(q), tonumber(r)
         local px, py = axial_to_pixel(q, r, HEX_SIZE)
         px, py = origin_x + px, origin_y + py
-        if px > -HEX_SIZE * 2 and px < w + HEX_SIZE * 2 and py > MAP_TOP and py < LEGEND_Y then
+        if py > MAP_TOP and py < MAP_BOTTOM then
             local terrain = TERRAIN[terrain_id]
             local is_player = (q == p.q and r == p.r)
             if p.visible[key] then
@@ -1288,8 +1287,7 @@ function Game:draw_legend()
     gfx.font(gfx.FONT_MONO_12)
     for i, terrain_id in ipairs(LEGEND_ORDER) do
         local t = TERRAIN[terrain_id]
-        local col, row = (i - 1) % 2, (i - 1) // 2
-        local x, y = 6 + col * 150, LEGEND_Y + row * 16
+        local x, y = PANEL_X + 2, LEGEND_Y + (i - 1) * 18
 
         local fill = shade_color(t.shade)
         if fill ~= gfx.WHITE then
@@ -1356,8 +1354,8 @@ local INV_POS = {}   -- rebuilt each draw: row_index -> {x, y, w, h} - where tha
 -- Equip slots sit ON the body part they dress, NEO Scavenger style: a box over
 -- the head, the face, the torso, the legs, a hand... sized to that part, with
 -- the worn item painted onto the body and its icon drawn inside the box.
--- {x, y, w, h} in screen pixels, laid out against the silhouette below
--- (BODY_SCALE 1.25, head top at y 72). Boxes never touch each other.
+-- {x, y, w, h} authored against the figure at center x 150 / head top y 72,
+-- then shifted with it (BODY_DX/BODY_DY below). Boxes never touch each other.
 local EQUIP_RECT = {
     head   = {139,  64, 22, 18},   -- top of the head (a hat sits here)
     ears   = {118,  84, 20, 18},   -- against the side of the head
@@ -1381,20 +1379,25 @@ local EQUIP_NAME = {head = "Head", ears = "Ears", eyes = "Eyes", neck = "Neck",
 local EQUIP_ABBR = {head = "Hd", ears = "Ea", eyes = "Ey", neck = "Nk", jacket = "Jk",
                     shirt = "Sh", hands = "Gl", wrists = "Wr", pants = "Pt", feet = "Ft",
                     lhand = "LH", rhand = "RH", back = "Bk"}
+-- where the doll sits on the 400x300 screen: the left column, head at the top
+local BODY_DX, BODY_DY = -66, -46
+for _, r in pairs(EQUIP_RECT) do r[1], r[2] = r[1] + BODY_DX, r[2] + BODY_DY end
 
-local GROUND_GRID_COLS = 9
-local GROUND_GRID_ROWS = 1   -- visible rows; the grid scrolls to follow the cursor
+-- right column (from INV_COL_X): ground grid, bag grid with its name and
+-- fill count above it, then what the cursor is on
+local INV_COL_X = 212
+local GROUND_GRID_COLS = 5
+local GROUND_GRID_ROWS = 2   -- visible rows; the grid scrolls to follow the cursor
 local GROUND_CELL, GROUND_GAP = 30, 2
-local GROUND_Y = 30
--- bag: up to BACKPACK_CAP cells in two rows, all visible; the bag's name and
--- fill count sit to the right of the grid
-local BACKPACK_COLS = 8
+local GROUND_Y = 32
+-- bag: up to BACKPACK_CAP cells, all visible
+local BACKPACK_COLS = 7
 local BACKPACK_CELL, BACKPACK_GAP = 24, 2
-local BACKPACK_Y = 310
-local BAG_LABEL_X = 220
-local CONDITIONS_Y = 300
--- log lines sit on the last lines of the reported screen height (like the
--- map screen's key hint at h - 8), so a panel shorter than 400 px keeps them
+local BACKPACK_Y = 114
+local BAG_LABEL_Y = BACKPACK_Y - 5
+local CURSOR_DESC_Y = 210
+local CONDITIONS_Y = 264     -- full width, under the doll
+-- log lines sit on the last lines of the reported screen height
 local INV_LOG_LINES = 2
 
 local function item_abbr(item_id)
@@ -1412,7 +1415,7 @@ function Game:current_conditions()
     if #list == 0 then return "Conditions: none" end
     local text = table.concat(list, ", ")
     -- all four at once don't fit after the prefix (mono 12 is ~7px/char)
-    if (12 + #text) * 7 > 292 then return text end
+    if (12 + #text) * 7 > 392 then return text end
     return "Conditions: " .. text
 end
 
@@ -1458,10 +1461,10 @@ end
 -- overlapping parts (arm meeting torso) don't leave internal seams.
 -- ---------------------------------------------------------------------
 
-local BODY_CX = 150
+local BODY_CX = 150 + BODY_DX
 -- The figure is authored in the coordinates below (head top at y 117, feet at
 -- 289) and scaled by BODY_SCALE about its top, landing at BODY_Y0.
-local BODY_SCALE, BODY_SRC_Y0, BODY_Y0 = 1.25, 117, 72
+local BODY_SCALE, BODY_SRC_Y0, BODY_Y0 = 1.25, 117, 72 + BODY_DY
 local BODY_TOP = BODY_Y0
 local BODY_BOTTOM = BODY_Y0 + math.ceil((289 - BODY_SRC_Y0) * BODY_SCALE)   -- exclusive
 
@@ -1789,12 +1792,12 @@ function Game:draw_inventory(w, h)
         label = label .. " " .. (off + 1) .. "-" .. math.min(#ground, off + per_page)
             .. "/" .. #ground
     end
-    gfx.text(4, 26, label)
+    gfx.text(INV_COL_X, GROUND_Y - 5, label)
     for i = 1, n_ground do
         if i > off and i <= off + per_page then
             local col = (i - off - 1) % GROUND_GRID_COLS
             local row = (i - off - 1) // GROUND_GRID_COLS
-            local x = 6 + col * (GROUND_CELL + GROUND_GAP)
+            local x = INV_COL_X + 2 + col * (GROUND_CELL + GROUND_GAP)
             local y = GROUND_Y + row * (GROUND_CELL + GROUND_GAP)
             add_row("ground", i, x, y, GROUND_CELL, GROUND_CELL)
         else
@@ -1815,7 +1818,7 @@ function Game:draw_inventory(w, h)
     local function bag_cell(i)
         local col = (i - 1) % BACKPACK_COLS
         local row = (i - 1) // BACKPACK_COLS
-        return 6 + col * (BACKPACK_CELL + BACKPACK_GAP),
+        return INV_COL_X + 2 + col * (BACKPACK_CELL + BACKPACK_GAP),
                BACKPACK_Y + row * (BACKPACK_CELL + BACKPACK_GAP)
     end
     for i = 1, math.min(math.max(n_inv, math.min(n_inv + 1, capacity)), BACKPACK_CAP) do
@@ -1855,17 +1858,16 @@ function Game:draw_inventory(w, h)
         end
     end
 
-    -- what the cursor is on, right-aligned on the "Ground" line
+    -- what the cursor is on, under the bag
     gfx.color(gfx.BLACK)
     local desc = self:cursor_description()
-    local max_chars = (296 - 4 - 7 * 15) // 7   -- leave room for "Ground 10-18/18"
+    local max_chars = (w - INV_COL_X - 2) // 7
     if #desc > max_chars then desc = desc:sub(1, max_chars) end
-    gfx.text(296 - 7 * #desc, 26, desc)
+    gfx.text(INV_COL_X, CURSOR_DESC_Y, desc)
 
-    gfx.color(gfx.BLACK)
     local back = self.player.equipped.back
-    gfx.text(BAG_LABEL_X, BACKPACK_Y + 16, back and ITEM_DB[back].name or "Pockets")
-    gfx.text(BAG_LABEL_X, BACKPACK_Y + 42, n_inv .. "/" .. capacity)
+    gfx.text(INV_COL_X, BAG_LABEL_Y, (back and ITEM_DB[back].name or "Pockets")
+        .. " " .. n_inv .. "/" .. capacity)
 
     -- log: the newest INV_LOG_LINES lines, the last one at h - 8
     local ly = h - 8 - 12 * (INV_LOG_LINES - 1)
@@ -1884,7 +1886,10 @@ end
 -- ---------------------------------------------------------------------
 
 local CREATOR_ROWS = #ATTRIBUTES + #TRAITS
-local CREATOR_ATTR_Y, CREATOR_TRAIT_Y, CREATOR_ROW_H = 52, 128, 14
+-- attributes in the left column, traits in the right (from CREATOR_TRAIT_X),
+-- the highlighted row's description and the resulting build below both
+local CREATOR_ATTR_Y, CREATOR_TRAIT_Y, CREATOR_ROW_H = 52, 52, 14
+local CREATOR_TRAIT_X = 200
 
 function Game:creator_key(key)
     local p = self.player
@@ -1923,33 +1928,33 @@ function Game:draw_creator(w, h)
     gfx.text(6, 16, "Create your survivor")
     gfx.font(gfx.FONT_MONO_12)
 
-    gfx.text(6, 36, "Attributes   points left " .. attr_points_left(p.attrs))
+    gfx.text(6, 36, "Attributes  left " .. attr_points_left(p.attrs))
     for i, name in ipairs(ATTRIBUTES) do
         local y = CREATOR_ATTR_Y + (i - 1) * CREATOR_ROW_H
         local v = p.attrs[name]
         gfx.text(6, y, (self.creator_cursor == i and ">" or " ") .. name)
         for c = 1, ATTR_MAX do
-            local cx = 130 + (c - 1) * 12
+            local cx = 100 + (c - 1) * 12
             if c <= v then gfx.fill_rect(cx, y - 9, 10, 9) else gfx.rect(cx, y - 9, 10, 9) end
         end
-        gfx.text(210, y, tostring(v))
+        gfx.text(176, y, tostring(v))
     end
 
     local tleft = trait_points_left(p.traits)
-    gfx.text(6, CREATOR_TRAIT_Y - 16, "Traits       points left " .. tleft)
+    gfx.text(CREATOR_TRAIT_X, CREATOR_TRAIT_Y - 16, "Traits  left " .. tleft)
     for i, t in ipairs(TRAITS) do
         local row = #ATTRIBUTES + i
         local y = CREATOR_TRAIT_Y + (i - 1) * CREATOR_ROW_H
         local mark = p.traits[t.name] and "[x] " or "[ ] "
-        gfx.text(6, y, (self.creator_cursor == row and ">" or " ") .. mark .. t.name)
+        gfx.text(CREATOR_TRAIT_X, y, (self.creator_cursor == row and ">" or " ") .. mark .. t.name)
         -- what it does to the budget: positives spend, negatives give
         local cost = (t.cost > 0 and "-" or "+") .. math.abs(t.cost)
-        gfx.text(294 - 7 * #cost, y, cost)
+        gfx.text(w - 6 - 7 * #cost, y, cost)
     end
 
     -- the highlighted row explained, then the build it gives
     local y = CREATOR_TRAIT_Y + #TRAITS * CREATOR_ROW_H + 6
-    gfx.line(6, y - 10, 294, y - 10)
+    gfx.line(6, y - 10, w - 6, y - 10)
     local row = self.creator_cursor
     local desc = row <= #ATTRIBUTES and ATTR_DESC[ATTRIBUTES[row]]
         or TRAITS[row - #ATTRIBUTES].desc

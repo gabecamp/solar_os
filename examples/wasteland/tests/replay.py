@@ -1,7 +1,7 @@
 import sys
 from PIL import Image, ImageDraw, ImageFont
 
-W, H, SCALE = 300, 400, 2
+W, H, SCALE = 400, 300, 2
 GRAY = {"WHITE": 255, "LIGHT": 190, "DARK": 105, "BLACK": 0}
 
 def replay(ops_path, out_path):

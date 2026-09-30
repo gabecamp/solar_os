@@ -82,7 +82,7 @@ g.player.bag_bonus = 16          -- biggest bag the layout allows
 g.player.inventory = {}
 local ids = {"rock", "cloth_scrap", "canned_beans", "water_bottle", "tshirt", "jeans", "boots", "cap", "gloves"}
 for k = 1, L.BACKPACK_CAP do g.player.inventory[k] = {item = ids[(k - 1) % #ids + 1], qty = 1} end
-g:draw_inventory(300, 400)
+g:draw_inventory(400, 300)
 local INV_ROWS, INV_POS = rows_pos()
 local bag = 0
 for k, row in ipairs(INV_ROWS) do
@@ -213,7 +213,7 @@ g = fresh()
 g.player.inventory = {}
 g.ground["0,0"] = {}
 g.player.equipped.rhand = "rock"
-g:draw_inventory(300, 400)
+g:draw_inventory(400, 300)
 INV_ROWS, INV_POS = rows_pos()
 local drop_bag, drop_ground
 for k, row in ipairs(INV_ROWS) do
