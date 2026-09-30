@@ -1,7 +1,7 @@
 import sys
 from PIL import Image, ImageDraw, ImageFont
 
-W, H, SCALE = 300, 400, 2
+W, H, SCALE = 400, 300, 2
 GRAY = {"WHITE": 255, "LIGHT": 190, "DARK": 105, "BLACK": 0}
 
 def replay(ops_path, out_path):
@@ -46,6 +46,7 @@ def replay(ops_path, out_path):
     framed.paste(img, (4, 4))
     framed.save(out_path)
 
-for name in ("creator", "inventory_hands", "inventory", "inventory_barefoot", "inventory_full", "inventory_dressed", "map", "map_explored", "map_scavenge", "map_full"):
-    replay(f"ops_{name}.txt", f"preview_{name}.png")
+import glob
+for ops in sorted(glob.glob("ops_*.txt")):
+    replay(ops, "preview_" + ops[4:-4] + ".png")
 print("ok")

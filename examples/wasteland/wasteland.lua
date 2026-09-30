@@ -1,8 +1,8 @@
 --[[
 Wasteland Survivor - a NEO Scavenger-style hex survival game for SolarOS.
 
-Written for a small monochrome/grayscale portrait display (designed and
-tested against 300x400) with no polygon-fill primitive available - hex
+Written for a small monochrome landscape display (400x300, the Waveshare
+RLCD's logical size under SolarOS) with no polygon-fill primitive - hex
 tiles are drawn as outlines (gfx.line x6) with an optional gfx.fill_rect
 bounding-box wash underneath for shading, rather than the isometric 3D
 block look used in the desktop/Pi version of this game. That's a
@@ -17,11 +17,18 @@ Controls:
   Enter / Space   - inventory: pick up the item under the cursor, then press
                     again on a ground cell, bag cell or body slot to move it
   E               - inventory: use the item under the cursor - eat/drink one,
-                    put it on, take it off, or hold it in a free hand
-  (creator)       - Up/Dn pick a row, Left/Right change an attribute,
-                    Enter toggles a trait / starts on [ Start ]
+                    wear it, hold it in a free hand, or take it off; on a
+                    Cloth Scrap while bleeding: bandage the wound
+  1-7 / Up,Dn,Enter - encounter screen: pick a choice (moving can run you
+                    into animals, mutants, bandits or, rarely, a helper;
+                    hold a weapon in a hand to fight with it)
   I               - toggle inventory screen
   Q / ESC         - quit
+
+A new game opens on the character creator: Up/Down pick a row, Left/Right
+change an attribute, Space toggles a trait, Enter starts. You get 5 trait
+points; negative traits give more. Health 0 ends the run (death screen,
+Enter makes a new survivor).
 
 This is a single self-contained script, matching the SolarOS Playground
 convention (see the bundled Snake example) - no extra require()s beyond
@@ -44,6 +51,10 @@ local REST_HOURS = 4
 local SCAVENGE_HOURS = 1      -- also costs this many MP
 local SCAVENGE_TRIES = 3      -- searches per tile before it's picked clean
 local SCAVENGE_ROLLS = 2      -- loot-table rolls per search
+local MAX_HEALTH = 100
+local BLEED_PER_HOUR = 4      -- HP lost per hour while bleeding (awake or resting)
+local REST_HEAL_PER_HOUR = 3  -- HP back per hour of rest (not while bleeding), at Endurance 3
+local WOUND_REST_HOURS = 24   -- hours of rest before a wound stops costing 1 MP
 -- gfx.getch timeout. The screen is only redrawn after a key was handled, so
 -- idle wakeups just check should_exit(); this only bounds how quickly a
 -- quit request from the OS is noticed.
@@ -55,6 +66,7 @@ local KEY_LF = 10
 local KEY_ESC = 27
 local KEY_A, KEY_D, KEY_S, KEY_W = 97, 100, 115, 119
 local KEY_E, KEY_F, KEY_I, KEY_Q = 101, 102, 105, 113
+local KEY_T = 116
 
 -- Terrain: id -> {name, cost (MP + hours), passable, shade}
 -- shade is one of gfx.WHITE / gfx.LIGHT / gfx.DARK / gfx.BLACK, used as
@@ -70,24 +82,17 @@ local TERRAIN_WEIGHTS = {
     {"plains", 45}, {"forest", 30}, {"hills", 18}, {"water", 7},
 }
 
-local BACKPACK_CAP = 16      -- most bag cells the screen can show
-local POCKET_CELLS = 4       -- bag cells with nothing on your back
+local BACKPACK_CAP = 16      -- most bag cells any build can have (the layout's limit)
+local POCKET_CELLS = 4       -- bag cells with nothing worn on your back
 
 -- Also the cursor order on the paperdoll: top of the body to the bottom.
 local EQUIP_SLOTS = {
-    "head", "ears", "eyes", "neck", "jacket", "back",
-    "shirt", "hands", "wrists", "lhand", "rhand", "pants", "feet",
+    "head", "ears", "eyes", "neck", "back", "jacket", "shirt",
+    "hands", "wrists", "pants", "lhand", "rhand", "feet",
 }
--- slots that hold anything (you carry it rather than wear it)
-local HAND_SLOTS = {lhand = true, rhand = true}
--- slot names for messages and empty slots (the short form when a box is small)
-local EQUIP_NAME = {head = "Head", ears = "Ears", eyes = "Eyes", neck = "Neck",
-                    jacket = "Jacket", back = "Back", shirt = "Shirt", hands = "Gloves",
-                    wrists = "Wrists", lhand = "L.Hand", rhand = "R.Hand",
-                    pants = "Pants", feet = "Feet"}
-local EQUIP_ABBR = {head = "Hd", ears = "Ea", eyes = "Ey", neck = "Nk", jacket = "Jk",
-                    back = "Bk", shirt = "Sh", hands = "Gl", wrists = "Wr",
-                    lhand = "LH", rhand = "RH", pants = "Pt", feet = "Ft"}
+-- Hand slots hold any item (a rock, a bottle, a spare jacket); every other
+-- slot only takes items whose ITEM_DB slot matches.
+local HOLD_SLOTS = {lhand = true, rhand = true}
 
 local ITEM_DB = {
     -- wear: what the item paints on the paperdoll when worn - {body part,
@@ -118,17 +123,41 @@ local ITEM_DB = {
                             {"arms", 150, 232, "BLACK"}}},
     bracers      = {name = "Bracers",      slot = "wrists", consumable = nil,
                     wear = {{"arms", 222, 233, "BLACK"}}},
-    -- bag_cells: how many bag cells you get while this is on your back
-    backpack     = {name = "Backpack",     slot = "back",  consumable = nil, bag_cells = 12,
+    -- bags: bag_cells is how many bag cells you get while wearing it
+    backpack     = {name = "Backpack",     slot = "back", consumable = nil, bag_cells = 12,
                     wear = {{"torso", 147, 196, "BLACK", 9, 13}}},
-    satchel      = {name = "Satchel",      slot = "back",  consumable = nil, bag_cells = 8,
-                    wear = {{"torso", 147, 200, "BLACK", 11, 13}}},
+    satchel      = {name = "Satchel",      slot = "back", consumable = nil, bag_cells = 8,
+                    wear = {{"torso", 147, 210, "BLACK", 12, 15}}},
     canned_beans = {name = "Canned Beans", slot = nil, consumable = {hunger = 40}},
     water_bottle = {name = "Water Bottle", slot = nil, consumable = {thirst = 50}},
     berries      = {name = "Wild Berries", slot = nil, consumable = {hunger = 15, thirst = 5}},
-    rock         = {name = "Rock",         slot = nil, consumable = nil},
-    cloth_scrap  = {name = "Cloth Scrap",  slot = nil, consumable = nil},
+    strange_meat = {name = "Strange Meat", slot = nil, consumable = {hunger = 30, thirst = -5}},
+    -- weapon: used from a hand slot. dmg per hit; reach "close" (arm's
+    -- length) or "near" (a spear's length); thrown ones are hurled from
+    -- range and land on the ground; bleed: % chance a hit opens a wound
+    rock         = {name = "Rock",         slot = nil, consumable = nil,
+                    weapon = {dmg = 6, reach = "close", thrown = true}},
+    cloth_scrap  = {name = "Cloth Scrap",  slot = nil, consumable = nil},   -- E: bandage
+    knife        = {name = "Knife",        slot = nil, consumable = nil,
+                    weapon = {dmg = 12, reach = "close", bleed = 30}},
+    pipe         = {name = "Lead Pipe",    slot = nil, consumable = nil,
+                    weapon = {dmg = 15, reach = "close"}},
+    spear        = {name = "Spear",        slot = nil, consumable = nil,
+                    weapon = {dmg = 10, reach = "near", bleed = 15}},
+    -- artifacts: left by anomalies; artifact = effects while held in a hand
+    -- (see recompute_stats), desc = what the inventory shows under the cursor
+    weeping_stone = {name = "Weeping Stone", slot = nil, consumable = nil,
+                     artifact = {mp = 1, thirst = 1.5}, desc = "+1 MP, thirst x1.5"},
+    drowned_eye   = {name = "Drowned Eye",   slot = nil, consumable = nil,
+                     artifact = {sight = 1, rest_drain = 1.3}, desc = "+1 sight, tire x1.3"},
+    flesh_knot    = {name = "Flesh Knot",    slot = nil, consumable = nil,
+                     artifact = {heal = 2, hunger = 1.5}, desc = "+2 HP/h, hunger x1.5"},
+    hollow_star   = {name = "Hollow Star",   slot = nil, consumable = nil,
+                     artifact = {scav = 1, scav_hurt = 3}, desc = "+1 find, -3 HP/search"},
+    quiet_shell   = {name = "Quiet Shell",   slot = nil, consumable = nil,
+                     artifact = {encounter = 0.5, sight = -1}, desc = "half encounters, -1 sight"},
 }
+local ARTIFACTS = {"weeping_stone", "drowned_eye", "flesh_knot", "hollow_star", "quiet_shell"}
 
 -- What scavenging can turn up, per terrain: {item, weight}. "nothing" is a
 -- dud roll. Plains are old roadside junk, forest is food and cold-weather
@@ -136,16 +165,155 @@ local ITEM_DB = {
 local SCAVENGE_LOOT = {
     plains = {{"nothing", 8}, {"rock", 3}, {"cloth_scrap", 4}, {"canned_beans", 3},
               {"water_bottle", 3}, {"cap", 1}, {"sunglasses", 1}, {"gloves", 1},
-              {"satchel", 1}},
+              {"satchel", 1}, {"pipe", 1}, {"knife", 1}},
     forest = {{"nothing", 7}, {"berries", 6}, {"cloth_scrap", 2}, {"water_bottle", 2},
-              {"scarf", 1}, {"earmuffs", 1}, {"gloves", 1}},
+              {"scarf", 1}, {"earmuffs", 1}, {"gloves", 1}, {"spear", 1}},
     hills  = {{"nothing", 9}, {"rock", 6}, {"water_bottle", 2}, {"canned_beans", 1},
-              {"jacket", 1}, {"bracers", 1}, {"boots", 1}},
+              {"jacket", 1}, {"bracers", 1}, {"boots", 1}, {"knife", 1}},
 }
 
 -- Worn gear that is scattered around the map (the starting clothes aren't).
 local WORLD_WEARABLES = {"cap", "gloves", "earmuffs", "sunglasses", "scarf",
                          "jacket", "bracers", "satchel"}
+
+-- ---------------------------------------------------------------------
+-- Encounters: rolled after each move. A fight is a series of choices at a
+-- range (far -> near -> close); every choice is a dice roll against an
+-- attribute, then the other side acts.
+-- ---------------------------------------------------------------------
+
+local ENCOUNTER_CHANCE = {plains = 10, forest = 15, hills = 12}   -- % per move onto it
+local ENCOUNTER_COOLDOWN = 2   -- moves after an encounter before another can happen
+local ENCOUNTER_KINDS = {{"animal", 40}, {"mutant", 25}, {"anomaly", 20},
+                         {"bandit", 12}, {"helper", 3}}
+local RANGE_NAME = {far = "Far", near = "Near", close = "Close"}
+local CLOSER = {far = "near", near = "close"}
+local FARTHER = {close = "near", near = "far"}
+local FISTS = {dmg = 4, reach = "close"}
+local PLAYER_HIT = 55          -- % to hit, +8 per Speed over 3
+local WATCH_AIM = 15           -- extra % on your next hit after a good look
+local THROW_HIT = 50           -- % to hit with a throw, +8 per Perception over 3
+local WATCH_CHANCE = 60        -- % to read the enemy, +10 per Perception over 3
+local HIDE_CHANCE = 35         -- % at Far, +10 per Perception over 3, -10 vs animals
+local FLEE_CHANCE = {far = 70, near = 50, close = 30}   -- +10 per Speed over the enemy's
+local ADVANCE_CHANCE = 60      -- % an enemy closes in per turn, +10 per speed over yours
+local ENEMY_DODGE = 5          -- enemy hit % lost per point of your Speed over 3
+local WOUND_DAMAGE = 12        -- one enemy hit this hard leaves a wound
+local ENEMY_BLEED_DMG = 3      -- per turn while an enemy bleeds
+local ENEMY_FLEE_CHANCE = 30   -- % per turn a beaten enemy (hp <= flees_at) runs
+
+-- kind: animal / mutant (hostile, can't be reasoned with), bandit (demands
+-- food first), helper (never fights), anomaly (step 3). hp, dmg {lo, hi},
+-- hit %, speed (1-6 like your Speed), bleed % per hit, flees_at (hp), start
+-- range, loot {item, weight} rolled loot_rolls times, who = how the log and
+-- the fight text name it.
+local ENCOUNTERS = {
+    {kind = "animal", name = "Jawhound", who = "jawhound",
+     intro = "A dog stands in the scrub. Its lower jaw has split into three, "
+          .. "each ringed with teeth, and all three are working. It hasn't blinked "
+          .. "since you saw it.",
+     hp = 30, dmg = {6, 12}, hit = 60, speed = 4, bleed = 30, flees_at = 8, start = "far",
+     loot = {{"strange_meat", 3}, {"nothing", 1}}, loot_rolls = 1},
+    {kind = "animal", name = "Skinless Boar", who = "boar",
+     intro = "Something big roots in the dirt, wet and red all over: a boar with "
+          .. "no hide, only muscle and gristle shining in the light. It smells you "
+          .. "and lifts its head.",
+     hp = 45, dmg = {8, 16}, hit = 50, speed = 3, bleed = 10, flees_at = 10, start = "far",
+     loot = {{"strange_meat", 1}}, loot_rolls = 2},
+    {kind = "animal", name = "Knotted Crows", who = "crow-knot",
+     intro = "What you took for a bush is a mass of crows grown together at the "
+          .. "wings. One body, dozens of heads, all of them turning toward you at once.",
+     hp = 20, dmg = {3, 8}, hit = 70, speed = 5, bleed = 20, flees_at = 5, start = "near",
+     loot = {{"strange_meat", 1}, {"nothing", 2}}, loot_rolls = 1},
+    {kind = "animal", name = "Crawling Stag", who = "stag",
+     intro = "A stag picks its way toward you on seven legs. Its antlers have grown "
+          .. "back into its skull, and the eyes beneath them look almost human.",
+     hp = 40, dmg = {8, 18}, hit = 45, speed = 3, bleed = 15, flees_at = 10, start = "far",
+     loot = {{"strange_meat", 2}, {"nothing", 1}}, loot_rolls = 2},
+    {kind = "mutant", name = "The Fused", who = "fused pair",
+     intro = "Two people walk as one, joined at the ribs by a bridge of shared skin. "
+          .. "They are whispering to each other about you. They agree on something, "
+          .. "and turn.",
+     talk = "Both mouths answer at once, in words that aren't words.",
+     hp = 50, dmg = {8, 14}, hit = 50, speed = 2, bleed = 10, start = "far",
+     loot = {{"cloth_scrap", 3}, {"canned_beans", 1}, {"nothing", 2}}, loot_rolls = 2},
+    {kind = "mutant", name = "Mouthless Man", who = "mouthless man",
+     intro = "A man in a rotted raincoat. Where his mouth should be the skin has "
+          .. "healed over smooth. He breathes through wet slits in his neck, faster "
+          .. "now that he has seen you.",
+     talk = "He tries to answer. The slits in his neck flutter uselessly.",
+     hp = 35, dmg = {6, 12}, hit = 60, speed = 4, bleed = 15, start = "far",
+     loot = {{"knife", 1}, {"cloth_scrap", 2}, {"nothing", 2}}, loot_rolls = 1},
+    {kind = "mutant", name = "The Bloom", who = "bloom",
+     intro = "A woman sits in the grass, covered in soft pink growths that swell "
+          .. "and shrink as she breathes. She smiles with half a face, then stands "
+          .. "up far too quickly.",
+     talk = "'Stay,' she says, from somewhere inside the growths. 'Grow with us.'",
+     hp = 40, dmg = {5, 10}, hit = 65, speed = 2, bleed = 0, start = "near",
+     loot = {{"berries", 2}, {"water_bottle", 1}, {"nothing", 2}}, loot_rolls = 1},
+    {kind = "bandit", name = "Road Bandits", who = "bandit",
+     intro = "Two figures step out from behind a wrecked car, one holding a knife "
+          .. "low. 'Easy,' says the taller one. 'Nobody has to get hurt. That part "
+          .. "is up to you.'",
+     demand = "'Food. Hand some over and walk away.'",
+     hp = 35, dmg = {6, 12}, hit = 55, speed = 3, bleed = 25, flees_at = 8, start = "near",
+     loot = {{"knife", 2}, {"canned_beans", 3}, {"water_bottle", 3}, {"jacket", 1},
+             {"cloth_scrap", 2}}, loot_rolls = 2},
+    {kind = "bandit", name = "Toll Man", who = "toll man",
+     intro = "A thin man in a welding mask blocks the path, tapping a lead pipe "
+          .. "against his leg. 'Toll road,' he says. 'Pay up or bleed.'",
+     demand = "'Something to eat. That's the toll.'",
+     hp = 30, dmg = {7, 14}, hit = 55, speed = 3, bleed = 5, flees_at = 6, start = "near",
+     loot = {{"pipe", 3}, {"canned_beans", 2}, {"sunglasses", 1}}, loot_rolls = 2},
+    {kind = "helper", name = "Old Medic", who = "medic", help = "medic",
+     intro = "An old woman with a red cross painted on her pack waves you over. Her "
+          .. "eyes are clear and her hands are steady. 'You look like you could use "
+          .. "some help.'",
+     start = "near"},
+    {kind = "helper", name = "Wanderer", who = "wanderer", help = "wanderer",
+     intro = "A man with a walking stick sits by a small fire and raises a hand. No "
+          .. "weapon in sight. 'Sit a minute. I don't bite. Not like the rest of "
+          .. "them out there.'",
+     start = "near"},
+}
+-- anomalies: no fight. Investigate opens a random puzzle; finishing it has
+-- ARTIFACT_CHANCE of leaving an artifact, failing it hurts in odd ways.
+local ANOMALIES = {
+    {kind = "anomaly", name = "The Humming Hollow", who = "humming hollow",
+     intro = "The grass in this dip lies flat in a perfect spiral, and the air above "
+          .. "it hums at a pitch you feel in your teeth. A crow lands at the edge and "
+          .. "is folded into nothing without a sound."},
+    {kind = "anomaly", name = "The Drowned Bell", who = "drowned bell",
+     intro = "A bell tolls somewhere beneath your feet, though there is no church for "
+          .. "miles. With every stroke the ground ripples like water, and something "
+          .. "far below answers it."},
+    {kind = "anomaly", name = "Wrong Stars", who = "wrong stars",
+     intro = "At midday a patch of sky above you goes black and fills with stars in "
+          .. "shapes no one has named. You have the strong feeling that something up "
+          .. "there has noticed you looking."},
+    {kind = "anomaly", name = "The Stillness", who = "stillness",
+     intro = "Ahead, birds hang motionless in mid-flight and dust floats unmoving in "
+          .. "the light. When you reach toward it, every sound stops, even your own "
+          .. "heartbeat."},
+    {kind = "anomaly", name = "The Door in the Field", who = "door",
+     intro = "A door frame stands alone in the field, no walls around it. Through it "
+          .. "you see this same field, but at night, and someone standing in it, "
+          .. "waiting for you."},
+}
+for _, a in ipairs(ANOMALIES) do ENCOUNTERS[#ENCOUNTERS + 1] = a end
+local ARTIFACT_CHANCE = 25     -- % after a finished puzzle, +5 per Perception over 3
+local BOLT_N, BOLT_HAZARDS = 5, 6               -- grid side, deadly cells
+local BOLT_START, BOLT_GOAL = BOLT_N * (BOLT_N - 1) + 3, 3   -- bottom and top middle
+local BOLTS = 3                -- bolts to throw, +1 per Perception over 3 (min 1)
+local SEQ_LENGTHS = {3, 4, 5}  -- sequence puzzle rounds
+local RUNE_N, RUNE_SCRAMBLE = 5, 3
+local RUNE_MOVES = 6           -- presses allowed, +1 per Perception over 3 (min RUNE_SCRAMBLE)
+
+local ENCOUNTERS_BY_KIND = {}
+for _, e in ipairs(ENCOUNTERS) do
+    ENCOUNTERS_BY_KIND[e.kind] = ENCOUNTERS_BY_KIND[e.kind] or {}
+    table.insert(ENCOUNTERS_BY_KIND[e.kind], e)
+end
 
 -- ---------------------------------------------------------------------
 -- Item sprites (16x16, 1-bit)
@@ -361,35 +529,35 @@ local SPRITE_ART = {
         "................",
         ".....######.....",
         "....#......#....",
+        "...##########...",
         "..############..",
-        ".##############.",
-        ".##..........##.",
-        ".##.########.##.",
-        ".##.#......#.##.",
-        ".##.########.##.",
-        ".##############.",
-        ".##############.",
-        ".##############.",
-        ".##############.",
+        "..##........##..",
+        "..##.######.##..",
+        "..##.#....#.##..",
+        "..##.######.##..",
+        "..##........##..",
         "..############..",
+        "..############..",
+        "..############..",
+        "...##########...",
         "................",
         "................",
     },
     satchel = {
         "................",
+        "#...............",
+        ".#..............",
         "..#.............",
         "...#............",
         "....#...........",
         ".....#..........",
-        "......#.........",
-        ".......#........",
-        "..###########...",
-        ".#############..",
-        ".#############..",
-        ".######.######..",
-        ".#############..",
-        ".#############..",
-        "..###########...",
+        "..############..",
+        "..#..........#..",
+        "..############..",
+        "..############..",
+        "..############..",
+        "..############..",
+        "..############..",
         "................",
         "................",
     },
@@ -463,6 +631,168 @@ local SPRITE_ART = {
         ".....#...####...",
         "..........##....",
         "................",
+        "................",
+    },
+    weeping_stone = {
+        "................",
+        "......####......",
+        "....########....",
+        "...##########...",
+        "..###.####.###..",
+        "..###.####.###..",
+        "..############..",
+        "..############..",
+        "...##########...",
+        "....########....",
+        "......####......",
+        "...#........#...",
+        "...#........#...",
+        "..###......###..",
+        "...#........#...",
+        "................",
+    },
+    drowned_eye = {
+        "................",
+        "................",
+        "......####......",
+        "...##########...",
+        "..###......###..",
+        ".##....##....##.",
+        "##....####....##",
+        "##...######...##",
+        "##....####....##",
+        ".##....##....##.",
+        "..###......###..",
+        "...##########...",
+        "......####......",
+        "................",
+        "................",
+        "................",
+    },
+    flesh_knot = {
+        "................",
+        "....###..###....",
+        "...#####.####...",
+        "..##..####..##..",
+        "..#..##..##..#..",
+        "..#.##....##.#..",
+        "..###..##..###..",
+        "...#..####..#...",
+        "...#..####..#...",
+        "..###..##..###..",
+        "..#.##....##.#..",
+        "..#..##..##..#..",
+        "..##..####..##..",
+        "...####.#####...",
+        "....###..###....",
+        "................",
+    },
+    hollow_star = {
+        "........#.......",
+        ".......###......",
+        "...#...#.#...#..",
+        "....#.#...#.#...",
+        ".....#.....#....",
+        "....#.......#...",
+        ".###.........###",
+        "....#.......#...",
+        ".....#.....#....",
+        "....#.#...#.#...",
+        "...#...#.#...#..",
+        ".......###......",
+        "........#.......",
+        "................",
+        "................",
+        "................",
+    },
+    quiet_shell = {
+        "................",
+        "......#####.....",
+        "....##.....##...",
+        "...#..####...#..",
+        "..#..#....#...#.",
+        "..#.#..##..#..#.",
+        "..#.#.#..#.#..#.",
+        "..#.#..#.#.#..#.",
+        "..#..#..##.#..#.",
+        "...#..#...#..#..",
+        "....#..###..#...",
+        ".....##...##....",
+        ".......###......",
+        "................",
+        "................",
+        "................",
+    },
+    strange_meat = {
+        "................",
+        "................",
+        ".....######.....",
+        "...##########...",
+        "..####.#######..",
+        ".######.#####.#.",
+        ".#######.###.##.",
+        "################",
+        "##.#############",
+        "###.######.#####",
+        ".####.###.#####.",
+        "..############..",
+        "...##########...",
+        ".....######.....",
+        "................",
+        "................",
+    },
+    knife = {
+        "................",
+        ".............##.",
+        "............###.",
+        "...........###..",
+        "..........###...",
+        ".........###....",
+        "........###.....",
+        ".......###......",
+        "......###.......",
+        "....#.##........",
+        ".....#..........",
+        "....#.#.........",
+        "...###..........",
+        "..###...........",
+        ".###............",
+        "................",
+    },
+    pipe = {
+        "................",
+        "............###.",
+        "...........#####",
+        "...........#####",
+        "..........#####.",
+        ".........####...",
+        "........####....",
+        ".......####.....",
+        "......####......",
+        ".....####.......",
+        "....####........",
+        "...####.........",
+        "..####..........",
+        ".####...........",
+        ".###............",
+        "................",
+    },
+    spear = {
+        "..............#.",
+        ".............###",
+        "............####",
+        "...........####.",
+        "...........##...",
+        "..........#.#...",
+        ".........#......",
+        "........#.......",
+        ".......#........",
+        "......#.........",
+        ".....#..........",
+        "....#...........",
+        "...#............",
+        "..#.............",
+        ".#..............",
         "................",
     },
 }
@@ -567,6 +897,84 @@ for terrain_id in pairs(TERRAIN) do
     assert(GLYPHS[terrain_id], "terrain has no glyph: " .. terrain_id)
 end
 
+-- The four sigils of the sequence puzzle (16x16, keys 1-4).
+local SIGIL_ART = {
+    {
+        ".......##.......",
+        "......#..#......",
+        "......#..#......",
+        ".....#....#.....",
+        ".....#.##.#.....",
+        "....#.####.#....",
+        "....#.####.#....",
+        "...#...##...#...",
+        "...#........#...",
+        "..#..........#..",
+        "..#..........#..",
+        ".#............#.",
+        ".##############.",
+        "................",
+        "................",
+        "................",
+    },
+    {
+        "................",
+        "...#########....",
+        "..#.........#...",
+        ".#..#######..#..",
+        ".#.#.......#.#..",
+        ".#.#..###..#.#..",
+        ".#.#.#...#.#.#..",
+        ".#.#.#.#.#.#.#..",
+        ".#.#.#.##..#.#..",
+        ".#.#..#....#.#..",
+        ".#..#.....#..#..",
+        "..#..#####..#...",
+        "...#.......#....",
+        "....#######.....",
+        "................",
+        "................",
+    },
+    {
+        "......####......",
+        ".....######.....",
+        "......####......",
+        ".......##.......",
+        "...#...##...#...",
+        "....#..##..#....",
+        ".....#.##.#.....",
+        "....#..##..#....",
+        "...#...##...#...",
+        "....#..##..#....",
+        ".....#.##.#.....",
+        "......####......",
+        ".....#.##.#.....",
+        "....#..##..#....",
+        "...#...##...#...",
+        "................",
+    },
+    {
+        "................",
+        ".....######.....",
+        "...##......##...",
+        "..#....##....#..",
+        ".#.....##.....#.",
+        ".#.....##.......",
+        "#......##.......",
+        "################",
+        ".......##......#",
+        ".......##......#",
+        ".#.....##.....#.",
+        ".#.....##.....#.",
+        "..#....##....#..",
+        "...##......##...",
+        ".....######.....",
+        "................",
+    },
+}
+local SIGILS = {}
+for i, rows in ipairs(SIGIL_ART) do SIGILS[i] = pack_bitmap("sigil" .. i, rows, 16, 16) end
+
 -- ---------------------------------------------------------------------
 -- Small deterministic RNG (avoids depending on math.randomseed behaving
 -- a particular way on-device - same approach as the bundled Snake demo)
@@ -580,7 +988,7 @@ local function weighted_pick(seed, weights)
     seed = rand_next(seed)
     local total = 0
     for _, w in ipairs(weights) do total = total + w[2] end
-    local roll = seed % total
+    local roll = seed * total // 32768   -- high bits; the LCG's low bits cycle fast
     local acc = 0
     for _, w in ipairs(weights) do
         acc = acc + w[2]
@@ -696,73 +1104,98 @@ local function generate_world(seed)
     return tiles, ground, seed
 end
 
--- Character creation: NEO Scavenger-style point buy plus a Project Zomboid-
--- style trait budget (positives cost points, negatives give them back).
--- Every attribute and trait changes something real (see recompute_stats).
+-- ---------------------------------------------------------------------
+-- Character: attributes (NEO Scavenger-style point buy) and traits (Project
+-- Zomboid-style budget: positive traits cost points, negative ones give them
+-- back, and you can only start with the balance at 0 or above). Only traits
+-- that actually change something are offered.
+-- ---------------------------------------------------------------------
+
 local ATTRIBUTES = {"Strength", "Speed", "Perception", "Endurance"}
-local ATTR_MIN, ATTR_MAX, ATTR_START, ATTR_POOL = 1, 6, 3, 12
-local ATTR_HELP = {
-    Strength = "+/-1 bag cell per point from 3",
-    Speed = "+1 MP at 5, -1 MP at 1-2",
-    Perception = "Sight, and scavenging finds",
-    Endurance = "Rest drains 10% slower per point",
+local ATTR_MIN, ATTR_MAX, ATTR_DEFAULT, ATTR_POINTS = 1, 6, 3, 12
+local ATTR_DESC = {
+    Strength   = "Strength: +1 bag cell per point over 3",
+    Speed      = "Speed: +1 MP per 2 points over 3",
+    Perception = "Perception: sight, finds, fewer duds",
+    Endurance  = "Endurance: 10% slower tiring per point",
 }
--- cost > 0 spends trait points, cost < 0 gives them; opp = the trait it
--- can't be taken with (picking one drops the other)
+
+-- cost > 0 spends trait points, cost < 0 gives them. fx keys: mp, sight,
+-- scav (finds per search), bag (cells), hunger / rest_gain (multipliers)
 local TRAITS = {
-    {id = "quick",      name = "Quick",        cost = 3,  desc = "+1 MP",              fx = {mp = 1},          opp = "asthmatic"},
-    {id = "hawk",       name = "Hawk-Eyed",    cost = 3,  desc = "+1 sight",           fx = {sight = 1},       opp = "nearsight"},
-    {id = "scrounger",  name = "Scrounger",    cost = 2,  desc = "+1 find per search", fx = {rolls = 1},       opp = "careless"},
-    {id = "lighteater", name = "Light Eater",  cost = 2,  desc = "Hunger 25% slower",  fx = {hunger = 0.75},   opp = "bigeater"},
-    {id = "packmule",   name = "Pack Mule",    cost = 2,  desc = "+2 bag cells",       fx = {cells = 2}},
-    {id = "asthmatic",  name = "Asthmatic",    cost = -3, desc = "-1 MP",              fx = {mp = -1},         opp = "quick"},
-    {id = "nearsight",  name = "Near-Sighted", cost = -3, desc = "-1 sight",           fx = {sight = -1},      opp = "hawk"},
-    {id = "careless",   name = "Careless",     cost = -2, desc = "-1 find per search", fx = {rolls = -1},      opp = "scrounger"},
-    {id = "bigeater",   name = "Big Eater",    cost = -2, desc = "Hunger 25% faster",  fx = {hunger = 1.25},   opp = "lighteater"},
-    {id = "insomniac",  name = "Insomniac",    cost = -2, desc = "Rests 25% weaker",   fx = {rest_gain = 0.75}},
+    {name = "Quick",        cost = 3,  desc = "+1 movement point",        fx = {mp = 1}},
+    {name = "Hawk-Eyed",    cost = 3,  desc = "+1 sight",                 fx = {sight = 1}},
+    {name = "Scrounger",    cost = 2,  desc = "+1 find per search",       fx = {scav = 1}},
+    {name = "Light Eater",  cost = 2,  desc = "Hunger drains 25% slower", fx = {hunger = 0.75}},
+    {name = "Pack Mule",    cost = 2,  desc = "+2 bag cells",             fx = {bag = 2}},
+    {name = "Asthmatic",    cost = -3, desc = "-1 movement point",        fx = {mp = -1}},
+    {name = "Near-Sighted", cost = -3, desc = "-1 sight",                 fx = {sight = -1}},
+    {name = "Careless",     cost = -2, desc = "-1 find per search",       fx = {scav = -1}},
+    {name = "Big Eater",    cost = -2, desc = "Hunger drains 25% faster", fx = {hunger = 1.25}},
+    {name = "Insomniac",    cost = -2, desc = "Resting restores 25% less", fx = {rest_gain = 0.75}},
 }
+
+local function default_attrs()
+    local a = {}
+    for _, name in ipairs(ATTRIBUTES) do a[name] = ATTR_DEFAULT end
+    return a
+end
 
 local function attr_points_left(attrs)
     local used = 0
-    for _, a in ipairs(ATTRIBUTES) do used = used + attrs[a] end
-    return ATTR_POOL - used
+    for _, name in ipairs(ATTRIBUTES) do used = used + attrs[name] end
+    return ATTR_POINTS - used
 end
 
--- Trait points left: starts at 0; positives spend, negatives refund.
-local function trait_budget(traits)
-    local left = 0
+-- trait points left: everyone gets TRAIT_START_POINTS, negatives add more,
+-- positives spend; must be >= 0 to start
+local TRAIT_START_POINTS = 5
+local function trait_points_left(traits)
+    local left = TRAIT_START_POINTS
     for _, t in ipairs(TRAITS) do
-        if traits[t.id] then left = left - t.cost end
+        if traits[t.name] then left = left - t.cost end
     end
     return left
 end
 
--- Derived stats from attributes + traits (formulas from the Python version's
--- player.py where it had them).
-local function recompute_stats(p)
-    local a = p.attrs
-    local mp = BASE_MAX_MP + (a.Speed - 3) // 2
-    local sight = BASE_SIGHT + (a.Perception - 3) // 2
-    local rolls = SCAVENGE_ROLLS + (a.Perception - 3) // 2
-    local cells = a.Strength - 3
-    local hunger, rest_gain = 1, 1
-    for _, t in ipairs(TRAITS) do
-        if p.traits[t.id] then
-            mp = mp + (t.fx.mp or 0)
-            sight = sight + (t.fx.sight or 0)
-            rolls = rolls + (t.fx.rolls or 0)
-            cells = cells + (t.fx.cells or 0)
-            hunger = hunger * (t.fx.hunger or 1)
-            rest_gain = rest_gain * (t.fx.rest_gain or 1)
+-- Derived stats from attributes + traits, stored on the player.
+local FX_MULT = {hunger = true, rest_gain = true, thirst = true, rest_drain = true,
+                 encounter = true}
+local function recompute_stats(player)
+    local a = player.attrs
+    local fx = {mp = 0, sight = 0, scav = 0, bag = 0, heal = 0, scav_hurt = 0,
+                hunger = 1, rest_gain = 1, thirst = 1, rest_drain = 1, encounter = 1}
+    local function add(effects)
+        for k, v in pairs(effects) do
+            if FX_MULT[k] then fx[k] = fx[k] * v else fx[k] = fx[k] + v end
         end
     end
-    p.max_mp = math.max(1, mp)
-    p.sight = math.max(1, sight)
-    p.scav_rolls = math.max(1, rolls)
-    p.bonus_cells = cells
-    p.hunger_mult = hunger
-    p.rest_gain_mult = rest_gain
-    p.rest_drain_mult = 1 - 0.1 * (a.Endurance - 3)
+    for _, t in ipairs(TRAITS) do
+        if player.traits[t.name] then add(t.fx) end
+    end
+    -- artifacts work while held
+    for _, slot in ipairs({"lhand", "rhand"}) do
+        local item = player.equipped[slot]
+        if item and ITEM_DB[item].artifact then add(ITEM_DB[item].artifact) end
+    end
+    player.max_mp = math.max(1, BASE_MAX_MP + (a.Speed - 3) // 2 + fx.mp)
+    player.sight = math.max(1, BASE_SIGHT + (a.Perception - 3) // 2 + fx.sight)
+    player.scav_rolls = math.max(1, SCAVENGE_ROLLS + (a.Perception - 3) // 2 + fx.scav)
+    player.bag_bonus = (a.Strength - 3) + fx.bag
+    player.hunger_mult = fx.hunger
+    player.rest_gain_mult = fx.rest_gain
+    player.rest_drain_mult = (1 - 0.1 * (a.Endurance - 3)) * fx.rest_drain
+    player.thirst_mult = fx.thirst
+    player.heal_per_hour = fx.heal
+    player.encounter_mult = fx.encounter
+    player.scav_hurt = fx.scav_hurt
+    if player.mp and player.mp > player.max_mp then player.mp = player.max_mp end
+end
+
+-- Perception scales how often a search roll comes up empty: 100% at 3,
+-- 25% at 6, 150% at 1.
+local function dud_percent(perception)
+    return 100 * (7 - perception) // 4
 end
 
 local function new_player()
@@ -773,9 +1206,8 @@ local function new_player()
         sight = BASE_SIGHT,
         hours = 0,
         needs = {hunger = 100, thirst = 100, rest = 100},
-        attrs = {Strength = ATTR_START, Speed = ATTR_START,
-                 Perception = ATTR_START, Endurance = ATTR_START},
-        traits = {},
+        health = MAX_HEALTH,
+        injuries = {bleeding = false, wounded_hours = 0},
         equipped = {shirt = "tshirt", pants = "jeans", feet = "boots", back = "backpack"},
         inventory = {
             {item = "water_bottle", qty = 1},
@@ -783,14 +1215,9 @@ local function new_player()
         },
         explored = {},
         visible = {},
+        attrs = default_attrs(),
+        traits = {},
     }
-end
-
-local function new_player_with_stats()
-    local p = new_player()
-    recompute_stats(p)
-    p.mp = p.max_mp
-    return p
 end
 
 local function update_visibility(player, tiles)
@@ -807,20 +1234,45 @@ end
 
 local function clamp(v) return math.max(0, math.min(100, v)) end
 
--- hunger_mult / rest_drain_mult / rest_gain_mult come from recompute_stats
--- (traits, Endurance); they default to 1 for a player built without it.
+-- Split text into lines of at most cols characters, breaking at spaces.
+local function wrap(text, cols)
+    local lines, line = {}, ""
+    for word in text:gmatch("%S+") do
+        if line == "" then
+            line = word
+        elseif #line + 1 + #word <= cols then
+            line = line .. " " .. word
+        else
+            lines[#lines + 1] = line
+            line = word
+        end
+    end
+    if line ~= "" then lines[#lines + 1] = line end
+    return lines
+end
+
 local function apply_awake_hours(player, hours)
-    local hm, rm = player.hunger_mult or 1, player.rest_drain_mult or 1
-    player.needs.hunger = clamp(player.needs.hunger - hours * (100 / 72) * hm)
-    player.needs.thirst = clamp(player.needs.thirst - hours * (100 / 48))
-    player.needs.rest = clamp(player.needs.rest - hours * (100 / 18) * rm)
+    player.needs.hunger = clamp(player.needs.hunger - hours * (100 / 72) * player.hunger_mult)
+    player.needs.thirst = clamp(player.needs.thirst - hours * (100 / 48) * player.thirst_mult)
+    player.needs.rest = clamp(player.needs.rest - hours * (100 / 18) * player.rest_drain_mult)
+    player.health = clamp(player.health + hours * player.heal_per_hour)
+    if player.injuries.bleeding then
+        player.health = clamp(player.health - hours * BLEED_PER_HOUR)
+    end
 end
 
 local function apply_rest_hours(player, hours)
-    local hm, gm = player.hunger_mult or 1, player.rest_gain_mult or 1
-    player.needs.hunger = clamp(player.needs.hunger - hours * (100 / 72) * 0.5 * hm)
-    player.needs.thirst = clamp(player.needs.thirst - hours * (100 / 48) * 0.5)
-    player.needs.rest = clamp(player.needs.rest + hours * (100 / 6) * gm)
+    player.needs.hunger = clamp(player.needs.hunger - hours * (100 / 72) * 0.5 * player.hunger_mult)
+    player.needs.thirst = clamp(player.needs.thirst - hours * (100 / 48) * 0.5 * player.thirst_mult)
+    player.needs.rest = clamp(player.needs.rest + hours * (100 / 6) * player.rest_gain_mult)
+    local inj = player.injuries
+    if inj.bleeding then
+        player.health = clamp(player.health - hours * BLEED_PER_HOUR)
+    else
+        local heal = REST_HEAL_PER_HOUR * (1 + 0.1 * (player.attrs.Endurance - 3))
+        player.health = clamp(player.health + hours * heal)
+        inj.wounded_hours = math.max(0, inj.wounded_hours - hours)
+    end
 end
 
 local function effective_max_mp(player)
@@ -828,6 +1280,7 @@ local function effective_max_mp(player)
     if player.needs.hunger <= 0 then penalty = penalty + 1 end
     if player.needs.thirst <= 0 then penalty = penalty + 1 end
     if player.needs.rest <= 0 then penalty = penalty + 1 end
+    if player.injuries.wounded_hours > 0 then penalty = penalty + 1 end
     return math.max(1, player.max_mp - penalty)
 end
 
@@ -852,15 +1305,40 @@ function Game.new()
     self.tiles, self.ground, seed = generate_world(seed)
     self.seed = seed             -- RNG state for scavenging
     self.scavenged = {}          -- tile key -> searches used
-    self.player = new_player_with_stats()
+    self.player = new_player()
+    recompute_stats(self.player)
     update_visibility(self.player, self.tiles)
     self.screen = "creator"      -- "creator", then "map" or "inventory"
-    self.creator = {cursor = 1, msg = nil}
+    self.creator_cursor = 1      -- rows: attributes, then traits
+    self.creator_msg = nil
     self.log = {"You wake up in the wasteland."}
     self.inv_cursor = 1
     self.inv_selected = nil      -- {"ground"|"inventory"|"equip", key}
     self.quit = false
     return self
+end
+
+-- Leave the creator: apply the chosen stats and start on the map.
+function Game:start_game()
+    if trait_points_left(self.player.traits) < 0 then
+        self.creator_msg = "Too many trait points spent."
+        return false
+    end
+    local p = self.player
+    recompute_stats(p)
+    p.mp = p.max_mp
+    p.explored = {}
+    update_visibility(p, self.tiles)
+    self.screen = "map"
+    return true
+end
+
+-- Health at 0 ends the run: the death screen, then a new character.
+function Game:check_death(cause)
+    if self.player.health > 0 then return false end
+    self.screen = "dead"
+    self.death_cause = cause
+    return true
 end
 
 function Game:push_log(text)
@@ -899,6 +1377,7 @@ function Game:try_move(q, r)
     if pile and #pile > 0 then self:push_log("Something is here. (I to look)") end
     if p.needs.hunger <= 0 then self:push_log("You are starving!") end
     if p.needs.thirst <= 0 then self:push_log("You are dehydrated!") end
+    if not self:check_death("You bled out.") then self:maybe_encounter(terrain_id) end
 end
 
 function Game:move_dir(dq, dr)
@@ -944,19 +1423,20 @@ function Game:scavenge()
     p.hours = p.hours + SCAVENGE_HOURS
     apply_awake_hours(p, SCAVENGE_HOURS)
     self.scavenged[key] = (self.scavenged[key] or 0) + 1
+    if p.scav_hurt > 0 then
+        p.health = clamp(p.health - p.scav_hurt)
+        self:push_log("The star in your hand drinks from you. (-" .. p.scav_hurt .. " HP)")
+    end
 
-    -- Perception: sharper eyes mean fewer dud rolls (the "nothing" weight is
-    -- scaled by (7 - Per) / 4: x1 at 3, x1/4 at 6, x1.5 at 1) and more
-    -- rolls (scav_rolls, from recompute_stats)
-    local per = p.attrs and p.attrs.Perception or ATTR_START
+    -- Perception: fewer dud rolls (and, via scav_rolls, more of them)
     local table_ = {}
     for i, entry in ipairs(loot) do
         local w = entry[2]
-        if entry[1] == "nothing" then w = math.max(1, w * (7 - per) // 4) end
+        if entry[1] == "nothing" then w = math.max(1, w * (7 - p.attrs.Perception) // 4) end
         table_[i] = {entry[1], w}
     end
     local found = {}
-    for _ = 1, p.scav_rolls or SCAVENGE_ROLLS do
+    for _ = 1, p.scav_rolls do
         local item
         self.seed, item = weighted_pick(self.seed, table_)
         if item ~= "nothing" then
@@ -972,6 +1452,7 @@ function Game:scavenge()
     end
     if p.needs.hunger <= 0 then self:push_log("You are starving!") end
     if p.needs.thirst <= 0 then self:push_log("You are dehydrated!") end
+    self:check_death(p.scav_hurt > 0 and "The Hollow Star emptied you." or "You bled out.")
 end
 
 function Game:rest()
@@ -986,6 +1467,8 @@ function Game:rest()
     p.mp = effective_max_mp(p)
     update_visibility(p, self.tiles)
     self:push_log("Rested " .. REST_HOURS .. "h.")
+    if p.injuries.bleeding then self:push_log("You're still bleeding. Bandage it (E on cloth).") end
+    self:check_death("You bled out in your sleep.")
 end
 
 -- -- inventory transfer -------------------------------------------------
@@ -1034,36 +1517,34 @@ local function add_to_list(list, stack, cap)
     return true
 end
 
--- Bag cells available: what's on your back (or just pockets), plus Strength
--- and Pack Mule, within what the screen can show.
+-- Bag cells available now: the worn bag (or bare pockets) plus Strength and
+-- Pack Mule, within what the screen can show.
 function Game:bag_capacity()
     local p = self.player
-    local back = p.equipped.back
-    local base = back and ITEM_DB[back].bag_cells or POCKET_CELLS
-    return math.max(2, math.min(BACKPACK_CAP, base + (p.bonus_cells or 0)))
+    local bag = p.equipped.back and ITEM_DB[p.equipped.back].bag_cells or POCKET_CELLS
+    return math.max(2, math.min(BACKPACK_CAP, bag + (p.bag_bonus or 0)))
 end
 
 function Game:put_stack(kind, k, stack)
-    local cap = self:bag_capacity()
     if kind == "ground" then
         add_to_list(self:ground_list(), stack)
         return true
     elseif kind == "inventory" then
-        if not add_to_list(self.player.inventory, stack, cap) then
+        if not add_to_list(self.player.inventory, stack, self:bag_capacity()) then
             self:push_log("Bag full.")
             return false
         end
         return true
     elseif kind == "equip" then
         local def = ITEM_DB[stack.item]
-        if def.slot ~= k and not HAND_SLOTS[k] then
-            self:push_log(def.name .. " can't go in " .. EQUIP_NAME[k] .. ".")
+        if def.slot ~= k and not HOLD_SLOTS[k] then
+            self:push_log(def.name .. " can't go in " .. k .. ".")
             return false
         end
         local current = self.player.equipped[k]
         if current then
             local old = {item = current, qty = 1}
-            if not add_to_list(self.player.inventory, old, cap) then
+            if not add_to_list(self.player.inventory, old, self:bag_capacity()) then
                 add_to_list(self:ground_list(), old)
                 self:push_log("Bag full: " .. ITEM_DB[current].name .. " dropped.")
             end
@@ -1072,7 +1553,7 @@ function Game:put_stack(kind, k, stack)
         -- equipping takes one; anything else in the stack goes to the bag
         if stack.qty > 1 then
             local rest = {item = stack.item, qty = stack.qty - 1}
-            if not add_to_list(self.player.inventory, rest, cap) then
+            if not add_to_list(self.player.inventory, rest, self:bag_capacity()) then
                 add_to_list(self:ground_list(), rest)
             end
         end
@@ -1091,43 +1572,37 @@ function Game:restore_stack(kind, k, stack)
     end
 end
 
--- Copy of everything a move can touch, so a move that would leave the bag
--- holding more than it can (swapping to a smaller bag) can be undone whole.
-function Game:snapshot()
-    local function copy(list)
-        local out = {}
-        for i, st in ipairs(list) do out[i] = {item = st.item, qty = st.qty} end
-        return out
-    end
-    local eq = {}
-    for k, v in pairs(self.player.equipped) do eq[k] = v end
-    return {inv = copy(self.player.inventory), ground = copy(self:ground_list()), eq = eq}
+local function copy_stacks(list)
+    local out = {}
+    for i, s in ipairs(list) do out[i] = {item = s.item, qty = s.qty} end
+    return out
 end
 
-function Game:restore(snap)
-    self.player.inventory = snap.inv
-    self.ground[hex_key(self.player.q, self.player.r)] = snap.ground
-    self.player.equipped = snap.eq
-end
-
--- Returns true when the item moved.
+-- Move a stack. Returns true when it moved. A move that would leave more
+-- stacks in the bag than it can hold (e.g. taking off a full backpack) is
+-- undone as a whole.
 function Game:try_transfer(source, dest)
     local s_kind, s_key = source[1], source[2]
     local d_kind, d_key = dest[1], dest[2]
     if s_kind == d_kind and s_key == d_key then return false end
-    local snap = self:snapshot()
+    local p = self.player
+    local saved_inv, saved_ground = copy_stacks(p.inventory), copy_stacks(self:ground_list())
+    local saved_eq = {}
+    for slot, item in pairs(p.equipped) do saved_eq[slot] = item end
+
     local stack = self:remove_stack(s_kind, s_key)
     if not stack then return false end
     local ok = self:put_stack(d_kind, d_key, stack)
-    if not ok then
-        self:restore_stack(s_kind, s_key, stack)
-        return false
-    end
-    if #self.player.inventory > self:bag_capacity() then
-        self:restore(snap)
+    if ok and #p.inventory > self:bag_capacity() then
         self:push_log("Bag too small - empty it first.")
+        ok = false
+    end
+    if not ok then
+        p.inventory, p.equipped = saved_inv, saved_eq
+        self.ground[hex_key(p.q, p.r)] = saved_ground
         return false
     end
+    recompute_stats(p)   -- held artifacts change stats
     self:push_log("Moved " .. ITEM_DB[stack.item].name .. ".")
     return true
 end
@@ -1151,30 +1626,526 @@ function Game:try_consume(kind, k)
     self:push_log("Consumed " .. def.name .. ".")
 end
 
--- E on the inventory screen: do the obvious thing with what's under the
--- cursor. Food/drink: eat or drink one. Something worn/held: take it off
--- into the bag. Wearable in the bag or on the ground: put it on (swapping
--- out whatever was there). Anything else: hold it in a free hand.
-function Game:use(kind, k)
+-- E on the inventory screen: the obvious thing for the item under the cursor.
+-- Food/drink is eaten, gear is worn, anything else goes to a free hand; on a
+-- body slot it takes the item off (held food is eaten instead).
+function Game:use_item(kind, k)
     local stack = self:get_stack(kind, k)
     if not stack then return end
     local def = ITEM_DB[stack.item]
-    if def.consumable then
-        self:try_consume(kind, k)
-    elseif kind == "equip" then
-        if self:try_transfer({"equip", k}, {"inventory"}) then
-            self:push_log("Took off " .. def.name .. ".")
+    local p = self.player
+    if stack.item == "cloth_scrap" and p.injuries.bleeding then
+        p.injuries.bleeding = false
+        stack.qty = stack.qty - 1
+        if stack.qty <= 0 then self:remove_stack(kind, k) end
+        self:push_log("You bind the wound. The bleeding stops.")
+        return
+    end
+    if kind == "equip" then
+        if def.consumable and HOLD_SLOTS[k] then
+            self:try_consume(kind, k)
+        else
+            self:try_transfer({kind, k}, {"inventory"})
         end
+    elseif def.consumable then
+        self:try_consume(kind, k)
     elseif def.slot then
-        if self:try_transfer({kind, k}, {"equip", def.slot}) then
-            self:push_log("Put on " .. def.name .. ".")
+        self:try_transfer({kind, k}, {"equip", def.slot})
+    else
+        local hand = (not p.equipped.rhand and "rhand") or (not p.equipped.lhand and "lhand") or "rhand"
+        self:try_transfer({kind, k}, {"equip", hand})
+    end
+end
+
+-- -- encounters -----------------------------------------------------------
+
+local ENC_COLS = 55            -- mono 12 is ~7 px/char: 55 chars fit 400 px
+local ENC_MSG_LINES = 4
+
+-- 0..n-1 from the LCG's high bits
+function Game:rand(n)
+    self.seed = rand_next(self.seed)
+    return self.seed * n // 32768
+end
+
+function Game:roll(pct)
+    return self:rand(100) < pct
+end
+
+function Game:maybe_encounter(terrain_id)
+    if (self.enc_cooldown or 0) > 0 then
+        self.enc_cooldown = self.enc_cooldown - 1
+        return
+    end
+    local chance = ENCOUNTER_CHANCE[terrain_id]
+    if chance and self:roll(chance * self.player.encounter_mult) then self:start_encounter(self:pick_encounter()) end
+end
+
+-- A kind by ENCOUNTER_KINDS weight (skipping kinds with no entries), then
+-- one of its entries at random.
+function Game:pick_encounter()
+    local kinds = {}
+    for _, k in ipairs(ENCOUNTER_KINDS) do
+        if ENCOUNTERS_BY_KIND[k[1]] then kinds[#kinds + 1] = k end
+    end
+    local kind
+    self.seed, kind = weighted_pick(self.seed, kinds)
+    local list = ENCOUNTERS_BY_KIND[kind]
+    return list[self:rand(#list) + 1]
+end
+
+function Game:start_encounter(def)
+    self.enc = {def = def, hp = def.hp, range = def.start or "far", msg = {},
+                intro = wrap(def.intro, ENC_COLS), cursor = 1, aim = 0,
+                demanding = def.kind == "bandit"}
+    if def.kind == "bandit" then self:enc_say(def.demand) end
+    self.screen = "encounter"
+end
+
+function Game:enc_say(text)
+    for _, line in ipairs(wrap(text, ENC_COLS)) do table.insert(self.enc.msg, line) end
+    while #self.enc.msg > ENC_MSG_LINES do table.remove(self.enc.msg, 1) end
+end
+
+function Game:end_encounter(summary)
+    self.enc.over = true
+    self.enc_cooldown = ENCOUNTER_COOLDOWN
+    if summary then self:push_log(summary) end
+end
+
+-- The weapon in your hands (right first), its name and slot; fists if none.
+function Game:weapon()
+    for _, slot in ipairs({"rhand", "lhand"}) do
+        local item = self.player.equipped[slot]
+        if item and ITEM_DB[item].weapon then return ITEM_DB[item].weapon, ITEM_DB[item].name, slot end
+    end
+    return FISTS, "Fists"
+end
+
+function Game:thrown_slot()
+    for _, slot in ipairs({"rhand", "lhand"}) do
+        local item = self.player.equipped[slot]
+        if item and ITEM_DB[item].weapon and ITEM_DB[item].weapon.thrown then return slot end
+    end
+end
+
+-- First food/drink in the bag, for paying off bandits.
+function Game:food_index()
+    for i, stack in ipairs(self.player.inventory) do
+        if ITEM_DB[stack.item].consumable then return i end
+    end
+end
+
+function Game:enemy_condition()
+    local f = self.enc.hp / self.enc.def.hp
+    if f > 0.75 then return "unhurt" elseif f > 0.4 then return "hurt" end
+    return "badly hurt"
+end
+
+-- What you can do now, as {label, action}.
+function Game:encounter_options()
+    local e = self.enc
+    if e.over then return {{"Continue", "leave"}} end
+    local kind = e.def.kind
+    if kind == "helper" then return {{"Talk", "talk"}, {"Walk on", "leave_quietly"}} end
+    if kind == "anomaly" then return {{"Investigate", "investigate"}, {"Walk away", "leave_quietly"}} end
+    if e.demanding then
+        local o = {}
+        if self:food_index() then o[#o + 1] = {"Give them some food", "give"} end
+        o[#o + 1] = {"Refuse", "refuse"}
+        o[#o + 1] = {"Run for it", "flee"}
+        return o
+    end
+    local o = {}
+    local w, wname = self:weapon()
+    if e.range == "far" then
+        o[#o + 1] = {"Approach", "approach"}
+    elseif e.range == "near" then
+        if w.reach == "near" then o[#o + 1] = {"Attack (" .. wname .. ")", "attack"} end
+        o[#o + 1] = {"Close in", "approach"}
+    else
+        o[#o + 1] = {"Attack (" .. wname .. ")", "attack"}
+    end
+    local ts = self:thrown_slot()
+    if ts and e.range ~= "close" then
+        o[#o + 1] = {"Throw the " .. ITEM_DB[self.player.equipped[ts]].name:lower(), "throw"}
+    end
+    if e.range ~= "far" then o[#o + 1] = {"Back off", "back"} end
+    if not e.seen then o[#o + 1] = {"Watch it", "watch"} end
+    if e.range == "far" then o[#o + 1] = {"Hide", "hide"} end
+    if kind == "mutant" and not e.talked then o[#o + 1] = {"Talk", "talk"} end
+    o[#o + 1] = {"Flee", "flee"}
+    return o
+end
+
+function Game:enemy_dies()
+    local e = self.enc
+    local found = {}
+    for _ = 1, e.def.loot_rolls or 1 do
+        local item
+        self.seed, item = weighted_pick(self.seed, e.def.loot)
+        if item ~= "nothing" then
+            self:put_stack("ground", nil, {item = item, qty = 1})
+            found[#found + 1] = ITEM_DB[item].name
+        end
+    end
+    self:enc_say("The " .. e.def.who .. " goes still.")
+    if #found > 0 then self:enc_say("Left behind: " .. table.concat(found, ", ") .. ".") end
+    self:end_encounter("You killed the " .. e.def.who .. ".")
+end
+
+-- The other side's turn: bleed, flee when beaten, close in, or strike.
+function Game:enemy_turn()
+    local e, p, d = self.enc, self.player, self.enc.def
+    if e.over or self.screen ~= "encounter" then return end
+    if e.bleeding then
+        e.hp = e.hp - ENEMY_BLEED_DMG
+        if e.hp <= 0 then return self:enemy_dies() end
+    end
+    if d.flees_at and e.hp <= d.flees_at and self:roll(ENEMY_FLEE_CHANCE) then
+        self:enc_say("The " .. d.who .. " breaks away and flees.")
+        return self:end_encounter("The " .. d.who .. " fled.")
+    end
+    if e.range ~= "close" then
+        if self:roll(ADVANCE_CHANCE + 10 * (d.speed - p.attrs.Speed)) then
+            e.range = CLOSER[e.range]
+            self:enc_say("The " .. d.who .. " closes in.")
+        else
+            self:enc_say("The " .. d.who .. " circles, watching you.")
+        end
+        return
+    end
+    if not self:roll(d.hit - ENEMY_DODGE * (p.attrs.Speed - 3)) then
+        self:enc_say("The " .. d.who .. " lunges and misses.")
+        return
+    end
+    local dmg = d.dmg[1] + self:rand(d.dmg[2] - d.dmg[1] + 1)
+    p.health = clamp(p.health - dmg)
+    local text = "The " .. d.who .. " hits you (-" .. dmg .. " HP)."
+    if d.bleed and d.bleed > 0 and not p.injuries.bleeding and self:roll(d.bleed) then
+        p.injuries.bleeding = true
+        text = text .. " You're bleeding."
+    end
+    if dmg >= WOUND_DAMAGE and p.injuries.wounded_hours == 0 then
+        p.injuries.wounded_hours = WOUND_REST_HOURS
+        text = text .. " It leaves a deep wound."
+    end
+    self:enc_say(text)
+    self:check_death("Killed by the " .. d.name .. ".")
+end
+
+function Game:enc_hit(dmg, bleed, how)
+    local e = self.enc
+    e.hp = e.hp - dmg
+    local text = how .. " (-" .. dmg .. ")."
+    if bleed and self:roll(bleed) and not e.bleeding then
+        e.bleeding = true
+        text = text .. " It's bleeding."
+    end
+    self:enc_say(text)
+    if e.hp <= 0 then self:enemy_dies() end
+end
+
+function Game:helper_talk()
+    local p, d = self.player, self.enc.def
+    if d.help == "medic" then
+        p.injuries.bleeding = false
+        p.injuries.wounded_hours = p.injuries.wounded_hours // 2
+        p.health = clamp(p.health + 25)
+        self:put_stack("ground", nil, {item = "cloth_scrap", qty = 2})
+        self:enc_say("She cleans and binds your hurts without a word, and leaves you "
+            .. "two clean strips of cloth. (+25 HP)")
+        self:end_encounter("The medic patched you up.")
+    else
+        for key in pairs(self.tiles) do
+            local q, r = key:match("(-?%d+),(-?%d+)")
+            if axial_distance(p.q, p.r, tonumber(q), tonumber(r)) <= 3 then p.explored[key] = true end
+        end
+        self:put_stack("ground", nil, {item = "water_bottle", qty = 1})
+        self:enc_say("He draws the land around you in the dirt and hands you a bottle of "
+            .. "clean water. 'Stay off the roads at night.'")
+        self:end_encounter("The wanderer shared water and directions.")
+    end
+end
+
+function Game:encounter_action(action)
+    local e, p = self.enc, self.player
+    e.msg = {}
+    if action == "investigate" then
+        return self:start_puzzle()
+    elseif action == "leave" or action == "leave_quietly" then
+        if action == "leave_quietly" then
+            self.enc_cooldown = ENCOUNTER_COOLDOWN
+            self:push_log("You nod and walk on.")
+        end
+        self.enc = nil
+        self.screen = "map"
+        return
+    elseif action == "talk" then
+        if e.def.kind == "helper" then return self:helper_talk() end
+        e.talked = true
+        self:enc_say(e.def.talk)
+    elseif action == "give" then
+        local i = self:food_index()
+        local stack = p.inventory[i]
+        local name = ITEM_DB[stack.item].name
+        stack.qty = stack.qty - 1
+        if stack.qty <= 0 then table.remove(p.inventory, i) end
+        self:enc_say("They take the " .. name:lower() .. " and back off into the ruins.")
+        return self:end_encounter("You paid the " .. e.def.who .. " off.")
+    elseif action == "refuse" then
+        e.demanding = false
+        self:enc_say("'Wrong answer.'")
+    elseif action == "approach" then
+        e.range = CLOSER[e.range]
+        self:enc_say("You move in. Range: " .. RANGE_NAME[e.range] .. ".")
+    elseif action == "back" then
+        e.range = FARTHER[e.range]
+        self:enc_say("You back away. Range: " .. RANGE_NAME[e.range] .. ".")
+    elseif action == "attack" then
+        local w, wname = self:weapon()
+        local hit = PLAYER_HIT + 8 * (p.attrs.Speed - 3) + e.aim
+        e.aim = 0
+        if self:roll(hit) then
+            local dmg = math.max(1, w.dmg - self:rand(w.dmg // 4 + 1) + 2 * (p.attrs.Strength - 3))
+            self:enc_hit(dmg, w.bleed, "You hit the " .. e.def.who .. " (" .. wname:lower() .. ")")
+        else
+            self:enc_say("You swing at the " .. e.def.who .. " and miss.")
+        end
+    elseif action == "throw" then
+        local slot = self:thrown_slot()
+        local item = p.equipped[slot]
+        local w = ITEM_DB[item].weapon
+        p.equipped[slot] = nil
+        recompute_stats(p)
+        self:put_stack("ground", nil, {item = item, qty = 1})
+        if self:roll(THROW_HIT + 8 * (p.attrs.Perception - 3) + e.aim) then
+            self:enc_hit(w.dmg, w.bleed, "Your " .. ITEM_DB[item].name:lower() .. " strikes the " .. e.def.who)
+        else
+            self:enc_say("Your " .. ITEM_DB[item].name:lower() .. " sails wide.")
+        end
+        e.aim = 0
+    elseif action == "watch" then
+        if self:roll(WATCH_CHANCE + 10 * (p.attrs.Perception - 3)) then
+            e.seen = true
+            e.aim = WATCH_AIM
+            self:enc_say("You study how it moves. It looks " .. self:enemy_condition()
+                .. ", and you see an opening.")
+        else
+            self:enc_say("You can't make out much.")
+        end
+    elseif action == "hide" then
+        local chance = HIDE_CHANCE + 10 * (p.attrs.Perception - 3)
+        if e.def.kind == "animal" then chance = chance - 10 end
+        if self:roll(chance) then
+            self:enc_say("You drop into cover and keep very still. It passes you by.")
+            return self:end_encounter("You hid from the " .. e.def.who .. ".")
+        end
+        self:enc_say("It has seen where you went.")
+    elseif action == "flee" then
+        if self:roll(FLEE_CHANCE[e.range] + 10 * (p.attrs.Speed - e.def.speed)) then
+            p.mp = p.mp - 1
+            self:enc_say("You run until your lungs burn. It doesn't follow. (-1 MP)")
+            return self:end_encounter("You ran from the " .. e.def.who .. ".")
+        end
+        self:enc_say("You try to run, but it cuts you off.")
+    end
+    if not e.over then self:enemy_turn() end
+end
+
+-- -- anomaly puzzles ---------------------------------------------------------
+
+local function bolt_neighbors(c)
+    local out, row, col = {}, (c - 1) // BOLT_N, (c - 1) % BOLT_N
+    if row > 0 then out[#out + 1] = c - BOLT_N end
+    if row < BOLT_N - 1 then out[#out + 1] = c + BOLT_N end
+    if col > 0 then out[#out + 1] = c - 1 end
+    if col < BOLT_N - 1 then out[#out + 1] = c + 1 end
+    return out
+end
+
+-- the cell one step from c in a direction (nil off the grid)
+local function bolt_step(c, dir)
+    local row, col = (c - 1) // BOLT_N, (c - 1) % BOLT_N
+    if dir == "up" and row > 0 then return c - BOLT_N end
+    if dir == "down" and row < BOLT_N - 1 then return c + BOLT_N end
+    if dir == "left" and col > 0 then return c - 1 end
+    if dir == "right" and col < BOLT_N - 1 then return c + 1 end
+end
+
+local function bolt_path_exists(haz)
+    local seen, queue, head = {[BOLT_START] = true}, {BOLT_START}, 1
+    while queue[head] do
+        local c = queue[head]
+        head = head + 1
+        if c == BOLT_GOAL then return true end
+        for _, n in ipairs(bolt_neighbors(c)) do
+            if not haz[n] and not seen[n] then
+                seen[n] = true
+                queue[#queue + 1] = n
+            end
+        end
+    end
+    return false
+end
+
+local function bolt_count(haz, c)
+    local n = 0
+    for _, nb in ipairs(bolt_neighbors(c)) do if haz[nb] then n = n + 1 end end
+    return n
+end
+
+function Game:start_puzzle()
+    local per = self.player.attrs.Perception
+    local kind = ({"bolts", "sequence", "runes"})[self:rand(3) + 1]
+    local z = {kind = kind, msg = ""}
+    if kind == "bolts" then
+        repeat
+            z.haz = {}
+            local placed = 0
+            while placed < BOLT_HAZARDS do
+                local c = self:rand(BOLT_N * BOLT_N) + 1
+                if c ~= BOLT_START and c ~= BOLT_GOAL and not z.haz[c] then
+                    z.haz[c] = true
+                    placed = placed + 1
+                end
+            end
+        until bolt_path_exists(z.haz)
+        z.pos, z.visited, z.revealed = BOLT_START, {[BOLT_START] = true}, {}
+        z.bolts = math.max(1, BOLTS + per - 3)
+    elseif kind == "sequence" then
+        z.round = 1
+        self:new_sequence(z)
+    else
+        z.target = {}
+        for i = 1, RUNE_N do z.target[i] = self:rand(4) end
+        repeat
+            z.cur, z.scramble = {}, {}
+            for i = 1, RUNE_N do z.cur[i] = z.target[i] end
+            for k = 1, RUNE_SCRAMBLE do
+                local i = self:rand(RUNE_N) + 1
+                z.scramble[k] = i
+                -- a press turns rune i and its neighbours forward; scramble backward
+                for j = math.max(1, i - 1), math.min(RUNE_N, i + 1) do z.cur[j] = (z.cur[j] + 3) % 4 end
+            end
+            local same = true
+            for i = 1, RUNE_N do if z.cur[i] ~= z.target[i] then same = false end end
+        until not same
+        z.moves = math.max(RUNE_SCRAMBLE, RUNE_MOVES + per - 3)
+    end
+    self.puz = z
+    self.screen = "puzzle"
+end
+
+function Game:new_sequence(z)
+    z.seq, z.typed, z.showing = {}, 0, true
+    for i = 1, SEQ_LENGTHS[z.round] do z.seq[i] = self:rand(4) + 1 end
+end
+
+-- Leave the anomaly: success may leave an artifact, failure hurts.
+function Game:finish_puzzle(result)
+    local p, who = self.player, self.enc.def.who
+    self.enc, self.puz = nil, nil
+    self.enc_cooldown = ENCOUNTER_COOLDOWN
+    self.screen = "map"
+    if result == "backed_off" then
+        self:push_log("You back away from the " .. who .. ".")
+    elseif result == "solved" then
+        if self:roll(ARTIFACT_CHANCE + 5 * (p.attrs.Perception - 3)) then
+            local id = ARTIFACTS[self:rand(#ARTIFACTS) + 1]
+            self:put_stack("ground", nil, {item = id, qty = 1})
+            self:push_log("The " .. who .. " fades. It left something:")
+            self:push_log(ITEM_DB[id].name .. ". (I to pick it up)")
+        else
+            self:push_log("The " .. who .. " fades. Nothing remains.")
         end
     else
-        local hand = "rhand"
-        if self.player.equipped.rhand and not self.player.equipped.lhand then hand = "lhand" end
-        if self:try_transfer({kind, k}, {"equip", hand}) then
-            self:push_log("Holding " .. def.name .. ".")
+        local r = self:rand(3)
+        if r == 0 then
+            local dmg = 10 + self:rand(16)
+            p.health = clamp(p.health - dmg)
+            self:push_log("The " .. who .. " tears at you. (-" .. dmg .. " HP)")
+        elseif r == 1 then
+            p.injuries.bleeding = true
+            self:push_log("Your nose and ears begin to bleed.")
+        else
+            local hours = 4 + self:rand(5)
+            p.hours = p.hours + hours
+            apply_awake_hours(p, hours)
+            self:push_log("You come to. The sun has moved. (" .. hours .. "h lost)")
         end
+        self:check_death("Taken by the " .. who .. ".")
+    end
+end
+
+function Game:puzzle_key(key)
+    local z = self.puz
+    if key == gfx.KEY_ESCAPE or key == KEY_Q then return self:finish_puzzle("backed_off") end
+    local dir = (key == gfx.KEY_UP or key == KEY_W) and "up"
+        or (key == gfx.KEY_DOWN or key == KEY_S) and "down"
+        or (key == gfx.KEY_LEFT or key == KEY_A) and "left"
+        or (key == gfx.KEY_RIGHT or key == KEY_D) and "right"
+    if z.kind == "bolts" then
+        if key == KEY_T then
+            z.aiming = z.bolts > 0 and not z.aiming
+            z.msg = z.aiming and "Throw which way?" or (z.bolts > 0 and "" or "No bolts left.")
+            return
+        end
+        if not dir then return end
+        local c = bolt_step(z.pos, dir)
+        if not c then return end
+        if z.aiming then
+            z.aiming = false
+            z.bolts = z.bolts - 1
+            z.revealed[c] = true
+            z.msg = z.haz[c] and "The bolt is snatched from the air and crushed."
+                or "The bolt lands and lies still."
+            return
+        end
+        if z.haz[c] then return self:finish_puzzle("failed") end
+        z.pos, z.visited[c], z.msg = c, true, ""
+        if c == BOLT_GOAL then return self:finish_puzzle("solved") end
+    elseif z.kind == "sequence" then
+        if z.showing then
+            z.showing = false
+            return
+        end
+        if key < 49 or key > 52 then return end
+        if key - 48 ~= z.seq[z.typed + 1] then return self:finish_puzzle("failed") end
+        z.typed = z.typed + 1
+        if z.typed == #z.seq then
+            z.round = z.round + 1
+            if z.round > #SEQ_LENGTHS then return self:finish_puzzle("solved") end
+            self:new_sequence(z)
+        end
+    else
+        if key < 49 or key >= 49 + RUNE_N then return end
+        local i = key - 48
+        for j = math.max(1, i - 1), math.min(RUNE_N, i + 1) do z.cur[j] = (z.cur[j] + 1) % 4 end
+        z.moves = z.moves - 1
+        local done = true
+        for k = 1, RUNE_N do if z.cur[k] ~= z.target[k] then done = false end end
+        if done then return self:finish_puzzle("solved") end
+        if z.moves <= 0 then return self:finish_puzzle("failed") end
+    end
+end
+
+function Game:encounter_key(key)
+    local opts = self:encounter_options()
+    local e = self.enc
+    local pick
+    if key >= 49 and key < 49 + #opts then          -- '1'..
+        pick = key - 48
+    elseif key == gfx.KEY_UP or key == KEY_W then
+        e.cursor = math.max(1, e.cursor - 1)
+    elseif key == gfx.KEY_DOWN or key == KEY_S then
+        e.cursor = math.min(#opts, e.cursor + 1)
+    elseif key == KEY_ENTER or key == KEY_LF or key == KEY_SPACE then
+        pick = e.cursor
+    end
+    if pick and opts[pick] then
+        e.cursor = 1
+        self:encounter_action(opts[pick][2])
     end
 end
 
@@ -1200,31 +2171,34 @@ local function draw_glyph(terrain_id, cx, cy, color)
     draw_sprite(rnd(cx) - GLYPH_W // 2, rnd(cy) - GLYPH_H // 2, GLYPH_W, GLYPH_H, GLYPHS[terrain_id])
 end
 
--- Vertical layout of the map screen (300x400): HUD text above MAP_TOP, the
--- hex map centered between MAP_TOP and the legend, then the legend (two rows
--- of 14px swatches), the message log, and the key hints on the last line.
-local MAP_TOP = 58
-local LEGEND_Y = 306
+-- Map screen (400x300 landscape): the hex map in the left MAP_W pixels
+-- between MAP_TOP and MAP_BOTTOM; the HUD and the terrain legend in a panel
+-- to its right (from PANEL_X); the log and key hints across the bottom.
+local MAP_W, MAP_TOP, MAP_BOTTOM = 256, 4, 236
+local PANEL_X = 262
+local LEGEND_Y = 80
 local LEGEND_ORDER = {"plains", "forest", "hills", "water"}
 
 function Game:draw_map(w, h)
     gfx.clear(gfx.WHITE)
 
     local p = self.player
-    local origin_x, origin_y = w // 2, (MAP_TOP + LEGEND_Y - 4) // 2
+    local origin_x, origin_y = MAP_W // 2, (MAP_TOP + MAP_BOTTOM) // 2
 
     -- HUD
     gfx.color(gfx.BLACK)
-    gfx.font(gfx.FONT_BOLD_14)
-    gfx.text(6, 16, "Wasteland Survivor")
     gfx.font(gfx.FONT_MONO_12)
     local scav = SCAVENGE_LOOT[self.tiles[hex_key(p.q, p.r)]]
         and (self:scavenge_left() .. "/" .. SCAVENGE_TRIES) or "-"
-    gfx.text(6, 34, "MP " .. math.max(p.mp, 0) .. "/" .. p.max_mp
-        .. "  Hrs " .. p.hours .. "  Sight " .. p.sight .. "  Scav " .. scav)
-    gfx.text(6, 50, "Hun " .. math.floor(p.needs.hunger)
-        .. " Thi " .. math.floor(p.needs.thirst)
-        .. " Rst " .. math.floor(p.needs.rest))
+    gfx.text(PANEL_X, 14, "MP " .. math.max(p.mp, 0) .. "/" .. p.max_mp .. "  Hrs " .. p.hours)
+    gfx.text(PANEL_X, 28, "Sight " .. p.sight .. " Scav " .. scav)
+    gfx.text(PANEL_X, 42, "Hun " .. math.floor(p.needs.hunger)
+        .. " Thi " .. math.floor(p.needs.thirst))
+    gfx.text(PANEL_X, 56, "Rest " .. math.floor(p.needs.rest) .. "  HP " .. math.floor(p.health))
+    local inj = {}
+    if p.injuries.bleeding then inj[#inj + 1] = "BLEEDING" end
+    if p.injuries.wounded_hours > 0 then inj[#inj + 1] = "Wounded" end
+    if #inj > 0 then gfx.text(PANEL_X, 70, table.concat(inj, " ")) end
 
     local reachable = {}
     for _, n in ipairs(neighbors(self.tiles, p.q, p.r)) do
@@ -1236,7 +2210,7 @@ function Game:draw_map(w, h)
         q, r = tonumber(q), tonumber(r)
         local px, py = axial_to_pixel(q, r, HEX_SIZE)
         px, py = origin_x + px, origin_y + py
-        if px > -HEX_SIZE * 2 and px < w + HEX_SIZE * 2 and py > MAP_TOP and py < LEGEND_Y then
+        if py > MAP_TOP and py < MAP_BOTTOM then
             local terrain = TERRAIN[terrain_id]
             local is_player = (q == p.q and r == p.r)
             if p.visible[key] then
@@ -1296,8 +2270,7 @@ function Game:draw_legend()
     gfx.font(gfx.FONT_MONO_12)
     for i, terrain_id in ipairs(LEGEND_ORDER) do
         local t = TERRAIN[terrain_id]
-        local col, row = (i - 1) % 2, (i - 1) // 2
-        local x, y = 6 + col * 150, LEGEND_Y + row * 16
+        local x, y = PANEL_X + 2, LEGEND_Y + (i - 1) * 18
 
         local fill = shade_color(t.shade)
         if fill ~= gfx.WHITE then
@@ -1364,8 +2337,8 @@ local INV_POS = {}   -- rebuilt each draw: row_index -> {x, y, w, h} - where tha
 -- Equip slots sit ON the body part they dress, NEO Scavenger style: a box over
 -- the head, the face, the torso, the legs, a hand... sized to that part, with
 -- the worn item painted onto the body and its icon drawn inside the box.
--- {x, y, w, h} in screen pixels, laid out against the silhouette below
--- (BODY_SCALE 1.25, head top at y 72). Boxes never touch each other.
+-- {x, y, w, h} authored against the figure at center x 150 / head top y 72,
+-- then shifted with it (BODY_DX/BODY_DY below). Boxes never touch each other.
 local EQUIP_RECT = {
     head   = {139,  64, 22, 18},   -- top of the head (a hat sits here)
     ears   = {118,  84, 20, 18},   -- against the side of the head
@@ -1373,28 +2346,42 @@ local EQUIP_RECT = {
     neck   = {140, 105, 20, 18},   -- throat / collar
     jacket = {116, 126, 68, 38},   -- chest and shoulders
     shirt  = {124, 167, 52, 36},   -- belly
-    back   = {230, 118, 40, 40},   -- beside the shoulder: what's on your back
-    hands  = { 73, 212, 22, 22},   -- gloves, on the left hand/forearm
+    hands  = { 73, 212, 22, 22},   -- gloves: the left forearm and hand
     wrists = {205, 212, 22, 22},   -- the right wrist
     lhand  = { 70, 236, 24, 24},   -- held in the left hand (anything)
     rhand  = {206, 236, 24, 24},   -- held in the right hand (anything)
+    back   = {230, 118, 40, 40},   -- worn on the back, drawn beside the shoulder
     pants  = {122, 206, 56, 58},   -- hips and legs
-    feet   = {120, 267, 60, 19},   -- both feet
+    feet   = {120, 267, 60, 20},   -- both feet
 }
+-- shown inside an empty slot; the long form when it fits the box
+local EQUIP_NAME = {head = "Head", ears = "Ears", eyes = "Eyes", neck = "Neck",
+                    jacket = "Jacket", shirt = "Shirt", hands = "Gloves",
+                    wrists = "Wrists", pants = "Pants", feet = "Feet",
+                    lhand = "L Hand", rhand = "R Hand", back = "Back"}
+local EQUIP_ABBR = {head = "Hd", ears = "Ea", eyes = "Ey", neck = "Nk", jacket = "Jk",
+                    shirt = "Sh", hands = "Gl", wrists = "Wr", pants = "Pt", feet = "Ft",
+                    lhand = "LH", rhand = "RH", back = "Bk"}
+-- where the doll sits on the 400x300 screen: the left column, head at the top
+local BODY_DX, BODY_DY = -66, -46
+for _, r in pairs(EQUIP_RECT) do r[1], r[2] = r[1] + BODY_DX, r[2] + BODY_DY end
 
-local GROUND_GRID_COLS = 9
-local GROUND_GRID_ROWS = 1   -- visible rows; the grid scrolls to follow the cursor
+-- right column (from INV_COL_X): ground grid, bag grid with its name and
+-- fill count above it, then what the cursor is on
+local INV_COL_X = 212
+local GROUND_GRID_COLS = 5
+local GROUND_GRID_ROWS = 2   -- visible rows; the grid scrolls to follow the cursor
 local GROUND_CELL, GROUND_GAP = 30, 2
-local GROUND_Y = 30
--- bag: up to BACKPACK_CAP cells in two rows, all visible
-local BACKPACK_COLS = 8
-local BACKPACK_CELL, BACKPACK_GAP = 22, 2
-local BACKPACK_Y = 314
-local CONDITIONS_Y = 297
--- The log sits on the last lines of the REPORTED screen height (like the map
--- screen's key hint at h - 8), not at fixed y: on the device the bottom of a
--- fixed 400px layout got cut off.
-local INV_LOG_LINES, INV_LOG_BOTTOM, INV_LOG_STEP = 2, 8, 12
+local GROUND_Y = 32
+-- bag: up to BACKPACK_CAP cells, all visible
+local BACKPACK_COLS = 7
+local BACKPACK_CELL, BACKPACK_GAP = 24, 2
+local BACKPACK_Y = 114
+local BAG_LABEL_Y = BACKPACK_Y - 5
+local CURSOR_DESC_Y = 210
+local CONDITIONS_Y = 264     -- full width, under the doll
+-- log lines sit on the last lines of the reported screen height
+local INV_LOG_LINES = 2
 
 local function item_abbr(item_id)
     return ITEM_DB[item_id].name:sub(1, 1)
@@ -1408,10 +2395,13 @@ function Game:current_conditions()
     if self.player.needs.hunger <= 0 then table.insert(list, "Starving") end
     if self.player.needs.thirst <= 0 then table.insert(list, "Dehydrated") end
     if self.player.needs.rest <= 0 then table.insert(list, "Exhausted") end
+    if self.player.injuries.bleeding then table.insert(list, "Bleeding") end
+    if self.player.injuries.wounded_hours > 0 then table.insert(list, "Wounded") end
+    if self.player.health < 50 then table.insert(list, "Hurt") end
     if #list == 0 then return "Conditions: none" end
     local text = table.concat(list, ", ")
     -- all four at once don't fit after the prefix (mono 12 is ~7px/char)
-    if (12 + #text) * 7 > 292 then return text end
+    if (12 + #text) * 7 > 392 then return text end
     return "Conditions: " .. text
 end
 
@@ -1457,10 +2447,10 @@ end
 -- overlapping parts (arm meeting torso) don't leave internal seams.
 -- ---------------------------------------------------------------------
 
-local BODY_CX = 150
+local BODY_CX = 150 + BODY_DX
 -- The figure is authored in the coordinates below (head top at y 117, feet at
 -- 289) and scaled by BODY_SCALE about its top, landing at BODY_Y0.
-local BODY_SCALE, BODY_SRC_Y0, BODY_Y0 = 1.25, 117, 72
+local BODY_SCALE, BODY_SRC_Y0, BODY_Y0 = 1.25, 117, 72 + BODY_DY
 local BODY_TOP = BODY_Y0
 local BODY_BOTTOM = BODY_Y0 + math.ceil((289 - BODY_SRC_Y0) * BODY_SCALE)   -- exclusive
 
@@ -1634,8 +2624,9 @@ local function paint_part(part, src_y0, src_y1, color, inner, outer)
 end
 
 -- Draw order for painting worn items: under-layers before over-layers.
-local WEAR_ORDER = {"shirt", "pants", "jacket", "back", "feet", "hands", "head",
-                    "neck", "wrists", "eyes", "ears"}
+-- Held items (lhand/rhand) are never painted on, only shown in their box.
+local WEAR_ORDER = {"shirt", "pants", "jacket", "back", "feet", "hands", "head", "neck",
+                    "wrists", "eyes", "ears"}
 
 function Game:draw_silhouette()
     -- pass 1: outline (every block grown by 1px, black)
@@ -1750,7 +2741,7 @@ function Game:draw_inventory(w, h)
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
     gfx.font(gfx.FONT_MONO_12)
-    gfx.text(4, 12, "Arrows Enter:move E:use I:map")
+    gfx.text(4, 12, "Up/Dn Enter:move E:use I:map")
 
     INV_ROWS = {}
     INV_POS = {}
@@ -1762,15 +2753,15 @@ function Game:draw_inventory(w, h)
     end
 
     -- ground items grid. Every ground stack is a cursor row (ground rows come
-    -- first, so cursor index == ground index), plus one empty cell after them
-    -- to drop things into. Only GROUND_GRID_ROWS rows of cells fit above the
-    -- paperdoll: scroll the window to keep the cursor in view and give
-    -- off-screen cells no position.
+    -- first, so cursor index == ground index), but only GROUND_GRID_ROWS rows
+    -- of cells fit above the paperdoll: scroll the window to keep the cursor
+    -- in view and give off-screen stacks no position.
     local ground = self:ground_list()
-    local ncells = #ground + 1
+    -- one extra, empty cell after the last stack: somewhere to drop things
+    local n_ground = #ground + 1
     local per_page = GROUND_GRID_COLS * GROUND_GRID_ROWS
     local off = self.ground_off or 0
-    if self.inv_cursor <= ncells then
+    if self.inv_cursor <= n_ground then
         local crow = (self.inv_cursor - 1) // GROUND_GRID_COLS
         local first = off // GROUND_GRID_COLS
         if crow < first then
@@ -1779,7 +2770,7 @@ function Game:draw_inventory(w, h)
             off = (crow - GROUND_GRID_ROWS + 1) * GROUND_GRID_COLS
         end
     end
-    local total_rows = (ncells + GROUND_GRID_COLS - 1) // GROUND_GRID_COLS
+    local total_rows = (n_ground + GROUND_GRID_COLS - 1) // GROUND_GRID_COLS
     off = math.max(0, math.min(off, (total_rows - GROUND_GRID_ROWS) * GROUND_GRID_COLS))
     self.ground_off = off
     local label = "Ground"
@@ -1787,12 +2778,12 @@ function Game:draw_inventory(w, h)
         label = label .. " " .. (off + 1) .. "-" .. math.min(#ground, off + per_page)
             .. "/" .. #ground
     end
-    gfx.text(4, 26, label)
-    for i = 1, ncells do
+    gfx.text(INV_COL_X, GROUND_Y - 5, label)
+    for i = 1, n_ground do
         if i > off and i <= off + per_page then
             local col = (i - off - 1) % GROUND_GRID_COLS
             local row = (i - off - 1) // GROUND_GRID_COLS
-            local x = 6 + col * (GROUND_CELL + GROUND_GAP)
+            local x = INV_COL_X + 2 + col * (GROUND_CELL + GROUND_GAP)
             local y = GROUND_Y + row * (GROUND_CELL + GROUND_GAP)
             add_row("ground", i, x, y, GROUND_CELL, GROUND_CELL)
         else
@@ -1806,25 +2797,19 @@ function Game:draw_inventory(w, h)
         add_row("equip", slot, r[1], r[2], r[3], r[4])
     end
 
-    -- bag: one cell per bag slot you have (bag_capacity), in two rows. Stacks
-    -- and the first free cell (a drop target) are cursor rows; the rest of
-    -- the free cells are drawn as plain empty boxes.
-    local cap = self:bag_capacity()
+    -- bag: one cell per unit of capacity. Every stack is a row, plus the
+    -- first empty cell (a drop target); the other empty cells are just drawn.
+    local capacity = self:bag_capacity()
+    local n_inv = #self.player.inventory
     local function bag_cell(i)
         local col = (i - 1) % BACKPACK_COLS
         local row = (i - 1) // BACKPACK_COLS
-        return 6 + col * (BACKPACK_CELL + BACKPACK_GAP),
+        return INV_COL_X + 2 + col * (BACKPACK_CELL + BACKPACK_GAP),
                BACKPACK_Y + row * (BACKPACK_CELL + BACKPACK_GAP)
     end
-    local ninv = #self.player.inventory
-    -- (never hide stacks: if the bag somehow holds more than it should, show them)
-    for i = 1, math.min(BACKPACK_CAP, math.max(ninv, math.min(cap, ninv + 1))) do
+    for i = 1, math.min(math.max(n_inv, math.min(n_inv + 1, capacity)), BACKPACK_CAP) do
         local x, y = bag_cell(i)
         add_row("inventory", i, x, y, BACKPACK_CELL, BACKPACK_CELL)
-    end
-    for i = ninv + 2, cap do
-        local x, y = bag_cell(i)
-        self:draw_slot_box(x, y, BACKPACK_CELL, BACKPACK_CELL, nil, false, false)
     end
 
     self.inv_cursor = math.max(1, math.min(self.inv_cursor, #INV_ROWS))
@@ -1838,6 +2823,11 @@ function Game:draw_inventory(w, h)
                 i == self.inv_cursor,
                 self.inv_selected and self.inv_selected[1] == row[1] and self.inv_selected[2] == row[2])
         end
+    end
+
+    for i = n_inv + 2, capacity do
+        local x, y = bag_cell(i)
+        self:draw_slot_box(x, y, BACKPACK_CELL, BACKPACK_CELL, nil, false, false)
     end
 
     gfx.color(gfx.BLACK)
@@ -1854,158 +2844,256 @@ function Game:draw_inventory(w, h)
         end
     end
 
-    -- what the cursor is on, right-aligned on the "Ground" line
+    -- what the cursor is on, under the bag
     gfx.color(gfx.BLACK)
     local desc = self:cursor_description()
-    local max_chars = (296 - 4 - 7 * 15) // 7   -- leave room for "Ground 10-18/18"
+    local max_chars = (w - INV_COL_X - 2) // 7
     if #desc > max_chars then desc = desc:sub(1, max_chars) end
-    gfx.text(296 - 7 * #desc, 26, desc)
+    gfx.text(INV_COL_X, CURSOR_DESC_Y, desc)
+    local row = INV_ROWS[self.inv_cursor]
+    local stack = row and self:get_stack(row[1], row[2])
+    local effect = stack and ITEM_DB[stack.item].desc
+    if effect then gfx.text(INV_COL_X, CURSOR_DESC_Y + 14, effect:sub(1, max_chars)) end
 
-    gfx.color(gfx.BLACK)
     local back = self.player.equipped.back
-    gfx.text(6, BACKPACK_Y - 5, (back and ITEM_DB[back].name or "Pockets") .. " "
-        .. #self.player.inventory .. "/" .. cap)
+    gfx.text(INV_COL_X, BAG_LABEL_Y, (back and ITEM_DB[back].name or "Pockets")
+        .. " " .. n_inv .. "/" .. capacity)
 
-    -- log: the newest INV_LOG_LINES lines, bottom line at h - INV_LOG_BOTTOM
-    local ly = h - INV_LOG_BOTTOM - INV_LOG_STEP * (INV_LOG_LINES - 1)
+    -- log: the newest INV_LOG_LINES lines, the last one at h - 8
+    local ly = h - 8 - 12 * (INV_LOG_LINES - 1)
     local start_i = math.max(1, #self.log - INV_LOG_LINES + 1)
     for i = start_i, #self.log do
         gfx.text(4, ly, self.log[i])
-        ly = ly + INV_LOG_STEP
+        ly = ly + 12
     end
 
     gfx.refresh()
 end
 
 -- ---------------------------------------------------------------------
--- Character creator (first screen). Rows: the 4 attributes, the traits,
--- then "Start". The player's attrs/traits are edited in place and the
--- derived stats are recomputed after every change, so the preview is live.
+-- Character creator screen
+-- rows 1..#ATTRIBUTES are attributes, the rest are TRAITS in order
 -- ---------------------------------------------------------------------
 
-local CREATOR_ROWS = #ATTRIBUTES + #TRAITS + 1
-local CREATOR_ATTR_Y, CREATOR_TRAIT_Y, CREATOR_ROW_H = 48, 126, 14
+local CREATOR_ROWS = #ATTRIBUTES + #TRAITS
+-- attributes in the left column, traits in the right (from CREATOR_TRAIT_X),
+-- the highlighted row's description and the resulting build below both
+local CREATOR_ATTR_Y, CREATOR_TRAIT_Y, CREATOR_ROW_H = 52, 52, 14
+local CREATOR_TRAIT_X = 200
 
-function Game:creator_row()
-    local c = self.creator.cursor
-    if c <= #ATTRIBUTES then return "attr", ATTRIBUTES[c] end
-    c = c - #ATTRIBUTES
-    if c <= #TRAITS then return "trait", TRAITS[c] end
-    return "start"
-end
-
-function Game:creator_adjust(delta)
-    local kind, name = self:creator_row()
-    if kind ~= "attr" then return end
-    local a = self.player.attrs
-    local v = a[name] + delta
-    if v < ATTR_MIN or v > ATTR_MAX then return end
-    if delta > 0 and attr_points_left(a) <= 0 then
-        self.creator.msg = "No points left: lower another first."
-        return
-    end
-    a[name] = v
-    self.creator.msg = nil
-    recompute_stats(self.player)
-end
-
-function Game:creator_toggle(t)
-    local traits = self.player.traits
-    if traits[t.id] then
-        traits[t.id] = nil
-    else
-        traits[t.id] = true
-        if t.opp then traits[t.opp] = nil end
-    end
-    self.creator.msg = nil
-    recompute_stats(self.player)
-end
-
--- Begin the game; refused while the trait points are overspent.
-function Game:creator_start()
-    if trait_budget(self.player.traits) < 0 then
-        self.creator.msg = "Trait points below 0: add a flaw or drop a perk."
-        return false
-    end
+function Game:creator_key(key)
     local p = self.player
-    recompute_stats(p)
-    p.mp = p.max_mp
-    update_visibility(p, self.tiles)
-    self.screen = "map"
-    return true
+    local row = self.creator_cursor
+    self.creator_msg = nil
+    if key == gfx.KEY_UP or key == KEY_W then
+        self.creator_cursor = math.max(1, row - 1)
+    elseif key == gfx.KEY_DOWN or key == KEY_S then
+        self.creator_cursor = math.min(CREATOR_ROWS, row + 1)
+    elseif (key == gfx.KEY_LEFT or key == KEY_A or key == gfx.KEY_RIGHT or key == KEY_D)
+        and row <= #ATTRIBUTES then
+        local name = ATTRIBUTES[row]
+        local up = key == gfx.KEY_RIGHT or key == KEY_D
+        if up and p.attrs[name] < ATTR_MAX and attr_points_left(p.attrs) > 0 then
+            p.attrs[name] = p.attrs[name] + 1
+        elseif up and attr_points_left(p.attrs) <= 0 then
+            self.creator_msg = "No points left: lower another first."
+        elseif not up and p.attrs[name] > ATTR_MIN then
+            p.attrs[name] = p.attrs[name] - 1
+        end
+        recompute_stats(p)
+    elseif key == KEY_SPACE and row > #ATTRIBUTES then
+        local t = TRAITS[row - #ATTRIBUTES]
+        p.traits[t.name] = not p.traits[t.name] or nil
+        recompute_stats(p)
+    elseif key == KEY_ENTER or key == KEY_LF then
+        self:start_game()
+    end
 end
 
 function Game:draw_creator(w, h)
-    gfx.clear(gfx.WHITE)
     local p = self.player
-    local cursor = self.creator.cursor
-
-    -- one row of the list; the cursor row is drawn inverted
-    local function row_text(i, y, x, text)
-        if i == cursor then
-            gfx.color(gfx.BLACK)
-            gfx.fill_rect(2, y - 11, w - 4, CREATOR_ROW_H)
-            gfx.color(gfx.WHITE)
-        else
-            gfx.color(gfx.BLACK)
-        end
-        gfx.text(x, y, text)
-    end
-
+    gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
     gfx.font(gfx.FONT_BOLD_14)
-    gfx.text(6, 16, "New Survivor")
+    gfx.text(6, 16, "Create your survivor")
     gfx.font(gfx.FONT_MONO_12)
-    gfx.text(6, 34, "Attributes      points left " .. attr_points_left(p.attrs))
 
+    gfx.text(6, 36, "Attributes  left " .. attr_points_left(p.attrs))
     for i, name in ipairs(ATTRIBUTES) do
         local y = CREATOR_ATTR_Y + (i - 1) * CREATOR_ROW_H
         local v = p.attrs[name]
-        row_text(i, y, 8, name)
-        -- 6-cell bar: filled cells = value
+        gfx.text(6, y, (self.creator_cursor == i and ">" or " ") .. name)
         for c = 1, ATTR_MAX do
-            local bx = 120 + (c - 1) * 12
-            if c <= v then
-                gfx.fill_rect(bx, y - 9, 10, 9)
-            else
-                gfx.rect(bx, y - 9, 10, 9)
-            end
+            local cx = 100 + (c - 1) * 12
+            if c <= v then gfx.fill_rect(cx, y - 9, 10, 9) else gfx.rect(cx, y - 9, 10, 9) end
         end
-        gfx.text(198, y, tostring(v))
+        gfx.text(176, y, tostring(v))
     end
 
-    gfx.color(gfx.BLACK)
-    gfx.text(6, CREATOR_TRAIT_Y - 14, "Traits          points left " .. trait_budget(p.traits))
+    local tleft = trait_points_left(p.traits)
+    gfx.text(CREATOR_TRAIT_X, CREATOR_TRAIT_Y - 16, "Traits  left " .. tleft)
     for i, t in ipairs(TRAITS) do
-        local idx = #ATTRIBUTES + i
+        local row = #ATTRIBUTES + i
         local y = CREATOR_TRAIT_Y + (i - 1) * CREATOR_ROW_H
-        row_text(idx, y, 8, (p.traits[t.id] and "[x] " or "[ ] ") .. t.name)
-        gfx.text(124, y, t.desc)
+        local mark = p.traits[t.name] and "[x] " or "[ ] "
+        gfx.text(CREATOR_TRAIT_X, y, (self.creator_cursor == row and ">" or " ") .. mark .. t.name)
+        -- what it does to the budget: positives spend, negatives give
         local cost = (t.cost > 0 and "-" or "+") .. math.abs(t.cost)
         gfx.text(w - 6 - 7 * #cost, y, cost)
     end
 
-    local start_y = CREATOR_TRAIT_Y + #TRAITS * CREATOR_ROW_H + 6
-    row_text(CREATOR_ROWS, start_y, w // 2 - 28, "[ Start ]")
-
-    -- live preview of what the choices add up to
-    gfx.color(gfx.BLACK)
-    gfx.line(6, start_y + 8, w - 6, start_y + 8)
-    gfx.text(6, start_y + 24, "MP " .. p.max_mp .. "  Sight " .. p.sight
-        .. "  Finds " .. p.scav_rolls .. "  Bag " .. self:bag_capacity())
-    local kind, what = self:creator_row()
-    local help
-    if kind == "attr" then
-        help = what .. ": " .. ATTR_HELP[what]
-    elseif kind == "trait" then
-        help = what.name .. ": " .. what.desc
-    else
-        help = "Begin with these stats."
+    -- the highlighted row explained, then the build it gives
+    local y = CREATOR_TRAIT_Y + #TRAITS * CREATOR_ROW_H + 6
+    gfx.line(6, y - 10, w - 6, y - 10)
+    local row = self.creator_cursor
+    local desc = row <= #ATTRIBUTES and ATTR_DESC[ATTRIBUTES[row]]
+        or TRAITS[row - #ATTRIBUTES].desc
+    gfx.text(6, y + 4, desc)
+    local bag = ITEM_DB.backpack.bag_cells + p.bag_bonus
+    gfx.text(6, y + 20, "MP " .. p.max_mp .. " Sight " .. p.sight .. " Finds " .. p.scav_rolls
+        .. " Duds " .. dud_percent(p.attrs.Perception) .. "%")
+    gfx.text(6, y + 34, "Bag " .. math.max(2, math.min(BACKPACK_CAP, bag)) .. " cells (backpack)")
+    if self.creator_msg then
+        gfx.text(6, y + 50, self.creator_msg)
+    elseif tleft < 0 then
+        gfx.text(6, y + 50, "Trait points below 0: can't start.")
     end
-    gfx.text(6, start_y + 40, help)
-    if self.creator.msg then gfx.text(6, start_y + 56, self.creator.msg) end
 
-    gfx.text(6, h - 8, "Up/Dn L/R:attr Enter:pick Q:quit")
+    gfx.text(6, h - 20, "Up/Dn row  L/R attribute")
+    gfx.text(6, h - 8, "Spc trait  Enter start  Q quit")
+    gfx.refresh()
+end
+
+-- Encounter screen: name, description, what just happened, status, and the
+-- numbered choices (at most 7 rows fit above the bottom edge).
+function Game:draw_encounter(w, h)
+    local e, p = self.enc, self.player
+    gfx.clear(gfx.WHITE)
+    gfx.color(gfx.BLACK)
+    gfx.font(gfx.FONT_BOLD_14)
+    gfx.text(6, 16, e.def.name)
+    gfx.font(gfx.FONT_MONO_12)
+    for i, line in ipairs(e.intro) do gfx.text(6, 22 + 13 * i, line) end
+    gfx.line(6, 114, w - 6, 114)
+    for i, line in ipairs(e.msg) do gfx.text(6, 116 + 13 * i, line) end
+    local status = "You " .. math.floor(p.health) .. " HP"
+    if p.injuries.bleeding then status = status .. " bleeding" end
+    if e.def.hp then
+        status = "Range " .. RANGE_NAME[e.range] .. "   " .. status
+            .. "   It: " .. (e.seen and self:enemy_condition() or "?")
+    end
+    gfx.text(6, 186, status)
+    gfx.line(6, 192, w - 6, 192)
+    for i, o in ipairs(self:encounter_options()) do
+        gfx.text(6, 194 + 13 * i, (i == e.cursor and ">" or " ") .. i .. " " .. o[1])
+    end
+    gfx.refresh()
+end
+
+-- A rune: a box with a needle pointing up/right/down/left (0-3).
+local function draw_rune(x, y, size, dir)
+    gfx.rect(x, y, size, size)
+    local cx, cy, r = x + size // 2, y + size // 2, size // 2 - 4
+    local dx, dy = ({0, 1, 0, -1})[dir + 1], ({-1, 0, 1, 0})[dir + 1]
+    gfx.fill_rect(cx - 2, cy - 2, 5, 5)
+    for t = -1, 1 do
+        gfx.line(cx + t * dy, cy + t * dx, cx + dx * r + t * dy, cy + dy * r + t * dx)
+    end
+end
+
+function Game:draw_puzzle(w, h)
+    local z = self.puz
+    gfx.clear(gfx.WHITE)
+    gfx.color(gfx.BLACK)
+    gfx.font(gfx.FONT_BOLD_14)
+    gfx.text(6, 16, self.enc.def.name)
+    gfx.font(gfx.FONT_MONO_12)
+    if z.kind == "bolts" then
+        gfx.text(6, 34, "Your detector clicks once for each deadly spot")
+        gfx.text(6, 47, "next to you. Reach the glint at the top.")
+        local cell = 32
+        local x0, y0 = (w - cell * BOLT_N) // 2, 58
+        for c = 1, BOLT_N * BOLT_N do
+            local x = x0 + ((c - 1) % BOLT_N) * cell
+            local y = y0 + ((c - 1) // BOLT_N) * cell
+            gfx.color(gfx.BLACK)
+            gfx.rect(x, y, cell + 1, cell + 1)
+            if z.revealed[c] and z.haz[c] then
+                gfx.color(gfx.DARK)
+                gfx.fill_rect(x + 2, y + 2, cell - 3, cell - 3)
+            elseif z.visited[c] and c ~= z.pos then
+                gfx.text(x + 13, y + 21, tostring(bolt_count(z.haz, c)))
+            elseif z.revealed[c] then
+                gfx.fill_rect(x + 14, y + 14, 5, 5)
+            end
+            if c == BOLT_GOAL then
+                gfx.color(gfx.BLACK)
+                gfx.rect(x + 8, y + 8, 17, 17)
+                gfx.rect(x + 12, y + 12, 9, 9)
+            end
+        end
+        local px = x0 + ((z.pos - 1) % BOLT_N) * cell
+        local py = y0 + ((z.pos - 1) // BOLT_N) * cell
+        gfx.color(gfx.BLACK)
+        gfx.fill_rect(px + 6, py + 6, cell - 11, cell - 11)
+        gfx.color(gfx.WHITE)
+        gfx.text(px + 13, py + 21, tostring(bolt_count(z.haz, z.pos)))
+        gfx.color(gfx.BLACK)
+        gfx.text(6, 238, "Bolts: " .. z.bolts .. (z.aiming and "   (aiming)" or ""))
+        gfx.text(6, 254, z.msg)
+        gfx.text(6, h - 8, "Arrows move  T+arrow throw a bolt  Esc back away")
+    elseif z.kind == "sequence" then
+        gfx.text(6, 34, z.showing and "The signs burn in this order. Remember them."
+            or "Press the keys for the signs, in order.")
+        gfx.text(6, 47, "Round " .. z.round .. " of " .. #SEQ_LENGTHS)
+        local n, box = #z.seq, 30
+        local x0 = (w - n * (box + 6)) // 2
+        for i = 1, n do
+            local x = x0 + (i - 1) * (box + 6)
+            gfx.rect(x, 80, box, box)
+            local shown = z.showing and z.seq[i] or (i <= z.typed and z.seq[i])
+            if shown then
+                draw_sprite(x + 7, 87, 16, 16, SIGILS[shown])
+            else
+                gfx.text(x + 12, 100, "?")
+            end
+        end
+        gfx.text(6, 150, "The signs and their keys:")
+        for i = 1, 4 do
+            local x = 60 + (i - 1) * 80
+            gfx.rect(x, 162, 30, 30)
+            draw_sprite(x + 7, 169, 16, 16, SIGILS[i])
+            gfx.text(x + 12, 208, tostring(i))
+        end
+        gfx.text(6, h - 8, z.showing and "Any key: hide them   Esc back away" or "Keys 1-4   Esc back away")
+    else
+        gfx.text(6, 34, "Runes are cut into the stone. Pressing one turns")
+        gfx.text(6, 47, "it and its neighbours. Match the carving above.")
+        local size, gap = 40, 12
+        local x0 = (w - RUNE_N * size - (RUNE_N - 1) * gap) // 2
+        gfx.text(6, 72, "Carving:")
+        for i = 1, RUNE_N do draw_rune(x0 + (i - 1) * (size + gap), 80, size, z.target[i]) end
+        gfx.text(6, 150, "Stone:")
+        for i = 1, RUNE_N do
+            local x = x0 + (i - 1) * (size + gap)
+            draw_rune(x, 158, size, z.cur[i])
+            gfx.text(x + 17, 214, tostring(i))
+        end
+        gfx.text(6, 244, "Presses left: " .. z.moves)
+        gfx.text(6, h - 8, "Keys 1-" .. RUNE_N .. "   Esc back away")
+    end
+    gfx.refresh()
+end
+
+function Game:draw_dead(w, h)
+    gfx.clear(gfx.WHITE)
+    gfx.color(gfx.BLACK)
+    gfx.font(gfx.FONT_BOLD_14)
+    gfx.text(6, 40, "You are dead.")
+    gfx.font(gfx.FONT_MONO_12)
+    gfx.text(6, 70, self.death_cause or "")
+    gfx.text(6, 90, "You lasted " .. self.player.hours .. " hours in the wasteland.")
+    gfx.text(6, h - 8, "Enter: new survivor  Q: quit")
     gfx.refresh()
 end
 
@@ -2018,29 +3106,6 @@ gfx.begin()
 local ok, err = pcall(function()
     local game = Game.new()
     local w, h = gfx.size()
-
-    local function handle_creator_key(key)
-        if key == gfx.KEY_ESCAPE or key == KEY_Q then
-            game.quit = true
-        elseif key == gfx.KEY_UP or key == KEY_W then
-            game.creator.cursor = math.max(1, game.creator.cursor - 1)
-        elseif key == gfx.KEY_DOWN or key == KEY_S then
-            game.creator.cursor = math.min(CREATOR_ROWS, game.creator.cursor + 1)
-        elseif key == gfx.KEY_LEFT or key == KEY_A then
-            game:creator_adjust(-1)
-        elseif key == gfx.KEY_RIGHT or key == KEY_D then
-            game:creator_adjust(1)
-        elseif key == KEY_ENTER or key == KEY_LF or key == KEY_SPACE then
-            local kind, what = game:creator_row()
-            if kind == "trait" then
-                game:creator_toggle(what)
-            elseif kind == "start" then
-                game:creator_start()
-            else
-                game.creator.cursor = game.creator.cursor + 1
-            end
-        end
-    end
 
     local function handle_map_key(key)
         if key == gfx.KEY_ESCAPE or key == KEY_Q then
@@ -2076,7 +3141,7 @@ local ok, err = pcall(function()
         elseif key == KEY_E then
             local row = INV_ROWS[game.inv_cursor]
             if row then
-                game:use(row[1], row[2])
+                game:use_item(row[1], row[2])
                 -- the stack may be gone or shifted; don't keep a stale pick
                 game.inv_selected = nil
             end
@@ -2102,6 +3167,12 @@ local ok, err = pcall(function()
         if dirty then
             if game.screen == "creator" then
                 game:draw_creator(w, h)
+            elseif game.screen == "dead" then
+                game:draw_dead(w, h)
+            elseif game.screen == "encounter" then
+                game:draw_encounter(w, h)
+            elseif game.screen == "puzzle" then
+                game:draw_puzzle(w, h)
             elseif game.screen == "map" then
                 game:draw_map(w, h)
             else
@@ -2113,7 +3184,21 @@ local ok, err = pcall(function()
         local key = gfx.getch(POLL_MS)
         if key ~= nil then
             if game.screen == "creator" then
-                handle_creator_key(key)
+                if key == gfx.KEY_ESCAPE or key == KEY_Q then
+                    game.quit = true
+                else
+                    game:creator_key(key)
+                end
+            elseif game.screen == "encounter" then
+                game:encounter_key(key)
+            elseif game.screen == "puzzle" then
+                game:puzzle_key(key)
+            elseif game.screen == "dead" then
+                if key == gfx.KEY_ESCAPE or key == KEY_Q then
+                    game.quit = true
+                elseif key == KEY_ENTER or key == KEY_LF then
+                    game = Game.new()   -- a fresh world and the creator
+                end
             elseif game.screen == "map" then
                 handle_map_key(key)
             else

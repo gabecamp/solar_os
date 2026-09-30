@@ -47,15 +47,13 @@ function gfx.fill_circle(x, y, r) end
 function gfx.pixel(x, y) end
 REFRESH_COUNT = 0
 function gfx.refresh() REFRESH_COUNT = REFRESH_COUNT + 1 end
-function gfx.size() return 300, 400 end
+function gfx.size() return 400, 300 end
 
 -- D=100 right, A=97 left, W=119 up, S=115 down, Space=32 rest,
 -- I=105 inventory toggle, Enter=10 confirm (SolarOS sends '\n'), E=101 eat/drink,
 -- Q=113 quit. nil entries are idle getch timeouts (must not trigger redraws).
 local KEY_QUEUE = {
-    115, 115, 115, 115, 115, 115, 115,     -- creator: down past the attributes
-    115, 115, 115, 115, 115, 115, 115,     -- and traits to [ Start ]
-    10,                                    -- start
+    10,                  -- start with the default build (character creator)
     100, nil, nil,       -- move right (D)
     119, nil, nil,       -- move up (W)
     32,                  -- rest (in case out of MP)

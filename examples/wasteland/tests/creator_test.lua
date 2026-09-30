@@ -1,89 +1,93 @@
 -- Character creator: point-buy and trait-budget rules, derived stats, and the
--- whole flow through the real main loop (keys -> stats -> map HUD).
+-- creator screen driven through the real main loop.
 package.path = "./?.lua;" .. package.path
 local fake = require("solaros")
 local gfx = fake.gfx
 gfx.begin()
 
-local Game, L = dofile("lib_layout.lua")
+local Game, C = dofile("lib_creator.lua")
+local UP, DOWN, LEFT, RIGHT = gfx.KEY_UP, gfx.KEY_DOWN, gfx.KEY_LEFT, gfx.KEY_RIGHT
+local SPACE, ENTER = 32, 10
 
-print("1. defaults: all attributes 3, nothing left to spend, no traits")
+local function press(g, ...)
+    for _, k in ipairs({...}) do g:creator_key(k) end
+end
+
+print("1. a new game starts on the creator with a valid default build")
 local g = Game.new()
-local p = g.player
 assert(g.screen == "creator")
-assert(L.attr_points_left(p.attrs) == 0 and L.trait_budget(p.traits) == 0)
-assert(p.max_mp == 2 and p.sight == 2 and p.scav_rolls == 2 and g:bag_capacity() == 12)
+assert(C.attr_points_left(g.player.attrs) == 0 and C.trait_points_left(g.player.traits) == 5,
+       "5 trait points to spend at the start")
+assert(g.player.max_mp == 2 and g.player.sight == 2 and g.player.scav_rolls == 2)
 print("   OK")
 
-print("2. point buy: raising needs freed points; stays within 1..6")
-g.creator.cursor = 3                       -- Perception
-g:creator_adjust(1)
-assert(p.attrs.Perception == 3 and g.creator.msg, "raise with 0 points left must be refused")
-g.creator.cursor = 1                       -- Strength
-g:creator_adjust(-1); g:creator_adjust(-1); g:creator_adjust(-1)
-assert(p.attrs.Strength == 1, "can't go below 1")
-g.creator.cursor = 3
-g:creator_adjust(1); g:creator_adjust(1); g:creator_adjust(1); g:creator_adjust(1)
-assert(p.attrs.Perception == 5, "only the 2 freed points can be spent")
+print("2. attributes: points move between stats, stay in 1..6, never overspend")
+press(g, RIGHT)                                   -- Strength up with 0 points left
+assert(g.player.attrs.Strength == 3 and g.creator_msg, "no points: refused with a message")
+press(g, LEFT, LEFT)                              -- Strength 3 -> 1, frees 2
+press(g, DOWN, DOWN, RIGHT, RIGHT, RIGHT)         -- Perception 3 -> 5 (third press refused)
+assert(g.player.attrs.Strength == 1 and g.player.attrs.Perception == 5)
+assert(C.attr_points_left(g.player.attrs) == 0)
+press(g, UP, UP, LEFT, LEFT, LEFT)                -- can't go below 1
+assert(g.player.attrs.Strength == C.ATTR_MIN)
+assert(g.player.sight == 3 and g.player.scav_rolls == 3 and g.player.bag_bonus == -2,
+       "Perception 5: sight 3, 3 finds; Strength 1: -2 bag cells")
 print("   OK")
 
-print("3. derived stats follow the attributes")
-assert(p.sight == 3 and p.scav_rolls == 3, "Perception 5: +1 sight, +1 find")
-assert(g:bag_capacity() == 10, "Strength 1: backpack 12 - 2")
-p.attrs.Speed, p.attrs.Endurance = 5, 6
-L.recompute_stats(p)
-assert(p.max_mp == 3, "Speed 5: +1 MP")
-assert(math.abs(p.rest_drain_mult - 0.7) < 1e-9, "Endurance 6: rest drains 30% slower")
-p.attrs.Speed, p.attrs.Endurance = 3, 3
-L.recompute_stats(p)
+print("3. traits: positives spend, negatives give back; start refused below 0")
+g = Game.new()
+local quick = #C.ATTRIBUTES + 1                   -- first trait row
+g.creator_cursor = quick
+press(g, SPACE, DOWN, SPACE)                      -- Quick + Hawk-Eyed (-6 of 5)
+assert(C.trait_points_left(g.player.traits) == -1 and g.player.max_mp == 3)
+press(g, ENTER)
+assert(g.screen == "creator", "must not start with trait points below 0")
+g.creator_cursor = #C.ATTRIBUTES + 6              -- Asthmatic (+3)
+press(g, SPACE)
+assert(C.trait_points_left(g.player.traits) == 2 and g.player.max_mp == 2)
+press(g, SPACE)                                   -- toggling off works too
+assert(not g.player.traits.Asthmatic)
 print("   OK")
 
-print("4. traits: budget, opposites exclude each other, effects apply")
-local by_id = {}
-for _, t in ipairs(L.TRAITS) do by_id[t.id] = t end
-g:creator_toggle(by_id.quick)
-assert(L.trait_budget(p.traits) == -3 and p.max_mp == 3)
-assert(g:creator_start() == false and g.screen == "creator", "can't start overspent")
-g:creator_toggle(by_id.asthmatic)          -- the opposite of Quick: replaces it
-assert(not p.traits.quick and p.traits.asthmatic and p.max_mp == 1)
-assert(L.trait_budget(p.traits) == 3)
-g:creator_toggle(by_id.scrounger); g:creator_toggle(by_id.packmule)
-assert(p.scav_rolls == 4 and g:bag_capacity() == 12, "Scrounger +1 find, Pack Mule +2 cells")
-assert(L.trait_budget(p.traits) == -1)
-g:creator_toggle(by_id.bigeater)
-assert(p.hunger_mult == 1.25 and L.trait_budget(p.traits) == 1)
-assert(g:creator_start() == true and g.screen == "map" and p.mp == p.max_mp)
-print("   OK")
-
-print("5. every trait does something (no labels with nothing behind them)")
-for _, t in ipairs(L.TRAITS) do
-    local q = Game.new().player
-    local before = {q.max_mp, q.sight, q.scav_rolls, q.bonus_cells, q.hunger_mult, q.rest_gain_mult}
-    q.traits[t.id] = true
-    L.recompute_stats(q)
-    local after = {q.max_mp, q.sight, q.scav_rolls, q.bonus_cells, q.hunger_mult, q.rest_gain_mult}
+print("4. every trait changes a derived stat (no labels with nothing behind them)")
+for _, t in ipairs(C.TRAITS) do
+    local p1, p2 = Game.new().player, Game.new().player
+    p2.traits[t.name] = true
+    C.recompute_stats(p2)
     local changed = false
-    for k = 1, #before do if before[k] ~= after[k] then changed = true end end
-    assert(changed, t.name .. " changes nothing")
+    for _, k in ipairs({"max_mp", "sight", "scav_rolls", "bag_bonus", "hunger_mult", "rest_gain_mult"}) do
+        if p1[k] ~= p2[k] then changed = true end
+    end
+    assert(changed, t.name .. " does nothing")
 end
 print("   OK")
 
-print("6. through the real main loop: lower Speed twice, raise Perception twice, start")
-local keys = {115, 0x82, 0x82, 115, 0x83, 0x83}   -- Down, Left x2, Down, Right x2
-for _ = 1, 12 do keys[#keys + 1] = 115 end        -- down to [ Start ]
-keys[#keys + 1] = 10
+print("5. starting applies the build: MP full, sight used for the fog")
+g = Game.new()
+g.creator_cursor = 3                              -- Perception
+g.player.attrs.Strength = 1                       -- free 2 points
+press(g, RIGHT, RIGHT, ENTER)
+assert(g.screen == "map" and g.player.sight == 3 and g.player.mp == g.player.max_mp)
+local far = 0
+for key in pairs(g.player.visible) do far = far + 1 end
+assert(far == 37, "sight 3 on the hex grid shows 37 tiles, got " .. far)
+print("   OK")
+
+print("6. the real main loop: creator first, Enter starts, the map follows")
 local i, texts = 0, {}
+local keys = {DOWN, DOWN, RIGHT, ENTER}           -- try raising Perception, then start
 local saved_getch, saved_exit, saved_text = gfx.getch, fake.should_exit, gfx.text
 gfx.getch = function() i = i + 1; if i > #keys then return 113 end; return keys[i] end
 fake.should_exit = function() return i > #keys + 5 end
 gfx.text = function(x, y, s) texts[#texts + 1] = s end
 dofile("wasteland_run.lua")
 gfx.getch, fake.should_exit, gfx.text = saved_getch, saved_exit, saved_text
-local function drew(needle)
-    for _, s in ipairs(texts) do if s:find(needle, 1, true) then return true end end
+local saw_creator, saw_map = false, false
+for _, s in ipairs(texts) do
+    if s == "Create your survivor" then saw_creator = true end
+    if s:find("F:scavenge", 1, true) then saw_map = true end
 end
-assert(drew("MP 1  Sight 3  Finds 3  Bag 12"), "creator preview should show the new stats")
-assert(drew("MP 1/1  Hrs 0  Sight 3"), "map HUD should use the chosen stats")
+assert(saw_creator and saw_map, "creator then map")
 print("   OK")
 
 print("\nCREATOR TESTS PASSED")

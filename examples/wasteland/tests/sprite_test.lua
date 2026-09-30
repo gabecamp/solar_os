@@ -58,11 +58,11 @@ game.player.q, game.player.r = 0, 0
 game.player.equipped.head = "cap"
 game.player.equipped.hands = "gloves"
 SPRITE_CALLS = {}
-game:draw_inventory(300, 400)
+game:draw_inventory(400, 300)
 print("4. draw_inventory issued " .. #SPRITE_CALLS .. " sprite calls (args validated by stub)")
 assert(#SPRITE_CALLS > 0)
 for _, c in ipairs(SPRITE_CALLS) do
-    assert(c.x >= 0 and c.y >= 0 and c.x + c.w <= 300 and c.y + c.h <= 400,
+    assert(c.x >= 0 and c.y >= 0 and c.x + c.w <= 400 and c.y + c.h <= 300,
         ("sprite off screen at %d,%d"):format(c.x, c.y))
 end
 -- expected: ground 4 + bag 2 + equipped (tshirt,jeans,boots,backpack,cap,gloves)
@@ -74,7 +74,7 @@ print("   count matches: 4 ground + 2 bag + 6 worn x 5 (halo) = 36, all on scree
 ITEM_DB.mystery = {name = "Mystery", slot = nil, consumable = nil}
 table.insert(game.player.inventory, {item = "mystery", qty = 1})
 SPRITE_CALLS = {}
-game:draw_inventory(300, 400)
+game:draw_inventory(400, 300)
 print("5. unknown item drew without error (letter fallback), sprites this frame: " .. #SPRITE_CALLS)
 
 -- 6. eyeball the art

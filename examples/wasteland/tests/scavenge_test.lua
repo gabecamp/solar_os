@@ -77,31 +77,32 @@ for terrain, table_ in pairs(LOOT) do
 end
 print("   OK")
 
-print("5. Perception: sharp eyes find more (fewer duds, more rolls)")
-local function finds(per)
-    local g3 = fresh("hills")
-    g3.player.attrs.Perception = per
-    local L2 = select(2, dofile("lib_layout.lua"))
-    L2.recompute_stats(g3.player)
-    for _ = 1, 500 do
-        g3.scavenged = {}
-        g3.player.mp = 2
-        g3:scavenge()
+print("4b. Perception: more finds per search and fewer duds as it rises")
+local _, C = dofile("lib_creator.lua")
+local function finds_per_search(per)
+    local g2 = fresh("hills")   -- the table with the most duds
+    g2.player.attrs.Perception = per
+    C.recompute_stats(g2.player)
+    for _ = 1, 600 do
+        g2.scavenged = {}
+        g2.player.mp = 2
+        g2:scavenge()
     end
-    return count(g3:ground_list()), g3.player.scav_rolls
+    return count(g2:ground_list()) / 600, g2.player.scav_rolls
 end
-local low, low_rolls = finds(1)
-local mid, mid_rolls = finds(3)
-local high, high_rolls = finds(6)
-print(("   500 searches on hills: Per 1 -> %d items (%d roll), Per 3 -> %d (%d), Per 6 -> %d (%d)")
-      :format(low, low_rolls, mid, mid_rolls, high, high_rolls))
-assert(low_rolls == 1 and mid_rolls == 2 and high_rolls == 3)
-assert(low < mid and mid < high, "higher Perception must find more")
+local low, low_rolls = finds_per_search(1)
+local mid, mid_rolls = finds_per_search(3)
+local high, high_rolls = finds_per_search(6)
+print(("   Per 1: %d rolls, %.2f items/search   Per 3: %d, %.2f   Per 6: %d, %.2f")
+      :format(low_rolls, low, mid_rolls, mid, high_rolls, high))
+assert(low_rolls == 1 and mid_rolls == ROLLS and high_rolls == ROLLS + 1)
+assert(low < mid and mid < high, "higher Perception should find more")
+assert(C.dud_percent(3) == 100 and C.dud_percent(6) == 25 and C.dud_percent(1) == 150)
 print("   OK")
 
-print("6. F on the map screen scavenges (real main loop)")
+print("5. F on the map screen scavenges (real main loop)")
 local i, texts = 0, {}
-local keys = {115,115,115,115,115,115,115,115,115,115,115,115,115,115, 10, 102}   -- creator: down to Start, Enter; then F
+local keys = {10, 102}   -- Enter: start with the default build, then F
 local saved_getch, saved_exit, saved_text = gfx.getch, fake.should_exit, gfx.text
 gfx.getch = function() i = i + 1; if i > #keys then return 113 end; return keys[i] end
 fake.should_exit = function() return i > #keys + 5 end

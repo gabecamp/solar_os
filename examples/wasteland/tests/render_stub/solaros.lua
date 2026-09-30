@@ -34,7 +34,7 @@ function gfx.sprite(x, y, w, h, data)
 end
 gfx.bitmap = gfx.sprite
 function gfx.refresh() end
-function gfx.size() return 300, 400 end
+function gfx.size() return 400, 300 end
 function gfx.getch() return nil end
 function M.should_exit() return true end
 function M.audio.tone() end

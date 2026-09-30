@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Render what the screens WOULD look like into ../previews/*.png (needs Pillow:
-# pip install pillow). This replays the game's gfx calls into a 300x400 image;
+# pip install pillow). This replays the game's gfx calls into a 400x300 image;
 # it does NOT reproduce the real RLCD's dithering, fonts, or refresh behaviour.
 set -euo pipefail
 cd "$(dirname "$0")"

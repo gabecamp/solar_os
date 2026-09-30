@@ -1,6 +1,6 @@
 package.path = "./?.lua;" .. package.path
 local solaros = require("solaros"); solaros.gfx.begin()
-local Game, TERRAIN, GLYPHS, GLYPH_ART, GW, GH, LEGEND_ORDER, LEGEND_Y, MAP_TOP, HEX_SIZE = dofile("lib_map.lua")
+local Game, TERRAIN, GLYPHS, GLYPH_ART, GW, GH, LEGEND_ORDER, LEGEND_Y, MAP_TOP, HEX_SIZE, MAP_W, MAP_BOTTOM, PANEL_X = dofile("lib_map.lua")
 
 -- 1. every terrain has a glyph and an ink color; legend lists every terrain exactly once
 local seen = {}
@@ -40,13 +40,13 @@ print("3. glyphs pack to 20 bytes and round-trip exactly")
 local g = Game.new()
 for key in pairs(g.tiles) do g.player.visible[key] = true; g.player.explored[key] = true end
 SPRITE_CALLS = {}
-g:draw_map(300, 400)
+g:draw_map(400, 300)
 local tiles = 0; for _ in pairs(g.tiles) do tiles = tiles + 1 end
 -- every tile except the player's gets a glyph, plus 4 in the legend
 assert(#SPRITE_CALLS == (tiles - 1) + 4, ("expected %d sprite calls, got %d"):format(tiles - 1 + 4, #SPRITE_CALLS))
 for _, c in ipairs(SPRITE_CALLS) do
     assert(c.w == GW and c.h == GH and #c.data == 20)
-    assert(c.x >= 0 and c.y >= 0 and c.x + c.w <= 300 and c.y + c.h <= 400, "glyph off screen")
+    assert(c.x >= 0 and c.y >= 0 and c.x + c.w <= 400 and c.y + c.h <= 300, "glyph off screen")
 end
 print(("4. full map drew %d glyphs (%d tiles - player tile + 4 legend), all on screen"):format(#SPRITE_CALLS, tiles))
 
@@ -54,11 +54,11 @@ print(("4. full map drew %d glyphs (%d tiles - player tile + 4 legend), all on s
 g = Game.new()
 g.player.visible = {}; g.player.explored = {}
 SPRITE_CALLS = {}
-g:draw_map(300, 400)
+g:draw_map(400, 300)
 assert(#SPRITE_CALLS == 4, "with nothing seen only the legend should draw, got " .. #SPRITE_CALLS)
 g.player.explored["1,0"] = true
 SPRITE_CALLS = {}
-g:draw_map(300, 400)
+g:draw_map(400, 300)
 assert(#SPRITE_CALLS == 5, "one remembered tile should add exactly one glyph")
 print("5. unseen tiles draw no glyph; remembered tiles draw one")
 
@@ -68,16 +68,17 @@ local longest = 0
 for i, id in ipairs(LEGEND_ORDER) do
     local t = TERRAIN[id]
     local detail = t.passable and (t.cost .. " MP") or "impassable"
-    local col = (i - 1) % 2
-    local right = 6 + col * 150 + 20 + 7 * #(t.name .. " " .. detail)
+    local right = PANEL_X + 2 + 20 + 7 * #(t.name .. " " .. detail)
     longest = math.max(longest, right)
 end
-assert(longest <= 296, "legend text runs off the screen: " .. longest)
-local origin_y = (MAP_TOP + LEGEND_Y - 4) // 2
+assert(longest <= 398, "legend text runs off the screen: " .. longest)
+local origin_y = (MAP_TOP + MAP_BOTTOM) // 2
 local lowest = origin_y + math.floor(HEX_SIZE * 1.5 * 4) + HEX_SIZE
 local highest = origin_y - math.floor(HEX_SIZE * 1.5 * 4) - HEX_SIZE
-assert(lowest < LEGEND_Y - 2, "map reaches y=" .. lowest .. " into the legend at " .. LEGEND_Y)
-assert(highest > 54, "map reaches y=" .. highest .. " into the HUD")
+assert(lowest <= MAP_BOTTOM and lowest < 300 - 52 - 9, "map reaches y=" .. lowest .. " into the log")
+assert(highest >= 0, "map reaches y=" .. highest .. " off the top")
+local widest = MAP_W // 2 + math.ceil(HEX_SIZE * math.sqrt(3) * 4.5)
+assert(widest < PANEL_X - 2, "map reaches x=" .. widest .. " into the panel at " .. PANEL_X)
 print(("6. legend text ends at x=%d (<=296); full map spans y=%d..%d (HUD ends ~54, legend starts %d)")
     :format(longest, highest, lowest, LEGEND_Y))
 
