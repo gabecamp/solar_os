@@ -102,7 +102,10 @@ function Game:draw_encounter(w, h)
     gfx.text(6, 16, e.def.name)
     gfx.font(gfx.FONT_MONO_12)
     for i, line in ipairs(e.intro) do gfx.text(6, 22 + 13 * i, line) end
-    gfx.line(6, 114, w - 6, 114)
+    self:draw_portrait(e, w - 102, 18)
+    gfx.color(gfx.BLACK)
+    gfx.font(gfx.FONT_MONO_12)
+    gfx.line(6, 114, w - 108, 114)
     for i, line in ipairs(e.msg) do gfx.text(6, 116 + 13 * i, line) end
     local status = "You " .. math.floor(p.health) .. " HP"
     if p.injuries.bleeding then status = status .. " bleeding" end

@@ -152,6 +152,16 @@ g.enc.cursor = 2
 g:draw_encounter(400, 300)
 solaros.dump("ops_encounter_fight.txt")
 
+-- Scenes 8b-8e: the portrait reacting - far, close, badly hurt, dead
+for _, st in ipairs({{"far", 1, nil}, {"close", 1, nil}, {"near", 0.2, nil}, {"near", 0, "dead"}}) do
+    g = fresh(); g:start_game()
+    start_named(g, "Jawhound")
+    g.enc.range, g.enc.hp, g.enc.outcome = st[1], math.floor(g.enc.def.hp * st[2]), st[3]
+    g.enc.seen = true
+    g:draw_encounter(400, 300)
+    solaros.dump("ops_portrait_" .. (st[3] or (st[2] < 1 and "hurt" or st[1])) .. ".txt")
+end
+
 -- Scene 9: a helper
 g = fresh(); g:start_game()
 start_named(g, "Old Medic")

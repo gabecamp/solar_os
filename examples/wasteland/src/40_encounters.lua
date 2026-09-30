@@ -1,6 +1,8 @@
 -- -- encounters -----------------------------------------------------------
 
 local ENC_COLS = 55            -- mono 12 is ~7 px/char: 55 chars fit 400 px
+-- the intro shares its lines with the 96 px portrait in the top-right corner
+local ENC_INTRO_COLS = (400 - 12 - 104) // 7
 local ENC_MSG_LINES = 4
 
 -- 0..n-1 from the LCG's high bits
@@ -37,7 +39,7 @@ end
 
 function Game:start_encounter(def)
     self.enc = {def = def, hp = def.hp, range = def.start or "far", msg = {},
-                intro = wrap(def.intro, ENC_COLS), cursor = 1, aim = 0,
+                intro = wrap(def.intro, ENC_INTRO_COLS), cursor = 1, aim = 0,
                 demanding = def.kind == "bandit"}
     if def.kind == "bandit" then self:enc_say(def.demand) end
     self.screen = "encounter"
@@ -121,6 +123,7 @@ end
 
 function Game:enemy_dies()
     local e = self.enc
+    e.outcome = "dead"            -- the portrait shows it
     local found = {}
     for _ = 1, e.def.loot_rolls or 1 do
         local item
@@ -145,6 +148,7 @@ function Game:enemy_turn()
     end
     if d.flees_at and e.hp <= d.flees_at and self:roll(ENEMY_FLEE_CHANCE) then
         self:enc_say("The " .. d.who .. " breaks away and flees.")
+        e.outcome = "fled"
         return self:end_encounter("The " .. d.who .. " fled.")
     end
     if e.range ~= "close" then

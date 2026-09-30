@@ -28,7 +28,8 @@ local function run_loop(keys, n)
     local saved_getch, saved_exit, saved_text = gfx.getch, fake.should_exit, gfx.text
     gfx.getch = function()
         i = i + 1
-        if i > n then return 113 end   -- Q
+        if i > n then handled = handled + 1; return 113 end   -- Q (a key too: on an
+        -- encounter screen it is not "quit", so it redraws like any other key)
         if keys[i] ~= nil then handled = handled + 1 end
         return keys[i]
     end

@@ -166,51 +166,52 @@ local ENEMY_FLEE_CHANCE = 30   -- % per turn a beaten enemy (hp <= flees_at) run
 -- hit %, speed (1-6 like your Speed), bleed % per hit, flees_at (hp), start
 -- range, loot {item, weight} rolled loot_rolls times, who = how the log and
 -- the fight text name it.
+-- art = its portrait in PORTRAIT_DATA (tools/paint_portraits.py paints them).
 local ENCOUNTERS = {
-    {kind = "animal", name = "Jawhound", who = "jawhound",
+    {kind = "animal", name = "Jawhound", art = "jawhound", who = "jawhound",
      intro = "A dog stands in the scrub. Its lower jaw has split into three, "
           .. "each ringed with teeth, and all three are working. It hasn't blinked "
           .. "since you saw it.",
      hp = 30, dmg = {6, 12}, hit = 60, speed = 4, bleed = 30, flees_at = 8, start = "far",
      loot = {{"strange_meat", 3}, {"nothing", 1}}, loot_rolls = 1},
-    {kind = "animal", name = "Skinless Boar", who = "boar",
+    {kind = "animal", name = "Skinless Boar", art = "boar", who = "boar",
      intro = "Something big roots in the dirt, wet and red all over: a boar with "
           .. "no hide, only muscle and gristle shining in the light. It smells you "
           .. "and lifts its head.",
      hp = 45, dmg = {8, 16}, hit = 50, speed = 3, bleed = 10, flees_at = 10, start = "far",
      loot = {{"strange_meat", 1}}, loot_rolls = 2},
-    {kind = "animal", name = "Knotted Crows", who = "crow-knot",
+    {kind = "animal", name = "Knotted Crows", art = "crows", who = "crow-knot",
      intro = "What you took for a bush is a mass of crows grown together at the "
           .. "wings. One body, dozens of heads, all of them turning toward you at once.",
      hp = 20, dmg = {3, 8}, hit = 70, speed = 5, bleed = 20, flees_at = 5, start = "near",
      loot = {{"strange_meat", 1}, {"nothing", 2}}, loot_rolls = 1},
-    {kind = "animal", name = "Crawling Stag", who = "stag",
+    {kind = "animal", name = "Crawling Stag", art = "stag", who = "stag",
      intro = "A stag picks its way toward you on seven legs. Its antlers have grown "
           .. "back into its skull, and the eyes beneath them look almost human.",
      hp = 40, dmg = {8, 18}, hit = 45, speed = 3, bleed = 15, flees_at = 10, start = "far",
      loot = {{"strange_meat", 2}, {"nothing", 1}}, loot_rolls = 2},
-    {kind = "mutant", name = "The Fused", who = "fused pair",
+    {kind = "mutant", name = "The Fused", art = "fused", who = "fused pair",
      intro = "Two people walk as one, joined at the ribs by a bridge of shared skin. "
           .. "They are whispering to each other about you. They agree on something, "
           .. "and turn.",
      talk = "Both mouths answer at once, in words that aren't words.",
      hp = 50, dmg = {8, 14}, hit = 50, speed = 2, bleed = 10, start = "far",
      loot = {{"cloth_scrap", 3}, {"canned_beans", 1}, {"nothing", 2}}, loot_rolls = 2},
-    {kind = "mutant", name = "Mouthless Man", who = "mouthless man",
+    {kind = "mutant", name = "Mouthless Man", art = "mouthless", who = "mouthless man",
      intro = "A man in a rotted raincoat. Where his mouth should be the skin has "
           .. "healed over smooth. He breathes through wet slits in his neck, faster "
           .. "now that he has seen you.",
      talk = "He tries to answer. The slits in his neck flutter uselessly.",
      hp = 35, dmg = {6, 12}, hit = 60, speed = 4, bleed = 15, start = "far",
      loot = {{"knife", 1}, {"cloth_scrap", 2}, {"nothing", 2}}, loot_rolls = 1},
-    {kind = "mutant", name = "The Bloom", who = "bloom",
+    {kind = "mutant", name = "The Bloom", art = "bloom", who = "bloom",
      intro = "A woman sits in the grass, covered in soft pink growths that swell "
           .. "and shrink as she breathes. She smiles with half a face, then stands "
           .. "up far too quickly.",
      talk = "'Stay,' she says, from somewhere inside the growths. 'Grow with us.'",
      hp = 40, dmg = {5, 10}, hit = 65, speed = 2, bleed = 0, start = "near",
      loot = {{"berries", 2}, {"water_bottle", 1}, {"nothing", 2}}, loot_rolls = 1},
-    {kind = "bandit", name = "Road Bandits", who = "bandit",
+    {kind = "bandit", name = "Road Bandits", art = "bandits", who = "bandit",
      intro = "Two figures step out from behind a wrecked car, one holding a knife "
           .. "low. 'Easy,' says the taller one. 'Nobody has to get hurt. That part "
           .. "is up to you.'",
@@ -218,18 +219,18 @@ local ENCOUNTERS = {
      hp = 35, dmg = {6, 12}, hit = 55, speed = 3, bleed = 25, flees_at = 8, start = "near",
      loot = {{"knife", 2}, {"canned_beans", 3}, {"water_bottle", 3}, {"jacket", 1},
              {"cloth_scrap", 2}}, loot_rolls = 2},
-    {kind = "bandit", name = "Toll Man", who = "toll man",
+    {kind = "bandit", name = "Toll Man", art = "tollman", who = "toll man",
      intro = "A thin man in a welding mask blocks the path, tapping a lead pipe "
           .. "against his leg. 'Toll road,' he says. 'Pay up or bleed.'",
      demand = "'Something to eat. That's the toll.'",
      hp = 30, dmg = {7, 14}, hit = 55, speed = 3, bleed = 5, flees_at = 6, start = "near",
      loot = {{"pipe", 3}, {"canned_beans", 2}, {"sunglasses", 1}}, loot_rolls = 2},
-    {kind = "helper", name = "Old Medic", who = "medic", help = "medic",
+    {kind = "helper", name = "Old Medic", art = "medic", who = "medic", help = "medic",
      intro = "An old woman with a red cross painted on her pack waves you over. Her "
           .. "eyes are clear and her hands are steady. 'You look like you could use "
           .. "some help.'",
      start = "near"},
-    {kind = "helper", name = "Wanderer", who = "wanderer", help = "wanderer",
+    {kind = "helper", name = "Wanderer", art = "wanderer", who = "wanderer", help = "wanderer",
      intro = "A man with a walking stick sits by a small fire and raises a hand. No "
           .. "weapon in sight. 'Sit a minute. I don't bite. Not like the rest of "
           .. "them out there.'",
@@ -238,23 +239,23 @@ local ENCOUNTERS = {
 -- anomalies: no fight. Investigate opens a random puzzle; finishing it has
 -- ARTIFACT_CHANCE of leaving an artifact, failing it hurts in odd ways.
 local ANOMALIES = {
-    {kind = "anomaly", name = "The Humming Hollow", who = "humming hollow",
+    {kind = "anomaly", name = "The Humming Hollow", art = "hollow", who = "humming hollow",
      intro = "The grass in this dip lies flat in a perfect spiral, and the air above "
           .. "it hums at a pitch you feel in your teeth. A crow lands at the edge and "
           .. "is folded into nothing without a sound."},
-    {kind = "anomaly", name = "The Drowned Bell", who = "drowned bell",
+    {kind = "anomaly", name = "The Drowned Bell", art = "bell", who = "drowned bell",
      intro = "A bell tolls somewhere beneath your feet, though there is no church for "
           .. "miles. With every stroke the ground ripples like water, and something "
           .. "far below answers it."},
-    {kind = "anomaly", name = "Wrong Stars", who = "wrong stars",
+    {kind = "anomaly", name = "Wrong Stars", art = "stars", who = "wrong stars",
      intro = "At midday a patch of sky above you goes black and fills with stars in "
           .. "shapes no one has named. You have the strong feeling that something up "
           .. "there has noticed you looking."},
-    {kind = "anomaly", name = "The Stillness", who = "stillness",
+    {kind = "anomaly", name = "The Stillness", art = "stillness", who = "stillness",
      intro = "Ahead, birds hang motionless in mid-flight and dust floats unmoving in "
           .. "the light. When you reach toward it, every sound stops, even your own "
           .. "heartbeat."},
-    {kind = "anomaly", name = "The Door in the Field", who = "door",
+    {kind = "anomaly", name = "The Door in the Field", art = "door", who = "door",
      intro = "A door frame stands alone in the field, no walls around it. Through it "
           .. "you see this same field, but at night, and someone standing in it, "
           .. "waiting for you."},

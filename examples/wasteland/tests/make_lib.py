@@ -11,7 +11,7 @@ Outputs (git-ignored, regenerated on every run):
   lib_layout.lua     -> bounds_test, regression_test (layout constants + INV_ROWS/INV_POS)
   lib_scavenge.lua   -> scavenge_test
   lib_creator.lua    -> creator_test, regression_test (stats, traits, slots)
-  lib_encounter.lua  -> encounter_test (health, injuries, weapons, encounters)
+  lib_encounter.lua  -> encounter_test, portrait_test (encounters and their art)
   wasteland_run.lua  -> full copy, run under the fake solaros by run_tests.sh / soak
 """
 import pathlib
@@ -55,6 +55,9 @@ lib = src[:cut]
           "ENCOUNTERS = ENCOUNTERS, ENCOUNTER_KINDS = ENCOUNTER_KINDS, ENC_COLS = ENC_COLS, "
           "wrap = wrap, ARTIFACTS = ARTIFACTS, BOLT_N = BOLT_N, BOLT_START = BOLT_START, "
           "BOLT_GOAL = BOLT_GOAL, BOLT_HAZARDS = BOLT_HAZARDS, SEQ_LENGTHS = SEQ_LENGTHS, "
-          "RUNE_N = RUNE_N, recompute_stats = recompute_stats}\n")
+          "RUNE_N = RUNE_N, recompute_stats = recompute_stats, "
+          "ENC_INTRO_COLS = ENC_INTRO_COLS, PORTRAIT_DATA = PORTRAIT_DATA, "
+          "PORTRAIT_CACHE = PORTRAIT_CACHE, portrait_view = portrait_view, "
+          "b64_decode = b64_decode, PORTRAIT_SIZE = PORTRAIT_SIZE}\n")
 (here / "wasteland_run.lua").write_text(src)
 print("generated lib_*.lua, wasteland_run.lua")

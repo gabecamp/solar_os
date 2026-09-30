@@ -94,9 +94,10 @@ assert(counts.helper and counts.helper / n < 0.06, "helpers must stay rare")
 
 print("7. text fits: intros <= 6 lines, every state has <= 7 options of <= 55 chars")
 for _, d in ipairs(E.ENCOUNTERS) do
-    local lines = E.wrap(d.intro, E.ENC_COLS)
+    -- the intro wraps narrower: it shares its lines with the portrait
+    local lines = E.wrap(d.intro, E.ENC_INTRO_COLS)
     assert(#lines <= 6, d.name .. " intro is " .. #lines .. " lines")
-    for _, l in ipairs(lines) do assert(#l <= E.ENC_COLS) end
+    for _, l in ipairs(lines) do assert(#l <= E.ENC_INTRO_COLS) end
     for _, range in ipairs({"far", "near", "close"}) do
         for _, hands in ipairs({{}, {rhand = "spear", lhand = "rock"}}) do
             g = fresh()
