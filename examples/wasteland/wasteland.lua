@@ -16,7 +16,10 @@ Controls:
                     the ground here - open the inventory to pick them up)
   Enter / Space   - inventory: pick up the item under the cursor, then press
                     again on a ground cell, bag cell or body slot to move it
-  E               - inventory: eat/drink ONE of the item under the cursor
+  E               - inventory: use the item under the cursor - eat/drink one,
+                    put it on, take it off, or hold it in a free hand
+  (creator)       - Up/Dn pick a row, Left/Right change an attribute,
+                    Enter toggles a trait / starts on [ Start ]
   I               - toggle inventory screen
   Q / ESC         - quit
 
@@ -67,13 +70,24 @@ local TERRAIN_WEIGHTS = {
     {"plains", 45}, {"forest", 30}, {"hills", 18}, {"water", 7},
 }
 
-local BACKPACK_CAP = 16      -- stacks; the bag strip shows all of them
+local BACKPACK_CAP = 16      -- most bag cells the screen can show
+local POCKET_CELLS = 4       -- bag cells with nothing on your back
 
 -- Also the cursor order on the paperdoll: top of the body to the bottom.
 local EQUIP_SLOTS = {
-    "head", "ears", "eyes", "neck", "jacket",
-    "shirt", "hands", "wrists", "pants", "feet",
+    "head", "ears", "eyes", "neck", "jacket", "back",
+    "shirt", "hands", "wrists", "lhand", "rhand", "pants", "feet",
 }
+-- slots that hold anything (you carry it rather than wear it)
+local HAND_SLOTS = {lhand = true, rhand = true}
+-- slot names for messages and empty slots (the short form when a box is small)
+local EQUIP_NAME = {head = "Head", ears = "Ears", eyes = "Eyes", neck = "Neck",
+                    jacket = "Jacket", back = "Back", shirt = "Shirt", hands = "Gloves",
+                    wrists = "Wrists", lhand = "L.Hand", rhand = "R.Hand",
+                    pants = "Pants", feet = "Feet"}
+local EQUIP_ABBR = {head = "Hd", ears = "Ea", eyes = "Ey", neck = "Nk", jacket = "Jk",
+                    back = "Bk", shirt = "Sh", hands = "Gl", wrists = "Wr",
+                    lhand = "LH", rhand = "RH", pants = "Pt", feet = "Ft"}
 
 local ITEM_DB = {
     -- wear: what the item paints on the paperdoll when worn - {body part,
@@ -104,6 +118,11 @@ local ITEM_DB = {
                             {"arms", 150, 232, "BLACK"}}},
     bracers      = {name = "Bracers",      slot = "wrists", consumable = nil,
                     wear = {{"arms", 222, 233, "BLACK"}}},
+    -- bag_cells: how many bag cells you get while this is on your back
+    backpack     = {name = "Backpack",     slot = "back",  consumable = nil, bag_cells = 12,
+                    wear = {{"torso", 147, 196, "BLACK", 9, 13}}},
+    satchel      = {name = "Satchel",      slot = "back",  consumable = nil, bag_cells = 8,
+                    wear = {{"torso", 147, 200, "BLACK", 11, 13}}},
     canned_beans = {name = "Canned Beans", slot = nil, consumable = {hunger = 40}},
     water_bottle = {name = "Water Bottle", slot = nil, consumable = {thirst = 50}},
     berries      = {name = "Wild Berries", slot = nil, consumable = {hunger = 15, thirst = 5}},
@@ -116,7 +135,8 @@ local ITEM_DB = {
 -- gear, hills are rock and whatever hikers left behind.
 local SCAVENGE_LOOT = {
     plains = {{"nothing", 8}, {"rock", 3}, {"cloth_scrap", 4}, {"canned_beans", 3},
-              {"water_bottle", 3}, {"cap", 1}, {"sunglasses", 1}, {"gloves", 1}},
+              {"water_bottle", 3}, {"cap", 1}, {"sunglasses", 1}, {"gloves", 1},
+              {"satchel", 1}},
     forest = {{"nothing", 7}, {"berries", 6}, {"cloth_scrap", 2}, {"water_bottle", 2},
               {"scarf", 1}, {"earmuffs", 1}, {"gloves", 1}},
     hills  = {{"nothing", 9}, {"rock", 6}, {"water_bottle", 2}, {"canned_beans", 1},
@@ -125,7 +145,7 @@ local SCAVENGE_LOOT = {
 
 -- Worn gear that is scattered around the map (the starting clothes aren't).
 local WORLD_WEARABLES = {"cap", "gloves", "earmuffs", "sunglasses", "scarf",
-                         "jacket", "bracers"}
+                         "jacket", "bracers", "satchel"}
 
 -- ---------------------------------------------------------------------
 -- Item sprites (16x16, 1-bit)
@@ -334,6 +354,42 @@ local SPRITE_ART = {
         "....#####.......",
         ".....###........",
         "................",
+        "................",
+        "................",
+    },
+    backpack = {
+        "................",
+        ".....######.....",
+        "....#......#....",
+        "..############..",
+        ".##############.",
+        ".##..........##.",
+        ".##.########.##.",
+        ".##.#......#.##.",
+        ".##.########.##.",
+        ".##############.",
+        ".##############.",
+        ".##############.",
+        ".##############.",
+        "..############..",
+        "................",
+        "................",
+    },
+    satchel = {
+        "................",
+        "..#.............",
+        "...#............",
+        "....#...........",
+        ".....#..........",
+        "......#.........",
+        ".......#........",
+        "..###########...",
+        ".#############..",
+        ".#############..",
+        ".######.######..",
+        ".#############..",
+        ".#############..",
+        "..###########...",
         "................",
         "................",
     },
@@ -640,6 +696,75 @@ local function generate_world(seed)
     return tiles, ground, seed
 end
 
+-- Character creation: NEO Scavenger-style point buy plus a Project Zomboid-
+-- style trait budget (positives cost points, negatives give them back).
+-- Every attribute and trait changes something real (see recompute_stats).
+local ATTRIBUTES = {"Strength", "Speed", "Perception", "Endurance"}
+local ATTR_MIN, ATTR_MAX, ATTR_START, ATTR_POOL = 1, 6, 3, 12
+local ATTR_HELP = {
+    Strength = "+/-1 bag cell per point from 3",
+    Speed = "+1 MP at 5, -1 MP at 1-2",
+    Perception = "Sight, and scavenging finds",
+    Endurance = "Rest drains 10% slower per point",
+}
+-- cost > 0 spends trait points, cost < 0 gives them; opp = the trait it
+-- can't be taken with (picking one drops the other)
+local TRAITS = {
+    {id = "quick",      name = "Quick",        cost = 3,  desc = "+1 MP",              fx = {mp = 1},          opp = "asthmatic"},
+    {id = "hawk",       name = "Hawk-Eyed",    cost = 3,  desc = "+1 sight",           fx = {sight = 1},       opp = "nearsight"},
+    {id = "scrounger",  name = "Scrounger",    cost = 2,  desc = "+1 find per search", fx = {rolls = 1},       opp = "careless"},
+    {id = "lighteater", name = "Light Eater",  cost = 2,  desc = "Hunger 25% slower",  fx = {hunger = 0.75},   opp = "bigeater"},
+    {id = "packmule",   name = "Pack Mule",    cost = 2,  desc = "+2 bag cells",       fx = {cells = 2}},
+    {id = "asthmatic",  name = "Asthmatic",    cost = -3, desc = "-1 MP",              fx = {mp = -1},         opp = "quick"},
+    {id = "nearsight",  name = "Near-Sighted", cost = -3, desc = "-1 sight",           fx = {sight = -1},      opp = "hawk"},
+    {id = "careless",   name = "Careless",     cost = -2, desc = "-1 find per search", fx = {rolls = -1},      opp = "scrounger"},
+    {id = "bigeater",   name = "Big Eater",    cost = -2, desc = "Hunger 25% faster",  fx = {hunger = 1.25},   opp = "lighteater"},
+    {id = "insomniac",  name = "Insomniac",    cost = -2, desc = "Rests 25% weaker",   fx = {rest_gain = 0.75}},
+}
+
+local function attr_points_left(attrs)
+    local used = 0
+    for _, a in ipairs(ATTRIBUTES) do used = used + attrs[a] end
+    return ATTR_POOL - used
+end
+
+-- Trait points left: starts at 0; positives spend, negatives refund.
+local function trait_budget(traits)
+    local left = 0
+    for _, t in ipairs(TRAITS) do
+        if traits[t.id] then left = left - t.cost end
+    end
+    return left
+end
+
+-- Derived stats from attributes + traits (formulas from the Python version's
+-- player.py where it had them).
+local function recompute_stats(p)
+    local a = p.attrs
+    local mp = BASE_MAX_MP + (a.Speed - 3) // 2
+    local sight = BASE_SIGHT + (a.Perception - 3) // 2
+    local rolls = SCAVENGE_ROLLS + (a.Perception - 3) // 2
+    local cells = a.Strength - 3
+    local hunger, rest_gain = 1, 1
+    for _, t in ipairs(TRAITS) do
+        if p.traits[t.id] then
+            mp = mp + (t.fx.mp or 0)
+            sight = sight + (t.fx.sight or 0)
+            rolls = rolls + (t.fx.rolls or 0)
+            cells = cells + (t.fx.cells or 0)
+            hunger = hunger * (t.fx.hunger or 1)
+            rest_gain = rest_gain * (t.fx.rest_gain or 1)
+        end
+    end
+    p.max_mp = math.max(1, mp)
+    p.sight = math.max(1, sight)
+    p.scav_rolls = math.max(1, rolls)
+    p.bonus_cells = cells
+    p.hunger_mult = hunger
+    p.rest_gain_mult = rest_gain
+    p.rest_drain_mult = 1 - 0.1 * (a.Endurance - 3)
+end
+
 local function new_player()
     return {
         q = 0, r = 0,
@@ -648,7 +773,10 @@ local function new_player()
         sight = BASE_SIGHT,
         hours = 0,
         needs = {hunger = 100, thirst = 100, rest = 100},
-        equipped = {shirt = "tshirt", pants = "jeans", feet = "boots"},
+        attrs = {Strength = ATTR_START, Speed = ATTR_START,
+                 Perception = ATTR_START, Endurance = ATTR_START},
+        traits = {},
+        equipped = {shirt = "tshirt", pants = "jeans", feet = "boots", back = "backpack"},
         inventory = {
             {item = "water_bottle", qty = 1},
             {item = "canned_beans", qty = 1},
@@ -656,6 +784,13 @@ local function new_player()
         explored = {},
         visible = {},
     }
+end
+
+local function new_player_with_stats()
+    local p = new_player()
+    recompute_stats(p)
+    p.mp = p.max_mp
+    return p
 end
 
 local function update_visibility(player, tiles)
@@ -672,16 +807,20 @@ end
 
 local function clamp(v) return math.max(0, math.min(100, v)) end
 
+-- hunger_mult / rest_drain_mult / rest_gain_mult come from recompute_stats
+-- (traits, Endurance); they default to 1 for a player built without it.
 local function apply_awake_hours(player, hours)
-    player.needs.hunger = clamp(player.needs.hunger - hours * (100 / 72))
+    local hm, rm = player.hunger_mult or 1, player.rest_drain_mult or 1
+    player.needs.hunger = clamp(player.needs.hunger - hours * (100 / 72) * hm)
     player.needs.thirst = clamp(player.needs.thirst - hours * (100 / 48))
-    player.needs.rest = clamp(player.needs.rest - hours * (100 / 18))
+    player.needs.rest = clamp(player.needs.rest - hours * (100 / 18) * rm)
 end
 
 local function apply_rest_hours(player, hours)
-    player.needs.hunger = clamp(player.needs.hunger - hours * (100 / 72) * 0.5)
+    local hm, gm = player.hunger_mult or 1, player.rest_gain_mult or 1
+    player.needs.hunger = clamp(player.needs.hunger - hours * (100 / 72) * 0.5 * hm)
     player.needs.thirst = clamp(player.needs.thirst - hours * (100 / 48) * 0.5)
-    player.needs.rest = clamp(player.needs.rest + hours * (100 / 6))
+    player.needs.rest = clamp(player.needs.rest + hours * (100 / 6) * gm)
 end
 
 local function effective_max_mp(player)
@@ -713,9 +852,10 @@ function Game.new()
     self.tiles, self.ground, seed = generate_world(seed)
     self.seed = seed             -- RNG state for scavenging
     self.scavenged = {}          -- tile key -> searches used
-    self.player = new_player()
+    self.player = new_player_with_stats()
     update_visibility(self.player, self.tiles)
-    self.screen = "map"          -- "map" or "inventory"
+    self.screen = "creator"      -- "creator", then "map" or "inventory"
+    self.creator = {cursor = 1, msg = nil}
     self.log = {"You wake up in the wasteland."}
     self.inv_cursor = 1
     self.inv_selected = nil      -- {"ground"|"inventory"|"equip", key}
@@ -805,10 +945,20 @@ function Game:scavenge()
     apply_awake_hours(p, SCAVENGE_HOURS)
     self.scavenged[key] = (self.scavenged[key] or 0) + 1
 
+    -- Perception: sharper eyes mean fewer dud rolls (the "nothing" weight is
+    -- scaled by (7 - Per) / 4: x1 at 3, x1/4 at 6, x1.5 at 1) and more
+    -- rolls (scav_rolls, from recompute_stats)
+    local per = p.attrs and p.attrs.Perception or ATTR_START
+    local table_ = {}
+    for i, entry in ipairs(loot) do
+        local w = entry[2]
+        if entry[1] == "nothing" then w = math.max(1, w * (7 - per) // 4) end
+        table_[i] = {entry[1], w}
+    end
     local found = {}
-    for _ = 1, SCAVENGE_ROLLS do
+    for _ = 1, p.scav_rolls or SCAVENGE_ROLLS do
         local item
-        self.seed, item = weighted_pick(self.seed, loot)
+        self.seed, item = weighted_pick(self.seed, table_)
         if item ~= "nothing" then
             self:put_stack("ground", nil, {item = item, qty = 1})
             found[#found + 1] = ITEM_DB[item].name
@@ -884,26 +1034,36 @@ local function add_to_list(list, stack, cap)
     return true
 end
 
+-- Bag cells available: what's on your back (or just pockets), plus Strength
+-- and Pack Mule, within what the screen can show.
+function Game:bag_capacity()
+    local p = self.player
+    local back = p.equipped.back
+    local base = back and ITEM_DB[back].bag_cells or POCKET_CELLS
+    return math.max(2, math.min(BACKPACK_CAP, base + (p.bonus_cells or 0)))
+end
+
 function Game:put_stack(kind, k, stack)
+    local cap = self:bag_capacity()
     if kind == "ground" then
         add_to_list(self:ground_list(), stack)
         return true
     elseif kind == "inventory" then
-        if not add_to_list(self.player.inventory, stack, BACKPACK_CAP) then
-            self:push_log("Backpack full.")
+        if not add_to_list(self.player.inventory, stack, cap) then
+            self:push_log("Bag full.")
             return false
         end
         return true
     elseif kind == "equip" then
         local def = ITEM_DB[stack.item]
-        if def.slot ~= k then
-            self:push_log(def.name .. " can't go in " .. k .. ".")
+        if def.slot ~= k and not HAND_SLOTS[k] then
+            self:push_log(def.name .. " can't go in " .. EQUIP_NAME[k] .. ".")
             return false
         end
         local current = self.player.equipped[k]
         if current then
             local old = {item = current, qty = 1}
-            if not add_to_list(self.player.inventory, old, BACKPACK_CAP) then
+            if not add_to_list(self.player.inventory, old, cap) then
                 add_to_list(self:ground_list(), old)
                 self:push_log("Bag full: " .. ITEM_DB[current].name .. " dropped.")
             end
@@ -912,7 +1072,7 @@ function Game:put_stack(kind, k, stack)
         -- equipping takes one; anything else in the stack goes to the bag
         if stack.qty > 1 then
             local rest = {item = stack.item, qty = stack.qty - 1}
-            if not add_to_list(self.player.inventory, rest, BACKPACK_CAP) then
+            if not add_to_list(self.player.inventory, rest, cap) then
                 add_to_list(self:ground_list(), rest)
             end
         end
@@ -931,18 +1091,45 @@ function Game:restore_stack(kind, k, stack)
     end
 end
 
+-- Copy of everything a move can touch, so a move that would leave the bag
+-- holding more than it can (swapping to a smaller bag) can be undone whole.
+function Game:snapshot()
+    local function copy(list)
+        local out = {}
+        for i, st in ipairs(list) do out[i] = {item = st.item, qty = st.qty} end
+        return out
+    end
+    local eq = {}
+    for k, v in pairs(self.player.equipped) do eq[k] = v end
+    return {inv = copy(self.player.inventory), ground = copy(self:ground_list()), eq = eq}
+end
+
+function Game:restore(snap)
+    self.player.inventory = snap.inv
+    self.ground[hex_key(self.player.q, self.player.r)] = snap.ground
+    self.player.equipped = snap.eq
+end
+
+-- Returns true when the item moved.
 function Game:try_transfer(source, dest)
     local s_kind, s_key = source[1], source[2]
     local d_kind, d_key = dest[1], dest[2]
-    if s_kind == d_kind and s_key == d_key then return end
+    if s_kind == d_kind and s_key == d_key then return false end
+    local snap = self:snapshot()
     local stack = self:remove_stack(s_kind, s_key)
-    if not stack then return end
+    if not stack then return false end
     local ok = self:put_stack(d_kind, d_key, stack)
     if not ok then
         self:restore_stack(s_kind, s_key, stack)
-    else
-        self:push_log("Moved " .. ITEM_DB[stack.item].name .. ".")
+        return false
     end
+    if #self.player.inventory > self:bag_capacity() then
+        self:restore(snap)
+        self:push_log("Bag too small - empty it first.")
+        return false
+    end
+    self:push_log("Moved " .. ITEM_DB[stack.item].name .. ".")
+    return true
 end
 
 function Game:try_consume(kind, k)
@@ -962,6 +1149,33 @@ function Game:try_consume(kind, k)
         self:remove_stack(kind, k)
     end
     self:push_log("Consumed " .. def.name .. ".")
+end
+
+-- E on the inventory screen: do the obvious thing with what's under the
+-- cursor. Food/drink: eat or drink one. Something worn/held: take it off
+-- into the bag. Wearable in the bag or on the ground: put it on (swapping
+-- out whatever was there). Anything else: hold it in a free hand.
+function Game:use(kind, k)
+    local stack = self:get_stack(kind, k)
+    if not stack then return end
+    local def = ITEM_DB[stack.item]
+    if def.consumable then
+        self:try_consume(kind, k)
+    elseif kind == "equip" then
+        if self:try_transfer({"equip", k}, {"inventory"}) then
+            self:push_log("Took off " .. def.name .. ".")
+        end
+    elseif def.slot then
+        if self:try_transfer({kind, k}, {"equip", def.slot}) then
+            self:push_log("Put on " .. def.name .. ".")
+        end
+    else
+        local hand = "rhand"
+        if self.player.equipped.rhand and not self.player.equipped.lhand then hand = "lhand" end
+        if self:try_transfer({kind, k}, {"equip", hand}) then
+            self:push_log("Holding " .. def.name .. ".")
+        end
+    end
 end
 
 -- ---------------------------------------------------------------------
@@ -1159,28 +1373,28 @@ local EQUIP_RECT = {
     neck   = {140, 105, 20, 18},   -- throat / collar
     jacket = {116, 126, 68, 38},   -- chest and shoulders
     shirt  = {124, 167, 52, 36},   -- belly
-    hands  = { 73, 219, 22, 22},   -- the left hand
-    wrists = {205, 202, 22, 20},   -- the right wrist
+    back   = {230, 118, 40, 40},   -- beside the shoulder: what's on your back
+    hands  = { 73, 212, 22, 22},   -- gloves, on the left hand/forearm
+    wrists = {205, 212, 22, 22},   -- the right wrist
+    lhand  = { 70, 236, 24, 24},   -- held in the left hand (anything)
+    rhand  = {206, 236, 24, 24},   -- held in the right hand (anything)
     pants  = {122, 206, 56, 58},   -- hips and legs
-    feet   = {120, 267, 60, 20},   -- both feet
+    feet   = {120, 267, 60, 19},   -- both feet
 }
--- shown inside an empty slot; the long form when it fits the box
-local EQUIP_NAME = {head = "Head", ears = "Ears", eyes = "Eyes", neck = "Neck",
-                    jacket = "Jacket", shirt = "Shirt", hands = "Hands",
-                    wrists = "Wrists", pants = "Pants", feet = "Feet"}
-local EQUIP_ABBR = {head = "Hd", ears = "Ea", eyes = "Ey", neck = "Nk", jacket = "Jk",
-                    shirt = "Sh", hands = "Hn", wrists = "Wr", pants = "Pt", feet = "Ft"}
 
 local GROUND_GRID_COLS = 9
 local GROUND_GRID_ROWS = 1   -- visible rows; the grid scrolls to follow the cursor
 local GROUND_CELL, GROUND_GAP = 30, 2
 local GROUND_Y = 30
--- bag: BACKPACK_CAP cells in two rows, all visible
+-- bag: up to BACKPACK_CAP cells in two rows, all visible
 local BACKPACK_COLS = 8
-local BACKPACK_CELL, BACKPACK_GAP = 26, 2
-local BACKPACK_Y = 318
-local CONDITIONS_Y = 300
-local INV_LOG_Y, INV_LOG_LINES = 385, 2
+local BACKPACK_CELL, BACKPACK_GAP = 22, 2
+local BACKPACK_Y = 314
+local CONDITIONS_Y = 297
+-- The log sits on the last lines of the REPORTED screen height (like the map
+-- screen's key hint at h - 8), not at fixed y: on the device the bottom of a
+-- fixed 400px layout got cut off.
+local INV_LOG_LINES, INV_LOG_BOTTOM, INV_LOG_STEP = 2, 8, 12
 
 local function item_abbr(item_id)
     return ITEM_DB[item_id].name:sub(1, 1)
@@ -1420,8 +1634,8 @@ local function paint_part(part, src_y0, src_y1, color, inner, outer)
 end
 
 -- Draw order for painting worn items: under-layers before over-layers.
-local WEAR_ORDER = {"shirt", "pants", "jacket", "feet", "hands", "head", "neck",
-                    "wrists", "eyes", "ears"}
+local WEAR_ORDER = {"shirt", "pants", "jacket", "back", "feet", "hands", "head",
+                    "neck", "wrists", "eyes", "ears"}
 
 function Game:draw_silhouette()
     -- pass 1: outline (every block grown by 1px, black)
@@ -1536,7 +1750,7 @@ function Game:draw_inventory(w, h)
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
     gfx.font(gfx.FONT_MONO_12)
-    gfx.text(4, 12, "Up/Dn Enter:move E:eat/drink I:map")
+    gfx.text(4, 12, "Arrows Enter:move E:use I:map")
 
     INV_ROWS = {}
     INV_POS = {}
@@ -1548,13 +1762,15 @@ function Game:draw_inventory(w, h)
     end
 
     -- ground items grid. Every ground stack is a cursor row (ground rows come
-    -- first, so cursor index == ground index), but only GROUND_GRID_ROWS rows
-    -- of cells fit above the paperdoll: scroll the window to keep the cursor
-    -- in view and give off-screen stacks no position.
+    -- first, so cursor index == ground index), plus one empty cell after them
+    -- to drop things into. Only GROUND_GRID_ROWS rows of cells fit above the
+    -- paperdoll: scroll the window to keep the cursor in view and give
+    -- off-screen cells no position.
     local ground = self:ground_list()
+    local ncells = #ground + 1
     local per_page = GROUND_GRID_COLS * GROUND_GRID_ROWS
     local off = self.ground_off or 0
-    if self.inv_cursor <= #ground then
+    if self.inv_cursor <= ncells then
         local crow = (self.inv_cursor - 1) // GROUND_GRID_COLS
         local first = off // GROUND_GRID_COLS
         if crow < first then
@@ -1563,7 +1779,7 @@ function Game:draw_inventory(w, h)
             off = (crow - GROUND_GRID_ROWS + 1) * GROUND_GRID_COLS
         end
     end
-    local total_rows = (#ground + GROUND_GRID_COLS - 1) // GROUND_GRID_COLS
+    local total_rows = (ncells + GROUND_GRID_COLS - 1) // GROUND_GRID_COLS
     off = math.max(0, math.min(off, (total_rows - GROUND_GRID_ROWS) * GROUND_GRID_COLS))
     self.ground_off = off
     local label = "Ground"
@@ -1572,7 +1788,7 @@ function Game:draw_inventory(w, h)
             .. "/" .. #ground
     end
     gfx.text(4, 26, label)
-    for i, _ in ipairs(ground) do
+    for i = 1, ncells do
         if i > off and i <= off + per_page then
             local col = (i - off - 1) % GROUND_GRID_COLS
             local row = (i - off - 1) // GROUND_GRID_COLS
@@ -1590,13 +1806,25 @@ function Game:draw_inventory(w, h)
         add_row("equip", slot, r[1], r[2], r[3], r[4])
     end
 
-    -- backpack: two rows of cells
-    for i, _ in ipairs(self.player.inventory) do
+    -- bag: one cell per bag slot you have (bag_capacity), in two rows. Stacks
+    -- and the first free cell (a drop target) are cursor rows; the rest of
+    -- the free cells are drawn as plain empty boxes.
+    local cap = self:bag_capacity()
+    local function bag_cell(i)
         local col = (i - 1) % BACKPACK_COLS
         local row = (i - 1) // BACKPACK_COLS
-        local x = 6 + col * (BACKPACK_CELL + BACKPACK_GAP)
-        local y = BACKPACK_Y + row * (BACKPACK_CELL + BACKPACK_GAP)
+        return 6 + col * (BACKPACK_CELL + BACKPACK_GAP),
+               BACKPACK_Y + row * (BACKPACK_CELL + BACKPACK_GAP)
+    end
+    local ninv = #self.player.inventory
+    -- (never hide stacks: if the bag somehow holds more than it should, show them)
+    for i = 1, math.min(BACKPACK_CAP, math.max(ninv, math.min(cap, ninv + 1))) do
+        local x, y = bag_cell(i)
         add_row("inventory", i, x, y, BACKPACK_CELL, BACKPACK_CELL)
+    end
+    for i = ninv + 2, cap do
+        local x, y = bag_cell(i)
+        self:draw_slot_box(x, y, BACKPACK_CELL, BACKPACK_CELL, nil, false, false)
     end
 
     self.inv_cursor = math.max(1, math.min(self.inv_cursor, #INV_ROWS))
@@ -1634,17 +1862,150 @@ function Game:draw_inventory(w, h)
     gfx.text(296 - 7 * #desc, 26, desc)
 
     gfx.color(gfx.BLACK)
-    gfx.text(6, BACKPACK_Y - 5, "Bag " .. #self.player.inventory .. "/" .. BACKPACK_CAP)
+    local back = self.player.equipped.back
+    gfx.text(6, BACKPACK_Y - 5, (back and ITEM_DB[back].name or "Pockets") .. " "
+        .. #self.player.inventory .. "/" .. cap)
 
-    -- log: the bag's second row ends at BACKPACK_Y + 54 = 372, so only the
-    -- newest INV_LOG_LINES lines fit below it
-    local ly = INV_LOG_Y
+    -- log: the newest INV_LOG_LINES lines, bottom line at h - INV_LOG_BOTTOM
+    local ly = h - INV_LOG_BOTTOM - INV_LOG_STEP * (INV_LOG_LINES - 1)
     local start_i = math.max(1, #self.log - INV_LOG_LINES + 1)
     for i = start_i, #self.log do
         gfx.text(4, ly, self.log[i])
-        ly = ly + 12
+        ly = ly + INV_LOG_STEP
     end
 
+    gfx.refresh()
+end
+
+-- ---------------------------------------------------------------------
+-- Character creator (first screen). Rows: the 4 attributes, the traits,
+-- then "Start". The player's attrs/traits are edited in place and the
+-- derived stats are recomputed after every change, so the preview is live.
+-- ---------------------------------------------------------------------
+
+local CREATOR_ROWS = #ATTRIBUTES + #TRAITS + 1
+local CREATOR_ATTR_Y, CREATOR_TRAIT_Y, CREATOR_ROW_H = 48, 126, 14
+
+function Game:creator_row()
+    local c = self.creator.cursor
+    if c <= #ATTRIBUTES then return "attr", ATTRIBUTES[c] end
+    c = c - #ATTRIBUTES
+    if c <= #TRAITS then return "trait", TRAITS[c] end
+    return "start"
+end
+
+function Game:creator_adjust(delta)
+    local kind, name = self:creator_row()
+    if kind ~= "attr" then return end
+    local a = self.player.attrs
+    local v = a[name] + delta
+    if v < ATTR_MIN or v > ATTR_MAX then return end
+    if delta > 0 and attr_points_left(a) <= 0 then
+        self.creator.msg = "No points left: lower another first."
+        return
+    end
+    a[name] = v
+    self.creator.msg = nil
+    recompute_stats(self.player)
+end
+
+function Game:creator_toggle(t)
+    local traits = self.player.traits
+    if traits[t.id] then
+        traits[t.id] = nil
+    else
+        traits[t.id] = true
+        if t.opp then traits[t.opp] = nil end
+    end
+    self.creator.msg = nil
+    recompute_stats(self.player)
+end
+
+-- Begin the game; refused while the trait points are overspent.
+function Game:creator_start()
+    if trait_budget(self.player.traits) < 0 then
+        self.creator.msg = "Trait points below 0: add a flaw or drop a perk."
+        return false
+    end
+    local p = self.player
+    recompute_stats(p)
+    p.mp = p.max_mp
+    update_visibility(p, self.tiles)
+    self.screen = "map"
+    return true
+end
+
+function Game:draw_creator(w, h)
+    gfx.clear(gfx.WHITE)
+    local p = self.player
+    local cursor = self.creator.cursor
+
+    -- one row of the list; the cursor row is drawn inverted
+    local function row_text(i, y, x, text)
+        if i == cursor then
+            gfx.color(gfx.BLACK)
+            gfx.fill_rect(2, y - 11, w - 4, CREATOR_ROW_H)
+            gfx.color(gfx.WHITE)
+        else
+            gfx.color(gfx.BLACK)
+        end
+        gfx.text(x, y, text)
+    end
+
+    gfx.color(gfx.BLACK)
+    gfx.font(gfx.FONT_BOLD_14)
+    gfx.text(6, 16, "New Survivor")
+    gfx.font(gfx.FONT_MONO_12)
+    gfx.text(6, 34, "Attributes      points left " .. attr_points_left(p.attrs))
+
+    for i, name in ipairs(ATTRIBUTES) do
+        local y = CREATOR_ATTR_Y + (i - 1) * CREATOR_ROW_H
+        local v = p.attrs[name]
+        row_text(i, y, 8, name)
+        -- 6-cell bar: filled cells = value
+        for c = 1, ATTR_MAX do
+            local bx = 120 + (c - 1) * 12
+            if c <= v then
+                gfx.fill_rect(bx, y - 9, 10, 9)
+            else
+                gfx.rect(bx, y - 9, 10, 9)
+            end
+        end
+        gfx.text(198, y, tostring(v))
+    end
+
+    gfx.color(gfx.BLACK)
+    gfx.text(6, CREATOR_TRAIT_Y - 14, "Traits          points left " .. trait_budget(p.traits))
+    for i, t in ipairs(TRAITS) do
+        local idx = #ATTRIBUTES + i
+        local y = CREATOR_TRAIT_Y + (i - 1) * CREATOR_ROW_H
+        row_text(idx, y, 8, (p.traits[t.id] and "[x] " or "[ ] ") .. t.name)
+        gfx.text(124, y, t.desc)
+        local cost = (t.cost > 0 and "-" or "+") .. math.abs(t.cost)
+        gfx.text(w - 6 - 7 * #cost, y, cost)
+    end
+
+    local start_y = CREATOR_TRAIT_Y + #TRAITS * CREATOR_ROW_H + 6
+    row_text(CREATOR_ROWS, start_y, w // 2 - 28, "[ Start ]")
+
+    -- live preview of what the choices add up to
+    gfx.color(gfx.BLACK)
+    gfx.line(6, start_y + 8, w - 6, start_y + 8)
+    gfx.text(6, start_y + 24, "MP " .. p.max_mp .. "  Sight " .. p.sight
+        .. "  Finds " .. p.scav_rolls .. "  Bag " .. self:bag_capacity())
+    local kind, what = self:creator_row()
+    local help
+    if kind == "attr" then
+        help = what .. ": " .. ATTR_HELP[what]
+    elseif kind == "trait" then
+        help = what.name .. ": " .. what.desc
+    else
+        help = "Begin with these stats."
+    end
+    gfx.text(6, start_y + 40, help)
+    if self.creator.msg then gfx.text(6, start_y + 56, self.creator.msg) end
+
+    gfx.text(6, h - 8, "Up/Dn L/R:attr Enter:pick Q:quit")
     gfx.refresh()
 end
 
@@ -1657,6 +2018,29 @@ gfx.begin()
 local ok, err = pcall(function()
     local game = Game.new()
     local w, h = gfx.size()
+
+    local function handle_creator_key(key)
+        if key == gfx.KEY_ESCAPE or key == KEY_Q then
+            game.quit = true
+        elseif key == gfx.KEY_UP or key == KEY_W then
+            game.creator.cursor = math.max(1, game.creator.cursor - 1)
+        elseif key == gfx.KEY_DOWN or key == KEY_S then
+            game.creator.cursor = math.min(CREATOR_ROWS, game.creator.cursor + 1)
+        elseif key == gfx.KEY_LEFT or key == KEY_A then
+            game:creator_adjust(-1)
+        elseif key == gfx.KEY_RIGHT or key == KEY_D then
+            game:creator_adjust(1)
+        elseif key == KEY_ENTER or key == KEY_LF or key == KEY_SPACE then
+            local kind, what = game:creator_row()
+            if kind == "trait" then
+                game:creator_toggle(what)
+            elseif kind == "start" then
+                game:creator_start()
+            else
+                game.creator.cursor = game.creator.cursor + 1
+            end
+        end
+    end
 
     local function handle_map_key(key)
         if key == gfx.KEY_ESCAPE or key == KEY_Q then
@@ -1692,7 +2076,7 @@ local ok, err = pcall(function()
         elseif key == KEY_E then
             local row = INV_ROWS[game.inv_cursor]
             if row then
-                game:try_consume(row[1], row[2])
+                game:use(row[1], row[2])
                 -- the stack may be gone or shifted; don't keep a stale pick
                 game.inv_selected = nil
             end
@@ -1716,7 +2100,9 @@ local ok, err = pcall(function()
     local dirty = true
     while not game.quit and not solaros.should_exit() do
         if dirty then
-            if game.screen == "map" then
+            if game.screen == "creator" then
+                game:draw_creator(w, h)
+            elseif game.screen == "map" then
                 game:draw_map(w, h)
             else
                 game:draw_inventory(w, h)
@@ -1726,7 +2112,9 @@ local ok, err = pcall(function()
 
         local key = gfx.getch(POLL_MS)
         if key ~= nil then
-            if game.screen == "map" then
+            if game.screen == "creator" then
+                handle_creator_key(key)
+            elseif game.screen == "map" then
                 handle_map_key(key)
             else
                 handle_inventory_key(key)

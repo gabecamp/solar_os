@@ -19,7 +19,17 @@ end
 -- Run the real main loop (wasteland_run.lua) against a scripted key list.
 -- nil entries are idle getch timeouts. Returns refresh count, keys handled,
 -- and every string drawn with gfx.text.
+-- keys that walk the character creator down to [ Start ] and press Enter
+local START = {115,115,115,115,115,115,115,115,115,115,115,115,115,115, 10}
+local function with_start(keys, n)
+    local out = {}
+    for k = 1, #START do out[k] = START[k] end
+    for k = 1, n do out[#START + k] = keys[k] end
+    return out, n + #START
+end
+
 local function run_loop(keys, n)
+    keys, n = with_start(keys, n)
     local i, handled, texts = 0, 0, {}
     local saved_getch, saved_exit, saved_text = gfx.getch, fake.should_exit, gfx.text
     gfx.getch = function()
@@ -44,9 +54,9 @@ print("[17] E on the inventory screen eats/drinks the item under the cursor")
 -- spawn ground: rock, cloth_scrap, canned_beans, water_bottle -> cursor 4 is water
 local _, _, texts = run_loop({105, 115, 115, 115, 101}, 5)
 assert(drew(texts, "Consumed Water Bottle."), "E did not consume the water bottle")
-assert(drew(texts, "Up/Dn Enter:move E:eat/drink I:map"), "inventory hint should mention E")
+assert(drew(texts, "Arrows Enter:move E:use I:map"), "inventory hint should mention E")
 local _, _, texts2 = run_loop({105, 101}, 2)   -- cursor 1 = rock
-assert(drew(texts2, "Rock isn't edible/drinkable."), "E on a rock should say so")
+assert(drew(texts2, "Holding Rock."), "E on a rock should pick it up in a hand")
 print("    OK")
 
 print("[18] consuming takes ONE unit; the stack goes only when empty")
@@ -69,11 +79,16 @@ for k = 1, 200 do keys[k] = (k % 50 == 0) and 100 or nil end   -- 4 keys in 200 
 local refreshes, handled = run_loop(keys, 200)
 print(("    %d refreshes for %d keys over 200 polls (+1 initial frame, +1 for the quit key)")
       :format(refreshes, handled))
+-- handled includes the creator keys; the point is idle polls add nothing
 assert(refreshes <= handled + 2, "idle polls are redrawing")
 print("    OK")
 
 print("[20] every bag stack (cap " .. L.BACKPACK_CAP .. ") is drawn and selectable")
 g = fresh()
+g.player.attrs.Strength = 6        -- backpack 12 + 3 + Pack Mule 2 -> the 16-cell max
+g.player.traits.packmule = true
+L.recompute_stats(g.player)
+assert(g:bag_capacity() == L.BACKPACK_CAP)
 g.player.inventory = {}
 local ids = {"rock", "cloth_scrap", "canned_beans", "water_bottle", "tshirt", "jeans", "boots", "cap", "gloves"}
 for k = 1, L.BACKPACK_CAP do g.player.inventory[k] = {item = ids[(k - 1) % #ids + 1], qty = 1} end
@@ -93,12 +108,12 @@ local ri = find(g:ground_list(), "rock")
 g:try_transfer({"ground", ri}, {"inventory"})
 assert(#g.player.inventory == 1 and g.player.inventory[1].qty == 2, "rocks should merge")
 g.player.inventory = {}
-for k = 1, L.BACKPACK_CAP do g.player.inventory[k] = {item = "rock", qty = 1} end
+for k = 1, g:bag_capacity() do g.player.inventory[k] = {item = "rock", qty = 1} end
 local before = {}
 for k, s in ipairs(g:ground_list()) do before[k] = s.item end
 local bi = find(g:ground_list(), "canned_beans")
 g:try_transfer({"ground", bi}, {"inventory"})
-assert(#g.player.inventory == L.BACKPACK_CAP)
+assert(#g.player.inventory == g:bag_capacity())
 for k, s in ipairs(g:ground_list()) do
     assert(s.item == before[k], "rejected move must restore the ground order")
 end
@@ -108,10 +123,10 @@ print("[+] equipping over an occupied slot with a full bag drops the old item")
 g = fresh()
 g.player.equipped.head = "cap"
 g.player.inventory = {}
-for k = 1, L.BACKPACK_CAP - 1 do g.player.inventory[k] = {item = "rock", qty = k} end
-g.player.inventory[L.BACKPACK_CAP] = {item = "cap", qty = 1}  -- a second cap; bag is full
+for k = 1, g:bag_capacity() - 1 do g.player.inventory[k] = {item = "rock", qty = k} end
+g.player.inventory[g:bag_capacity()] = {item = "cap", qty = 1}  -- a second cap; bag is full
 -- equipping it frees its cell, so the old cap goes back to the bag (merging)
-g:try_transfer({"inventory", L.BACKPACK_CAP}, {"equip", "head"})
+g:try_transfer({"inventory", g:bag_capacity()}, {"equip", "head"})
 assert(g.player.equipped.head == "cap")
 local _, caps = find(g.player.inventory, "cap")
 assert(caps and caps.qty == 1, "old cap should be back in the bag")
@@ -119,12 +134,12 @@ assert(caps and caps.qty == 1, "old cap should be back in the bag")
 -- the old gloves have nowhere to go but the ground
 g.player.equipped.hands = "gloves"
 g.player.inventory = {}
-for k = 1, L.BACKPACK_CAP do g.player.inventory[k] = {item = "x" .. k, qty = 1} end
+for k = 1, g:bag_capacity() do g.player.inventory[k] = {item = "x" .. k, qty = 1} end
 table.insert(g:ground_list(), {item = "gloves", qty = 1})
 local ground_before = #g:ground_list()
 g:try_transfer({"ground", ground_before}, {"equip", "hands"})
 assert(g.player.equipped.hands == "gloves")
-assert(#g.player.inventory == L.BACKPACK_CAP, "bag must not exceed its cap")
+assert(#g.player.inventory == g:bag_capacity(), "bag must not exceed its cap")
 local _, gl = find(g:ground_list(), "gloves")
 assert(gl and gl.qty == 1, "old gloves should land on the ground")
 print("    OK")
@@ -132,10 +147,12 @@ print("    OK")
 print("[+] every body slot has an item, and every wearable not worn at the start spawns")
 local Game2, ITEM_DB, EQUIP_SLOTS = dofile("lib_only.lua")
 for _, slot in ipairs(EQUIP_SLOTS) do
+  if not L.HAND_SLOTS[slot] then   -- hands hold anything; no dedicated item
     local found
     for id, def in pairs(ITEM_DB) do if def.slot == slot then found = id end end
     assert(found, "no item fits the " .. slot .. " slot")
     assert(ITEM_DB[found].wear, found .. " has no look on the doll")
+  end
 end
 for seed_try = 1, 5 do
     g = Game2.new()
@@ -150,6 +167,58 @@ for seed_try = 1, 5 do
         if def.slot and not start[id] then assert(seen[id], id .. " never spawns") end
     end
 end
+print("    OK")
+
+print("[+] hands hold anything; E eats from a hand, wears, takes off, holds")
+g = fresh()
+local ri2 = find(g:ground_list(), "rock")
+assert(g:try_transfer({"ground", ri2}, {"equip", "rhand"}))
+assert(g.player.equipped.rhand == "rock", "a rock can be held")
+local bi2 = find(g:ground_list(), "canned_beans")
+assert(g:try_transfer({"ground", bi2}, {"equip", "lhand"}))
+g.player.needs.hunger = 10
+g:use("equip", "lhand")
+assert(g.player.needs.hunger == 50 and g.player.equipped.lhand == nil, "E eats the held beans")
+table.insert(g:ground_list(), {item = "cap", qty = 1})
+g:use("ground", #g:ground_list())
+assert(g.player.equipped.head == "cap", "E on a wearable puts it on")
+g:use("equip", "head")
+assert(g.player.equipped.head == nil and find(g.player.inventory, "cap"), "E on a worn item takes it off")
+local ci = find(g:ground_list(), "cloth_scrap")
+g:use("ground", ci)
+assert(g.player.equipped.lhand == "cloth_scrap", "E holds a plain item in the free hand")
+print("    OK")
+
+print("[+] the bag on your back sets the bag size; can't shrink below the contents")
+g = fresh()
+assert(g:bag_capacity() == 12)
+for k = #g.player.inventory + 1, 10 do g.player.inventory[k] = {item = "x" .. k, qty = 1} end
+table.insert(g:ground_list(), {item = "satchel", qty = 1})
+local si = #g:ground_list()
+assert(not g:try_transfer({"ground", si}, {"equip", "back"}), "10 stacks don't fit a satchel")
+assert(g.player.equipped.back == "backpack" and #g.player.inventory == 10)
+assert(g.log[#g.log] == "Bag too small - empty it first.")
+while #g.player.inventory > 3 do table.remove(g.player.inventory) end
+assert(g:try_transfer({"ground", si}, {"equip", "back"}), "3 stacks + the old backpack fit")
+assert(g.player.equipped.back == "satchel" and g:bag_capacity() == 8)
+assert(find(g.player.inventory, "backpack"), "the old backpack goes in the bag")
+g:use("equip", "back")                      -- 5 stacks > 4 pockets
+assert(g.player.equipped.back == "satchel", "can't take the bag off while it's too full")
+print("    OK")
+
+print("[+] there is always an empty cell to drop into (bag and ground)")
+g = fresh()
+g.player.inventory = {}
+g:draw_inventory(300, 400)
+local rows, pos = rows_pos()
+local bag_row, ground_rows = nil, 0
+for k, row in ipairs(rows) do
+    if row[1] == "inventory" then bag_row = k end
+    if row[1] == "ground" then ground_rows = ground_rows + 1 end
+end
+assert(bag_row and pos[bag_row], "an empty bag still has a cell to drop into")
+assert(ground_rows == #g:ground_list() + 1, "one spare ground cell after the stacks")
+assert(g:try_transfer({"ground", 1}, {"inventory", 1}) and #g.player.inventory == 1)
 print("    OK")
 
 print("\nREGRESSION TESTS PASSED")

@@ -32,6 +32,8 @@ solaros.dump("ops_inventory_barefoot.txt")
 -- Scene 2b: worst case - full bag, more ground stacks than fit (grid scrolled
 -- to the cursor), a bag cell selected, all four conditions
 g = fresh()
+g.player.attrs.Strength, g.player.traits.packmule = 6, true   -- biggest bag: 16 cells
+select(2, dofile("lib_layout.lua")).recompute_stats(g.player)
 g.player.inventory = {}
 local ids = {"rock", "cloth_scrap", "canned_beans", "water_bottle", "tshirt", "jeans", "boots", "cap", "gloves"}
 for k = 1, 16 do g.player.inventory[k] = {item = ids[(k - 1) % #ids + 1], qty = k} end
@@ -55,6 +57,28 @@ g.inv_cursor = #g:ground_list() + 5
 g.log = {"Moved Leather Jacket.", "Moved Scarf."}
 g:draw_inventory(300, 400)
 solaros.dump("ops_inventory_dressed.txt")
+
+-- Scene 2d: holding a rock and beans, satchel on the back, 1 free bag cell
+g = fresh()
+g.player.equipped.back = "satchel"
+g.player.equipped.rhand = "rock"
+g.player.equipped.lhand = "canned_beans"
+g.player.inventory = {{item = "water_bottle", qty = 2}, {item = "backpack", qty = 1},
+                      {item = "berries", qty = 5}}
+g.inv_cursor = #g:ground_list() + 1 + 11     -- the R.Hand slot
+g.log = {"Holding Rock.", "Put on Satchel."}
+g:draw_inventory(300, 400)
+solaros.dump("ops_inventory_hands.txt")
+
+-- Scene 0: character creator, Perception raised, a couple of traits
+g = fresh()
+g.player.attrs.Strength, g.player.attrs.Perception = 2, 4
+g.player.traits.scrounger, g.player.traits.bigeater = true, true
+local recompute = select(2, dofile("lib_layout.lua")).recompute_stats
+recompute(g.player)
+g.creator.cursor = 3
+g:draw_creator(300, 400)
+solaros.dump("ops_creator.txt")
 
 -- Scene 3: the map screen
 g = fresh()

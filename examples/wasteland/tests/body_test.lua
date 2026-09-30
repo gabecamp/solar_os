@@ -85,7 +85,10 @@ for _, slot in ipairs(L.EQUIP_SLOTS) do
             if body_px[y * 1000 + x] then covered = covered + 1 end
         end
     end
-    if covered == 0 then print("   slot not on the body: " .. slot); slot_problems = slot_problems + 1 end
+    -- the back slot stands beside the figure (you can't see your back)
+    if covered == 0 and slot ~= "back" then
+        print("   slot not on the body: " .. slot); slot_problems = slot_problems + 1
+    end
     if r[1] - 2 < 0 or r[1] + r[3] + 2 > 300 then print("   slot off screen: " .. slot); slot_problems = slot_problems + 1 end
     for _, o in ipairs(obstacles) do
         if r[1] - 2 < o[4] and r[1] + r[3] + 2 > o[2] and r[2] - 2 < o[5] and r[2] + r[4] + 2 > o[3] then

@@ -3,8 +3,10 @@ local fake = require("solaros")
 local keys = {100, 97, 119, 115, 32, 102, 105, 13, 10, 101, 0x80, 0x81, 0x82, 0x83}
 local n, seed = 0, 12345
 local orig_getch = fake.gfx.getch
+local start = {115,115,115,115,115,115,115,115,115,115,115,115,115,115, 10}
 fake.gfx.getch = function()
     n = n + 1
+    if n <= #start then return start[n] end   -- get through the creator first
     if n > 400 then return 113 end                  -- Q
     seed = (seed * 109 + 1021) % 32768
     return keys[seed % #keys + 1]

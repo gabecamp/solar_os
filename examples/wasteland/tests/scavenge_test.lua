@@ -77,9 +77,31 @@ for terrain, table_ in pairs(LOOT) do
 end
 print("   OK")
 
-print("5. F on the map screen scavenges (real main loop)")
+print("5. Perception: sharp eyes find more (fewer duds, more rolls)")
+local function finds(per)
+    local g3 = fresh("hills")
+    g3.player.attrs.Perception = per
+    local L2 = select(2, dofile("lib_layout.lua"))
+    L2.recompute_stats(g3.player)
+    for _ = 1, 500 do
+        g3.scavenged = {}
+        g3.player.mp = 2
+        g3:scavenge()
+    end
+    return count(g3:ground_list()), g3.player.scav_rolls
+end
+local low, low_rolls = finds(1)
+local mid, mid_rolls = finds(3)
+local high, high_rolls = finds(6)
+print(("   500 searches on hills: Per 1 -> %d items (%d roll), Per 3 -> %d (%d), Per 6 -> %d (%d)")
+      :format(low, low_rolls, mid, mid_rolls, high, high_rolls))
+assert(low_rolls == 1 and mid_rolls == 2 and high_rolls == 3)
+assert(low < mid and mid < high, "higher Perception must find more")
+print("   OK")
+
+print("6. F on the map screen scavenges (real main loop)")
 local i, texts = 0, {}
-local keys = {102}
+local keys = {115,115,115,115,115,115,115,115,115,115,115,115,115,115, 10, 102}   -- creator: down to Start, Enter; then F
 local saved_getch, saved_exit, saved_text = gfx.getch, fake.should_exit, gfx.text
 gfx.getch = function() i = i + 1; if i > #keys then return 113 end; return keys[i] end
 fake.should_exit = function() return i > #keys + 5 end

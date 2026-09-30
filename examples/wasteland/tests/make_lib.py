@@ -34,7 +34,12 @@ lib = src[:cut]
           "BACKPACK_CAP = BACKPACK_CAP, BACKPACK_COLS = BACKPACK_COLS, "
           "BACKPACK_CELL = BACKPACK_CELL, BACKPACK_GAP = BACKPACK_GAP, "
           "BACKPACK_Y = BACKPACK_Y, CONDITIONS_Y = CONDITIONS_Y, "
-          "INV_LOG_Y = INV_LOG_Y, INV_LOG_LINES = INV_LOG_LINES, "
+          "INV_LOG_LINES = INV_LOG_LINES, INV_LOG_BOTTOM = INV_LOG_BOTTOM, "
+          "INV_LOG_STEP = INV_LOG_STEP, POCKET_CELLS = POCKET_CELLS, "
+          "HAND_SLOTS = HAND_SLOTS, recompute_stats = recompute_stats, "
+          "TRAITS = TRAITS, ATTRIBUTES = ATTRIBUTES, ITEM_DB = ITEM_DB, "
+          "attr_points_left = attr_points_left, trait_budget = trait_budget, "
+          "CREATOR_ROWS = CREATOR_ROWS, "
           "BODY_CX = BODY_CX, BODY_TOP = BODY_TOP, BODY_BOTTOM = BODY_BOTTOM}, "
           "function() return INV_ROWS, INV_POS end\n")
 (here / "lib_scavenge.lua").write_text(
