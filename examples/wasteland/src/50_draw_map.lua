@@ -255,6 +255,14 @@ local function fill_hex(cx, cy, size, color)
     end
 end
 
+-- Unit hex corners (cos, sin of 60i-30 degrees), worked out once: the map
+-- draws hundreds of hexes a frame and each new table is garbage to collect.
+local HEX_CORNERS = {}
+for i = 0, 6 do
+    local angle = math.rad(60 * (i % 6) - 30)
+    HEX_CORNERS[2 * i + 1], HEX_CORNERS[2 * i + 2] = math.cos(angle), math.sin(angle)
+end
+
 -- fill_color may be nil (outline only). size defaults to HEX_SIZE.
 function Game:draw_hex(cx, cy, fill_color, outline_color, size)
     size = size or HEX_SIZE
@@ -262,14 +270,10 @@ function Game:draw_hex(cx, cy, fill_color, outline_color, size)
         fill_hex(cx, cy, size, fill_color)
     end
     gfx.color(outline_color)
-    local corners = {}
+    local c = HEX_CORNERS
     for i = 0, 5 do
-        local angle = math.rad(60 * i - 30)
-        corners[i + 1] = {cx + size * math.cos(angle), cy + size * math.sin(angle)}
-    end
-    for i = 1, 6 do
-        local a, b = corners[i], corners[i % 6 + 1]
-        gfx.line(rnd(a[1]), rnd(a[2]), rnd(b[1]), rnd(b[2]))
+        gfx.line(rnd(cx + size * c[2 * i + 1]), rnd(cy + size * c[2 * i + 2]),
+                 rnd(cx + size * c[2 * i + 3]), rnd(cy + size * c[2 * i + 4]))
     end
 end
 

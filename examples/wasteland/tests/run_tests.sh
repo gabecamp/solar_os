@@ -23,4 +23,5 @@ for t in unit_test sprite_test bounds_test body_test glyph_test regression_test 
 done
 echo "== main loop (scripted keys) =="; lua5.4 wasteland_run.lua
 echo "== soak (400 random keys) ==";    lua5.4 soak.lua | tail -n 1
+echo "== memory and draw calls ==";   lua5.4 ../tools/perf_check.lua 1000 2000
 echo; echo "ALL PASSED"
