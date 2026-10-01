@@ -188,6 +188,27 @@ local TRADE = {
              {"vodka", 2}, {"empty_bottle", 3}, {"geiger", 1}, {"gasmask", 1},
              {"knife", 1}, {"permit", 1}},
     restock = {"canned_beans", "water_bottle", "antirad", "bandage", "vodka", "empty_bottle"},
+    -- everyone you can trade with: the town's trader (self.trader, the
+    -- numbers above), Mother Okun at the Ferry Post (self.ferry_trader) and
+    -- the Peddler on his round (self.peddler); src/46_peddler.lua
+    people = {
+        town = {name = "Trader", markup = 1.5},
+        ferry = {name = "Mother Okun", markup = 1.3, restock_hours = 48, restock_n = 2,
+                 hello = "'Ferry's not running. Trading is.'",
+                 stock = {{"fishing_rod", 1}, {"snare", 2}, {"rope", 3}, {"antirad", 2}, {"raw_fish", 2},
+                          {"copper_wire", 1}, {"battery_cell", 1}, {"empty_bottle", 2}},
+                 restock = {"snare", "rope", "raw_fish", "antirad", "copper_wire", "empty_bottle"}},
+        peddler = {name = "The Peddler", markup = 1.4, restock_hours = 36, restock_n = 2,
+                   hello = "'Everything rattles. Everything's for sale.'",
+                   stock = {{"battery_cell", 1}, {"jerky", 2}, {"antenna", 1}, {"lore_page", 1},
+                            {"broken_headlamp", 1}, {"rope", 1}},
+                   restock = {"jerky", "battery_cell", "copper_wire", "circuit_board", "lore_page",
+                              "bandage", "antenna"}},
+    },
+    -- the Ferry Post: a little cluster of ruins by the water, far from the town
+    ferry = {ruins = 4, min_from_town = 9, min_from_start = 4},
+    -- the Peddler's round: route_n stops around the map, stay hours at each
+    route_n = 7, stay = 12,
 }
 -- The guards let you through with a Zone Permit, or for `bribe` artifacts.
 local GOAL = {bribe = 3}
@@ -301,6 +322,9 @@ local QUESTS = {
     supply = {offer = "Anna: 'We're out of bandages. Call me when you've two to spare.'",
               journal = "find 2 bandages, then call her.", need = {"bandage", 2},
               reward = {{"medkit", 1}, {"water_bottle", 2}}},
+    fish = {offer = "Mother Okun: 'Bring me three fish. The ferry men row badly hungry.'",
+            journal = "bring 3 fish to the Ferry Post.", need = 3,
+            reward = {{"snare", 2}, {"lucky_lure", 1}}},
     dog = {offer = "Karl: 'Before you go - my old dog ran off. Find her by the water?'",
            journal = "find his dog by the river", near = 4, far = 8},
 }
@@ -2145,6 +2169,30 @@ local GLYPH_ART = {
         "..#.#.....",
         ".#####....",
     },
+    ferry = {   -- a little boat on the water
+        "....#.....",
+        "....##....",
+        "....###...",
+        "....#.....",
+        "#########.",
+        ".#######..",
+        "..#####...",
+        "..........",
+        "#.#.#.#.#.",
+        ".#.#.#.#.#",
+    },
+    cart = {    -- the Peddler's handcart
+        "......#...",
+        ".#####.#..",
+        ".#####..#.",
+        ".#####...#",
+        ".######...",
+        "..........",
+        ".##...##..",
+        "#..#.#..#.",
+        "#..#.#..#.",
+        ".##...##..",
+    },
     camp = {
         "....##....",
         "...####...",
@@ -2842,6 +2890,9 @@ function Game.new()
     end
     self.world_seed = seed       -- the map is rebuilt from this when a save is loaded
     self.tiles, self.ground, seed, self.rad, self.sites = generate_world(seed)
+    self.extras = Game.place_extras(self.tiles, self.sites, self.rad, self.world_seed)
+    self.ferry_trader = Game.starting_stock("ferry")
+    self.peddler = Game.starting_stock("peddler")
     self.trader = {stock = {}, restocked = 0}   -- what the trader has now (it changes as you trade)
     for _, st in ipairs(TRADE.stock) do
         self.trader.stock[#self.trader.stock + 1] = {item = st[1], qty = st[2]}
@@ -3814,7 +3865,8 @@ local SAVE = {version = 1, dir = "wasteland", file = "save.lua",
                         "karl_asked", "karl_next", "karl_gave", "muted",
                         "difficulty", "dog", "radio", "karl_hint",
                         "base", "quest", "quests_done",
-                        "lore_read", "signal_page", "skills", "stats"}}
+                        "lore_read", "signal_page", "skills", "stats",
+                        "ferry_trader", "peddler"}}
 
 -- Where the save lives: <preferred storage>/wasteland/save.lua
 function SAVE.path()
@@ -3906,6 +3958,7 @@ end
 function Game:load_state(data)
     local tiles, _, _, rad, sites = generate_world(data.world_seed)
     self.tiles, self.rad, self.sites = tiles, rad, sites
+    self.extras = Game.place_extras(tiles, sites, rad, data.world_seed)
     for _, f in ipairs(SAVE.fields) do
         if data[f] ~= nil then self[f] = data[f] end
     end
@@ -5075,6 +5128,10 @@ function Game:spot_sites()
     if self:learn_site_seen("checkpoint") then
         self:push_log("A guard tower on the horizon: the Checkpoint.")
     end
+    if self.sites.ferry and self:learn_site_seen("ferry") then
+        self:push_log("A jetty and a few huts by the water: the Ferry Post, " .. self:site_bearing("ferry") .. ".")
+    end
+    self:spot_peddler()
 end
 
 function Game:learn_site_seen(name)
@@ -5093,6 +5150,11 @@ function Game:arrive_site()
         self:learn_site("checkpoint")
         self:push_log("The Checkpoint. Guards watch from the tower. T.")
         return true
+    elseif site == "ferry" then
+        self:learn_site("ferry")
+        self:push_log("The Ferry Post. Mother Okun trades from the jetty. T.")
+        self:hear_of_exit("Mother Okun")
+        return true
     end
     return false
 end
@@ -5101,9 +5163,13 @@ end
 function Game:site_action()
     local site = self:site_here()
     if site == "trader" then
-        self:open_trade()
+        self:open_trade("town")
+    elseif site == "ferry" then
+        self:open_trade("ferry")
     elseif site == "checkpoint" then
         self:open_gate()
+    elseif self:peddler_key() == hex_key(self.player.q, self.player.r) then
+        self:open_trade("peddler")
     else
         self:push_log("Nobody here. (T trades at a trader)")
     end
@@ -5115,22 +5181,24 @@ function Game.item_value(item)
     return TRADE.value[item] or 1
 end
 
-function Game:open_trade()
-    local t, p = self.trader, self.player
-    while p.hours - t.restocked >= TRADE.restock_hours do
-        t.restocked = t.restocked + TRADE.restock_hours
-        for _ = 1, TRADE.restock_n do
-            add_to_list(t.stock, {item = TRADE.restock[self:rand(#TRADE.restock) + 1], qty = 1})
-        end
-    end
-    self.trade_ui = {col = "mine", cursor = {mine = 1, theirs = 1}, give = {}, get = {},
-                     msg = "Pick what you give and take, then T."}
+-- who: "town" (the trader), "ferry" (Mother Okun) or "peddler"
+function Game:open_trade(who)
+    who = who or "town"
+    self:restock(who)
+    self.trade_ui = {who = who, col = "mine", cursor = {mine = 1, theirs = 1}, give = {}, get = {},
+                     msg = TRADE.people[who].hello or "Pick what you give and take, then T."}
     self.screen = "trade"
+end
+
+-- The one you're trading with now: their stock and their markup.
+function Game:trade_partner()
+    local who = self.trade_ui and self.trade_ui.who or "town"
+    return self:trade_state(who), TRADE.people[who]
 end
 
 -- The two columns: your bag and the trader's stock.
 function Game:trade_rows(col)
-    return col == "mine" and self.player.inventory or self.trader.stock
+    return col == "mine" and self.player.inventory or self:trade_partner().stock
 end
 
 -- What you offer, and what the trader asks for what you picked.
@@ -5139,7 +5207,8 @@ function Game:trade_totals()
     local give, get = 0, 0
     for item, n in pairs(u.give) do give = give + Game.item_value(item) * n end
     for item, n in pairs(u.get) do get = get + Game.item_value(item) * n end
-    return give, math.ceil(get * TRADE.markup)
+    local _, cfg = self:trade_partner()
+    return give, math.ceil(get * cfg.markup)
 end
 
 -- Take n units of item out of a stack list.
@@ -5154,7 +5223,7 @@ local function take_units(list, item, n)
 end
 
 function Game:make_deal()
-    local u, t = self.trade_ui, self.trader
+    local u, t = self.trade_ui, self:trade_partner()
     local give, ask = self:trade_totals()
     if next(u.get) == nil then
         u.msg = "Pick something to take (Right, Enter)."
@@ -5178,7 +5247,7 @@ function Game:make_deal()
     end
     u.give, u.get = {}, {}
     u.msg = dropped and "Deal. Your bag is full: some is on the ground." or "Deal."
-    self:push_log("You traded with the trader.")
+    self:push_log("You traded with " .. (u.who == "town" and "the trader" or TRADE.people[u.who].name) .. ".")
     for col, c in pairs(u.cursor) do
         u.cursor[col] = math.max(1, math.min(c, #self:trade_rows(col)))
     end
@@ -5211,7 +5280,9 @@ function Game:trade_key(key)
     elseif key == KEY.T then
         self:make_deal()
     elseif key == KEY.O then   -- (W is "up" here)
-        self:trader_work()
+        if u.who == "ferry" then self:ferry_work()
+        elseif u.who == "town" then self:trader_work()
+        else u.msg = "'Work? I'm a peddler. I peddle.'" end
     end
 end
 
@@ -5295,6 +5366,171 @@ function Game:finish_run(how)
     self:sfx("escape")
     self:record_run(how)
     Game.delete_save()
+end
+-- ---------------------------------------------------------------------
+-- More people to trade with: the Ferry Post and the Peddler
+--
+-- Game.place_extras(tiles, sites, rad, world_seed) adds the newer world
+-- features AFTER generate_world, from a seed stream of their own, so a
+-- world made before them (an old save) keeps every tile and site it had:
+--   the Ferry Post (sites.ferry): a few ruins by the water, far from the
+--     town; Mother Okun trades there (self.ferry_trader, saved).
+--   the Peddler's round (extras.route): TRADE.route_n stops around the map;
+--     he stays TRADE.stay hours at each, so where he is comes from the
+--     clock (nothing to save but his stock, self.peddler).
+-- Later features add their own pieces to `extras` the same way.
+-- ---------------------------------------------------------------------
+
+local function parse_key(key)
+    local q, r = key:match("(-?%d+),(-?%d+)")
+    return tonumber(q), tonumber(r)
+end
+
+function Game.place_extras(tiles, sites, rad, world_seed)
+    local seed = (world_seed * 48271 + 12345) % 2147483647
+    local function roll(n)
+        seed = rand_next(seed)
+        return seed % n
+    end
+    local keys = {}
+    for key in pairs(tiles) do keys[#keys + 1] = key end
+    table.sort(keys)
+    local taken = {}
+    for _, key in pairs(sites) do taken[key] = true end
+    taken[hex_key(0, 0)] = true
+    local extras = {}
+
+    -- the Ferry Post: a dry, cool hex next to the water, far from the town
+    local tq, tr = parse_key(sites.trader)
+    local F = TRADE.ferry
+    local function by_water(q, r)
+        for _, d in ipairs(AXIAL_DIRS) do
+            if tiles[hex_key(q + d[1], r + d[2])] == "water" then return true end
+        end
+        return false
+    end
+    for _, min_town in ipairs({F.min_from_town, F.min_from_town - 3}) do
+        local options = {}
+        for _, key in ipairs(keys) do
+            local q, r = parse_key(key)
+            if tiles[key] ~= "water" and not taken[key] and not rad[key]
+                and axial_distance(q, r, tq, tr) >= min_town
+                and axial_distance(0, 0, q, r) >= F.min_from_start and by_water(q, r) then
+                options[#options + 1] = key
+            end
+        end
+        if #options > 0 then
+            local key = options[roll(#options) + 1]
+            sites.ferry, taken[key] = key, true
+            tiles[key] = "ruins"
+            local q, r = parse_key(key)
+            local placed = 0
+            for _, d in ipairs(AXIAL_DIRS) do
+                local nk = hex_key(q + d[1], r + d[2])
+                if placed < F.ruins and tiles[nk] and tiles[nk] ~= "water" and not taken[nk] then
+                    tiles[nk] = "ruins"
+                    placed = placed + 1
+                end
+            end
+            break
+        end
+    end
+
+    -- the Peddler's round: one stop per slice of the compass, in order
+    local route = {}
+    for i = 0, TRADE.route_n - 1 do
+        local options = {}
+        for _, key in ipairs(keys) do
+            local q, r = parse_key(key)
+            local d = axial_distance(0, 0, q, r)
+            if TERRAIN[tiles[key]].passable and not taken[key] and d >= 3 and d < GRID_RADIUS then
+                local x, y = axial_to_pixel(q, r, 1)
+                local slice = math.floor((math.atan(y, x) + math.pi) / (2 * math.pi) * TRADE.route_n)
+                if slice % TRADE.route_n == i then options[#options + 1] = key end
+            end
+        end
+        if #options > 0 then route[#route + 1] = options[roll(#options) + 1] end
+    end
+    extras.route = route
+    return extras
+end
+
+-- -- the Peddler -----------------------------------------------------------
+
+-- Where he is now (or at `hours`): a stop on his round.
+function Game:peddler_key(hours)
+    local route = self.extras and self.extras.route or {}
+    if #route == 0 then return nil end
+    return route[((hours or self.player.hours) // TRADE.stay) % #route + 1]
+end
+
+-- Seeing him puts him in the journal (called from spot_sites).
+function Game:spot_peddler()
+    local key = self:peddler_key()
+    if key and self.player.visible[key] then
+        local pd = self.peddler
+        if pd.seen_key ~= key then
+            self:push_log("A man pushing a rattling handcart: the Peddler, " .. self:bearing_to(key) .. ".")
+        end
+        pd.seen_key, pd.seen_hour = key, self.player.hours
+    end
+end
+
+-- -- everyone's stock ------------------------------------------------------
+
+-- A trader's stock and restock clock: "town", "ferry" or "peddler".
+function Game:trade_state(who)
+    if who == "ferry" then return self.ferry_trader end
+    if who == "peddler" then return self.peddler end
+    return self.trader
+end
+
+-- Fill up what sold since the last visit.
+function Game:restock(who)
+    local t, p = self:trade_state(who), self.player
+    local cfg = TRADE.people[who] or {}
+    local hours = cfg.restock_hours or TRADE.restock_hours
+    local list, n = cfg.restock or TRADE.restock, cfg.restock_n or TRADE.restock_n
+    while p.hours - t.restocked >= hours do
+        t.restocked = t.restocked + hours
+        for _ = 1, n do
+            add_to_list(t.stock, {item = list[self:rand(#list) + 1], qty = 1})
+        end
+    end
+end
+
+-- A fresh stock list from TRADE.people[who].stock.
+function Game.starting_stock(who)
+    local out = {}
+    for _, st in ipairs(TRADE.people[who].stock) do out[#out + 1] = {item = st[1], qty = st[2]} end
+    return {stock = out, restocked = 0}
+end
+
+-- Mother Okun's job (O on her screen): three fish, any kind.
+function Game:ferry_work()
+    local u, q = self.trade_ui, self.quest
+    local fish = self:count_item("raw_fish") + self:count_item("cooked_fish")
+    if q and q.kind == "fish" then
+        if fish < QUESTS.fish.need then
+            u.msg = ("'Three fish. You've got %d.'"):format(fish)
+            return
+        end
+        local left = QUESTS.fish.need
+        for _, item in ipairs({"raw_fish", "cooked_fish"}) do
+            local n = math.min(left, self:count_item(item))
+            if n > 0 then self:take_items(item, n); left = left - n end
+        end
+        self:give_reward(QUESTS.fish.reward, "Mother Okun weighs them in her hands:")
+        u.msg = "'They'll row tomorrow. Here.'"
+        return
+    end
+    if q then
+        u.msg = "'You've work already. Finish it.'"
+        return
+    end
+    self.quest = {kind = "fish", giver = "Mother Okun"}
+    u.msg = QUESTS.fish.offer
+    self:push_log("Quest: " .. self:quest_text())
 end
 -- ---------------------------------------------------------------------
 -- Sound effects: short melodies through solaros.audio
@@ -5741,6 +5977,7 @@ function Game:draw_map(w, h)
     local site_at = {}
     for name, key in pairs(self.sites) do site_at[key] = name end
     if self.base then site_at[self.base.key] = "camp" end   -- drawn like a site
+    local peddler = self:peddler_key()
 
     local reachable = {}
     for _, n in ipairs(neighbors(self.tiles, p.q, p.r)) do
@@ -5795,6 +6032,12 @@ function Game:draw_map(w, h)
                 gfx.color(gfx.BLACK)
                 gfx.rect(rnd(px) - 7, rnd(py) - 7, 14, 14)
                 draw_glyph(site, px, py, gfx.BLACK)
+            end
+            if key == peddler and p.visible[key] and not is_player then
+                -- the Peddler and his cart, on a white patch
+                gfx.color(gfx.WHITE)
+                gfx.fill_rect(rnd(px) - 6, rnd(py) - 6, 12, 12)
+                draw_glyph("cart", px, py, gfx.BLACK)
             end
             if self.stashes[key] and (p.visible[key] or p.explored[key]) then
                 -- a stash from the notes: an X in the lower right
@@ -8322,15 +8565,16 @@ function Game:draw_trade(w, h)
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
     gfx.font(gfx.FONT_BOLD_14)
-    gfx.text(6, 16, "Trader")
+    local _, cfg = self:trade_partner()
+    gfx.text(6, 16, cfg.name)
     gfx.font(gfx.FONT_MONO_12)
-    gfx.text(110, 16, ("They ask x%.1f value"):format(TRADE.markup))
+    gfx.text(200, 16, ("They ask x%.1f value"):format(cfg.markup))
     for _, col in ipairs({"mine", "theirs"}) do
         local x = L.col_x[col]
         local rows = self:trade_rows(col)
         local pick = col == "mine" and u.give or u.get
         gfx.color(gfx.BLACK)
-        gfx.text(x, 36, col == "mine" and "Your bag  (you give)" or "Trader  (you take)")
+        gfx.text(x, 36, col == "mine" and "Your bag  (you give)" or "Theirs  (you take)")
         local c = u.cursor[col]
         local first = math.max(1, c - L.rows + 1)
         for i = first, math.min(#rows, first + L.rows - 1) do
@@ -8439,6 +8683,7 @@ local HELP = {
     {"", "C in a ruin: claim it. Carry light at night."},
     {"", "Skills grow with use (J). R on the title: records."},
     {"", "Storms: shelter in ruins, hills or trees."},
+    {"", "Mother Okun trades by the river; a Peddler roams."},
 }
 
 function Game:open_help()
@@ -8561,6 +8806,11 @@ function Game:journal_lines()
         add("The way out: unknown. Find the trader, or read notes.")
     end
     if self.sites_known.trader then add("Trader: " .. self:site_bearing("trader") .. ".") end
+    if self.sites_known.ferry then add("Ferry Post (Mother Okun): " .. self:site_bearing("ferry") .. ".") end
+    local pd = self.peddler
+    if pd and pd.seen_key then
+        add(("Peddler: last seen %s, day %d."):format(self:bearing_to(pd.seen_key), (self:clock(pd.seen_hour))))
+    end
     if self:lore_count() > 0 then
         add(("Pages read: %d/%d. L to reread them."):format(self:lore_count(), #LORE.pages))
     end

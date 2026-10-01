@@ -28,6 +28,11 @@ function Game:journal_lines()
         add("The way out: unknown. Find the trader, or read notes.")
     end
     if self.sites_known.trader then add("Trader: " .. self:site_bearing("trader") .. ".") end
+    if self.sites_known.ferry then add("Ferry Post (Mother Okun): " .. self:site_bearing("ferry") .. ".") end
+    local pd = self.peddler
+    if pd and pd.seen_key then
+        add(("Peddler: last seen %s, day %d."):format(self:bearing_to(pd.seen_key), (self:clock(pd.seen_hour))))
+    end
     if self:lore_count() > 0 then
         add(("Pages read: %d/%d. L to reread them."):format(self:lore_count(), #LORE.pages))
     end

@@ -163,6 +163,27 @@ local TRADE = {
              {"vodka", 2}, {"empty_bottle", 3}, {"geiger", 1}, {"gasmask", 1},
              {"knife", 1}, {"permit", 1}},
     restock = {"canned_beans", "water_bottle", "antirad", "bandage", "vodka", "empty_bottle"},
+    -- everyone you can trade with: the town's trader (self.trader, the
+    -- numbers above), Mother Okun at the Ferry Post (self.ferry_trader) and
+    -- the Peddler on his round (self.peddler); src/46_peddler.lua
+    people = {
+        town = {name = "Trader", markup = 1.5},
+        ferry = {name = "Mother Okun", markup = 1.3, restock_hours = 48, restock_n = 2,
+                 hello = "'Ferry's not running. Trading is.'",
+                 stock = {{"fishing_rod", 1}, {"snare", 2}, {"rope", 3}, {"antirad", 2}, {"raw_fish", 2},
+                          {"copper_wire", 1}, {"battery_cell", 1}, {"empty_bottle", 2}},
+                 restock = {"snare", "rope", "raw_fish", "antirad", "copper_wire", "empty_bottle"}},
+        peddler = {name = "The Peddler", markup = 1.4, restock_hours = 36, restock_n = 2,
+                   hello = "'Everything rattles. Everything's for sale.'",
+                   stock = {{"battery_cell", 1}, {"jerky", 2}, {"antenna", 1}, {"lore_page", 1},
+                            {"broken_headlamp", 1}, {"rope", 1}},
+                   restock = {"jerky", "battery_cell", "copper_wire", "circuit_board", "lore_page",
+                              "bandage", "antenna"}},
+    },
+    -- the Ferry Post: a little cluster of ruins by the water, far from the town
+    ferry = {ruins = 4, min_from_town = 9, min_from_start = 4},
+    -- the Peddler's round: route_n stops around the map, stay hours at each
+    route_n = 7, stay = 12,
 }
 -- The guards let you through with a Zone Permit, or for `bribe` artifacts.
 local GOAL = {bribe = 3}
@@ -276,6 +297,9 @@ local QUESTS = {
     supply = {offer = "Anna: 'We're out of bandages. Call me when you've two to spare.'",
               journal = "find 2 bandages, then call her.", need = {"bandage", 2},
               reward = {{"medkit", 1}, {"water_bottle", 2}}},
+    fish = {offer = "Mother Okun: 'Bring me three fish. The ferry men row badly hungry.'",
+            journal = "bring 3 fish to the Ferry Post.", need = 3,
+            reward = {{"snare", 2}, {"lucky_lure", 1}}},
     dog = {offer = "Karl: 'Before you go - my old dog ran off. Find her by the water?'",
            journal = "find his dog by the river", near = 4, far = 8},
 }

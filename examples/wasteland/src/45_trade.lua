@@ -65,6 +65,10 @@ function Game:spot_sites()
     if self:learn_site_seen("checkpoint") then
         self:push_log("A guard tower on the horizon: the Checkpoint.")
     end
+    if self.sites.ferry and self:learn_site_seen("ferry") then
+        self:push_log("A jetty and a few huts by the water: the Ferry Post, " .. self:site_bearing("ferry") .. ".")
+    end
+    self:spot_peddler()
 end
 
 function Game:learn_site_seen(name)
@@ -83,6 +87,11 @@ function Game:arrive_site()
         self:learn_site("checkpoint")
         self:push_log("The Checkpoint. Guards watch from the tower. T.")
         return true
+    elseif site == "ferry" then
+        self:learn_site("ferry")
+        self:push_log("The Ferry Post. Mother Okun trades from the jetty. T.")
+        self:hear_of_exit("Mother Okun")
+        return true
     end
     return false
 end
@@ -91,9 +100,13 @@ end
 function Game:site_action()
     local site = self:site_here()
     if site == "trader" then
-        self:open_trade()
+        self:open_trade("town")
+    elseif site == "ferry" then
+        self:open_trade("ferry")
     elseif site == "checkpoint" then
         self:open_gate()
+    elseif self:peddler_key() == hex_key(self.player.q, self.player.r) then
+        self:open_trade("peddler")
     else
         self:push_log("Nobody here. (T trades at a trader)")
     end
@@ -105,22 +118,24 @@ function Game.item_value(item)
     return TRADE.value[item] or 1
 end
 
-function Game:open_trade()
-    local t, p = self.trader, self.player
-    while p.hours - t.restocked >= TRADE.restock_hours do
-        t.restocked = t.restocked + TRADE.restock_hours
-        for _ = 1, TRADE.restock_n do
-            add_to_list(t.stock, {item = TRADE.restock[self:rand(#TRADE.restock) + 1], qty = 1})
-        end
-    end
-    self.trade_ui = {col = "mine", cursor = {mine = 1, theirs = 1}, give = {}, get = {},
-                     msg = "Pick what you give and take, then T."}
+-- who: "town" (the trader), "ferry" (Mother Okun) or "peddler"
+function Game:open_trade(who)
+    who = who or "town"
+    self:restock(who)
+    self.trade_ui = {who = who, col = "mine", cursor = {mine = 1, theirs = 1}, give = {}, get = {},
+                     msg = TRADE.people[who].hello or "Pick what you give and take, then T."}
     self.screen = "trade"
+end
+
+-- The one you're trading with now: their stock and their markup.
+function Game:trade_partner()
+    local who = self.trade_ui and self.trade_ui.who or "town"
+    return self:trade_state(who), TRADE.people[who]
 end
 
 -- The two columns: your bag and the trader's stock.
 function Game:trade_rows(col)
-    return col == "mine" and self.player.inventory or self.trader.stock
+    return col == "mine" and self.player.inventory or self:trade_partner().stock
 end
 
 -- What you offer, and what the trader asks for what you picked.
@@ -129,7 +144,8 @@ function Game:trade_totals()
     local give, get = 0, 0
     for item, n in pairs(u.give) do give = give + Game.item_value(item) * n end
     for item, n in pairs(u.get) do get = get + Game.item_value(item) * n end
-    return give, math.ceil(get * TRADE.markup)
+    local _, cfg = self:trade_partner()
+    return give, math.ceil(get * cfg.markup)
 end
 
 -- Take n units of item out of a stack list.
@@ -144,7 +160,7 @@ local function take_units(list, item, n)
 end
 
 function Game:make_deal()
-    local u, t = self.trade_ui, self.trader
+    local u, t = self.trade_ui, self:trade_partner()
     local give, ask = self:trade_totals()
     if next(u.get) == nil then
         u.msg = "Pick something to take (Right, Enter)."
@@ -168,7 +184,7 @@ function Game:make_deal()
     end
     u.give, u.get = {}, {}
     u.msg = dropped and "Deal. Your bag is full: some is on the ground." or "Deal."
-    self:push_log("You traded with the trader.")
+    self:push_log("You traded with " .. (u.who == "town" and "the trader" or TRADE.people[u.who].name) .. ".")
     for col, c in pairs(u.cursor) do
         u.cursor[col] = math.max(1, math.min(c, #self:trade_rows(col)))
     end
@@ -201,7 +217,9 @@ function Game:trade_key(key)
     elseif key == KEY.T then
         self:make_deal()
     elseif key == KEY.O then   -- (W is "up" here)
-        self:trader_work()
+        if u.who == "ferry" then self:ferry_work()
+        elseif u.who == "town" then self:trader_work()
+        else u.msg = "'Work? I'm a peddler. I peddle.'" end
     end
 end
 

@@ -80,6 +80,27 @@ What the Zone is like now:
   sale behind his counter, and has runners out in the Zone, some of whom
   don't come back (that's the den job).
 
+### Mother Okun, at the Ferry Post
+- **Role:** a second place to trade, a few ruined huts and a jetty on a
+  river far from the town. Her prices are kinder (1.3x value) and she
+  stocks what the town trader doesn't: a fishing rod, snares, rope,
+  fish, copper wire, a battery cell. She knows the way out too.
+  - **Work (O on her screen):** *"Bring me three fish."* Paid with two
+    snares and a Lucky Lure.
+- **Lore:** she ran the ferry before the evacuation and never left. The
+  boat hasn't crossed in years, but she still feeds the men who sleep on
+  it, and she trades so they can eat. *"Ferry's not running. Trading is."*
+
+### The Peddler
+- **Role:** a man pushing a rattling handcart on a round of seven stops
+  around the Zone, half a day at each. When you see him he goes in your
+  journal (where and when). **T** on his hex to trade: odd things the
+  Zone gives up, batteries, wire, the occasional torn page or broken
+  device. He doesn't take work.
+- **Lore:** nobody has seen where he sleeps. The cart never seems to get
+  emptier or fuller, and he always knows which way the next storm is
+  coming from. *"Everything rattles. Everything's for sale."*
+
 ### The sergeant at the Checkpoint
 - **Role:** the end of the game. The Checkpoint is a guard tower on the
   edge of the map, as far from the town as it gets. **T** there: show a

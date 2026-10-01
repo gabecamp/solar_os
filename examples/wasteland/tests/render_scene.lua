@@ -437,3 +437,22 @@ g.weather = function() return "Fog" end
 g:refresh_view()
 g:draw_map(400, 300)
 solaros.dump("ops_map_fog_winter.txt")
+
+-- Scenes: the Ferry Post on the map (with the Peddler passing), Mother Okun's stall
+g = Game.new()
+g:start_game()
+if g.sites.ferry then
+    local q, r = g.sites.ferry:match("(-?%d+),(-?%d+)")
+    g.player.q, g.player.r = tonumber(q) + 1, tonumber(r)
+    if not g.tiles[g.player.q .. "," .. g.player.r] then g.player.q = tonumber(q) end
+    g:refresh_view()
+    g:spot_sites()
+    g.extras.route[1] = g.player.q .. "," .. (g.player.r + 1)   -- (he's passing by)
+    g.player.hours = 0
+    g:draw_map(400, 300)
+    solaros.dump("ops_map_ferry.txt")
+    g:open_trade("ferry")
+    g.trade_ui.col = "theirs"
+    g:draw_trade(400, 300)
+    solaros.dump("ops_trade_ferry.txt")
+end

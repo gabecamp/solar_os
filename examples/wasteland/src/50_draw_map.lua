@@ -65,6 +65,7 @@ function Game:draw_map(w, h)
     local site_at = {}
     for name, key in pairs(self.sites) do site_at[key] = name end
     if self.base then site_at[self.base.key] = "camp" end   -- drawn like a site
+    local peddler = self:peddler_key()
 
     local reachable = {}
     for _, n in ipairs(neighbors(self.tiles, p.q, p.r)) do
@@ -119,6 +120,12 @@ function Game:draw_map(w, h)
                 gfx.color(gfx.BLACK)
                 gfx.rect(rnd(px) - 7, rnd(py) - 7, 14, 14)
                 draw_glyph(site, px, py, gfx.BLACK)
+            end
+            if key == peddler and p.visible[key] and not is_player then
+                -- the Peddler and his cart, on a white patch
+                gfx.color(gfx.WHITE)
+                gfx.fill_rect(rnd(px) - 6, rnd(py) - 6, 12, 12)
+                draw_glyph("cart", px, py, gfx.BLACK)
             end
             if self.stashes[key] and (p.visible[key] or p.explored[key]) then
                 -- a stash from the notes: an X in the lower right

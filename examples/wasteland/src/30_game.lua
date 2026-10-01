@@ -18,6 +18,9 @@ function Game.new()
     end
     self.world_seed = seed       -- the map is rebuilt from this when a save is loaded
     self.tiles, self.ground, seed, self.rad, self.sites = generate_world(seed)
+    self.extras = Game.place_extras(self.tiles, self.sites, self.rad, self.world_seed)
+    self.ferry_trader = Game.starting_stock("ferry")
+    self.peddler = Game.starting_stock("peddler")
     self.trader = {stock = {}, restocked = 0}   -- what the trader has now (it changes as you trade)
     for _, st in ipairs(TRADE.stock) do
         self.trader.stock[#self.trader.stock + 1] = {item = st[1], qty = st[2]}

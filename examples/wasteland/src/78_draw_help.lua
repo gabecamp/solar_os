@@ -25,6 +25,7 @@ local HELP = {
     {"", "C in a ruin: claim it. Carry light at night."},
     {"", "Skills grow with use (J). R on the title: records."},
     {"", "Storms: shelter in ruins, hills or trees."},
+    {"", "Mother Okun trades by the river; a Peddler roams."},
 }
 
 function Game:open_help()

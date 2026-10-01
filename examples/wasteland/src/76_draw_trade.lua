@@ -21,15 +21,16 @@ function Game:draw_trade(w, h)
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
     gfx.font(gfx.FONT_BOLD_14)
-    gfx.text(6, 16, "Trader")
+    local _, cfg = self:trade_partner()
+    gfx.text(6, 16, cfg.name)
     gfx.font(gfx.FONT_MONO_12)
-    gfx.text(110, 16, ("They ask x%.1f value"):format(TRADE.markup))
+    gfx.text(200, 16, ("They ask x%.1f value"):format(cfg.markup))
     for _, col in ipairs({"mine", "theirs"}) do
         local x = L.col_x[col]
         local rows = self:trade_rows(col)
         local pick = col == "mine" and u.give or u.get
         gfx.color(gfx.BLACK)
-        gfx.text(x, 36, col == "mine" and "Your bag  (you give)" or "Trader  (you take)")
+        gfx.text(x, 36, col == "mine" and "Your bag  (you give)" or "Theirs  (you take)")
         local c = u.cursor[col]
         local first = math.max(1, c - L.rows + 1)
         for i = first, math.min(#rows, first + L.rows - 1) do
