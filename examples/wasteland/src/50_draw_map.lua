@@ -266,8 +266,9 @@ for i = 0, 6 do
 end
 
 -- fill_color may be nil (outline only). size defaults to HEX_SIZE.
-function Game:draw_hex(cx, cy, fill_color, outline_color, size)
-    size = size or HEX_SIZE
+-- The hex drawn with rects and lines (the original way, kept for boards
+-- without gfx.bitmap and as the source of the masks below).
+local function draw_hex_lines(cx, cy, fill_color, outline_color, size)
     if fill_color then
         fill_hex(cx, cy, size, fill_color)
     end
@@ -277,6 +278,88 @@ function Game:draw_hex(cx, cy, fill_color, outline_color, size)
         gfx.line(rnd(cx + size * c[2 * i + 1]), rnd(cy + size * c[2 * i + 2]),
                  rnd(cx + size * c[2 * i + 3]), rnd(cy + size * c[2 * i + 4]))
     end
+end
+
+-- Hex masks: draw_hex_lines replayed once per size, at a whole-pixel
+-- center, into 1-bit bitmaps of at most 128 bytes (gfx.bitmap's limit), so
+-- a hex is ~5 draw calls instead of ~24 (16 fill bands + 6 lines). The
+-- firmware dithers a bitmap like a fill_rect of the same color. Each mask
+-- is a list of chunks {dx, dy, w, h, data} relative to the center.
+HEX_MASKS = {}   -- (a global: the bundle's 200-local limit)
+function Game.hex_mask(size)
+    if HEX_MASKS[size] then return HEX_MASKS[size] end
+    local layers, pen = {}, nil
+    local function plot(x, y)
+        local layer = layers[pen]
+        layer.px[y * 1000 + x] = true
+        layer.x0, layer.x1 = math.min(layer.x0, x), math.max(layer.x1, x)
+        layer.y0, layer.y1 = math.min(layer.y0, y), math.max(layer.y1, y)
+    end
+    local real = {color = gfx.color, fill_rect = gfx.fill_rect, line = gfx.line}
+    gfx.color = function(c)
+        pen = c
+        layers[c] = layers[c] or {px = {}, x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9}
+    end
+    gfx.fill_rect = function(x, y, w, h)
+        for yy = y, y + h - 1 do for xx = x, x + w - 1 do plot(xx, yy) end end
+    end
+    gfx.line = function(x0, y0, x1, y1)   -- Bresenham, both ends included
+        local dx, dy = math.abs(x1 - x0), -math.abs(y1 - y0)
+        local sx, sy = x0 < x1 and 1 or -1, y0 < y1 and 1 or -1
+        local err = dx + dy
+        while true do
+            plot(x0, y0)
+            if x0 == x1 and y0 == y1 then break end
+            local e2 = 2 * err
+            if e2 >= dy then err = err + dy; x0 = x0 + sx end
+            if e2 <= dx then err = err + dx; y0 = y0 + sy end
+        end
+    end
+    -- the fill in BLACK, the outline in WHITE, just to tell them apart
+    local ok, err = pcall(draw_hex_lines, 0, 0, gfx.BLACK, gfx.WHITE, size)
+    gfx.color, gfx.fill_rect, gfx.line = real.color, real.fill_rect, real.line
+    if not ok then error(err) end
+    local function pack(layer)
+        local chunks = {}
+        if not layer then return chunks end
+        local w = layer.x1 - layer.x0 + 1
+        local bpr = (w + 7) // 8
+        local rows = 128 // bpr
+        for top = layer.y0, layer.y1, rows do
+            local h = math.min(rows, layer.y1 - top + 1)
+            local bytes = {}
+            for y = top, top + h - 1 do
+                for b = 0, bpr - 1 do
+                    local v = 0
+                    for bit = 0, 7 do
+                        local x = layer.x0 + b * 8 + bit
+                        if b * 8 + bit < w and layer.px[y * 1000 + x] then v = v | (1 << bit) end
+                    end
+                    bytes[#bytes + 1] = string.char(v)
+                end
+            end
+            chunks[#chunks + 1] = {layer.x0, top, w, h, table.concat(bytes)}
+        end
+        return chunks
+    end
+    HEX_MASKS[size] = {fill = pack(layers[gfx.BLACK]), outline = pack(layers[gfx.WHITE])}
+    return HEX_MASKS[size]
+end
+
+local function draw_mask(chunks, cx, cy)
+    for _, c in ipairs(chunks) do draw_sprite(cx + c[1], cy + c[2], c[3], c[4], c[5]) end
+end
+
+function Game:draw_hex(cx, cy, fill_color, outline_color, size)
+    size = size or HEX_SIZE
+    if not draw_sprite then return draw_hex_lines(cx, cy, fill_color, outline_color, size) end
+    local mask, x, y = Game.hex_mask(size), rnd(cx), rnd(cy)
+    if fill_color and fill_color ~= gfx.WHITE then
+        gfx.color(fill_color)
+        draw_mask(mask.fill, x, y)
+    end
+    gfx.color(outline_color)
+    draw_mask(mask.outline, x, y)
 end
 
 local INV_ROWS = {}  -- rebuilt each draw: {kind, key, label} - only selectable item rows

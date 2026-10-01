@@ -52,7 +52,7 @@ before and start it. For anything that goes wrong, a photo of the screen
   much higher than ~1 MB on the device would be worth reporting.
 - The script is ~410 KB; SolarOS streams it from storage, so size is not
   a limit.
-- Redraws: the map is ~450-900 draw calls, the bag ~280 for a full redraw
+- Redraws: the map is ~200-500 draw calls, the bag ~280 for a full redraw
   and ~100 when only the cursor moves. The device info page (H, V) says
   "Fast drawing: yes" when the firmware has `solaros.tick_interval`; then
   moving the bag cursor should feel instant and other screens should appear

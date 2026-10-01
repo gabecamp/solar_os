@@ -39,8 +39,26 @@ print("3. glyphs pack to 20 bytes and round-trip exactly")
 -- 4. draw a fully revealed map: sprite contract holds (stub validates ints + byte count)
 local g = Game.new()
 for key in pairs(g.tiles) do g.player.visible[key] = true; g.player.explored[key] = true end
+-- hexes are drawn as bitmap masks (fill, outline): set those apart too
+local function is_mask(c)
+    for _, m in pairs(HEX_MASKS) do
+        for _, part in pairs(m) do
+            for _, ch in ipairs(part) do if ch[5] == c.data then return true end end
+        end
+    end
+    return false
+end
+local function drop_masks()
+    local n = 0
+    for i = #SPRITE_CALLS, 1, -1 do
+        if is_mask(SPRITE_CALLS[i]) then table.remove(SPRITE_CALLS, i); n = n + 1 end
+    end
+    return n
+end
 SPRITE_CALLS = {}
 g:draw_map(400, 300)
+local masks_drawn = drop_masks()
+assert(masks_drawn > 100, "the hexes are drawn with masks: " .. masks_drawn)
 -- you are a stick figure (7x11) on a halo (9x13): set those two apart
 local figure = {}
 for i = #SPRITE_CALLS, 1, -1 do
@@ -74,12 +92,36 @@ g = Game.new()
 g.player.visible = {}; g.player.explored = {}
 SPRITE_CALLS = {}
 g:draw_map(400, 300)
+drop_masks()
 assert(#SPRITE_CALLS == #LEGEND_ORDER + 2, "with nothing seen only the legend (and you) should draw, got " .. #SPRITE_CALLS)
 g.player.explored["1,0"] = true
 SPRITE_CALLS = {}
 g:draw_map(400, 300)
+drop_masks()
 assert(#SPRITE_CALLS == #LEGEND_ORDER + 3, "one remembered tile should add exactly one glyph")
 print("5. unseen tiles draw no glyph; remembered tiles draw one")
+
+-- 5b. the hex masks: within gfx.bitmap's 128 bytes, the fill sits inside the
+--     outline, and the outline is the six edges (every row has its sides)
+for _, size in ipairs({HEX_SIZE, HEX_SIZE - 3}) do
+    local m = Game.hex_mask(size)
+    local box = {1e9, 1e9, -1e9, -1e9}
+    for _, part in pairs(m) do
+        for _, ch in ipairs(part) do
+            assert(#ch[5] == ((ch[3] + 7) // 8) * ch[4] and #ch[5] <= 128, "mask chunk too big")
+        end
+    end
+    for _, ch in ipairs(m.outline) do
+        box = {math.min(box[1], ch[1]), math.min(box[2], ch[2]),
+               math.max(box[3], ch[1] + ch[3]), math.max(box[4], ch[2] + ch[4])}
+    end
+    assert(box[4] - box[2] == 2 * size + 1, "outline spans the hex's height")
+    for _, ch in ipairs(m.fill) do
+        assert(ch[1] > box[1] and ch[2] > box[2] and ch[1] + ch[3] < box[3] and ch[2] + ch[4] < box[4],
+               "fill stays inside the outline")
+    end
+end
+print("5b. hex masks fit gfx.bitmap and the fill stays inside the outline")
 
 -- 6. layout: legend text fits the width; map's lowest pixel is above the legend;
 --    map's top is below the HUD
