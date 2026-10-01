@@ -41,6 +41,18 @@ local g = Game.new()
 for key in pairs(g.tiles) do g.player.visible[key] = true; g.player.explored[key] = true end
 SPRITE_CALLS = {}
 g:draw_map(400, 300)
+-- you are a stick figure (7x11) on a halo (9x13): set those two apart
+local figure = {}
+for i = #SPRITE_CALLS, 1, -1 do
+    local c = SPRITE_CALLS[i]
+    if (c.w == 7 and c.h == 11) or (c.w == 9 and c.h == 13) then
+        figure[#figure + 1] = table.remove(SPRITE_CALLS, i)
+    end
+end
+assert(#figure == 2, "the player is drawn as a figure and its halo")
+for _, c in ipairs(figure) do
+    assert(#c.data == ((c.w + 7) // 8) * c.h and c.x + c.w <= 256, "figure fits the map")
+end
 local tiles = 0; for _ in pairs(g.tiles) do tiles = tiles + 1 end
 -- the world is bigger than the screen: only the hexes in the map window
 -- around you are drawn (plus one glyph per legend entry), never all of them
@@ -62,11 +74,11 @@ g = Game.new()
 g.player.visible = {}; g.player.explored = {}
 SPRITE_CALLS = {}
 g:draw_map(400, 300)
-assert(#SPRITE_CALLS == #LEGEND_ORDER, "with nothing seen only the legend should draw, got " .. #SPRITE_CALLS)
+assert(#SPRITE_CALLS == #LEGEND_ORDER + 2, "with nothing seen only the legend (and you) should draw, got " .. #SPRITE_CALLS)
 g.player.explored["1,0"] = true
 SPRITE_CALLS = {}
 g:draw_map(400, 300)
-assert(#SPRITE_CALLS == #LEGEND_ORDER + 1, "one remembered tile should add exactly one glyph")
+assert(#SPRITE_CALLS == #LEGEND_ORDER + 3, "one remembered tile should add exactly one glyph")
 print("5. unseen tiles draw no glyph; remembered tiles draw one")
 
 -- 6. layout: legend text fits the width; map's lowest pixel is above the legend;

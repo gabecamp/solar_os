@@ -171,17 +171,19 @@ function Game:draw_map(w, h)
                 draw_sprite(fx, fy, GLYPH_W, GLYPH_H, GLYPHS.campfire)
             end
             if is_player then
-                -- white halo keeps the marker visible on dark/black tiles
-                gfx.color(gfx.WHITE)
-                gfx.fill_rect(rnd(px) - 5, rnd(py) - 5, 10, 10)
-                gfx.color(gfx.BLACK)
-                gfx.fill_rect(rnd(px) - 3, rnd(py) - 3, 6, 6)
+                -- you: a stick figure on a white halo, so it reads on dark tiles
+                if draw_sprite then
+                    gfx.color(gfx.WHITE)
+                    draw_sprite(rnd(px) - 4, rnd(py) - 6, 9, 13, GLYPHS.player_halo)
+                    gfx.color(gfx.BLACK)
+                    draw_sprite(rnd(px) - 3, rnd(py) - 5, 7, 11, GLYPHS.player)
+                end
                 if self.dog then   -- your dog at your heel: a small block with an ear
                     gfx.color(gfx.WHITE)
-                    gfx.fill_rect(rnd(px) + 4, rnd(py) + 1, 8, 6)
+                    gfx.fill_rect(rnd(px) + 5, rnd(py) + 1, 8, 6)
                     gfx.color(gfx.BLACK)
-                    gfx.fill_rect(rnd(px) + 5, rnd(py) + 3, 6, 3)
-                    gfx.fill_rect(rnd(px) + 9, rnd(py) + 1, 2, 2)
+                    gfx.fill_rect(rnd(px) + 6, rnd(py) + 3, 6, 3)
+                    gfx.fill_rect(rnd(px) + 10, rnd(py) + 1, 2, 2)
                 end
             end
         end

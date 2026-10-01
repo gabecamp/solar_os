@@ -1486,6 +1486,40 @@ GLYPHS.rad = pack_bitmap("glyph:rad", {
     "..###..",
     "..###..",
 }, 7, 7)
+-- You on the map: a 7x11 stick figure, and a white halo 1px bigger all
+-- round (9x13, grown from the same art) so it reads on any terrain.
+do
+    local figure = {
+        "..###..",
+        "..###..",
+        "..###..",
+        "...#...",
+        ".#####.",
+        "#..#..#",
+        "...#...",
+        "...#...",
+        "..#.#..",
+        ".#...#.",
+        ".#...#.",
+    }
+    local halo = {}
+    for y = 0, #figure + 1 do
+        local row = {}
+        for x = 0, #figure[1] + 1 do
+            local on = false
+            for dy = -1, 1 do
+                for dx = -1, 1 do
+                    local r = figure[y + dy]
+                    if r and r:sub(x + dx, x + dx) == "#" then on = true end
+                end
+            end
+            row[#row + 1] = on and "#" or "."
+        end
+        halo[#halo + 1] = table.concat(row)
+    end
+    GLYPHS.player = pack_bitmap("glyph:player", figure, 7, 11)
+    GLYPHS.player_halo = pack_bitmap("glyph:player_halo", halo, 9, 13)
+end
 for terrain_id in pairs(TERRAIN) do
     assert(GLYPHS[terrain_id], "terrain has no glyph: " .. terrain_id)
 end

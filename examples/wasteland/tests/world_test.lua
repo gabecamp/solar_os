@@ -52,14 +52,11 @@ print("2. the camera follows you: far from the start you're still in the middle"
 local g = fresh()
 g.player.q, g.player.r = W.GRID_RADIUS - 1, 0
 g:refresh_view()
-local fills = {}
-local saved = gfx.fill_rect
-gfx.fill_rect = function(x, y, w, h) saved(x, y, w, h); fills[#fills + 1] = {x, y, w, h} end
+SPRITE_CALLS = {}   -- (the fake records every sprite)
 g:draw_map(400, 300)
-gfx.fill_rect = saved
 local marker = false
-for _, f in ipairs(fills) do
-    if f[3] == 6 and f[4] == 6 and math.abs(f[1] + 3 - 128) <= 1 and math.abs(f[2] + 3 - 120) <= 1 then
+for _, c in ipairs(SPRITE_CALLS) do   -- the 7x11 stick figure, centered
+    if c.w == 7 and c.h == 11 and math.abs(c.x + 3 - 128) <= 1 and math.abs(c.y + 5 - 120) <= 1 then
         marker = true
     end
 end
