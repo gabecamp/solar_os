@@ -428,3 +428,12 @@ rec.achieved.night_owl, rec.achieved.karl = true, true
 g:open_records()
 g:draw_records(400, 300)
 solaros.dump("ops_records.txt")
+
+-- Scene: a foggy winter day (shorter sight, the season on the panel)
+g = Game.new()
+g:start_game()
+g.player.hours = 13 * 24 + 2
+g.weather = function() return "Fog" end
+g:refresh_view()
+g:draw_map(400, 300)
+solaros.dump("ops_map_fog_winter.txt")

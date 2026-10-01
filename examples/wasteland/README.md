@@ -48,6 +48,13 @@ What the Zone is like now:
   and three of them will buy your way out.
 - **Night.** From 20:00 to 06:00 your sight shrinks unless you carry a
   light, and other things come out.
+- **Seasons and weather.** A run starts in late Autumn; each season lasts
+  10 days (Autumn, Winter, Spring, Summer, round again). Winter is colder,
+  with snow and less food; Summer is hot and thirsty, with storms; Autumn
+  has the most to forage. **Fog** shortens your sight, and things are on
+  you before you see them (but it's easier to hide). A **storm** out on
+  open plains or a ford wears you down hour by hour: get into ruins, hills
+  or trees and wait it out.
 - **The way out.** Find the **Trader** in the ruined town; he'll tell you
   where the **Checkpoint** is. Bring a **Zone Permit**, or 3 artifacts.
 

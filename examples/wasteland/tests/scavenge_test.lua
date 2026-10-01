@@ -111,7 +111,7 @@ dofile("wasteland_run.lua")
 gfx.getch, fake.should_exit, gfx.text = saved_getch, saved_exit, saved_text
 local hit = false
 for _, s in ipairs(texts) do
-    if s:find("^Found") or s:find("Found nothing") then hit = true end
+    if s:find("^Found") or s:find("Found nothing") or s:find("Press I to pick it up") then hit = true end
 end
 assert(hit, "F did not scavenge")
 print("   OK")

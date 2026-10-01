@@ -65,6 +65,7 @@ print("   OK")
 
 print("3. the clock: day 1 starts at 08:00; night from 20:00 costs sight unless you hold a torch")
 g = fresh()
+g.weather = function() return "Clear" end   -- (fog shortens sight too; that is weather_test's)
 local d, hr = g:clock()
 assert(d == 1 and hr == W.WORLD.start_hour)
 local sight = g.player.view_sight

@@ -79,8 +79,27 @@ local TERRAIN_WEIGHTS = {
 -- cold: rest drains faster and after cold_grace hours you lose health.
 local WORLD = {
     start_hour = 8, night_from = 20, night_to = 6, weather_block = 6,
-    weather = {{"Clear", 40}, {"Overcast", 30}, {"Rain", 20}, {"Cold snap", 10}},
-    need = {Clear = 0, Overcast = 1, Rain = 3, ["Cold snap"] = 5},
+    -- weather is rolled per block from the season's own weights (seasons)
+    need = {Clear = 0, Overcast = 1, Rain = 3, ["Cold snap"] = 5, Fog = 1, Storm = 4, Snow = 3},
+    -- seasons of season_days each, starting in late Autumn on day 1.
+    -- need: extra warmth all season; food: share of food in searches;
+    -- thirst: extra thirst drain per awake hour (summer heat)
+    season_days = 10,
+    seasons = {
+        {name = "Autumn", short = "Aut", need = 0, food = 1.25, thirst = 0,
+         weather = {{"Clear", 35}, {"Overcast", 30}, {"Rain", 18}, {"Fog", 12}, {"Storm", 5}}},
+        {name = "Winter", short = "Win", need = 1, food = 0.9, thirst = 0,
+         weather = {{"Clear", 34}, {"Overcast", 24}, {"Snow", 18}, {"Fog", 12}, {"Cold snap", 12}}},
+        {name = "Spring", short = "Spr", need = 0, food = 1, thirst = 0,
+         weather = {{"Clear", 32}, {"Overcast", 20}, {"Rain", 26}, {"Fog", 17}, {"Storm", 5}}},
+        {name = "Summer", short = "Sum", need = -1, food = 1, thirst = 0.4,
+         weather = {{"Clear", 52}, {"Overcast", 13}, {"Rain", 10}, {"Fog", 8}, {"Storm", 17}}},
+    },
+    -- a storm in the open (open terrain, no bedroll camp): rest each hour, and
+    -- HP each hour after `grace` hours of it; nothing else moves in it
+    storm = {open = {plains = true, ford = true}, rest = 4, grace = 2, hurt = 3, encounters = 0.5},
+    calm_start = 12,                   -- no storm or fog in the first hours of a run
+    fog_hide = 15,                     -- % on Hide in fog (encounters start near)
     night_need = 2, cold_rest_drain = 3, cold_grace = 2, cold_hurt = 2,
     night_encounters = 1.5, fire_rest_bonus = 0.5,
     rivers = 2, town_ruins = 9, lone_ruins = 8,
@@ -2996,7 +3015,7 @@ function Game:scavenge()
         end
         local food = ITEM_DB[entry[1]] and ITEM_DB[entry[1]].consumable
         if food and food.hunger and food.hunger > 0 then
-            w = math.max(1, math.floor(w * self:diff("food") + 0.5))
+            w = math.max(1, math.floor(w * self:diff("food") * self:season().food + 0.5))
         end
         table_[i] = {entry[1], w}
     end
@@ -3608,6 +3627,7 @@ end
 function Game:death_reason()
     local p = self.player
     if self.emission_caught then return "The emission took you." end
+    if (p.storm_hours or 0) > WORLD.storm.grace then return "The storm took you." end
     if (p.cold_hours or 0) > WORLD.cold_grace then return "You froze to death." end
     if self:rad_stage() >= 2 then
         return self:can_measure() and "Radiation sickness took you." or "A wasting sickness took you."
@@ -3638,12 +3658,48 @@ function Game:is_night(hours)
     return hour >= WORLD.night_from or hour < WORLD.night_to
 end
 
+-- The season `hours` into the run: an entry of WORLD.seasons (from the day,
+-- so nothing to save). Day 1 is late Autumn.
+function Game:season(hours)
+    local day = self:clock(hours)
+    local i = ((day - 1) // WORLD.season_days) % #WORLD.seasons + 1
+    return WORLD.seasons[i], (day - 1) % WORLD.season_days + 1
+end
+
 function Game:weather(hours)
     local block = (WORLD.start_hour + (hours or self.player.hours)) // WORLD.weather_block
     local s = (self.weather_seed + block * 7919) % 32768
     s = rand_next(rand_next(s))
-    local _, kind = weighted_pick(s, WORLD.weather)
+    local _, kind = weighted_pick(s, self:season(hours).weather)
+    -- a gentle first morning: no storm or fog while you find your feet
+    if (kind == "Storm" or kind == "Fog") and (hours or self.player.hours) < WORLD.calm_start then
+        kind = "Overcast"
+    end
     return kind
+end
+
+-- Out in the open in a storm, with nowhere to shelter.
+function Game:storm_exposed(hours)
+    local p = self.player
+    return self:weather(hours) == "Storm" and WORLD.storm.open[self.tiles[hex_key(p.q, p.r)]] == true
+        and not self:bed_here()
+end
+
+-- One hour of a storm (from tick): exposed, it wears you down.
+function Game:storm_hour(hour)
+    local p, st = self.player, WORLD.storm
+    if not self:storm_exposed(hour) then
+        p.storm_hours = 0
+        return
+    end
+    p.storm_hours = (p.storm_hours or 0) + 1
+    p.needs.rest = clamp(p.needs.rest - st.rest)
+    if p.storm_hours > st.grace then p.health = clamp(p.health - st.hurt) end
+end
+
+-- Map panel: "Win Storm" (season, weather).
+function Game:weather_text()
+    return self:season().short .. " " .. self:weather()
 end
 
 -- Warmth from what you wear (not what you hold).
@@ -3656,7 +3712,8 @@ function Game:warmth()
 end
 
 function Game:cold_need(hours)
-    return WORLD.need[self:weather(hours)] + (self:is_night(hours) and WORLD.night_need or 0)
+    return WORLD.need[self:weather(hours)] + self:season(hours).need
+        + (self:is_night(hours) and WORLD.night_need or 0)
 end
 
 function Game:fire_at(hours)
@@ -3683,7 +3740,8 @@ end
 function Game:refresh_view()
     local p = self.player
     local dark = self:is_night() and not self:has_light()
-    p.view_sight = math.max(1, p.sight - (dark and 1 or 0))
+    local fog = self:weather() == "Fog"
+    p.view_sight = math.max(1, p.sight - (dark and 1 or 0) - (fog and 1 or 0))
     update_visibility(p, self.tiles)
     self:apply_item_names()
 end
@@ -3707,6 +3765,9 @@ function Game:tick()
         end
         dose = dose + self:rad_hour()
         self:survive_hour()
+        self:storm_hour(hour)
+        local heat = self:season(hour).thirst
+        if heat > 0 then p.needs.thirst = clamp(p.needs.thirst - heat) end
         self:emission_hour(hour)
         self:dog_hour(hour)
         self:base_hour(hour)
@@ -3717,6 +3778,11 @@ function Game:tick()
         self:push_log("You're cold. Wear warmer clothes or build a fire.")
     elseif cold and p.cold_hours == WORLD.cold_grace + 1 then
         self:push_log("The cold is getting into you. (-" .. WORLD.cold_hurt .. " HP/h)")
+    end
+    if (p.storm_hours or 0) == 1 then
+        self:push_log("The storm is on you. Get to cover: ruins, hills or trees.")
+    elseif (p.storm_hours or 0) == WORLD.storm.grace + 1 then
+        self:push_log("The storm is beating you down. (-" .. WORLD.storm.hurt .. " HP/h)")
     end
     self:rad_news(dose, rad_before)
     self:survive_news()
@@ -4115,6 +4181,7 @@ function Game:maybe_encounter(terrain_id)
     local chance = FIGHT.ENCOUNTER_CHANCE[terrain_id]
     if chance then chance = chance * self:diff("encounter") end
     if chance and self:is_night() then chance = chance * WORLD.night_encounters end
+    if chance and self:weather() == "Storm" then chance = chance * WORLD.storm.encounters end
     if chance and self:roll(chance * self.player.encounter_mult) then self:start_encounter(self:pick_encounter()) end
 end
 
@@ -4136,6 +4203,10 @@ function Game:start_encounter(def)
                 intro = wrap(def.intro, ENC_INTRO_COLS), cursor = 1, aim = 0,
                 demanding = def.kind == "bandit"}
     if def.kind == "bandit" then self:enc_say(def.demand) end
+    if self:weather() == "Fog" then   -- it was on you before you saw it
+        self.enc.fog = true
+        if self.enc.range == "far" then self.enc.range = "near" end
+    end
     self.screen = "encounter"
 end
 
@@ -4227,7 +4298,7 @@ function Game:encounter_options()
     end
     if e.range ~= "far" then o[#o + 1] = {"Back off", "back"} end
     if not e.seen then o[#o + 1] = {"Watch it", "watch"} end
-    if e.range == "far" then o[#o + 1] = {"Hide", "hide"} end
+    if e.range == "far" or (e.fog and e.range == "near") then o[#o + 1] = {"Hide", "hide"} end
     if kind == "mutant" and not e.talked then o[#o + 1] = {"Talk", "talk"} end
     o[#o + 1] = {"Flee", "flee"}
     return o
@@ -4414,6 +4485,7 @@ function Game:encounter_action(action)
         end
     elseif action == "hide" then
         local chance = FIGHT.HIDE_CHANCE + 10 * (p.attrs.Perception - 3) + self:dog_bonus()
+            + (e.fog and WORLD.fog_hide or 0)
         if e.def.kind == "animal" then chance = chance - 10 end
         if self:roll(chance) then
             self:enc_say("You drop into cover and keep very still. It passes you by.")
@@ -5647,7 +5719,7 @@ function Game:draw_map(w, h)
     local day, hour = self:clock()
     gfx.text(PANEL_X, 14, ("Day %d %02d:00%s"):format(day, hour, self:is_night() and " Night" or ""))
     -- an emission coming (or raging) matters more than the weather
-    gfx.text(PANEL_X, 28, self:emission_text() or (self:weather() .. (self:fire_here() and "  Fire" or "")))
+    gfx.text(PANEL_X, 28, self:emission_text() or (self:weather_text() .. (self:fire_here() and "  Fire" or "")))
     local scav = SCAVENGE_LOOT[self.tiles[hex_key(p.q, p.r)]]
         and (self:scavenge_left() .. "/" .. SCAVENGE_TRIES) or "-"
     gfx.text(PANEL_X, 42, "MP " .. math.max(p.mp, 0) .. "/" .. p.max_mp
@@ -8366,6 +8438,7 @@ local HELP = {
     {"", "Karl fishes rivers. Strays like food."},
     {"", "C in a ruin: claim it. Carry light at night."},
     {"", "Skills grow with use (J). R on the title: records."},
+    {"", "Storms: shelter in ruins, hills or trees."},
 }
 
 function Game:open_help()
@@ -8474,6 +8547,12 @@ function Game:journal_lines()
     add(("Day %d, %02d:00. %d hours in the Zone. %s."):format(day, hour, p.hours,
         DIFFICULTY[self.difficulty or "normal"].name))
     add(self:skills_line())
+    local season, sday = self:season()
+    local weather = self:weather()
+    local advice = {Storm = " Find shelter: ruins, hills, trees.", Fog = " Sight is short.",
+                    Snow = " Dress warm.", ["Cold snap"] = " Dress warm."}
+    add(("%s, day %d of %d. %s.%s"):format(season.name, sday, WORLD.season_days, weather,
+        advice[weather] or ""))
     -- the way out
     if self.sites_known.checkpoint then
         add("Checkpoint: " .. self:site_bearing("checkpoint") .. ". Needs a permit or "

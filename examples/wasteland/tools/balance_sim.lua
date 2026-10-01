@@ -289,8 +289,13 @@ local function play(seed)
                 end
                 local target
                 local emit = g:emission_text()
+                -- a storm: get under cover (any terrain that isn't open), then wait it out
+                local storm = g:weather() == "Storm"
+                local open = D.WORLD.storm.open
                 if emit and not D.RAD.emission.shelter[g.tiles[here]] then
                     target = function(k) return g.tiles[k] == "ruins" end
+                elseif storm and open[g.tiles[here]] then
+                    target = function(k) return not open[g.tiles[k]] end
                 elseif can_exit and g.sites_known.checkpoint then
                     target = function(k) return k == g.sites.checkpoint end
                 elseif g.sites_known.trader and (not stats.traded or can_buy) and count(g, "permit") == 0 then
@@ -323,7 +328,7 @@ local function play(seed)
                         return (g.rad[k] or 0) < 3 or (p.rads or 0) < (hunting and 40 or 25)
                     end
                 end
-                if emit and D.RAD.emission.shelter[g.tiles[here]] then
+                if (emit and D.RAD.emission.shelter[g.tiles[here]]) or (storm and not open[g.tiles[here]]) then
                     local h = p.hours
                     g:rest()
                     if p.hours == h then wait_hour(g) end

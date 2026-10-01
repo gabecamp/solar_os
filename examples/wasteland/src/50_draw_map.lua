@@ -43,7 +43,7 @@ function Game:draw_map(w, h)
     local day, hour = self:clock()
     gfx.text(PANEL_X, 14, ("Day %d %02d:00%s"):format(day, hour, self:is_night() and " Night" or ""))
     -- an emission coming (or raging) matters more than the weather
-    gfx.text(PANEL_X, 28, self:emission_text() or (self:weather() .. (self:fire_here() and "  Fire" or "")))
+    gfx.text(PANEL_X, 28, self:emission_text() or (self:weather_text() .. (self:fire_here() and "  Fire" or "")))
     local scav = SCAVENGE_LOOT[self.tiles[hex_key(p.q, p.r)]]
         and (self:scavenge_left() .. "/" .. SCAVENGE_TRIES) or "-"
     gfx.text(PANEL_X, 42, "MP " .. math.max(p.mp, 0) .. "/" .. p.max_mp

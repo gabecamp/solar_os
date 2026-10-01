@@ -191,7 +191,7 @@ function Game:scavenge()
         end
         local food = ITEM_DB[entry[1]] and ITEM_DB[entry[1]].consumable
         if food and food.hunger and food.hunger > 0 then
-            w = math.max(1, math.floor(w * self:diff("food") + 0.5))
+            w = math.max(1, math.floor(w * self:diff("food") * self:season().food + 0.5))
         end
         table_[i] = {entry[1], w}
     end

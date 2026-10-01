@@ -160,6 +160,7 @@ end
 function Game:death_reason()
     local p = self.player
     if self.emission_caught then return "The emission took you." end
+    if (p.storm_hours or 0) > WORLD.storm.grace then return "The storm took you." end
     if (p.cold_hours or 0) > WORLD.cold_grace then return "You froze to death." end
     if self:rad_stage() >= 2 then
         return self:can_measure() and "Radiation sickness took you." or "A wasting sickness took you."

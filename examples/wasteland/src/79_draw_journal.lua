@@ -14,6 +14,12 @@ function Game:journal_lines()
     add(("Day %d, %02d:00. %d hours in the Zone. %s."):format(day, hour, p.hours,
         DIFFICULTY[self.difficulty or "normal"].name))
     add(self:skills_line())
+    local season, sday = self:season()
+    local weather = self:weather()
+    local advice = {Storm = " Find shelter: ruins, hills, trees.", Fog = " Sight is short.",
+                    Snow = " Dress warm.", ["Cold snap"] = " Dress warm."}
+    add(("%s, day %d of %d. %s.%s"):format(season.name, sday, WORLD.season_days, weather,
+        advice[weather] or ""))
     -- the way out
     if self.sites_known.checkpoint then
         add("Checkpoint: " .. self:site_bearing("checkpoint") .. ". Needs a permit or "

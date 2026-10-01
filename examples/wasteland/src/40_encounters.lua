@@ -25,6 +25,7 @@ function Game:maybe_encounter(terrain_id)
     local chance = FIGHT.ENCOUNTER_CHANCE[terrain_id]
     if chance then chance = chance * self:diff("encounter") end
     if chance and self:is_night() then chance = chance * WORLD.night_encounters end
+    if chance and self:weather() == "Storm" then chance = chance * WORLD.storm.encounters end
     if chance and self:roll(chance * self.player.encounter_mult) then self:start_encounter(self:pick_encounter()) end
 end
 
@@ -46,6 +47,10 @@ function Game:start_encounter(def)
                 intro = wrap(def.intro, ENC_INTRO_COLS), cursor = 1, aim = 0,
                 demanding = def.kind == "bandit"}
     if def.kind == "bandit" then self:enc_say(def.demand) end
+    if self:weather() == "Fog" then   -- it was on you before you saw it
+        self.enc.fog = true
+        if self.enc.range == "far" then self.enc.range = "near" end
+    end
     self.screen = "encounter"
 end
 
@@ -137,7 +142,7 @@ function Game:encounter_options()
     end
     if e.range ~= "far" then o[#o + 1] = {"Back off", "back"} end
     if not e.seen then o[#o + 1] = {"Watch it", "watch"} end
-    if e.range == "far" then o[#o + 1] = {"Hide", "hide"} end
+    if e.range == "far" or (e.fog and e.range == "near") then o[#o + 1] = {"Hide", "hide"} end
     if kind == "mutant" and not e.talked then o[#o + 1] = {"Talk", "talk"} end
     o[#o + 1] = {"Flee", "flee"}
     return o
@@ -324,6 +329,7 @@ function Game:encounter_action(action)
         end
     elseif action == "hide" then
         local chance = FIGHT.HIDE_CHANCE + 10 * (p.attrs.Perception - 3) + self:dog_bonus()
+            + (e.fog and WORLD.fog_hide or 0)
         if e.def.kind == "animal" then chance = chance - 10 end
         if self:roll(chance) then
             self:enc_say("You drop into cover and keep very still. It passes you by.")

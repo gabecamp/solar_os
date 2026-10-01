@@ -54,8 +54,27 @@ local TERRAIN_WEIGHTS = {
 -- cold: rest drains faster and after cold_grace hours you lose health.
 local WORLD = {
     start_hour = 8, night_from = 20, night_to = 6, weather_block = 6,
-    weather = {{"Clear", 40}, {"Overcast", 30}, {"Rain", 20}, {"Cold snap", 10}},
-    need = {Clear = 0, Overcast = 1, Rain = 3, ["Cold snap"] = 5},
+    -- weather is rolled per block from the season's own weights (seasons)
+    need = {Clear = 0, Overcast = 1, Rain = 3, ["Cold snap"] = 5, Fog = 1, Storm = 4, Snow = 3},
+    -- seasons of season_days each, starting in late Autumn on day 1.
+    -- need: extra warmth all season; food: share of food in searches;
+    -- thirst: extra thirst drain per awake hour (summer heat)
+    season_days = 10,
+    seasons = {
+        {name = "Autumn", short = "Aut", need = 0, food = 1.25, thirst = 0,
+         weather = {{"Clear", 35}, {"Overcast", 30}, {"Rain", 18}, {"Fog", 12}, {"Storm", 5}}},
+        {name = "Winter", short = "Win", need = 1, food = 0.9, thirst = 0,
+         weather = {{"Clear", 34}, {"Overcast", 24}, {"Snow", 18}, {"Fog", 12}, {"Cold snap", 12}}},
+        {name = "Spring", short = "Spr", need = 0, food = 1, thirst = 0,
+         weather = {{"Clear", 32}, {"Overcast", 20}, {"Rain", 26}, {"Fog", 17}, {"Storm", 5}}},
+        {name = "Summer", short = "Sum", need = -1, food = 1, thirst = 0.4,
+         weather = {{"Clear", 52}, {"Overcast", 13}, {"Rain", 10}, {"Fog", 8}, {"Storm", 17}}},
+    },
+    -- a storm in the open (open terrain, no bedroll camp): rest each hour, and
+    -- HP each hour after `grace` hours of it; nothing else moves in it
+    storm = {open = {plains = true, ford = true}, rest = 4, grace = 2, hurt = 3, encounters = 0.5},
+    calm_start = 12,                   -- no storm or fog in the first hours of a run
+    fog_hide = 15,                     -- % on Hide in fog (encounters start near)
     night_need = 2, cold_rest_drain = 3, cold_grace = 2, cold_hurt = 2,
     night_encounters = 1.5, fire_rest_bonus = 0.5,
     rivers = 2, town_ruins = 9, lone_ruins = 8,
