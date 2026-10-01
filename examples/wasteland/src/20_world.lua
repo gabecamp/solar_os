@@ -367,10 +367,10 @@ local function recompute_stats(player)
     player.sight = math.max(1, BASE_SIGHT + (a.Perception - 3) // 2 + fx.sight)
     player.scav_rolls = math.max(1, SCAVENGE_ROLLS + (a.Perception - 3) // 2 + fx.scav)
     player.bag_bonus = (a.Strength - 3) + fx.bag
-    player.hunger_mult = fx.hunger
+    player.hunger_mult = fx.hunger * (player.diff_drain or 1)
     player.rest_gain_mult = fx.rest_gain
     player.rest_drain_mult = (1 - 0.1 * (a.Endurance - 3)) * fx.rest_drain
-    player.thirst_mult = fx.thirst
+    player.thirst_mult = fx.thirst * (player.diff_drain or 1)
     player.heal_per_hour = fx.heal
     player.encounter_mult = fx.encounter
     player.scav_hurt = fx.scav_hurt

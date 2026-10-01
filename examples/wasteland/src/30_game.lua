@@ -49,6 +49,17 @@ function Game.new()
     return self
 end
 
+-- A difficulty multiplier (DIFFICULTY in 05_data); Normal is all 1.
+function Game:diff(key)
+    return DIFFICULTY[self.difficulty or "normal"][key]
+end
+
+function Game:set_difficulty(id)
+    self.difficulty = id
+    self.player.diff_drain = DIFFICULTY[id].drain
+    recompute_stats(self.player)
+end
+
 -- Leave the creator: apply the chosen stats and start on the map.
 function Game:start_game()
     if trait_points_left(self.player.traits) < 0 then
@@ -170,6 +181,10 @@ function Game:scavenge()
     for i, entry in ipairs(loot) do
         local w = entry[2]
         if entry[1] == "nothing" then w = math.max(1, w * (7 - p.attrs.Perception) // 4) end
+        local food = ITEM_DB[entry[1]] and ITEM_DB[entry[1]].consumable
+        if food and food.hunger and food.hunger > 0 then
+            w = math.max(1, math.floor(w * self:diff("food") + 0.5))
+        end
         table_[i] = {entry[1], w}
     end
     local found = {}

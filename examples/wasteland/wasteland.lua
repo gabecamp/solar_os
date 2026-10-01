@@ -223,6 +223,17 @@ local KARL = {
     rewards = {"pilk", "pilk", "fishing_rod", "lucky_lure", "karls_waders", "karls_hat"},
 }
 
+-- Difficulty, picked on the creator with 1/2/3 (self.difficulty, saved).
+-- Multipliers: food = weight of food in search tables, encounter = encounter
+-- chance, rad = radiation dose, emission = emission harm, drain = how fast
+-- hunger and thirst fall.
+local DIFFICULTY = {
+    order = {"easy", "normal", "hard"},
+    easy   = {name = "Easy", short = "Easy",          food = 1.5, encounter = 0.6, rad = 0.6, emission = 0.5, drain = 0.8},
+    normal = {name = "Normal", short = "Normal",        food = 1,   encounter = 1,   rad = 1,   emission = 1,   drain = 1},
+    hard   = {name = "Zone-Hardened", short = "Hard", food = 0.85, encounter = 1.3, rad = 1.25, emission = 1.25, drain = 1.1},
+}
+
 local BACKPACK_CAP = 16      -- most bag cells any build can have (the layout's limit)
 local POCKET_CELLS = 4       -- bag cells with nothing worn on your back
 
@@ -2281,10 +2292,10 @@ local function recompute_stats(player)
     player.sight = math.max(1, BASE_SIGHT + (a.Perception - 3) // 2 + fx.sight)
     player.scav_rolls = math.max(1, SCAVENGE_ROLLS + (a.Perception - 3) // 2 + fx.scav)
     player.bag_bonus = (a.Strength - 3) + fx.bag
-    player.hunger_mult = fx.hunger
+    player.hunger_mult = fx.hunger * (player.diff_drain or 1)
     player.rest_gain_mult = fx.rest_gain
     player.rest_drain_mult = (1 - 0.1 * (a.Endurance - 3)) * fx.rest_drain
-    player.thirst_mult = fx.thirst
+    player.thirst_mult = fx.thirst * (player.diff_drain or 1)
     player.heal_per_hour = fx.heal
     player.encounter_mult = fx.encounter
     player.scav_hurt = fx.scav_hurt
@@ -2441,6 +2452,17 @@ function Game.new()
     return self
 end
 
+-- A difficulty multiplier (DIFFICULTY in 05_data); Normal is all 1.
+function Game:diff(key)
+    return DIFFICULTY[self.difficulty or "normal"][key]
+end
+
+function Game:set_difficulty(id)
+    self.difficulty = id
+    self.player.diff_drain = DIFFICULTY[id].drain
+    recompute_stats(self.player)
+end
+
 -- Leave the creator: apply the chosen stats and start on the map.
 function Game:start_game()
     if trait_points_left(self.player.traits) < 0 then
@@ -2562,6 +2584,10 @@ function Game:scavenge()
     for i, entry in ipairs(loot) do
         local w = entry[2]
         if entry[1] == "nothing" then w = math.max(1, w * (7 - p.attrs.Perception) // 4) end
+        local food = ITEM_DB[entry[1]] and ITEM_DB[entry[1]].consumable
+        if food and food.hunger and food.hunger > 0 then
+            w = math.max(1, math.floor(w * self:diff("food") + 0.5))
+        end
         table_[i] = {entry[1], w}
     end
     local found = {}
@@ -3279,7 +3305,8 @@ local SAVE = {version = 1, dir = "wasteland", file = "save.lua",
               fields = {"world_seed", "seed", "weather_seed", "scavenged", "camps",
                         "known", "ground", "log", "enc_cooldown", "ticked_hour", "rad_known",
                         "trader", "sites_known", "stashes", "next_emission", "snares",
-                        "karl_asked", "karl_next", "karl_gave", "muted"}}
+                        "karl_asked", "karl_next", "karl_gave", "muted",
+                        "difficulty"}}
 
 -- Where the save lives: <preferred storage>/wasteland/save.lua
 function SAVE.path()
@@ -3493,7 +3520,7 @@ function Game:rad_hour()
     local level = self:rad_at(p.q, p.r)
     local dose = 0
     if level > 0 then
-        dose = RAD.dose[level] * self:rad_armor()
+        dose = RAD.dose[level] * self:rad_armor() * self:diff("rad")
         p.rads = math.min(RAD.max, (p.rads or 0) + dose)
         self.rad_known[hex_key(p.q, p.r)] = level
     elseif (p.rads or 0) > 0 then
@@ -3583,6 +3610,7 @@ function Game:maybe_encounter(terrain_id)
     end
     if self:maybe_karl("move") then return end
     local chance = FIGHT.ENCOUNTER_CHANCE[terrain_id]
+    if chance then chance = chance * self:diff("encounter") end
     if chance and self:is_night() then chance = chance * WORLD.night_encounters end
     if chance and self:roll(chance * self.player.encounter_mult) then self:start_encounter(self:pick_encounter()) end
 end
@@ -4094,8 +4122,9 @@ function Game:emission_hour(hour)
         if E.shelter[self.tiles[hex_key(p.q, p.r)]] then
             self.emission_news.sheltered = true
         else
-            p.health = clamp(p.health - E.hurt / E.hours)
-            p.rads = math.min(RAD.max, (p.rads or 0) + E.rads / E.hours * self:rad_armor())
+            local harm = self:diff("emission")
+            p.health = clamp(p.health - E.hurt / E.hours * harm)
+            p.rads = math.min(RAD.max, (p.rads or 0) + E.rads / E.hours * self:rad_armor() * harm)
             self.emission_news.caught = true
         end
         if hour == start + E.hours - 1 then self:emission_ends() end
@@ -5850,6 +5879,8 @@ function Game:creator_key(key)
         local t = TRAITS[row - #ATTRIBUTES]
         p.traits[t.name] = not p.traits[t.name] or nil
         recompute_stats(p)
+    elseif key >= 49 and key <= 51 then   -- 1/2/3: difficulty
+        self:set_difficulty(DIFFICULTY.order[key - 48])
     elseif key == KEY.ENTER or key == KEY.LF then
         self:start_game()
     end
@@ -5862,6 +5893,7 @@ function Game:draw_creator(w, h)
     gfx.font(gfx.FONT_BOLD_14)
     gfx.text(6, 16, "Create your survivor")
     gfx.font(gfx.FONT_MONO_12)
+    gfx.text(210, 16, "Difficulty 1-3: " .. DIFFICULTY[self.difficulty or "normal"].short)
 
     gfx.text(6, 36, "Attributes  left " .. attr_points_left(p.attrs))
     for i, name in ipairs(ATTRIBUTES) do
@@ -6320,7 +6352,8 @@ function Game:device_lines()
         local ok, there = pcall(st.exists, path)
         lines[#lines + 1] = "Save " .. path .. ": " .. (ok and (there and "found" or "none") or "error")
     end
-    lines[#lines + 1] = ("World seed %d, hour %d"):format(self.world_seed or 0, self.player.hours)
+    lines[#lines + 1] = ("World seed %d, hour %d, %s"):format(self.world_seed or 0, self.player.hours,
+        DIFFICULTY[self.difficulty or "normal"].name)
     lines[#lines + 1] = "Audio: " .. ((solaros.audio and solaros.audio.tone) and "tone ok" or "none")
     return lines
 end

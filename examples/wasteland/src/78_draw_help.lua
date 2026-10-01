@@ -78,7 +78,8 @@ function Game:device_lines()
         local ok, there = pcall(st.exists, path)
         lines[#lines + 1] = "Save " .. path .. ": " .. (ok and (there and "found" or "none") or "error")
     end
-    lines[#lines + 1] = ("World seed %d, hour %d"):format(self.world_seed or 0, self.player.hours)
+    lines[#lines + 1] = ("World seed %d, hour %d, %s"):format(self.world_seed or 0, self.player.hours,
+        DIFFICULTY[self.difficulty or "normal"].name)
     lines[#lines + 1] = "Audio: " .. ((solaros.audio and solaros.audio.tone) and "tone ok" or "none")
     return lines
 end

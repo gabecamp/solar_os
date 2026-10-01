@@ -49,7 +49,7 @@ function Game:rad_hour()
     local level = self:rad_at(p.q, p.r)
     local dose = 0
     if level > 0 then
-        dose = RAD.dose[level] * self:rad_armor()
+        dose = RAD.dose[level] * self:rad_armor() * self:diff("rad")
         p.rads = math.min(RAD.max, (p.rads or 0) + dose)
         self.rad_known[hex_key(p.q, p.r)] = level
     elseif (p.rads or 0) > 0 then

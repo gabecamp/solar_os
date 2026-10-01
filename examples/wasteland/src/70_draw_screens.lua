@@ -33,6 +33,8 @@ function Game:creator_key(key)
         local t = TRAITS[row - #ATTRIBUTES]
         p.traits[t.name] = not p.traits[t.name] or nil
         recompute_stats(p)
+    elseif key >= 49 and key <= 51 then   -- 1/2/3: difficulty
+        self:set_difficulty(DIFFICULTY.order[key - 48])
     elseif key == KEY.ENTER or key == KEY.LF then
         self:start_game()
     end
@@ -45,6 +47,7 @@ function Game:draw_creator(w, h)
     gfx.font(gfx.FONT_BOLD_14)
     gfx.text(6, 16, "Create your survivor")
     gfx.font(gfx.FONT_MONO_12)
+    gfx.text(210, 16, "Difficulty 1-3: " .. DIFFICULTY[self.difficulty or "normal"].short)
 
     gfx.text(6, 36, "Attributes  left " .. attr_points_left(p.attrs))
     for i, name in ipairs(ATTRIBUTES) do

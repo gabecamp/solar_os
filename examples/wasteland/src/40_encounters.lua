@@ -22,6 +22,7 @@ function Game:maybe_encounter(terrain_id)
     end
     if self:maybe_karl("move") then return end
     local chance = FIGHT.ENCOUNTER_CHANCE[terrain_id]
+    if chance then chance = chance * self:diff("encounter") end
     if chance and self:is_night() then chance = chance * WORLD.night_encounters end
     if chance and self:roll(chance * self.player.encounter_mult) then self:start_encounter(self:pick_encounter()) end
 end

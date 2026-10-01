@@ -17,7 +17,8 @@ local SAVE = {version = 1, dir = "wasteland", file = "save.lua",
               fields = {"world_seed", "seed", "weather_seed", "scavenged", "camps",
                         "known", "ground", "log", "enc_cooldown", "ticked_hour", "rad_known",
                         "trader", "sites_known", "stashes", "next_emission", "snares",
-                        "karl_asked", "karl_next", "karl_gave", "muted"}}
+                        "karl_asked", "karl_next", "karl_gave", "muted",
+                        "difficulty"}}
 
 -- Where the save lives: <preferred storage>/wasteland/save.lua
 function SAVE.path()

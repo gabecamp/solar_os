@@ -23,6 +23,7 @@ local ITEM_DB, KEY, TERRAIN = D.ITEM_DB, D.KEY, D.TERRAIN
 
 local RUNS = tonumber(arg[1]) or 200
 local FIRST = tonumber(arg[2]) or 1
+local LEVEL = arg[3] or "normal"   -- easy / normal / hard
 local MAX_HOURS = 24 * 30
 
 local function key(q, r) return q .. "," .. r end
@@ -246,6 +247,7 @@ end
 local function play(seed)
     fake.time.uptime_ms = function() return seed end
     local g = Game.new()
+    g:set_difficulty(LEVEL)
     g:start_game()
     local p = g.player
     local stats = {enc = {}, enc_hp = 0, artifacts = 0, max_rads = 0, traded = false}
@@ -350,7 +352,7 @@ for i = 0, RUNS - 1 do
 end
 table.sort(hours)
 local function pct(n) return ("%5.1f%%"):format(100 * n / RUNS) end
-print(("%d runs (seeds from %d)"):format(RUNS, FIRST))
+print(("%d runs (seeds from %d), %s"):format(RUNS, FIRST, LEVEL))
 print("how runs ended:")
 local keys = {}
 for k in pairs(results) do keys[#keys + 1] = k end

@@ -20,8 +20,9 @@ function Game:emission_hour(hour)
         if E.shelter[self.tiles[hex_key(p.q, p.r)]] then
             self.emission_news.sheltered = true
         else
-            p.health = clamp(p.health - E.hurt / E.hours)
-            p.rads = math.min(RAD.max, (p.rads or 0) + E.rads / E.hours * self:rad_armor())
+            local harm = self:diff("emission")
+            p.health = clamp(p.health - E.hurt / E.hours * harm)
+            p.rads = math.min(RAD.max, (p.rads or 0) + E.rads / E.hours * self:rad_armor() * harm)
             self.emission_news.caught = true
         end
         if hour == start + E.hours - 1 then self:emission_ends() end

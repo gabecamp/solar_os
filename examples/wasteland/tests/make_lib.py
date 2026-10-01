@@ -89,6 +89,7 @@ lib = src[:cut]
           "RECIPE_IDS = (function() local t = {} for _, r in ipairs(RECIPES) do t[r.id] = true end return t end)()}\n")
 (here / "lib_hunt.lua").write_text(
     lib + "\nreturn Game, {HUNT = HUNT, ITEM_DB = ITEM_DB, KEY = KEY, SPRITES = SPRITES, "
-          "RECIPES = RECIPES, FIGHT = FIGHT, KARL = KARL, PORTRAIT_DATA = PORTRAIT_DATA}\n")
+          "RECIPES = RECIPES, FIGHT = FIGHT, KARL = KARL, PORTRAIT_DATA = PORTRAIT_DATA, "
+          "DIFFICULTY = DIFFICULTY, RAD = RAD, SCAVENGE_LOOT = SCAVENGE_LOOT}\n")
 (here / "wasteland_run.lua").write_text(src)
 print("generated lib_*.lua, wasteland_run.lua")

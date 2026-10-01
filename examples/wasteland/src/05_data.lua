@@ -173,6 +173,17 @@ local KARL = {
     rewards = {"pilk", "pilk", "fishing_rod", "lucky_lure", "karls_waders", "karls_hat"},
 }
 
+-- Difficulty, picked on the creator with 1/2/3 (self.difficulty, saved).
+-- Multipliers: food = weight of food in search tables, encounter = encounter
+-- chance, rad = radiation dose, emission = emission harm, drain = how fast
+-- hunger and thirst fall.
+local DIFFICULTY = {
+    order = {"easy", "normal", "hard"},
+    easy   = {name = "Easy", short = "Easy",          food = 1.5, encounter = 0.6, rad = 0.6, emission = 0.5, drain = 0.8},
+    normal = {name = "Normal", short = "Normal",        food = 1,   encounter = 1,   rad = 1,   emission = 1,   drain = 1},
+    hard   = {name = "Zone-Hardened", short = "Hard", food = 0.85, encounter = 1.3, rad = 1.25, emission = 1.25, drain = 1.1},
+}
+
 local BACKPACK_CAP = 16      -- most bag cells any build can have (the layout's limit)
 local POCKET_CELLS = 4       -- bag cells with nothing worn on your back
 
