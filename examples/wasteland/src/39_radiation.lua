@@ -71,6 +71,22 @@ function Game:can_measure()
     return self:carrying("geiger") or self:carrying("anomaly_detector")
 end
 
+-- Items whose real name or description would give radiation away show a
+-- vague one until you can measure it (vague_name / vague_desc in ITEM_DB).
+-- ITEM_DB is edited in place so every screen and log line follows; runs
+-- from tick (every key) and refresh_view.
+function Game:apply_item_names()
+    local measured = self:can_measure()
+    for _, def in pairs(ITEM_DB) do
+        if def.vague_name or def.vague_desc then
+            def.real_name = def.real_name or def.name
+            def.real_desc = def.real_desc or def.desc
+            def.name = measured and def.real_name or (def.vague_name or def.real_name)
+            def.desc = measured and def.real_desc or (def.vague_desc or def.real_desc)
+        end
+    end
+end
+
 -- The Geiger counter reads your hex and the ones next to it.
 function Game:geiger_scan()
     local p = self.player

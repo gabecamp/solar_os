@@ -66,6 +66,7 @@ function Game:refresh_view()
     local dark = self:is_night() and not self:has_light()
     p.view_sight = math.max(1, p.sight - (dark and 1 or 0))
     update_visibility(p, self.tiles)
+    self:apply_item_names()
 end
 
 -- Apply the hours that passed since the last tick.

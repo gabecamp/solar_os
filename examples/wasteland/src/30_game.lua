@@ -369,6 +369,7 @@ end
 function Game:try_consume(kind, k)
     local stack = self:get_stack(kind, k)
     if not stack then return end
+    self:apply_item_names()
     local def = ITEM_DB[stack.item]
     if not def.consumable then
         self:push_log(def.name .. " isn't edible/drinkable.")

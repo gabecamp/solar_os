@@ -282,7 +282,7 @@ local ITEM_DB = {
                     wear = {{"torso", 147, 196, "BLACK", 9, 13}}},
     -- rad_armor multiplies the radiation you take while it's worn
     gasmask      = {name = "Gas Mask",     slot = "eyes",  consumable = nil, warmth = 1,
-                    rad_armor = 0.5, desc = "Worn: halves radiation",
+                    rad_armor = 0.5, desc = "Worn: halves radiation", vague_desc = "Worn: filters bad air",
                     wear = {{"head", 125, 139, "BLACK", 0, 10}}},
     -- belts: belt_cells more bag cells (pouches), on top of the bag
     leather_belt = {name = "Leather Belt", slot = "belt", consumable = nil, belt_cells = 2,
@@ -305,10 +305,12 @@ local ITEM_DB = {
     strange_meat = {name = "Strange Meat", slot = nil, consumable = {hunger = 30, thirst = -5},
                     sick = 25, perish = {hours = 36, into = "rotten_meat"}, desc = "Cook it (C at a fire)"},
     -- rads: taken off your radiation (see RAD)
+    -- vague_name/vague_desc: what you see without a Geiger counter (nothing
+    -- may say "radiation" until you can measure it; see apply_item_names)
     antirad      = {name = "Anti-Rad",     slot = nil, consumable = {rads = -50, thirst = -5},
-                    desc = "E: -50 rads"},
+                    desc = "E: -50 rads", vague_name = "Iodine Pills", vague_desc = "E: for sickness"},
     vodka        = {name = "Vodka",        slot = nil, consumable = {rads = -20, thirst = -10, rest = -10},
-                    desc = "E: -20 rads, dulls you"},
+                    desc = "E: -20 rads, dulls you", vague_desc = "E: settles the stomach"},
     geiger       = {name = "Geiger Counter", slot = nil, consumable = nil,
                     desc = "Carry it: reads radiation"},
     permit       = {name = "Zone Permit",  slot = nil, consumable = nil,

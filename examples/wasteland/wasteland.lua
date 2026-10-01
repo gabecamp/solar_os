@@ -332,7 +332,7 @@ local ITEM_DB = {
                     wear = {{"torso", 147, 196, "BLACK", 9, 13}}},
     -- rad_armor multiplies the radiation you take while it's worn
     gasmask      = {name = "Gas Mask",     slot = "eyes",  consumable = nil, warmth = 1,
-                    rad_armor = 0.5, desc = "Worn: halves radiation",
+                    rad_armor = 0.5, desc = "Worn: halves radiation", vague_desc = "Worn: filters bad air",
                     wear = {{"head", 125, 139, "BLACK", 0, 10}}},
     -- belts: belt_cells more bag cells (pouches), on top of the bag
     leather_belt = {name = "Leather Belt", slot = "belt", consumable = nil, belt_cells = 2,
@@ -355,10 +355,12 @@ local ITEM_DB = {
     strange_meat = {name = "Strange Meat", slot = nil, consumable = {hunger = 30, thirst = -5},
                     sick = 25, perish = {hours = 36, into = "rotten_meat"}, desc = "Cook it (C at a fire)"},
     -- rads: taken off your radiation (see RAD)
+    -- vague_name/vague_desc: what you see without a Geiger counter (nothing
+    -- may say "radiation" until you can measure it; see apply_item_names)
     antirad      = {name = "Anti-Rad",     slot = nil, consumable = {rads = -50, thirst = -5},
-                    desc = "E: -50 rads"},
+                    desc = "E: -50 rads", vague_name = "Iodine Pills", vague_desc = "E: for sickness"},
     vodka        = {name = "Vodka",        slot = nil, consumable = {rads = -20, thirst = -10, rest = -10},
-                    desc = "E: -20 rads, dulls you"},
+                    desc = "E: -20 rads, dulls you", vague_desc = "E: settles the stomach"},
     geiger       = {name = "Geiger Counter", slot = nil, consumable = nil,
                     desc = "Carry it: reads radiation"},
     permit       = {name = "Zone Permit",  slot = nil, consumable = nil,
@@ -3039,6 +3041,7 @@ end
 function Game:try_consume(kind, k)
     local stack = self:get_stack(kind, k)
     if not stack then return end
+    self:apply_item_names()
     local def = ITEM_DB[stack.item]
     if not def.consumable then
         self:push_log(def.name .. " isn't edible/drinkable.")
@@ -3529,6 +3532,7 @@ function Game:refresh_view()
     local dark = self:is_night() and not self:has_light()
     p.view_sight = math.max(1, p.sight - (dark and 1 or 0))
     update_visibility(p, self.tiles)
+    self:apply_item_names()
 end
 
 -- Apply the hours that passed since the last tick.
@@ -3821,6 +3825,22 @@ end
 -- Without one, radiation only shows as symptoms.
 function Game:can_measure()
     return self:carrying("geiger") or self:carrying("anomaly_detector")
+end
+
+-- Items whose real name or description would give radiation away show a
+-- vague one until you can measure it (vague_name / vague_desc in ITEM_DB).
+-- ITEM_DB is edited in place so every screen and log line follows; runs
+-- from tick (every key) and refresh_view.
+function Game:apply_item_names()
+    local measured = self:can_measure()
+    for _, def in pairs(ITEM_DB) do
+        if def.vague_name or def.vague_desc then
+            def.real_name = def.real_name or def.name
+            def.real_desc = def.real_desc or def.desc
+            def.name = measured and def.real_name or (def.vague_name or def.real_name)
+            def.desc = measured and def.real_desc or (def.vague_desc or def.real_desc)
+        end
+    end
 end
 
 -- The Geiger counter reads your hex and the ones next to it.
