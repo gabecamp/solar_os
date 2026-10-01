@@ -36,18 +36,21 @@ before and start it. For anything that goes wrong, a photo of the screen
 11. Quit with Q and start again. **Expect:** with the `write_file` firmware
     patch, a title screen with **Continue**; without it, straight to the
     creator (that's correct, not a bug).
+12. On the title (or the creator) press **R**. **Expect:** the records page
+    with the achievement list; any key goes back. After a death it should
+    show one more run.
 
 ## 5. An encounter (2 min)
-12. Walk until something happens (forest is busiest), or press **G** in a
+13. Walk until something happens (forest is busiest), or press **G** in a
     forest to hunt. **Expect:** a 96x96 picture top right, the story text,
     and a list of choices.
 
 ## Expected numbers (measured on a PC with the test fake)
-- Lua memory: about **730 KB** once loaded, **~830 KB** at most while
+- Lua memory: about **755 KB** once loaded, **~850 KB** at most while
   playing. The device info page (H, then V) shows the real figure. On the
   SolarTerm board Lua lives in the 8 MB PSRAM, so this should be fine;
   much higher than ~1 MB on the device would be worth reporting.
-- The script is ~390 KB; SolarOS streams it from storage, so size is not
+- The script is ~400 KB; SolarOS streams it from storage, so size is not
   a limit.
 - Redraws: the bag screen is the busiest (~1,300 draw calls), the map
   ~400-850. If the bag screen feels slow after a key press, say so.

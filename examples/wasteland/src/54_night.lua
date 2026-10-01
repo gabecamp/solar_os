@@ -44,6 +44,7 @@ function Game:horror_action(action)
         if self:roll(50) then
             local item = ARTIFACTS[self:rand(#ARTIFACTS) + 1]
             self:put_stack("ground", nil, {item = item, qty = 1})
+            self:stat("artifacts")
             self:enc_say("It bends down, and down, and puts something in the grass at your feet. "
                 .. "Then it isn't there.")
             return self:end_encounter("It left you a " .. ITEM_DB[item].name .. ".")

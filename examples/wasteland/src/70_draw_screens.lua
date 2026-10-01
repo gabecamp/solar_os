@@ -91,7 +91,7 @@ function Game:draw_creator(w, h)
     end
 
     gfx.text(6, h - 20, "Up/Dn row  L/R attribute")
-    gfx.text(6, h - 8, "Spc trait  Enter start  Q quit")
+    gfx.text(6, h - 8, "Spc trait  Enter start  R records  Q quit")
     gfx.refresh()
 end
 
@@ -226,8 +226,12 @@ function Game:draw_dead(w, h)
     gfx.text(6, 40, "You are dead.")
     gfx.font(gfx.FONT_MONO_12)
     gfx.text(6, 70, self.death_cause or "")
-    gfx.text(6, 90, "You lasted " .. self.player.hours .. " hours in the wasteland.")
-    gfx.text(6, h - 8, "Enter: new survivor  Q: quit")
+    local y = 100
+    for _, line in ipairs(self:run_summary()) do
+        gfx.text(6, y, line)
+        y = y + 16
+    end
+    gfx.text(6, h - 8, "Enter: new survivor  R: records  Q: quit")
     gfx.refresh()
 end
 

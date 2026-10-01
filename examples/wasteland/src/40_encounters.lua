@@ -57,6 +57,8 @@ end
 function Game:end_encounter(summary)
     self.enc.over = true
     self.enc_cooldown = FIGHT.ENCOUNTER_COOLDOWN
+    local d = self.enc.def
+    if (d.kind == "horror" or d.dark) and self.player.health > 0 then self:stat("horrors") end
     if summary then self:push_log(summary) end
 end
 
@@ -155,6 +157,7 @@ function Game:enemy_dies()
     end
     self:sfx("kill")
     self:skill_xp("fight", SKILLS.xp.kill)
+    self:stat("kills")
     self:quest_kill()
     self:enc_say("The " .. e.def.who .. " goes still.")
     if #found > 0 then self:enc_say("Left behind: " .. table.concat(found, ", ") .. ".") end

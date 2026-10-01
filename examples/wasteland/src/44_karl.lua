@@ -65,6 +65,7 @@ function Game:karl_answer(n)
     self.karl_hint = nil   -- a radio hint is good for one riddle
     local e = self.enc
     if n == e.riddle.right then
+        self:stat("riddles")
         local item = self:karl_reward()
         local stack = {item = item, qty = 1}
         if not self:put_stack("inventory", nil, stack) then self:put_stack("ground", nil, stack) end

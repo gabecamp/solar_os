@@ -102,9 +102,12 @@ function Game:draw_ending(w, h)
         gfx.text(6, y, line)
         y = y + 14
     end
-    y = y + 14
-    gfx.text(6, y, ("Day %d. %d hours in the Zone."):format(e.day, e.hours))
-    gfx.text(6, y + 16, ("Artifacts carried out: %d"):format(e.artifacts))
-    gfx.text(6, h - 8, "Enter: new survivor  Q: quit")
+    y = y + 8
+    gfx.text(6, y, ("Artifacts carried out: %d"):format(e.artifacts))
+    for _, line in ipairs(self:run_summary()) do
+        y = y + 15
+        gfx.text(6, y, line)
+    end
+    gfx.text(6, h - 8, "Enter: new survivor  R: records  Q: quit")
     gfx.refresh()
 end

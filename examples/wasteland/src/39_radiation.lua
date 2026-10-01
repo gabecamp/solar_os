@@ -166,5 +166,6 @@ function Game:scavenge_field()
     if not self:roll(RAD.artifact_find) then return end
     local item = ARTIFACTS[self:rand(#ARTIFACTS) + 1]
     self:put_stack("ground", nil, {item = item, qty = 1})
+    self:stat("artifacts")
     self:push_log("Something glints in the hot ground: " .. ITEM_DB[item].name .. ".")
 end

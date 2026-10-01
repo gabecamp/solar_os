@@ -41,6 +41,7 @@ function Game:repair(r)
     self:skill_xp("tinker", SKILLS.xp.repair)
     if self:roll(chance) then
         self:skill_xp("tinker", SKILLS.xp.repaired)
+        self:stat("repairs")
         for _, iq in ipairs(Game.recipe_inputs(r)) do self:take_items(iq[1], iq[2]) end
         local stack = {item = fix.out, qty = 1}
         if not self:put_stack("inventory", nil, stack) then self:put_stack("ground", nil, stack) end

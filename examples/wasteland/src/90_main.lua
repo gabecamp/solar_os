@@ -113,6 +113,8 @@ local ok, err = pcall(function()
                 game:draw_lore(w, h)
             elseif game.screen == "info" then
                 game:draw_info(w, h)
+            elseif game.screen == "records" then
+                game:draw_records(w, h)
             elseif game.screen == "trade" then
                 game:draw_trade(w, h)
             elseif game.screen == "gate" then
@@ -133,7 +135,12 @@ local ok, err = pcall(function()
 
         local key = gfx.getch(POLL_MS)
         if key ~= nil then
-            if game.screen == "title" then
+            if game.screen == "records" then
+                game:records_key(key)
+            elseif key == KEY.R and (game.screen == "title" or game.screen == "creator"
+                                     or game.screen == "dead" or game.screen == "ending") then
+                game:open_records()
+            elseif game.screen == "title" then
                 if key == gfx.KEY_ESCAPE or key == KEY.Q then
                     game.quit = true
                 else
@@ -175,7 +182,7 @@ local ok, err = pcall(function()
             -- time may have passed (moving, resting, crafting...): apply cold,
             -- night and light before the next frame
             if game.screen ~= "creator" and game.screen ~= "dead" and game.screen ~= "title"
-                and game.screen ~= "ending" then
+                and game.screen ~= "ending" and game.screen ~= "records" then
                 game:tick()
             end
             game:autosave()

@@ -23,7 +23,7 @@ local HELP = {
     {"", "3 artifacts or a permit get you out."},
     {"", "Karl fishes rivers. Strays like food."},
     {"", "C in a ruin: claim it. Carry light at night."},
-    {"", "Skills grow with use: see them in J."},
+    {"", "Skills grow with use (J). R on the title: records."},
 }
 
 function Game:open_help()

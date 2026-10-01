@@ -38,6 +38,7 @@ function Game:fish()
     if self:roll(HUNT.fish_chance + 5 * (p.attrs.Perception - 3) + self:fish_bonus()
                  + self:skill_bonus("fish")) then
         self:skill_xp("fish", SKILLS.xp.catch)
+        self:stat("fish")
         local fish = {item = "raw_fish", qty = 1}
         if not self:put_stack("inventory", nil, fish) then self:put_stack("ground", nil, fish) end
         self:push_log("A pale fish, too many eyes. Got it.")

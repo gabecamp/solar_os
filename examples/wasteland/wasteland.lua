@@ -2798,6 +2798,7 @@ function Game.new()
     self.next_emission = RAD.emission.first
     self.rad_known = {}          -- tile key -> rad level you've measured or felt there
     self.skills = {}             -- skill -> XP (src/55_skills.lua)
+    self.stats = {}              -- this run's counts (src/56_records.lua)
     self.seed = seed             -- RNG state for scavenging
     self.weather_seed = seed     -- fixed per world: weather is rolled from it (Game:weather)
     self.scavenged = {}          -- tile key -> searches used
@@ -2855,6 +2856,7 @@ function Game:check_death(cause)
     self:sfx("death")
     Game.delete_save()           -- one life: a dead survivor can't be continued
     self.death_cause = cause
+    self:record_run(nil, cause)
     return true
 end
 
@@ -2973,6 +2975,7 @@ function Game:scavenge()
         end
     end
     self:skill_xp("scav", SKILLS.xp.search + SKILLS.xp.find * #found)
+    self:stat("searches")
     if #found == 0 then
         self:push_log("Searched " .. SCAVENGE_HOURS .. "h. Found nothing.")
     else
@@ -3686,7 +3689,7 @@ function Game:tick()
     self:geiger_scan()
     self:refresh_view()
     self:spot_sites()
-    self:check_death(self:death_reason())
+    if not self:check_death(self:death_reason()) then self:check_achievements() end
 end
 -- ---------------------------------------------------------------------
 -- Saving and continuing
@@ -3710,7 +3713,7 @@ local SAVE = {version = 1, dir = "wasteland", file = "save.lua",
                         "karl_asked", "karl_next", "karl_gave", "muted",
                         "difficulty", "dog", "radio", "karl_hint",
                         "base", "quest", "quests_done",
-                        "lore_read", "signal_page", "skills"}}
+                        "lore_read", "signal_page", "skills", "stats"}}
 
 -- Where the save lives: <preferred storage>/wasteland/save.lua
 function SAVE.path()
@@ -3863,7 +3866,7 @@ function Game:draw_title(w, h)
         gfx.text(w // 2 - 100, y, text)
         gfx.color(gfx.BLACK)
     end
-    gfx.text(6, h - 8, "Up/Dn pick  Enter choose  Q quit")
+    gfx.text(6, h - 8, "Up/Dn pick  Enter choose  R records  Q quit")
     gfx.refresh()
 end
 
@@ -4047,6 +4050,7 @@ function Game:scavenge_field()
     if not self:roll(RAD.artifact_find) then return end
     local item = ARTIFACTS[self:rand(#ARTIFACTS) + 1]
     self:put_stack("ground", nil, {item = item, qty = 1})
+    self:stat("artifacts")
     self:push_log("Something glints in the hot ground: " .. ITEM_DB[item].name .. ".")
 end
 -- -- encounters -----------------------------------------------------------
@@ -4108,6 +4112,8 @@ end
 function Game:end_encounter(summary)
     self.enc.over = true
     self.enc_cooldown = FIGHT.ENCOUNTER_COOLDOWN
+    local d = self.enc.def
+    if (d.kind == "horror" or d.dark) and self.player.health > 0 then self:stat("horrors") end
     if summary then self:push_log(summary) end
 end
 
@@ -4206,6 +4212,7 @@ function Game:enemy_dies()
     end
     self:sfx("kill")
     self:skill_xp("fight", SKILLS.xp.kill)
+    self:stat("kills")
     self:quest_kill()
     self:enc_say("The " .. e.def.who .. " goes still.")
     if #found > 0 then self:enc_say("Left behind: " .. table.concat(found, ", ") .. ".") end
@@ -4513,6 +4520,7 @@ function Game:finish_puzzle(result)
         if self:roll(ARTIFACT_CHANCE + 5 * (p.attrs.Perception - 3)) then
             local id = ARTIFACTS[self:rand(#ARTIFACTS) + 1]
             self:put_stack("ground", nil, {item = id, qty = 1})
+            self:stat("artifacts")
             self:push_log("The " .. who .. " fades. It left something:")
             self:push_log(ITEM_DB[id].name .. ". (I to pick it up)")
         else
@@ -4740,6 +4748,7 @@ function Game:fish()
     if self:roll(HUNT.fish_chance + 5 * (p.attrs.Perception - 3) + self:fish_bonus()
                  + self:skill_bonus("fish")) then
         self:skill_xp("fish", SKILLS.xp.catch)
+        self:stat("fish")
         local fish = {item = "raw_fish", qty = 1}
         if not self:put_stack("inventory", nil, fish) then self:put_stack("ground", nil, fish) end
         self:push_log("A pale fish, too many eyes. Got it.")
@@ -4868,6 +4877,7 @@ function Game:karl_answer(n)
     self.karl_hint = nil   -- a radio hint is good for one riddle
     local e = self.enc
     if n == e.riddle.right then
+        self:stat("riddles")
         local item = self:karl_reward()
         local stack = {item = item, qty = 1}
         if not self:put_stack("inventory", nil, stack) then self:put_stack("ground", nil, stack) end
@@ -5177,6 +5187,7 @@ function Game:finish_run(how)
                    artifacts = self:artifact_count(), lore = self:lore_ending_line()}
     self.screen = "ending"
     self:sfx("escape")
+    self:record_run(how)
     Game.delete_save()
 end
 -- ---------------------------------------------------------------------
@@ -5203,6 +5214,7 @@ local SFX = {
     bark     = {{500, 40}, {0, 40}, {450, 60}},
     whine    = {{700, 120}, {500, 200}},
     level    = {{659, 70}, {784, 70}, {988, 70}, {1319, 140}},
+    achieve  = {{784, 80}, {1047, 80}, {1319, 80}, {1568, 200}},
 }
 
 function Game:sfx(name)
@@ -5374,6 +5386,7 @@ function Game:repair(r)
     self:skill_xp("tinker", SKILLS.xp.repair)
     if self:roll(chance) then
         self:skill_xp("tinker", SKILLS.xp.repaired)
+        self:stat("repairs")
         for _, iq in ipairs(Game.recipe_inputs(r)) do self:take_items(iq[1], iq[2]) end
         local stack = {item = fix.out, qty = 1}
         if not self:put_stack("inventory", nil, stack) then self:put_stack("ground", nil, stack) end
@@ -6254,6 +6267,7 @@ function Game:horror_action(action)
         if self:roll(50) then
             local item = ARTIFACTS[self:rand(#ARTIFACTS) + 1]
             self:put_stack("ground", nil, {item = item, qty = 1})
+            self:stat("artifacts")
             self:enc_say("It bends down, and down, and puts something in the grass at your feet. "
                 .. "Then it isn't there.")
             return self:end_encounter("It left you a " .. ITEM_DB[item].name .. ".")
@@ -6347,6 +6361,226 @@ function Game:skills_line()
         parts[#parts + 1] = SKILLS.name[name] .. " " .. self:skill_level(name)
     end
     return "Skills: " .. table.concat(parts, "  ")
+end
+-- ---------------------------------------------------------------------
+-- Run stats, lifetime records and achievements
+--
+-- self.stats counts this run (saved with it): kills, searches, artifacts
+-- found, fish caught, riddles answered, repairs, night horrors lived
+-- through. The lifetime records live in their own file next to the save,
+-- <mount>/wasteland/records.lua, written whenever a run ends or an
+-- achievement unlocks, so deleting a save (death, escape) keeps them.
+-- Without write_file they last until the app is closed.
+-- R on the title, creator, death and ending screens shows them.
+-- ---------------------------------------------------------------------
+
+local RECORDS = {
+    file = "records.lua",
+    data = nil,   -- the loaded records (Game.records)
+    -- id, name, what it takes, test(game, how): how = "permit"/"bribe" when escaping
+    list = {
+        {"first_steps", "First Steps", "Live to see day 2",
+         function(g) return (g:clock()) >= 2 end},
+        {"week", "Week in the Zone", "Live to see day 8",
+         function(g) return (g:clock()) >= 8 end},
+        {"out", "Out", "Leave the Zone alive", function(_, how) return how ~= nil end},
+        {"paper", "Paper Trail", "Leave with a Zone Permit",
+         function(_, how) return how == "permit" end},
+        {"bribed", "Bribed", "Buy your way out", function(_, how) return how == "bribe" end},
+        {"hardened", "Zone-Hardened", "Leave on Zone-Hardened",
+         function(g, how) return how ~= nil and g.difficulty == "hard" end},
+        {"dog", "Dog's Best Friend", "Tame a stray", function(g) return g.dog ~= nil end},
+        {"karl", "Karl's Friend", "Answer Karl 3 riddles in a run",
+         function(g) return g:stat_of("riddles") >= 3 end},
+        {"archivist", "Archivist", "Read every torn page",
+         function(g) return g:lore_count() >= #LORE.pages end},
+        {"fixer", "Fixer", "Repair a broken device", function(g) return g:stat_of("repairs") >= 1 end},
+        {"homeowner", "Homeowner", "Build all four camp parts",
+         function(g)
+             if not g.base then return false end
+             for _, part in ipairs(BASE.order) do
+                 if not g.base.built[part] then return false end
+             end
+             return true
+         end},
+        {"night_owl", "Night Owl", "Live through 3 night horrors",
+         function(g) return g:stat_of("horrors") >= 3 end},
+    },
+}
+
+function Game:stat(name, n)
+    self.stats = self.stats or {}
+    self.stats[name] = (self.stats[name] or 0) + (n or 1)
+end
+
+function Game:stat_of(name)
+    return (self.stats or {})[name] or 0
+end
+
+local function records_path()
+    local dir = SAVE.path()
+    return dir, dir and (dir .. "/" .. RECORDS.file)
+end
+
+-- The lifetime records, read from storage the first time.
+function Game.records()
+    if RECORDS.data then return RECORDS.data end
+    local rec
+    local storage = solaros.storage
+    local _, path = records_path()
+    if path and storage and storage.read_file then
+        local ok, text = pcall(storage.read_file, path, 16384)
+        local chunk = ok and type(text) == "string" and text ~= "" and load("return " .. text, "=records", "t", {})
+        local good, data = false, nil
+        if chunk then good, data = pcall(chunk) end
+        if good and type(data) == "table" then rec = data end
+    end
+    rec = rec or {}
+    rec.runs, rec.escapes, rec.kills = rec.runs or 0, rec.escapes or 0, rec.kills or 0
+    rec.longest, rec.most_out = rec.longest or 0, rec.most_out or 0
+    rec.deaths, rec.achieved = rec.deaths or {}, rec.achieved or {}
+    RECORDS.data = rec
+    return rec
+end
+
+-- Forget the loaded records (tests: read them back from storage).
+function Game.reload_records()
+    RECORDS.data = nil
+end
+
+function Game.write_records()
+    if not SAVE.can_write() then return false end
+    local dir, path = records_path()
+    return pcall(function()
+        if solaros.storage.makedirs then solaros.storage.makedirs(dir) end
+        solaros.storage.write_file(path, table.concat(SAVE.serialize(Game.records(), {})))
+    end)
+end
+
+-- Unlock what this run has earned (from tick, and when the run ends).
+function Game:check_achievements(how)
+    local rec, new = Game.records(), false
+    for _, a in ipairs(RECORDS.list) do
+        if not rec.achieved[a[1]] and a[4](self, how) then
+            rec.achieved[a[1]] = true
+            self.run_unlocked = (self.run_unlocked or 0) + 1
+            self:push_log("Achievement: " .. a[2] .. "!")
+            self:sfx("achieve")
+            new = true
+        end
+    end
+    if new then Game.write_records() end
+end
+
+-- A run is over: how = "permit"/"bribe" for an escape, nil for a death.
+function Game:record_run(how, cause)
+    if self.run_recorded then return end
+    self.run_recorded = true
+    local rec, p, best = Game.records(), self.player, {}
+    rec.runs = rec.runs + 1
+    rec.kills = rec.kills + self:stat_of("kills")
+    if p.hours > rec.longest then
+        if rec.runs > 1 then best[#best + 1] = "longest run" end
+        rec.longest = p.hours
+    end
+    if how then
+        rec.escapes = rec.escapes + 1
+        local out = self:artifact_count()
+        if out > rec.most_out then
+            if rec.most_out > 0 then best[#best + 1] = "most artifacts out" end
+            rec.most_out = out
+        end
+        local order = {easy = 1, normal = 2, hard = 3}
+        if (order[self.difficulty] or 0) > (order[rec.best_escape] or 0) then
+            rec.best_escape = self.difficulty
+        end
+    else
+        local why = cause or "Unknown"
+        rec.deaths[why] = (rec.deaths[why] or 0) + 1
+    end
+    self.run_best = best
+    self:check_achievements(how)
+    Game.write_records()
+end
+
+-- A few lines for the death and ending screens.
+function Game:run_summary()
+    local p = self.player
+    local day = self:clock()
+    local seen = 0
+    for _ in pairs(p.explored or {}) do seen = seen + 1 end
+    local lines = {
+        ("Day %d, %d hours. Kills %d. Hexes seen %d."):format(day, p.hours, self:stat_of("kills"), seen),
+        ("Searches %d. Artifacts found %d. Fish %d. Pages %d."):format(self:stat_of("searches"),
+            self:stat_of("artifacts"), self:stat_of("fish"), self:lore_count()),
+    }
+    if self.run_best and #self.run_best > 0 then
+        lines[#lines + 1] = "New record: " .. table.concat(self.run_best, ", ") .. "!"
+    end
+    if (self.run_unlocked or 0) > 0 then
+        lines[#lines + 1] = ("Achievements this run: %d. (R to see them)"):format(self.run_unlocked)
+    end
+    return lines
+end
+
+-- -- the records screen ---------------------------------------------------
+
+function Game:open_records()
+    self.records_back = self.screen
+    self.screen = "records"
+end
+
+function Game:records_key()
+    self.screen = self.records_back or "title"
+end
+
+function Game:records_lines()
+    local rec = Game.records()
+    local deaths, worst, worst_n = 0, nil, 0
+    for why, n in pairs(rec.deaths) do
+        deaths = deaths + n
+        if n > worst_n or (n == worst_n and why < worst) then worst, worst_n = why, n end
+    end
+    local lines = {
+        ("Runs %d   Escapes %d   Deaths %d"):format(rec.runs, rec.escapes, deaths),
+        ("Longest run %dh   Most artifacts out %d"):format(rec.longest, rec.most_out),
+        ("Kills, all runs %d   Best escape: %s"):format(rec.kills,
+            rec.best_escape and DIFFICULTY[rec.best_escape].short or "none"),
+    }
+    if worst then lines[#lines + 1] = "Most deaths: " .. worst end
+    return lines
+end
+
+function Game:draw_records(w, h)
+    local rec = Game.records()
+    gfx.clear(gfx.WHITE)
+    gfx.color(gfx.BLACK)
+    gfx.font(gfx.FONT_BOLD_14)
+    gfx.text(6, 18, "Records")
+    gfx.font(gfx.FONT_MONO_12)
+    local y = 40
+    for _, line in ipairs(self:records_lines()) do
+        gfx.text(6, y, line:sub(1, 56))
+        y = y + 14
+    end
+    local got = 0
+    for _, a in ipairs(RECORDS.list) do
+        if rec.achieved[a[1]] then got = got + 1 end
+    end
+    y = y + 8
+    gfx.font(gfx.FONT_BOLD_14)
+    gfx.text(6, y, ("Achievements %d/%d"):format(got, #RECORDS.list))
+    gfx.font(gfx.FONT_MONO_12)
+    y = y + 18
+    for _, a in ipairs(RECORDS.list) do
+        local done = rec.achieved[a[1]]
+        gfx.text(6, y, (done and "[x] " or "[ ] ") .. a[2])
+        gfx.text(170, y, a[3])
+        y = y + 13
+    end
+    if not SAVE.can_write() then gfx.text(6, h - 22, "(not saved: this SolarOS can't write files)") end
+    gfx.text(6, h - 8, "Any key: back")
+    gfx.refresh()
 end
 
 -- Equip slots sit ON the body part they dress, NEO Scavenger style: a box over
@@ -7347,7 +7581,7 @@ function Game:draw_creator(w, h)
     end
 
     gfx.text(6, h - 20, "Up/Dn row  L/R attribute")
-    gfx.text(6, h - 8, "Spc trait  Enter start  Q quit")
+    gfx.text(6, h - 8, "Spc trait  Enter start  R records  Q quit")
     gfx.refresh()
 end
 
@@ -7482,8 +7716,12 @@ function Game:draw_dead(w, h)
     gfx.text(6, 40, "You are dead.")
     gfx.font(gfx.FONT_MONO_12)
     gfx.text(6, 70, self.death_cause or "")
-    gfx.text(6, 90, "You lasted " .. self.player.hours .. " hours in the wasteland.")
-    gfx.text(6, h - 8, "Enter: new survivor  Q: quit")
+    local y = 100
+    for _, line in ipairs(self:run_summary()) do
+        gfx.text(6, y, line)
+        y = y + 16
+    end
+    gfx.text(6, h - 8, "Enter: new survivor  R: records  Q: quit")
     gfx.refresh()
 end
 
@@ -7694,10 +7932,13 @@ function Game:draw_ending(w, h)
         gfx.text(6, y, line)
         y = y + 14
     end
-    y = y + 14
-    gfx.text(6, y, ("Day %d. %d hours in the Zone."):format(e.day, e.hours))
-    gfx.text(6, y + 16, ("Artifacts carried out: %d"):format(e.artifacts))
-    gfx.text(6, h - 8, "Enter: new survivor  Q: quit")
+    y = y + 8
+    gfx.text(6, y, ("Artifacts carried out: %d"):format(e.artifacts))
+    for _, line in ipairs(self:run_summary()) do
+        y = y + 15
+        gfx.text(6, y, line)
+    end
+    gfx.text(6, h - 8, "Enter: new survivor  R: records  Q: quit")
     gfx.refresh()
 end
 -- ---------------------------------------------------------------------
@@ -7725,7 +7966,7 @@ local HELP = {
     {"", "3 artifacts or a permit get you out."},
     {"", "Karl fishes rivers. Strays like food."},
     {"", "C in a ruin: claim it. Carry light at night."},
-    {"", "Skills grow with use: see them in J."},
+    {"", "Skills grow with use (J). R on the title: records."},
 }
 
 function Game:open_help()
@@ -8011,6 +8252,8 @@ local ok, err = pcall(function()
                 game:draw_lore(w, h)
             elseif game.screen == "info" then
                 game:draw_info(w, h)
+            elseif game.screen == "records" then
+                game:draw_records(w, h)
             elseif game.screen == "trade" then
                 game:draw_trade(w, h)
             elseif game.screen == "gate" then
@@ -8031,7 +8274,12 @@ local ok, err = pcall(function()
 
         local key = gfx.getch(POLL_MS)
         if key ~= nil then
-            if game.screen == "title" then
+            if game.screen == "records" then
+                game:records_key(key)
+            elseif key == KEY.R and (game.screen == "title" or game.screen == "creator"
+                                     or game.screen == "dead" or game.screen == "ending") then
+                game:open_records()
+            elseif game.screen == "title" then
                 if key == gfx.KEY_ESCAPE or key == KEY.Q then
                     game.quit = true
                 else
@@ -8073,7 +8321,7 @@ local ok, err = pcall(function()
             -- time may have passed (moving, resting, crafting...): apply cold,
             -- night and light before the next frame
             if game.screen ~= "creator" and game.screen ~= "dead" and game.screen ~= "title"
-                and game.screen ~= "ending" then
+                and game.screen ~= "ending" and game.screen ~= "records" then
                 game:tick()
             end
             game:autosave()

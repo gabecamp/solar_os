@@ -105,5 +105,5 @@ function Game:tick()
     self:geiger_scan()
     self:refresh_view()
     self:spot_sites()
-    self:check_death(self:death_reason())
+    if not self:check_death(self:death_reason()) then self:check_achievements() end
 end

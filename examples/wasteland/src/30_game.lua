@@ -28,6 +28,7 @@ function Game.new()
     self.next_emission = RAD.emission.first
     self.rad_known = {}          -- tile key -> rad level you've measured or felt there
     self.skills = {}             -- skill -> XP (src/55_skills.lua)
+    self.stats = {}              -- this run's counts (src/56_records.lua)
     self.seed = seed             -- RNG state for scavenging
     self.weather_seed = seed     -- fixed per world: weather is rolled from it (Game:weather)
     self.scavenged = {}          -- tile key -> searches used
@@ -85,6 +86,7 @@ function Game:check_death(cause)
     self:sfx("death")
     Game.delete_save()           -- one life: a dead survivor can't be continued
     self.death_cause = cause
+    self:record_run(nil, cause)
     return true
 end
 
@@ -203,6 +205,7 @@ function Game:scavenge()
         end
     end
     self:skill_xp("scav", SKILLS.xp.search + SKILLS.xp.find * #found)
+    self:stat("searches")
     if #found == 0 then
         self:push_log("Searched " .. SCAVENGE_HOURS .. "h. Found nothing.")
     else

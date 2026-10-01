@@ -13,7 +13,7 @@ A complete, playable Lua game for the user's ESP32-S3 SolarTerm (Waveshare RLCD 
 
 - **Verified on the device:** only the early builds ("it works!"). Everything since is tested on a PC against a fake `solaros` module. `DEVICE_TEST.md` is the 10-minute checklist for the board, and **H then V** in game shows the device info page.
 - **Balance** (`tools/balance_sim.lua`, a bot playing 30-day runs with the real code): deaths Easy ~9%, Normal ~22%, Zone-Hardened ~45%.
-- **Perf** (`tools/perf_check.lua`, in the suite): bundle ~390 KB; Lua heap ~730 KB loaded, ~830 KB peak; busiest frame (bag) ~1,300 gfx calls.
+- **Perf** (`tools/perf_check.lua`, in the suite): bundle ~400 KB; Lua heap ~755 KB loaded, ~850 KB peak; busiest frame (bag) ~1,300 gfx calls.
 - **Open items:** the portrait regeneration waits for the Hugging Face ZeroGPU quota (a scheduled check-in retries it); the user will supply `art/karl.jpg` themself (Karl is a real person: **never generate him**).
 
 ## Code map
@@ -49,6 +49,7 @@ A complete, playable Lua game for the user's ESP32-S3 SolarTerm (Waveshare RLCD 
 | `53_lore` | `LORE` pages (a global), the reader |
 | `54_night` | night horrors |
 | `55_skills` | skills that grow with use: XP, levels, bonuses |
+| `56_records` | run stats, the lifetime records file, achievements, the records screen |
 | `60_draw_inventory` | the bag / body / ground screen |
 | `65_portrait_data` | **generated** by `tools/paint_portraits.py`: base64 portraits |
 | `66_portraits` | portrait decode cache and drawing |
@@ -90,6 +91,8 @@ The sim is not byte-reproducible between processes (Lua 5.4 varies `pairs` order
 
 The dated notes below were written as each feature landed; part names in older notes predate the 2026-10-01 split of `05_data` (now `05_data_world`, `06_data_items`, `07_data_encounters`) and of the puzzles into `41_puzzles`.
 
+> **Records and achievements (2026-10-01):** `src/56_records.lua`. Per run `self.stats` (saved): searches, kills, fish, artifacts found (field, puzzle, the Long Man), riddles, repairs, horrors (an encounter with `kind == "horror"` or `dark` that ends with you alive), via `Game:stat(name)` / `stat_of`. Lifetime records in **their own file**, `<mount>/wasteland/records.lua` (`Game.records()` loads once and caches; `Game.write_records()`; `Game.reload_records()` for tests): runs, escapes, deaths by cause, longest run, most artifacts carried out, kills over all runs, best difficulty escaped, and `achieved`. Written when a run ends (`record_run`, from `check_death` and `finish_run`, once per run) and when an achievement unlocks, so deleting the save keeps them; without `write_file` they last the session. 12 achievements in `RECORDS.list` ({id, name, what, test(game, how)}), checked every `tick` and at the end: First Steps (day 2), Week in the Zone (day 8), Out, Paper Trail, Bribed, Zone-Hardened, Dog's Best Friend, Karl's Friend (3 riddles in a run), Archivist (12 pages), Fixer (a repair), Homeowner (all 4 camp parts), Night Owl (3 horrors). Unlock: log line + `achieve` sound. The death and ending screens show `run_summary()` (day/hours, kills, hexes seen, searches, artifacts, fish, pages, new records, achievements this run). **R** on the title, creator, death and ending screens opens the records screen (`[x]` list); any key goes back. Test: `records_test.lua` (trade_test now checks only the save is deleted at the end).
+>
 > **Skills (2026-10-01):** `src/55_skills.lua`, numbers in `SKILLS` (05_data_world). `self.skills = {scav, fish, fight, tinker -> XP}` (saved). XP: search +1 and +1 per item found; fishing +1, a catch +2 more, hunting +1; a hit +1 (attack or throw), a kill +3; a craft or base build +1, a repair attempt +2 and +3 more on success. Levels 1-5 at 10/25/50/90/150 XP, with a log line and the `level` sound. Bonuses per level via `Game:skill_bonus(name)`: scav -5% dud weight (in `scavenge`), fish +4% to fish and hunt rolls, fight +3% to hit, tinker +5% repair chance; tinker 3+ takes an hour off every recipe, repair and build (`craft_hours`, min 1; the craft screen shows it). Journal line "Skills: Scav 2  Fish 1  Fight 3  Tinker 0". Sim deaths after skills: Easy ~9%, Normal ~22%, Zone-Hardened ~45% (was ~50; left, it is the original target). Test: `skills_test.lua`.
 >
 > **The code lives in `src/` now (split 2026-09-30).** `wasteland.lua` is GENERATED: edit the parts in `src/` (`00_header`, `05_data`, `10_sprites`, `20_world`, `30_game`, `35_crafting`, `36_survival`, `37_world_time`, `38_save`, `39_radiation`, `40_encounters`, `45_trade`, `50_draw_map`, `60_draw_inventory`, `65_portrait_data` (generated), `66_portraits`, `70_draw_screens`, `72_draw_craft`, `76_draw_trade`, `90_main`), then run `python3 tools/build.py` (the test runner does this first). The parts are concatenated in name order and share one scope - chapters, not modules - so a local defined in an earlier part is visible in later ones and order matters. Still ship/copy only `wasteland.lua`; `python3 tools/build.py --check` says whether it is current.

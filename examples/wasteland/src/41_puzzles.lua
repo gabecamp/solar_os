@@ -103,6 +103,7 @@ function Game:finish_puzzle(result)
         if self:roll(ARTIFACT_CHANCE + 5 * (p.attrs.Perception - 3)) then
             local id = ARTIFACTS[self:rand(#ARTIFACTS) + 1]
             self:put_stack("ground", nil, {item = id, qty = 1})
+            self:stat("artifacts")
             self:push_log("The " .. who .. " fades. It left something:")
             self:push_log(ITEM_DB[id].name .. ". (I to pick it up)")
         else

@@ -283,5 +283,6 @@ function Game:finish_run(how)
                    artifacts = self:artifact_count(), lore = self:lore_ending_line()}
     self.screen = "ending"
     self:sfx("escape")
+    self:record_run(how)
     Game.delete_save()
 end

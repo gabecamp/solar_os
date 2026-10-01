@@ -20,7 +20,7 @@ local SAVE = {version = 1, dir = "wasteland", file = "save.lua",
                         "karl_asked", "karl_next", "karl_gave", "muted",
                         "difficulty", "dog", "radio", "karl_hint",
                         "base", "quest", "quests_done",
-                        "lore_read", "signal_page", "skills"}}
+                        "lore_read", "signal_page", "skills", "stats"}}
 
 -- Where the save lives: <preferred storage>/wasteland/save.lua
 function SAVE.path()
@@ -173,7 +173,7 @@ function Game:draw_title(w, h)
         gfx.text(w // 2 - 100, y, text)
         gfx.color(gfx.BLACK)
     end
-    gfx.text(6, h - 8, "Up/Dn pick  Enter choose  Q quit")
+    gfx.text(6, h - 8, "Up/Dn pick  Enter choose  R records  Q quit")
     gfx.refresh()
 end
 

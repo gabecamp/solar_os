@@ -119,7 +119,9 @@ solaros.dump("ops_map_full.txt")
 -- Scene 6: death screen
 g = fresh()
 g.player.hours = 57
-g.death_cause = "You bled out."
+g.stats = {kills = 3, searches = 14, artifacts = 1, fish = 2}
+g.player.health = 0
+g:check_death("You bled out.")
 g:draw_dead(400, 300)
 solaros.dump("ops_dead.txt")
 
@@ -306,6 +308,8 @@ g.player.inventory = {{item = "permit", qty = 1}, {item = "weeping_stone", qty =
 g:open_gate()
 g:draw_gate(400, 300)
 solaros.dump("ops_gate.txt")
+g.stats = {kills = 7, searches = 40, artifacts = 4, fish = 3}
+g.player.hours = 190
 g:finish_run("permit")
 g:draw_ending(400, 300)
 solaros.dump("ops_ending.txt")
@@ -415,3 +419,12 @@ g:start_encounter({kind = "horror", horror = "long_man", name = "The Long Man", 
     intro = "Someone stands at the edge of your light. Too tall. Its arms hang past its knees. It doesn't move, and you can't tell which way it's facing."})
 g:draw_encounter(400, 300)
 solaros.dump("ops_horror.txt")
+
+-- Scene: the records screen (title, R)
+g = Game.new()
+g.screen = "title"
+local rec = Game.records()
+rec.achieved.night_owl, rec.achieved.karl = true, true
+g:open_records()
+g:draw_records(400, 300)
+solaros.dump("ops_records.txt")
