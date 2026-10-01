@@ -60,6 +60,10 @@ end
 -- E on a Battery Cell while you have the radio.
 function Game:charge_radio()
     if not (self:carrying("lora_radio") and self.radio) then return false end
+    if self.radio.charge >= TECH.radio_max then
+        self:push_log("The radio is fully charged already.")
+        return false
+    end
     self.radio.charge = TECH.radio_max
     self:push_log("The radio's charge light goes green. (" .. TECH.radio_max .. " calls)")
     return true
@@ -102,15 +106,20 @@ local RADIO = {}
 function RADIO.trader(self)
     self:learn_site("trader")
     local told = self:hear_of_exit("Trader")
-    self:mark_stash()
-    self:radio_say("'Trader here. Left a parcel for you, friend. Bearing's in your notes."
+    local parcel = self:mark_stash()
+    if not (told or parcel) then
+        self:radio_say("'Trader here. Nothing for you today, friend. Try me later.'")
+        return false
+    end
+    self:radio_say("'Trader here. "
+        .. (parcel and "Left a parcel for you, friend. Bearing's in your notes." or "")
         .. (told and " And the way out's open, if you've got paper.'" or "'"))
     return true
 end
 function RADIO.anna(self)
     local work = self:anna_work()
     if work == "offered" then return false end   -- free: she only asked
-    if work then return true end
+    if work then return work end
     local p = self.player
     if p.health >= MAX_HEALTH and not p.injuries.bleeding and p.injuries.wounded_hours == 0 then
         self:radio_say("Anna: 'You sound fine, love. Call me when it hurts.'")
@@ -156,9 +165,13 @@ function Game:radio_call(i)
         self:radio_say(ch.name .. ": no answer. Try again in " .. wait .. "h.")
     elseif r.charge <= 0 then
         self:radio_say("Dead air. The radio needs a Battery Cell (E on one).")
-    elseif RADIO[ch.id](self) then
-        r.charge = r.charge - 1
-        r.next[ch.id] = self.player.hours + ch.cooldown
+    else
+        local answered = RADIO[ch.id](self)
+        if answered then
+            r.charge = r.charge - 1
+            -- "open": the voice stays reachable (Anna after you bring her bandages)
+            r.next[ch.id] = answered ~= "open" and (self.player.hours + ch.cooldown) or nil
+        end
     end
 end
 

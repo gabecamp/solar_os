@@ -72,6 +72,7 @@ end
 -- Apply the hours that passed since the last tick.
 function Game:tick()
     local p = self.player
+    self:apply_item_names()   -- before any log line this tick names an item
     self.ticked_hour = self.ticked_hour or p.hours
     local was_cold = (p.cold_hours or 0) > 0
     local rad_before, dose = self:rad_stage(), 0

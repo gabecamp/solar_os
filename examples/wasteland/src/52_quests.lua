@@ -90,10 +90,9 @@ function Game:anna_work()
     if q and q.kind == "supply" then
         if not self:anna_ready() then return false end
         self:take_items(need[1], need[2])
-        self.radio.next.anna = nil
         self:give_reward(QUESTS.supply.reward, "Anna: 'Bless you.' A runner leaves a parcel:")
         self:radio_say("Anna: 'Bless you. The children here will sleep tonight. I've sent you something.'")
-        return true
+        return "open"   -- her channel stays open afterwards
     end
     local p = self.player
     local hurt = p.health < MAX_HEALTH or p.injuries.bleeding or p.injuries.wounded_hours > 0

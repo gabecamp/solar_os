@@ -3132,6 +3132,12 @@ function Game:try_consume(kind, k)
     self:after_consume(def, kind, k)
 end
 
+-- Use up one of the stack at kind/k (it goes when it runs out).
+function Game:use_one(kind, k, stack)
+    stack.qty = stack.qty - 1
+    if stack.qty <= 0 then self:remove_stack(kind, k) end
+end
+
 -- E on the inventory screen: the obvious thing for the item under the cursor.
 -- Food/drink is eaten, gear is worn, anything else goes to a free hand; on a
 -- body slot it takes the item off (held food is eaten instead).
@@ -3144,28 +3150,24 @@ function Game:use_item(kind, k)
         p.injuries.bleeding = false
         p.injuries.wounded_hours = math.max(0, p.injuries.wounded_hours - 12)
         p.health = clamp(p.health + 40)
-        stack.qty = stack.qty - 1
-        if stack.qty <= 0 then self:remove_stack(kind, k) end
+        self:use_one(kind, k, stack)
         self:push_log("You patch yourself up properly. (+40 HP)")
         return
     end
     if stack.item == "bandage" then
         p.injuries.bleeding = false
         p.health = clamp(p.health + 15)
-        stack.qty = stack.qty - 1
-        if stack.qty <= 0 then self:remove_stack(kind, k) end
+        self:use_one(kind, k, stack)
         self:push_log("You bandage yourself up. (+15 HP)")
         return
     end
-    if stack.item == "battery_cell" and self:charge_radio() then
-        stack.qty = stack.qty - 1
-        if stack.qty <= 0 then self:remove_stack(kind, k) end
+    if stack.item == "battery_cell" and self:carrying("lora_radio") then
+        if self:charge_radio() then self:use_one(kind, k, stack) end   -- a full radio keeps the cell
         return
     end
     if stack.item == "snare" then
         if self:set_snare() then
-            stack.qty = stack.qty - 1
-            if stack.qty <= 0 then self:remove_stack(kind, k) end
+            self:use_one(kind, k, stack)
         end
         return
     end
@@ -3175,22 +3177,19 @@ function Game:use_item(kind, k)
             return
         end
         p.injuries.wounded_hours = math.max(0, p.injuries.wounded_hours - 12)
-        stack.qty = stack.qty - 1
-        if stack.qty <= 0 then self:remove_stack(kind, k) end
+        self:use_one(kind, k, stack)
         self:push_log("You splint the wound. It'll mend sooner.")
         return
     end
     if stack.item == "scrawled_notes" then
         if self:read_notes() then
-            stack.qty = stack.qty - 1
-            if stack.qty <= 0 then self:remove_stack(kind, k) end
+            self:use_one(kind, k, stack)
         end
         return
     end
     if stack.item == "cloth_scrap" and p.injuries.bleeding then
         p.injuries.bleeding = false
-        stack.qty = stack.qty - 1
-        if stack.qty <= 0 then self:remove_stack(kind, k) end
+        self:use_one(kind, k, stack)
         self:push_log("You bind the wound. The bleeding stops.")
         return
     end
@@ -3621,6 +3620,7 @@ end
 -- Apply the hours that passed since the last tick.
 function Game:tick()
     local p = self.player
+    self:apply_item_names()   -- before any log line this tick names an item
     self.ticked_hour = self.ticked_hour or p.hours
     local was_cold = (p.cold_hours or 0) > 0
     local rad_before, dose = self:rad_stage(), 0
@@ -3770,6 +3770,12 @@ function Game:load_state(data)
     self.tiles, self.rad, self.sites = tiles, rad, sites
     for _, f in ipairs(SAVE.fields) do
         if data[f] ~= nil then self[f] = data[f] end
+    end
+    -- saves from before emissions existed (or one left far behind) would
+    -- otherwise never see another: schedule the next from now
+    local E = RAD.emission
+    if (self.next_emission or 0) + E.hours <= data.player.hours then
+        self.next_emission = data.player.hours + E.every[1]
     end
     self.player = data.player
     self.player.visible = {}
@@ -3966,8 +3972,9 @@ function Game:rad_news(dose, stage_before)
     self.dose_level = nil
     if dose > 0 then
         if measured then
-            self:push_log(("Geiger crackles: +%d rads (%d)."):format(math.floor(dose + 0.5),
-                                                                   math.floor(p.rads)))
+            self:push_log(("%s crackles: +%d rads (%d)."):format(
+                self:carrying("geiger") and "Geiger" or "Detector",
+                math.floor(dose + 0.5), math.floor(p.rads)))
             self:sfx("geiger")
         else
             self:push_log(RAD.feel[math.max(1, level)])   -- a feeling, not a reading
@@ -3990,8 +3997,9 @@ end
 function Game:rad_text()
     local p = self.player
     local rads = math.floor(p.rads or 0)
-    if self:carrying("geiger") then
-        return "Geiger " .. RAD.level_name[self:rad_at(p.q, p.r)] .. " Rad " .. rads
+    if self:can_measure() then
+        return (self:carrying("geiger") and "Geiger " or "Detect ")
+            .. RAD.level_name[self:rad_at(p.q, p.r)] .. " Rad " .. rads
     end
     local st = RAD.stages[self:rad_stage()]
     if not st then return nil end
@@ -4740,6 +4748,7 @@ function Game:check_snare()
         self:push_log("Your snare caught a two-headed hare. (I to take it)")
         self:sfx("chime")
     else
+        snare.set = p.hours   -- the hours you just checked can't catch again
         self:push_log("Your snare is empty.")
     end
 end
@@ -5334,6 +5343,10 @@ end
 -- E on a Battery Cell while you have the radio.
 function Game:charge_radio()
     if not (self:carrying("lora_radio") and self.radio) then return false end
+    if self.radio.charge >= TECH.radio_max then
+        self:push_log("The radio is fully charged already.")
+        return false
+    end
     self.radio.charge = TECH.radio_max
     self:push_log("The radio's charge light goes green. (" .. TECH.radio_max .. " calls)")
     return true
@@ -5376,15 +5389,20 @@ local RADIO = {}
 function RADIO.trader(self)
     self:learn_site("trader")
     local told = self:hear_of_exit("Trader")
-    self:mark_stash()
-    self:radio_say("'Trader here. Left a parcel for you, friend. Bearing's in your notes."
+    local parcel = self:mark_stash()
+    if not (told or parcel) then
+        self:radio_say("'Trader here. Nothing for you today, friend. Try me later.'")
+        return false
+    end
+    self:radio_say("'Trader here. "
+        .. (parcel and "Left a parcel for you, friend. Bearing's in your notes." or "")
         .. (told and " And the way out's open, if you've got paper.'" or "'"))
     return true
 end
 function RADIO.anna(self)
     local work = self:anna_work()
     if work == "offered" then return false end   -- free: she only asked
-    if work then return true end
+    if work then return work end
     local p = self.player
     if p.health >= MAX_HEALTH and not p.injuries.bleeding and p.injuries.wounded_hours == 0 then
         self:radio_say("Anna: 'You sound fine, love. Call me when it hurts.'")
@@ -5430,9 +5448,13 @@ function Game:radio_call(i)
         self:radio_say(ch.name .. ": no answer. Try again in " .. wait .. "h.")
     elseif r.charge <= 0 then
         self:radio_say("Dead air. The radio needs a Battery Cell (E on one).")
-    elseif RADIO[ch.id](self) then
-        r.charge = r.charge - 1
-        r.next[ch.id] = self.player.hours + ch.cooldown
+    else
+        local answered = RADIO[ch.id](self)
+        if answered then
+            r.charge = r.charge - 1
+            -- "open": the voice stays reachable (Anna after you bring her bandages)
+            r.next[ch.id] = answered ~= "open" and (self.player.hours + ch.cooldown) or nil
+        end
     end
 end
 
@@ -5926,10 +5948,9 @@ function Game:anna_work()
     if q and q.kind == "supply" then
         if not self:anna_ready() then return false end
         self:take_items(need[1], need[2])
-        self.radio.next.anna = nil
         self:give_reward(QUESTS.supply.reward, "Anna: 'Bless you.' A runner leaves a parcel:")
         self:radio_say("Anna: 'Bless you. The children here will sleep tonight. I've sent you something.'")
-        return true
+        return "open"   -- her channel stays open afterwards
     end
     local p = self.player
     local hurt = p.health < MAX_HEALTH or p.injuries.bleeding or p.injuries.wounded_hours > 0
@@ -6308,7 +6329,7 @@ end
 
 -- Draw order for painting worn items: under-layers before over-layers.
 -- Held items (lhand/rhand) are never painted on, only shown in their box.
-local WEAR_ORDER = {"shirt", "pants", "jacket", "back", "feet", "hands", "head", "neck",
+local WEAR_ORDER = {"shirt", "pants", "belt", "jacket", "back", "feet", "hands", "head", "neck",
                     "wrists", "eyes", "ears"}
 
 function Game:draw_silhouette()

@@ -91,6 +91,7 @@ function Game:check_snare()
         self:push_log("Your snare caught a two-headed hare. (I to take it)")
         self:sfx("chime")
     else
+        snare.set = p.hours   -- the hours you just checked can't catch again
         self:push_log("Your snare is empty.")
     end
 end

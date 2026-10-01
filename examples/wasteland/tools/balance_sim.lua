@@ -16,7 +16,8 @@ fake.gfx.begin()
 local src = io.open(os.getenv("WASTELAND_FILE") or "../wasteland.lua"):read("a")   -- (try variants)
 local lib = src:sub(1, src:find("-- Main loop", 1, true) - 1) .. [[
 return Game, {ITEM_DB = ITEM_DB, KEY = KEY, TERRAIN = TERRAIN, AXIAL_DIRS = AXIAL_DIRS,
-              TRADE = TRADE, GOAL = GOAL, RECIPES = RECIPES, RAD = RAD, WORLD = WORLD}
+              TRADE = TRADE, GOAL = GOAL, RECIPES = RECIPES, RAD = RAD, WORLD = WORLD,
+              apply_awake_hours = apply_awake_hours}
 ]]
 local Game, D = load(lib, "=wasteland")()
 local ITEM_DB, KEY, TERRAIN = D.ITEM_DB, D.KEY, D.TERRAIN
@@ -27,6 +28,11 @@ local LEVEL = arg[3] or "normal"   -- easy / normal / hard
 local MAX_HOURS = 24 * 30
 
 local function key(q, r) return q .. "," .. r end
+-- an hour that passes with nothing done still costs food, water and rest
+local function wait_hour(g)
+    g.player.hours = g.player.hours + 1
+    D.apply_awake_hours(g.player, 1)
+end
 local function parse(k)
     local q, r = k:match("(-?%d+),(-?%d+)")
     return tonumber(q), tonumber(r)
@@ -319,11 +325,11 @@ local function play(seed)
                 if emit and D.RAD.emission.shelter[g.tiles[here]] then
                     local h = p.hours
                     g:rest()
-                    if p.hours == h then p.hours = p.hours + 1 end
+                    if p.hours == h then wait_hour(g) end
                 elseif p.mp <= 0 then
                     local h = p.hours
                     g:rest()
-                    if p.hours == h then p.hours = p.hours + 1 end
+                    if p.hours == h then wait_hour(g) end
                 elseif g:scavenge_left() > 0   -- finds land on the ground: a full bag doesn't stop you
                     and (g.tiles[here] == "ruins" or p.needs.hunger < 60) then
                     g:scavenge()
@@ -336,7 +342,7 @@ local function play(seed)
                     else
                         g:rest()
                     end
-                    if p.hours == h and g.screen == "map" then p.hours = p.hours + 1 end   -- wait
+                    if p.hours == h and g.screen == "map" then wait_hour(g) end   -- wait
                 end
             end
             local rads_before = p.rads or 0

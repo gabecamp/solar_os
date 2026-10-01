@@ -125,8 +125,9 @@ function Game:rad_news(dose, stage_before)
     self.dose_level = nil
     if dose > 0 then
         if measured then
-            self:push_log(("Geiger crackles: +%d rads (%d)."):format(math.floor(dose + 0.5),
-                                                                   math.floor(p.rads)))
+            self:push_log(("%s crackles: +%d rads (%d)."):format(
+                self:carrying("geiger") and "Geiger" or "Detector",
+                math.floor(dose + 0.5), math.floor(p.rads)))
             self:sfx("geiger")
         else
             self:push_log(RAD.feel[math.max(1, level)])   -- a feeling, not a reading
@@ -149,8 +150,9 @@ end
 function Game:rad_text()
     local p = self.player
     local rads = math.floor(p.rads or 0)
-    if self:carrying("geiger") then
-        return "Geiger " .. RAD.level_name[self:rad_at(p.q, p.r)] .. " Rad " .. rads
+    if self:can_measure() then
+        return (self:carrying("geiger") and "Geiger " or "Detect ")
+            .. RAD.level_name[self:rad_at(p.q, p.r)] .. " Rad " .. rads
     end
     local st = RAD.stages[self:rad_stage()]
     if not st then return nil end

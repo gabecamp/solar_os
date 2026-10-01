@@ -300,7 +300,7 @@ end
 
 -- Draw order for painting worn items: under-layers before over-layers.
 -- Held items (lhand/rhand) are never painted on, only shown in their box.
-local WEAR_ORDER = {"shirt", "pants", "jacket", "back", "feet", "hands", "head", "neck",
+local WEAR_ORDER = {"shirt", "pants", "belt", "jacket", "back", "feet", "hands", "head", "neck",
                     "wrists", "eyes", "ears"}
 
 function Game:draw_silhouette()

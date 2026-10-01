@@ -114,6 +114,12 @@ function Game:load_state(data)
     for _, f in ipairs(SAVE.fields) do
         if data[f] ~= nil then self[f] = data[f] end
     end
+    -- saves from before emissions existed (or one left far behind) would
+    -- otherwise never see another: schedule the next from now
+    local E = RAD.emission
+    if (self.next_emission or 0) + E.hours <= data.player.hours then
+        self.next_emission = data.player.hours + E.every[1]
+    end
     self.player = data.player
     self.player.visible = {}
     self.player.explored = self.player.explored or {}

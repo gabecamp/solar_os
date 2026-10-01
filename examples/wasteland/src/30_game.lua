@@ -394,6 +394,12 @@ function Game:try_consume(kind, k)
     self:after_consume(def, kind, k)
 end
 
+-- Use up one of the stack at kind/k (it goes when it runs out).
+function Game:use_one(kind, k, stack)
+    stack.qty = stack.qty - 1
+    if stack.qty <= 0 then self:remove_stack(kind, k) end
+end
+
 -- E on the inventory screen: the obvious thing for the item under the cursor.
 -- Food/drink is eaten, gear is worn, anything else goes to a free hand; on a
 -- body slot it takes the item off (held food is eaten instead).
@@ -406,28 +412,24 @@ function Game:use_item(kind, k)
         p.injuries.bleeding = false
         p.injuries.wounded_hours = math.max(0, p.injuries.wounded_hours - 12)
         p.health = clamp(p.health + 40)
-        stack.qty = stack.qty - 1
-        if stack.qty <= 0 then self:remove_stack(kind, k) end
+        self:use_one(kind, k, stack)
         self:push_log("You patch yourself up properly. (+40 HP)")
         return
     end
     if stack.item == "bandage" then
         p.injuries.bleeding = false
         p.health = clamp(p.health + 15)
-        stack.qty = stack.qty - 1
-        if stack.qty <= 0 then self:remove_stack(kind, k) end
+        self:use_one(kind, k, stack)
         self:push_log("You bandage yourself up. (+15 HP)")
         return
     end
-    if stack.item == "battery_cell" and self:charge_radio() then
-        stack.qty = stack.qty - 1
-        if stack.qty <= 0 then self:remove_stack(kind, k) end
+    if stack.item == "battery_cell" and self:carrying("lora_radio") then
+        if self:charge_radio() then self:use_one(kind, k, stack) end   -- a full radio keeps the cell
         return
     end
     if stack.item == "snare" then
         if self:set_snare() then
-            stack.qty = stack.qty - 1
-            if stack.qty <= 0 then self:remove_stack(kind, k) end
+            self:use_one(kind, k, stack)
         end
         return
     end
@@ -437,22 +439,19 @@ function Game:use_item(kind, k)
             return
         end
         p.injuries.wounded_hours = math.max(0, p.injuries.wounded_hours - 12)
-        stack.qty = stack.qty - 1
-        if stack.qty <= 0 then self:remove_stack(kind, k) end
+        self:use_one(kind, k, stack)
         self:push_log("You splint the wound. It'll mend sooner.")
         return
     end
     if stack.item == "scrawled_notes" then
         if self:read_notes() then
-            stack.qty = stack.qty - 1
-            if stack.qty <= 0 then self:remove_stack(kind, k) end
+            self:use_one(kind, k, stack)
         end
         return
     end
     if stack.item == "cloth_scrap" and p.injuries.bleeding then
         p.injuries.bleeding = false
-        stack.qty = stack.qty - 1
-        if stack.qty <= 0 then self:remove_stack(kind, k) end
+        self:use_one(kind, k, stack)
         self:push_log("You bind the wound. The bleeding stops.")
         return
     end
