@@ -15,7 +15,7 @@ local HELP = {
     {"BAG", "Arrows pick  Enter select, Enter move"},
     {"", "E use: eat, drink, wear, read, set snare"},
     {"CRAFT", "Up/Dn pick  Enter make  C/Q back"},
-    {"TRADE", "Lt/Rt side  Enter +1  E -1  T deal"},
+    {"TRADE", "Lt/Rt side  Enter +1  E -1  T deal  O work"},
     {"FIGHTS", "Up/Dn pick  Enter choose"},
     {"PUZZLE", "Arrows move  T+arrow throw  1-4 sigils"},
     {"", "Q backs away from a puzzle unharmed"},

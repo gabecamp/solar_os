@@ -153,6 +153,7 @@ function Game:enemy_dies()
         end
     end
     self:sfx("kill")
+    self:quest_kill()
     self:enc_say("The " .. e.def.who .. " goes still.")
     if #found > 0 then self:enc_say("Left behind: " .. table.concat(found, ", ") .. ".") end
     self:end_encounter("You killed the " .. e.def.who .. ".")

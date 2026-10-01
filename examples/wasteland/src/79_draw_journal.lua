@@ -21,6 +21,8 @@ function Game:journal_lines()
         add("The way out: unknown. Find the trader, or read notes.")
     end
     if self.sites_known.trader then add("Trader: " .. self:site_bearing("trader") .. ".") end
+    local quest = self:quest_text()
+    if quest then add("Quest - " .. quest) end
     local camp = self:base_text()
     if camp then add(camp) end
     local permit = self:count_item("permit") > 0

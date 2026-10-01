@@ -73,6 +73,7 @@ function Game:karl_answer(n)
             .. "'Pepsi and milk. Trust me.'" or "his " .. name .. "."))
         self:sfx("gift")
         self:end_encounter("Karl gave you " .. name .. ".")
+        self:karl_work()
     else
         self:enc_say("Karl laughs. 'Wrong. The river keeps its secrets.' He wades off downstream.")
         self:end_encounter("Karl waded off, laughing.")

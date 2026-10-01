@@ -200,6 +200,8 @@ function Game:trade_key(key)
         end
     elseif key == KEY.T then
         self:make_deal()
+    elseif key == KEY.O then   -- (W is "up" here)
+        self:trader_work()
     end
 end
 
@@ -230,7 +232,12 @@ function Game:open_gate()
 end
 
 function Game:pay_bribe()
-    local p, left = self.player, GOAL.bribe
+    self:pay_artifacts(GOAL.bribe)
+end
+
+-- Hand over n artifacts: from the bag first, then your hands.
+function Game:pay_artifacts(n)
+    local p, left = self.player, n
     for i = #p.inventory, 1, -1 do
         local s = p.inventory[i]
         if left > 0 and ITEM_DB[s.item].artifact then

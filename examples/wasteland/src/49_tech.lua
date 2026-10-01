@@ -108,6 +108,9 @@ function RADIO.trader(self)
     return true
 end
 function RADIO.anna(self)
+    local work = self:anna_work()
+    if work == "offered" then return false end   -- free: she only asked
+    if work then return true end
     local p = self.player
     if p.health >= MAX_HEALTH and not p.injuries.bleeding and p.injuries.wounded_hours == 0 then
         self:radio_say("Anna: 'You sound fine, love. Call me when it hurts.'")
@@ -148,6 +151,7 @@ function Game:radio_call(i)
     local ch, r = TECH.channels[i], self.radio
     if not ch then return end
     local wait = (r.next[ch.id] or 0) - self.player.hours
+    if ch.id == "anna" and self:anna_ready() then wait = 0 end   -- she always takes the bandages
     if wait > 0 then
         self:radio_say(ch.name .. ": no answer. Try again in " .. wait .. "h.")
     elseif r.charge <= 0 then

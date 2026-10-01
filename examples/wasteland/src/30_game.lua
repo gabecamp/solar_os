@@ -123,7 +123,7 @@ function Game:try_move(q, r)
     if p.needs.thirst <= 0 then self:push_log("You are dehydrated!") end
     self:find_stash()
     self:check_snare()
-    if not self:check_death("You bled out.") and not self:arrive_site() then
+    if not self:check_death("You bled out.") and not self:arrive_site() and not self:quest_arrive() then
         self:maybe_encounter(terrain_id)
     end
 end
@@ -402,6 +402,15 @@ function Game:use_item(kind, k)
     if not stack then return end
     local def = ITEM_DB[stack.item]
     local p = self.player
+    if stack.item == "medkit" then
+        p.injuries.bleeding = false
+        p.injuries.wounded_hours = math.max(0, p.injuries.wounded_hours - 12)
+        p.health = clamp(p.health + 40)
+        stack.qty = stack.qty - 1
+        if stack.qty <= 0 then self:remove_stack(kind, k) end
+        self:push_log("You patch yourself up properly. (+40 HP)")
+        return
+    end
     if stack.item == "bandage" then
         p.injuries.bleeding = false
         p.health = clamp(p.health + 15)

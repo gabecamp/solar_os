@@ -74,7 +74,7 @@ local POLL_MS = 250
 -- SolarOS sends Enter as '\n' (LF); CR is kept just in case.
 local KEY = {SPACE = 32, ENTER = 13, LF = 10, ESC = 27,
              A = 97, C = 99, D = 100, E = 101, F = 102, I = 105, Q = 113,
-             S = 115, T = 116, W = 119, H = 104, V = 118, G = 103, M = 109, J = 106, R = 114}
+             S = 115, T = 116, W = 119, H = 104, V = 118, G = 103, M = 109, J = 106, R = 114, O = 111}
 
 -- Terrain: id -> {name, cost (MP + hours), passable, shade}
 -- shade is one of gfx.WHITE / gfx.LIGHT / gfx.DARK / gfx.BLACK, used as
@@ -185,7 +185,7 @@ local TRADE = {
         pilk = 7, lucky_lure = 12, karls_waders = 14, karls_hat = 10,
         broken_radio = 15, lora_radio = 60, broken_detector = 12, anomaly_detector = 45,
         broken_headlamp = 6, headlamp = 25, circuit_board = 10, copper_wire = 5,
-        battery_cell = 8, antenna = 6, multitool = 20,
+        battery_cell = 8, antenna = 6, multitool = 20, medkit = 15,
     },
     stock = {{"antirad", 3}, {"water_bottle", 4}, {"canned_beans", 4}, {"bandage", 2},
              {"multitool", 1}, {"battery_cell", 1},
@@ -292,6 +292,21 @@ local BASE = {
     order = {"box", "bedroll", "barrel", "barricade"},
     names = {box = "Stash box", bedroll = "Bedroll", barrel = "Rain barrel", barricade = "Barricade"},
     barrel_hours = 12, barrel_max = 6, bed_rest_bonus = 0.5,
+}
+
+-- Quests (src/52_quests.lua): offer = what they say, journal = the reminder.
+local QUESTS = {
+    fetch = {offer = "'Bring me an artifact. Any kind. I'll make it worth your while.'",
+             journal = "bring the trader an artifact.",
+             reward = {{"antirad", 2}, {"canned_beans", 3}, {"battery_cell", 1}}},
+    den = {offer = "'Something's denned up out there, killing my runners. Clear it.'",
+           journal = "clear the den", near = 5, far = 9, hp_mult = 1.5,
+           reward = {{"multitool", 1}, {"gasmask", 1}, {"machete", 1}}},
+    supply = {offer = "Anna: 'We're out of bandages. Call me when you've two to spare.'",
+              journal = "find 2 bandages, then call her.", need = {"bandage", 2},
+              reward = {{"medkit", 1}, {"water_bottle", 2}}},
+    dog = {offer = "Karl: 'Before you go - my old dog ran off. Find her by the water?'",
+           journal = "find his dog by the river", near = 4, far = 8},
 }
 
 local BACKPACK_CAP = 16      -- most bag cells any build can have (the layout's limit)
@@ -437,6 +452,8 @@ local ITEM_DB = {
     rope         = {name = "Rope",         slot = nil, consumable = nil, desc = "For crafting"},
     torch        = {name = "Torch",        slot = nil, consumable = nil,
                     desc = "Hold it: light in the dark"},
+    medkit       = {name = "Medkit",       slot = nil, consumable = nil,
+                    desc = "E: +40 HP, stops bleeding"},
     bandage      = {name = "Bandage",      slot = nil, consumable = nil,
                     desc = "E: stop bleeding, +15 HP"},
     splint       = {name = "Splint",       slot = nil, consumable = nil,
@@ -700,6 +717,24 @@ end
 local SPRITE_W, SPRITE_H = 16, 16
 
 local SPRITE_ART = {
+    medkit = {
+        "................",
+        "....########....",
+        "...#........#...",
+        "..############..",
+        "..#....##....#..",
+        "..#....##....#..",
+        "..#..######..#..",
+        "..#..######..#..",
+        "..#....##....#..",
+        "..#....##....#..",
+        "..#..........#..",
+        "..############..",
+        "................",
+        "................",
+        "................",
+        "................",
+    },
     lora_radio = {
         "..........#.....",
         "..........#.....",
@@ -2826,7 +2861,7 @@ function Game:try_move(q, r)
     if p.needs.thirst <= 0 then self:push_log("You are dehydrated!") end
     self:find_stash()
     self:check_snare()
-    if not self:check_death("You bled out.") and not self:arrive_site() then
+    if not self:check_death("You bled out.") and not self:arrive_site() and not self:quest_arrive() then
         self:maybe_encounter(terrain_id)
     end
 end
@@ -3105,6 +3140,15 @@ function Game:use_item(kind, k)
     if not stack then return end
     local def = ITEM_DB[stack.item]
     local p = self.player
+    if stack.item == "medkit" then
+        p.injuries.bleeding = false
+        p.injuries.wounded_hours = math.max(0, p.injuries.wounded_hours - 12)
+        p.health = clamp(p.health + 40)
+        stack.qty = stack.qty - 1
+        if stack.qty <= 0 then self:remove_stack(kind, k) end
+        self:push_log("You patch yourself up properly. (+40 HP)")
+        return
+    end
     if stack.item == "bandage" then
         p.injuries.bleeding = false
         p.health = clamp(p.health + 15)
@@ -3632,7 +3676,7 @@ local SAVE = {version = 1, dir = "wasteland", file = "save.lua",
                         "trader", "sites_known", "stashes", "next_emission", "snares",
                         "karl_asked", "karl_next", "karl_gave", "muted",
                         "difficulty", "dog", "radio", "karl_hint",
-                        "base"}}
+                        "base", "quest", "quests_done"}}
 
 -- Where the save lives: <preferred storage>/wasteland/save.lua
 function SAVE.path()
@@ -4118,6 +4162,7 @@ function Game:enemy_dies()
         end
     end
     self:sfx("kill")
+    self:quest_kill()
     self:enc_say("The " .. e.def.who .. " goes still.")
     if #found > 0 then self:enc_say("Left behind: " .. table.concat(found, ", ") .. ".") end
     self:end_encounter("You killed the " .. e.def.who .. ".")
@@ -4773,6 +4818,7 @@ function Game:karl_answer(n)
             .. "'Pepsi and milk. Trust me.'" or "his " .. name .. "."))
         self:sfx("gift")
         self:end_encounter("Karl gave you " .. name .. ".")
+        self:karl_work()
     else
         self:enc_say("Karl laughs. 'Wrong. The river keeps its secrets.' He wades off downstream.")
         self:end_encounter("Karl waded off, laughing.")
@@ -4990,6 +5036,8 @@ function Game:trade_key(key)
         end
     elseif key == KEY.T then
         self:make_deal()
+    elseif key == KEY.O then   -- (W is "up" here)
+        self:trader_work()
     end
 end
 
@@ -5020,7 +5068,12 @@ function Game:open_gate()
 end
 
 function Game:pay_bribe()
-    local p, left = self.player, GOAL.bribe
+    self:pay_artifacts(GOAL.bribe)
+end
+
+-- Hand over n artifacts: from the bag first, then your hands.
+function Game:pay_artifacts(n)
+    local p, left = self.player, n
     for i = #p.inventory, 1, -1 do
         local s = p.inventory[i]
         if left > 0 and ITEM_DB[s.item].artifact then
@@ -5329,6 +5382,9 @@ function RADIO.trader(self)
     return true
 end
 function RADIO.anna(self)
+    local work = self:anna_work()
+    if work == "offered" then return false end   -- free: she only asked
+    if work then return true end
     local p = self.player
     if p.health >= MAX_HEALTH and not p.injuries.bleeding and p.injuries.wounded_hours == 0 then
         self:radio_say("Anna: 'You sound fine, love. Call me when it hurts.'")
@@ -5369,6 +5425,7 @@ function Game:radio_call(i)
     local ch, r = TECH.channels[i], self.radio
     if not ch then return end
     local wait = (r.next[ch.id] or 0) - self.player.hours
+    if ch.id == "anna" and self:anna_ready() then wait = 0 end   -- she always takes the bandages
     if wait > 0 then
         self:radio_say(ch.name .. ": no answer. Try again in " .. wait .. "h.")
     elseif r.charge <= 0 then
@@ -5558,6 +5615,16 @@ function Game:draw_map(w, h)
                 gfx.color(gfx.BLACK)
                 gfx.rect(sx, sy, 6, 6)
                 gfx.line(sx + 3, sy + 6, sx + 3, sy + 8)
+            end
+            if self.quest and self.quest.target == key and (p.visible[key] or p.explored[key]) then
+                -- a quest target: "!" in a box, lower right
+                local qx, qy = rnd(px) + 4, rnd(py) + 2
+                gfx.color(gfx.WHITE)
+                gfx.fill_rect(qx - 1, qy - 1, 8, 10)
+                gfx.color(gfx.BLACK)
+                gfx.rect(qx - 1, qy - 1, 8, 10)
+                gfx.fill_rect(qx + 2, qy + 1, 2, 4)
+                gfx.fill_rect(qx + 2, qy + 6, 2, 2)
             end
             local hot = self.rad_known[key]
             if hot and hot > 0 and (p.visible[key] or p.explored[key]) then
@@ -5766,6 +5833,178 @@ function Game:base_text()
     end
     local where = self:at_base() and "here" or self:bearing_to(self.base.key)
     return "Camp: " .. where .. (#parts > 0 and (". " .. table.concat(parts, ", ") .. ".") or ".")
+end
+-- ---------------------------------------------------------------------
+-- Quests: small jobs from the people of the Zone (texts and numbers in
+-- QUESTS). One at a time: self.quest = {kind, giver, target, ...} (saved).
+--   fetch  (the trader, O on the trade screen): bring an artifact back.
+--   den    (the trader): kill the beast in a den a few hexes away.
+--   supply (Anna, on the radio): have bandages on you when you call her.
+--   dog    (Karl, after a right answer): find his lost dog by the river.
+-- Targets get a "!" on the map and a line in the journal.
+-- ---------------------------------------------------------------------
+
+function Game:give_reward(list, why)
+    local names = {}
+    for _, it in ipairs(list) do
+        local stack = {item = it[1], qty = it[2] or 1}
+        if not self:put_stack("inventory", nil, stack) then self:put_stack("ground", nil, stack) end
+        names[#names + 1] = ITEM_DB[it[1]].name .. ((it[2] or 1) > 1 and (" x" .. it[2]) or "")
+    end
+    self:sfx("gift")
+    self:push_log(why .. " " .. table.concat(names, ", ") .. ".")
+    self.quest = nil
+    self.quests_done = (self.quests_done or 0) + 1
+end
+
+-- A passable, non-site hex at distance near..far from you (optionally by water).
+function Game:quest_spot(near, far, by_water)
+    local p, taken, spots = self.player, {}, {}
+    for _, k in pairs(self.sites) do taken[k] = true end
+    if self.base then taken[self.base.key] = true end
+    for key, t in pairs(self.tiles) do
+        local q, r = key:match("(-?%d+),(-?%d+)")
+        q, r = tonumber(q), tonumber(r)
+        local d = axial_distance(p.q, p.r, q, r)
+        if TERRAIN[t].passable and d >= near and d <= far and not taken[key]
+            and (self.rad[key] or 0) == 0 then
+            if not by_water then
+                spots[#spots + 1] = key
+            else
+                for _, n in ipairs(neighbors(self.tiles, q, r)) do
+                    if self.tiles[hex_key(n[1], n[2])] == "water" then spots[#spots + 1] = key; break end
+                end
+            end
+        end
+    end
+    if #spots == 0 then return nil end
+    table.sort(spots)
+    return spots[self:rand(#spots) + 1]
+end
+
+-- W on the trade screen: ask for work, or hand it in.
+function Game:trader_work()
+    local u, q = self.trade_ui, self.quest
+    if q and q.kind == "fetch" then
+        if self:artifact_count() == 0 then
+            u.msg = "'Still waiting on that artifact.'"
+            return
+        end
+        self:pay_artifacts(1)
+        self:give_reward(QUESTS.fetch.reward, "The trader turns it over in his gloves. He pays:")
+        u.msg = "'Good. Come back if you want more work.'"
+        return
+    end
+    if q then
+        u.msg = "'Finish the job you've got first.'"
+        return
+    end
+    if self:rand(2) == 0 then
+        self.quest = {kind = "fetch", giver = "Trader"}
+        u.msg = QUESTS.fetch.offer
+    else
+        local key = self:quest_spot(QUESTS.den.near, QUESTS.den.far)
+        if not key then u.msg = "'Nothing today.'"; return end
+        self.quest = {kind = "den", giver = "Trader", target = key}
+        self.player.explored[key] = true
+        u.msg = QUESTS.den.offer .. " (" .. self:bearing_to(key) .. ")"
+    end
+    self:push_log("Quest: " .. self:quest_text())
+end
+
+-- Her supply job is done and in your bag (she answers even while busy).
+function Game:anna_ready()
+    local q, need = self.quest, QUESTS.supply.need
+    return q ~= nil and q.kind == "supply" and self:count_item(need[1]) >= need[2]
+end
+
+-- Anna's channel: hands in her supply job (true: the call is spent), or
+-- offers one when you're not hurt (free, like any call she doesn't answer).
+function Game:anna_work()
+    local q = self.quest
+    local need = QUESTS.supply.need
+    if q and q.kind == "supply" then
+        if not self:anna_ready() then return false end
+        self:take_items(need[1], need[2])
+        self.radio.next.anna = nil
+        self:give_reward(QUESTS.supply.reward, "Anna: 'Bless you.' A runner leaves a parcel:")
+        self:radio_say("Anna: 'Bless you. The children here will sleep tonight. I've sent you something.'")
+        return true
+    end
+    local p = self.player
+    local hurt = p.health < MAX_HEALTH or p.injuries.bleeding or p.injuries.wounded_hours > 0
+    if not q and not hurt then
+        self.quest = {kind = "supply", giver = "Anna"}
+        self:radio_say(QUESTS.supply.offer)
+        self:push_log("Quest: " .. self:quest_text())
+        return "offered"
+    end
+    return false
+end
+
+-- Karl, after a right answer: his dog ran off.
+function Game:karl_work()
+    if self.quest then return end
+    local key = self:quest_spot(QUESTS.dog.near, QUESTS.dog.far, true)
+    if not key then return end
+    self.quest = {kind = "dog", giver = "Karl", target = key}
+    self.player.explored[key] = true
+    self:enc_say(QUESTS.dog.offer .. " (" .. self:bearing_to(key) .. ")")
+    self:push_log("Quest: " .. self:quest_text())
+end
+
+-- Stepping onto a quest target (from try_move). True if it started a fight.
+function Game:quest_arrive()
+    local q = self.quest
+    if not (q and q.target == hex_key(self.player.q, self.player.r)) then return false end
+    if q.kind == "dog" then
+        local reward = {{"pilk", 2}}
+        for _, item in ipairs({"karls_waders", "karls_hat"}) do
+            if not (self.karl_gave and self.karl_gave[item]) and not self:carrying(item) then
+                reward = {{item, 1}}
+                self.karl_gave = self.karl_gave or {}
+                self.karl_gave[item] = true
+                break
+            end
+        end
+        self:sfx("bark")
+        self:give_reward(reward, "Karl's old dog limps out of the reeds and licks your hand. "
+            .. "Karl will be glad. Tied to its collar:")
+        return false
+    end
+    if q.kind == "den" then
+        local animals = ENCOUNTERS_BY_KIND.animal
+        local base = animals[self:rand(#animals) + 1]
+        local def = {}
+        for k, v in pairs(base) do def[k] = v end
+        def.hp = math.floor(base.hp * QUESTS.den.hp_mult)
+        def.flees_at = nil
+        def.den = true
+        def.intro = "The den stinks of old blood. Something big is home. " .. base.intro
+        self:start_encounter(def)
+        return true
+    end
+    return false
+end
+
+-- When a den beast dies (from enemy_dies).
+function Game:quest_kill()
+    local q = self.quest
+    if q and q.kind == "den" and self.enc and self.enc.def.den then
+        local reward = {}
+        for _, it in ipairs(QUESTS.den.reward) do
+            if not self:carrying(it[1]) then reward[#reward + 1] = it end
+        end
+        if #reward == 0 then reward = {{"antirad", 2}} end
+        self:give_reward({reward[1], {"canned_beans", 2}}, "The den is clear. The trader's payment:")
+    end
+end
+
+function Game:quest_text()
+    local q = self.quest
+    if not q then return nil end
+    local where = q.target and (" " .. self:bearing_to(q.target) .. ".") or ""
+    return q.giver .. ": " .. QUESTS[q.kind].journal .. where
 end
 
 -- Equip slots sit ON the body part they dress, NEO Scavenger style: a box over
@@ -7034,7 +7273,7 @@ function Game:draw_trade(w, h)
     local give, ask = self:trade_totals()
     gfx.text(6, 234, ("You give %d   They ask %d"):format(give, ask))
     gfx.text(6, 252, u.msg or "")
-    gfx.text(6, h - 8, "Arrows Enter:+1 E:-1 T:deal Q:leave")
+    gfx.text(6, h - 8, "Arrows Enter:+1 E:-1 T:deal O:work Q:leave")
     gfx.refresh()
 end
 
@@ -7102,7 +7341,7 @@ local HELP = {
     {"BAG", "Arrows pick  Enter select, Enter move"},
     {"", "E use: eat, drink, wear, read, set snare"},
     {"CRAFT", "Up/Dn pick  Enter make  C/Q back"},
-    {"TRADE", "Lt/Rt side  Enter +1  E -1  T deal"},
+    {"TRADE", "Lt/Rt side  Enter +1  E -1  T deal  O work"},
     {"FIGHTS", "Up/Dn pick  Enter choose"},
     {"PUZZLE", "Arrows move  T+arrow throw  1-4 sigils"},
     {"", "Q backs away from a puzzle unharmed"},
@@ -7207,6 +7446,8 @@ function Game:journal_lines()
         add("The way out: unknown. Find the trader, or read notes.")
     end
     if self.sites_known.trader then add("Trader: " .. self:site_bearing("trader") .. ".") end
+    local quest = self:quest_text()
+    if quest then add("Quest - " .. quest) end
     local camp = self:base_text()
     if camp then add(camp) end
     local permit = self:count_item("permit") > 0

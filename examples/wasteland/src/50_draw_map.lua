@@ -139,6 +139,16 @@ function Game:draw_map(w, h)
                 gfx.rect(sx, sy, 6, 6)
                 gfx.line(sx + 3, sy + 6, sx + 3, sy + 8)
             end
+            if self.quest and self.quest.target == key and (p.visible[key] or p.explored[key]) then
+                -- a quest target: "!" in a box, lower right
+                local qx, qy = rnd(px) + 4, rnd(py) + 2
+                gfx.color(gfx.WHITE)
+                gfx.fill_rect(qx - 1, qy - 1, 8, 10)
+                gfx.color(gfx.BLACK)
+                gfx.rect(qx - 1, qy - 1, 8, 10)
+                gfx.fill_rect(qx + 2, qy + 1, 2, 4)
+                gfx.fill_rect(qx + 2, qy + 6, 2, 2)
+            end
             local hot = self.rad_known[key]
             if hot and hot > 0 and (p.visible[key] or p.explored[key]) then
                 -- measured radiation: a trefoil in the upper left, inverted

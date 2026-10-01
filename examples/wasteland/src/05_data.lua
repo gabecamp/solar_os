@@ -24,7 +24,7 @@ local POLL_MS = 250
 -- SolarOS sends Enter as '\n' (LF); CR is kept just in case.
 local KEY = {SPACE = 32, ENTER = 13, LF = 10, ESC = 27,
              A = 97, C = 99, D = 100, E = 101, F = 102, I = 105, Q = 113,
-             S = 115, T = 116, W = 119, H = 104, V = 118, G = 103, M = 109, J = 106, R = 114}
+             S = 115, T = 116, W = 119, H = 104, V = 118, G = 103, M = 109, J = 106, R = 114, O = 111}
 
 -- Terrain: id -> {name, cost (MP + hours), passable, shade}
 -- shade is one of gfx.WHITE / gfx.LIGHT / gfx.DARK / gfx.BLACK, used as
@@ -135,7 +135,7 @@ local TRADE = {
         pilk = 7, lucky_lure = 12, karls_waders = 14, karls_hat = 10,
         broken_radio = 15, lora_radio = 60, broken_detector = 12, anomaly_detector = 45,
         broken_headlamp = 6, headlamp = 25, circuit_board = 10, copper_wire = 5,
-        battery_cell = 8, antenna = 6, multitool = 20,
+        battery_cell = 8, antenna = 6, multitool = 20, medkit = 15,
     },
     stock = {{"antirad", 3}, {"water_bottle", 4}, {"canned_beans", 4}, {"bandage", 2},
              {"multitool", 1}, {"battery_cell", 1},
@@ -242,6 +242,21 @@ local BASE = {
     order = {"box", "bedroll", "barrel", "barricade"},
     names = {box = "Stash box", bedroll = "Bedroll", barrel = "Rain barrel", barricade = "Barricade"},
     barrel_hours = 12, barrel_max = 6, bed_rest_bonus = 0.5,
+}
+
+-- Quests (src/52_quests.lua): offer = what they say, journal = the reminder.
+local QUESTS = {
+    fetch = {offer = "'Bring me an artifact. Any kind. I'll make it worth your while.'",
+             journal = "bring the trader an artifact.",
+             reward = {{"antirad", 2}, {"canned_beans", 3}, {"battery_cell", 1}}},
+    den = {offer = "'Something's denned up out there, killing my runners. Clear it.'",
+           journal = "clear the den", near = 5, far = 9, hp_mult = 1.5,
+           reward = {{"multitool", 1}, {"gasmask", 1}, {"machete", 1}}},
+    supply = {offer = "Anna: 'We're out of bandages. Call me when you've two to spare.'",
+              journal = "find 2 bandages, then call her.", need = {"bandage", 2},
+              reward = {{"medkit", 1}, {"water_bottle", 2}}},
+    dog = {offer = "Karl: 'Before you go - my old dog ran off. Find her by the water?'",
+           journal = "find his dog by the river", near = 4, far = 8},
 }
 
 local BACKPACK_CAP = 16      -- most bag cells any build can have (the layout's limit)
@@ -387,6 +402,8 @@ local ITEM_DB = {
     rope         = {name = "Rope",         slot = nil, consumable = nil, desc = "For crafting"},
     torch        = {name = "Torch",        slot = nil, consumable = nil,
                     desc = "Hold it: light in the dark"},
+    medkit       = {name = "Medkit",       slot = nil, consumable = nil,
+                    desc = "E: +40 HP, stops bleeding"},
     bandage      = {name = "Bandage",      slot = nil, consumable = nil,
                     desc = "E: stop bleeding, +15 HP"},
     splint       = {name = "Splint",       slot = nil, consumable = nil,
