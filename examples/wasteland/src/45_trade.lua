@@ -275,5 +275,6 @@ function Game:finish_run(how)
     self.ending = {how = how, day = (self:clock()), hours = self.player.hours,
                    artifacts = self:artifact_count()}
     self.screen = "ending"
+    self:sfx("escape")
     Game.delete_save()
 end

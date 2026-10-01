@@ -89,6 +89,7 @@ function Game:craft(r)
     for _, iq in ipairs(Game.recipe_inputs(r)) do self:take_items(iq[1], iq[2]) end
     p.hours = p.hours + r.hours
     apply_awake_hours(p, r.hours)
+    self:sfx("chime")
     if r.place == "campfire" then
         self.camps[hex_key(p.q, p.r)] = {until_hour = p.hours + RECIPES.campfire_hours}
         self:push_log("You build a campfire. It will burn " .. RECIPES.campfire_hours .. "h.")

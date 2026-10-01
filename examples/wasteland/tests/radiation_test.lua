@@ -116,7 +116,7 @@ fake.audio.tone = function() clicks = clicks + 1 end
 g = game_on(2)
 g.player.inventory[#g.player.inventory + 1] = {item = "geiger", qty = 1}
 pass_hours(g, 1)
-assert(has_log(g, "Geiger crackles") and clicks == 1)
+assert(has_log(g, "Geiger crackles") and clicks >= 1, "clicks: " .. clicks)
 local p = g.player
 for _, d in ipairs({{0, 0}, {1, 0}, {1, -1}, {0, -1}, {-1, 0}, {-1, 1}, {0, 1}}) do
     local k = key(p.q + d[1], p.r + d[2])

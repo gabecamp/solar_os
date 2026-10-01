@@ -81,10 +81,7 @@ function Game:rad_news(dose, stage_before)
         if geiger then
             self:push_log(("Geiger crackles: +%d rads (%d)."):format(math.floor(dose + 0.5),
                                                                    math.floor(p.rads)))
-            local audio = solaros.audio
-            if audio and audio.tone then
-                pcall(audio.tone, 1400 + 400 * self:rad_at(p.q, p.r), 30, 40)
-            end
+            self:sfx("geiger")
         else
             self:push_log("Your skin prickles. A metal taste.")
         end

@@ -38,6 +38,7 @@ function Game:fish()
         local fish = {item = "raw_fish", qty = 1}
         if not self:put_stack("inventory", nil, fish) then self:put_stack("ground", nil, fish) end
         self:push_log("A pale fish, too many eyes. Got it.")
+        self:sfx("chime")
     else
         self:push_log(("Fished %dh. Nothing bites."):format(HUNT.fish_hours))
     end
@@ -88,6 +89,7 @@ function Game:check_snare()
         self:put_stack("ground", nil, {item = HUNT.snare_catch[1], qty = HUNT.snare_catch[2]})
         snare.set = p.hours
         self:push_log("Your snare caught a two-headed hare. (I to take it)")
+        self:sfx("chime")
     else
         self:push_log("Your snare is empty.")
     end

@@ -68,6 +68,7 @@ end
 function Game:check_death(cause)
     if self.player.health > 0 then return false end
     self.screen = "dead"
+    self:sfx("death")
     Game.delete_save()           -- one life: a dead survivor can't be continued
     self.death_cause = cause
     return true

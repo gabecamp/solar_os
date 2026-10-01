@@ -50,6 +50,8 @@ function Game:emission_log()
     local n = self.emission_news
     self.emission_caught = n and n.caught
     if not n then return end
+    if n.warn then self:sfx("siren") end
+    if n.caught then self:sfx("emission") end
     if n.warn then
         self:push_log(("The sky bruises purple. Emission in %dh! Ruins/hills!"):format(RAD.emission.warn))
     end
@@ -104,5 +106,6 @@ function Game:find_stash()
     if self.stashes[key] then
         self.stashes[key] = nil
         self:push_log("You dig up the stash. (I to look)")
+        self:sfx("chime")
     end
 end

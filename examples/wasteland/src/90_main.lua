@@ -37,6 +37,8 @@ local ok, err = pcall(function()
             game:open_help()
         elseif key == KEY.G then
             game:gather()
+        elseif key == KEY.M then
+            game:toggle_mute()
         elseif key == KEY.C then
             game:open_crafting()
         elseif key == KEY.I then

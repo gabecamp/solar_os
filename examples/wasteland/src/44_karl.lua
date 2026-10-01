@@ -70,6 +70,7 @@ function Game:karl_answer(n)
         local name = ITEM_DB[item].name
         self:enc_say("'Ha! Sharp one.' Karl hands you " .. (item == "pilk" and "a bottle of Pilk. "
             .. "'Pepsi and milk. Trust me.'" or "his " .. name .. "."))
+        self:sfx("gift")
         self:end_encounter("Karl gave you " .. name .. ".")
     else
         self:enc_say("Karl laughs. 'Wrong. The river keeps its secrets.' He wades off downstream.")

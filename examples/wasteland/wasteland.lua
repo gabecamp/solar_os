@@ -74,7 +74,7 @@ local POLL_MS = 250
 -- SolarOS sends Enter as '\n' (LF); CR is kept just in case.
 local KEY = {SPACE = 32, ENTER = 13, LF = 10, ESC = 27,
              A = 97, C = 99, D = 100, E = 101, F = 102, I = 105, Q = 113,
-             S = 115, T = 116, W = 119, H = 104, V = 118, G = 103}
+             S = 115, T = 116, W = 119, H = 104, V = 118, G = 103, M = 109, J = 106, R = 114}
 
 -- Terrain: id -> {name, cost (MP + hours), passable, shade}
 -- shade is one of gfx.WHITE / gfx.LIGHT / gfx.DARK / gfx.BLACK, used as
@@ -2460,6 +2460,7 @@ end
 function Game:check_death(cause)
     if self.player.health > 0 then return false end
     self.screen = "dead"
+    self:sfx("death")
     Game.delete_save()           -- one life: a dead survivor can't be continued
     self.death_cause = cause
     return true
@@ -2921,6 +2922,7 @@ function Game:craft(r)
     for _, iq in ipairs(Game.recipe_inputs(r)) do self:take_items(iq[1], iq[2]) end
     p.hours = p.hours + r.hours
     apply_awake_hours(p, r.hours)
+    self:sfx("chime")
     if r.place == "campfire" then
         self.camps[hex_key(p.q, p.r)] = {until_hour = p.hours + RECIPES.campfire_hours}
         self:push_log("You build a campfire. It will burn " .. RECIPES.campfire_hours .. "h.")
@@ -3277,7 +3279,7 @@ local SAVE = {version = 1, dir = "wasteland", file = "save.lua",
               fields = {"world_seed", "seed", "weather_seed", "scavenged", "camps",
                         "known", "ground", "log", "enc_cooldown", "ticked_hour", "rad_known",
                         "trader", "sites_known", "stashes", "next_emission", "snares",
-                        "karl_asked", "karl_next", "karl_gave"}}
+                        "karl_asked", "karl_next", "karl_gave", "muted"}}
 
 -- Where the save lives: <preferred storage>/wasteland/save.lua
 function SAVE.path()
@@ -3523,10 +3525,7 @@ function Game:rad_news(dose, stage_before)
         if geiger then
             self:push_log(("Geiger crackles: +%d rads (%d)."):format(math.floor(dose + 0.5),
                                                                    math.floor(p.rads)))
-            local audio = solaros.audio
-            if audio and audio.tone then
-                pcall(audio.tone, 1400 + 400 * self:rad_at(p.q, p.r), 30, 40)
-            end
+            self:sfx("geiger")
         else
             self:push_log("Your skin prickles. A metal taste.")
         end
@@ -3703,6 +3702,7 @@ function Game:enemy_dies()
             found[#found + 1] = ITEM_DB[item].name
         end
     end
+    self:sfx("kill")
     self:enc_say("The " .. e.def.who .. " goes still.")
     if #found > 0 then self:enc_say("Left behind: " .. table.concat(found, ", ") .. ".") end
     self:end_encounter("You killed the " .. e.def.who .. ".")
@@ -3736,6 +3736,7 @@ function Game:enemy_turn()
     end
     local dmg = d.dmg[1] + self:rand(d.dmg[2] - d.dmg[1] + 1)
     p.health = clamp(p.health - dmg)
+    self:sfx("hurt")
     local text = "The " .. d.who .. " hits you (-" .. dmg .. " HP)."
     if d.bleed and d.bleed > 0 and not p.injuries.bleeding and self:roll(d.bleed) then
         p.injuries.bleeding = true
@@ -3752,6 +3753,7 @@ end
 function Game:enc_hit(dmg, bleed, how)
     local e = self.enc
     e.hp = e.hp - dmg
+    if e.hp > 0 then self:sfx("hit") end
     local text = how .. " (-" .. dmg .. ")."
     if bleed and self:roll(bleed) and not e.bleeding then
         e.bleeding = true
@@ -3830,6 +3832,7 @@ function Game:encounter_action(action)
             local dmg = math.max(1, w.dmg - self:rand(w.dmg // 4 + 1) + 2 * (p.attrs.Strength - 3))
             self:enc_hit(dmg, w.bleed, "You hit the " .. e.def.who .. " (" .. wname:lower() .. ")")
         else
+            self:sfx("miss")
             self:enc_say("You swing at the " .. e.def.who .. " and miss.")
         end
     elseif action == "throw" then
@@ -4121,6 +4124,8 @@ function Game:emission_log()
     local n = self.emission_news
     self.emission_caught = n and n.caught
     if not n then return end
+    if n.warn then self:sfx("siren") end
+    if n.caught then self:sfx("emission") end
     if n.warn then
         self:push_log(("The sky bruises purple. Emission in %dh! Ruins/hills!"):format(RAD.emission.warn))
     end
@@ -4175,6 +4180,7 @@ function Game:find_stash()
     if self.stashes[key] then
         self.stashes[key] = nil
         self:push_log("You dig up the stash. (I to look)")
+        self:sfx("chime")
     end
 end
 -- ---------------------------------------------------------------------
@@ -4217,6 +4223,7 @@ function Game:fish()
         local fish = {item = "raw_fish", qty = 1}
         if not self:put_stack("inventory", nil, fish) then self:put_stack("ground", nil, fish) end
         self:push_log("A pale fish, too many eyes. Got it.")
+        self:sfx("chime")
     else
         self:push_log(("Fished %dh. Nothing bites."):format(HUNT.fish_hours))
     end
@@ -4267,6 +4274,7 @@ function Game:check_snare()
         self:put_stack("ground", nil, {item = HUNT.snare_catch[1], qty = HUNT.snare_catch[2]})
         snare.set = p.hours
         self:push_log("Your snare caught a two-headed hare. (I to take it)")
+        self:sfx("chime")
     else
         self:push_log("Your snare is empty.")
     end
@@ -4343,6 +4351,7 @@ function Game:karl_answer(n)
         local name = ITEM_DB[item].name
         self:enc_say("'Ha! Sharp one.' Karl hands you " .. (item == "pilk" and "a bottle of Pilk. "
             .. "'Pepsi and milk. Trust me.'" or "his " .. name .. "."))
+        self:sfx("gift")
         self:end_encounter("Karl gave you " .. name .. ".")
     else
         self:enc_say("Karl laughs. 'Wrong. The river keeps its secrets.' He wades off downstream.")
@@ -4636,7 +4645,54 @@ function Game:finish_run(how)
     self.ending = {how = how, day = (self:clock()), hours = self.player.hours,
                    artifacts = self:artifact_count()}
     self.screen = "ending"
+    self:sfx("escape")
     Game.delete_save()
+end
+-- ---------------------------------------------------------------------
+-- Sound effects: short melodies through solaros.audio
+--
+-- Game:sfx(name) plays SFX[name], a list of {Hz, ms} notes (Hz 0 = a rest).
+-- tone_async queues them without stopping the game; plain tone (which
+-- blocks for its length) is the fallback. M on the map mutes (self.muted,
+-- saved). Never raises: a board without audio just stays quiet.
+-- ---------------------------------------------------------------------
+
+local SFX = {
+    hit      = {{880, 40}, {1320, 50}},
+    miss     = {{330, 60}},
+    hurt     = {{220, 70}, {150, 90}},
+    kill     = {{660, 60}, {880, 60}, {1320, 90}},
+    geiger   = {{1800, 12}, {0, 25}, {1800, 12}},
+    siren    = {{600, 150}, {900, 150}, {600, 150}, {900, 150}},
+    emission = {{120, 300}, {90, 400}},
+    chime    = {{1047, 60}, {1568, 90}},
+    gift     = {{784, 70}, {988, 70}, {1175, 120}},
+    death    = {{392, 200}, {330, 200}, {262, 400}},
+    escape   = {{523, 100}, {659, 100}, {784, 100}, {1047, 250}},
+    bark     = {{500, 40}, {0, 40}, {450, 60}},
+    whine    = {{700, 120}, {500, 200}},
+}
+
+function Game:sfx(name)
+    if self.muted then return end
+    local notes = SFX[name]
+    local audio = solaros.audio
+    if not (notes and audio) then return end
+    local play = audio.tone_async or audio.tone
+    if not play then return end
+    for _, n in ipairs(notes) do
+        if n[1] > 0 then
+            pcall(play, n[1], n[2], 40)
+        elseif audio.tone_async then
+            pcall(play, 20, n[2], 0)   -- a silent step keeps the rhythm in the queue
+        end
+    end
+    self.last_sfx = name   -- (for tests)
+end
+
+function Game:toggle_mute()
+    self.muted = not self.muted or nil
+    self:push_log(self.muted and "Sound off. (M)" or "Sound on. (M)")
 end
 -- ---------------------------------------------------------------------
 -- Rendering
@@ -6198,6 +6254,7 @@ local HELP = {
     {"", "F search the hex   E water: fill/drink"},
     {"", "T trade / Checkpoint   C craft   I bag"},
     {"", "G hunt, or fish by water with a rod"},
+    {"", "M sound on/off"},
     {"BAG", "Arrows pick  Enter select, Enter move"},
     {"", "E use: eat, drink, wear, read, set snare"},
     {"CRAFT", "Up/Dn pick  Enter make  C/Q back"},
@@ -6321,6 +6378,8 @@ local ok, err = pcall(function()
             game:open_help()
         elseif key == KEY.G then
             game:gather()
+        elseif key == KEY.M then
+            game:toggle_mute()
         elseif key == KEY.C then
             game:open_crafting()
         elseif key == KEY.I then

@@ -141,6 +141,7 @@ function Game:enemy_dies()
             found[#found + 1] = ITEM_DB[item].name
         end
     end
+    self:sfx("kill")
     self:enc_say("The " .. e.def.who .. " goes still.")
     if #found > 0 then self:enc_say("Left behind: " .. table.concat(found, ", ") .. ".") end
     self:end_encounter("You killed the " .. e.def.who .. ".")
@@ -174,6 +175,7 @@ function Game:enemy_turn()
     end
     local dmg = d.dmg[1] + self:rand(d.dmg[2] - d.dmg[1] + 1)
     p.health = clamp(p.health - dmg)
+    self:sfx("hurt")
     local text = "The " .. d.who .. " hits you (-" .. dmg .. " HP)."
     if d.bleed and d.bleed > 0 and not p.injuries.bleeding and self:roll(d.bleed) then
         p.injuries.bleeding = true
@@ -190,6 +192,7 @@ end
 function Game:enc_hit(dmg, bleed, how)
     local e = self.enc
     e.hp = e.hp - dmg
+    if e.hp > 0 then self:sfx("hit") end
     local text = how .. " (-" .. dmg .. ")."
     if bleed and self:roll(bleed) and not e.bleeding then
         e.bleeding = true
@@ -268,6 +271,7 @@ function Game:encounter_action(action)
             local dmg = math.max(1, w.dmg - self:rand(w.dmg // 4 + 1) + 2 * (p.attrs.Strength - 3))
             self:enc_hit(dmg, w.bleed, "You hit the " .. e.def.who .. " (" .. wname:lower() .. ")")
         else
+            self:sfx("miss")
             self:enc_say("You swing at the " .. e.def.who .. " and miss.")
         end
     elseif action == "throw" then

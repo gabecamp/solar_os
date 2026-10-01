@@ -12,6 +12,7 @@ local HELP = {
     {"", "F search the hex   E water: fill/drink"},
     {"", "T trade / Checkpoint   C craft   I bag"},
     {"", "G hunt, or fish by water with a rod"},
+    {"", "M sound on/off"},
     {"BAG", "Arrows pick  Enter select, Enter move"},
     {"", "E use: eat, drink, wear, read, set snare"},
     {"CRAFT", "Up/Dn pick  Enter make  C/Q back"},
