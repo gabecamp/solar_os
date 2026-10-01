@@ -84,6 +84,7 @@ lib = src[:cut]
 (here / "lib_trade.lua").write_text(
     lib + "\nreturn Game, {TRADE = TRADE, GOAL = GOAL, ITEM_DB = ITEM_DB, KEY = KEY, "
           "TERRAIN = TERRAIN, GRID_RADIUS = GRID_RADIUS, AXIAL_DIRS = AXIAL_DIRS, "
-          "SPRITES = SPRITES, generate_world = generate_world, ARTIFACTS = ARTIFACTS}\n")
+          "SPRITES = SPRITES, generate_world = generate_world, ARTIFACTS = ARTIFACTS, "
+          "RECIPE_IDS = (function() local t = {} for _, r in ipairs(RECIPES) do t[r.id] = true end return t end)()}\n")
 (here / "wasteland_run.lua").write_text(src)
 print("generated lib_*.lua, wasteland_run.lua")

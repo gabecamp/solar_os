@@ -13,9 +13,11 @@ python3 ../tools/build.py
 python3 make_lib.py
 # tests/solaros.lua is a FAKE of the on-device module; this makes require("solaros") find it.
 export LUA_PATH="./?.lua;;"
+export WASTELAND_SEED="${WASTELAND_SEED:-$(( $(date +%s) % 32768 ))}"
+echo "world seed: $WASTELAND_SEED  (replay: WASTELAND_SEED=$WASTELAND_SEED bash tests/run_tests.sh)"
 
 echo "== syntax ==";           luac5.4 -p ../wasteland.lua && echo OK
-for t in unit_test sprite_test bounds_test body_test glyph_test regression_test scavenge_test creator_test encounter_test portrait_test crafting_test world_test save_test radiation_test survival_test trade_test; do
+for t in unit_test sprite_test bounds_test body_test glyph_test regression_test scavenge_test creator_test encounter_test portrait_test crafting_test world_test save_test radiation_test survival_test trade_test gear_test; do
   echo "== $t ==";             lua5.4 "$t.lua" | tail -n 2
 done
 echo "== main loop (scripted keys) =="; lua5.4 wasteland_run.lua

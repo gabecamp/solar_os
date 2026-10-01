@@ -250,7 +250,7 @@ local function generate_world(seed)
         table.insert(ground[key], {item = item, qty = qty})
     end
     for _, item in ipairs(WORLD_WEARABLES) do drop(item, 1) end
-    for _ = 1, 3 do   -- food/water caches, scaled for the bigger map
+    for _ = 1, 2 do   -- food/water caches (loot is meant to be scarce)
         for _, item in ipairs({"canned_beans", "canned_beans", "water_bottle",
                                "water_bottle", "water_bottle", "cloth_scrap"}) do
             drop(item, 1)

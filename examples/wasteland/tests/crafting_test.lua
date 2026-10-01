@@ -76,6 +76,7 @@ assert(g:craft(find(g, "spear")))
 assert(bag_count(g, "knife") == 1, "the knife is a tool, not used up")
 assert(bag_count(g, "spear") == 1 and bag_count(g, "stick") == 0 and bag_count(g, "rope") == 0)
 g = fresh()
+g.sites_known.checkpoint = true   -- otherwise some notes sketch the way out instead
 local n_before = #g:known_recipes()
 g.player.inventory = {{item = "scrawled_notes", qty = 2}}
 g:use_item("inventory", 1)

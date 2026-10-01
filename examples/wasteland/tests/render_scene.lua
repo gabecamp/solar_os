@@ -309,3 +309,14 @@ solaros.dump("ops_gate.txt")
 g:finish_run("permit")
 g:draw_ending(400, 300)
 solaros.dump("ops_ending.txt")
+
+-- Scene: a leather belt worn, new weapons in the bag
+g = fresh()
+g.player.equipped.belt = "leather_belt"
+g.player.equipped.rhand = "machete"
+g.player.inventory = {{item = "shiv", qty = 1}, {item = "spiked_club", qty = 1},
+                      {item = "pipe_spear", qty = 1}, {item = "scrap_metal", qty = 3},
+                      {item = "jerky", qty = 2}, {item = "rope_belt", qty = 1}}
+g.inv_cursor = 1
+g:draw_inventory(400, 300)
+solaros.dump("ops_inventory_belt.txt")

@@ -21,11 +21,13 @@ end
 local function played_game()
     local g = Game.new()
     g:start_game()
+    g.maybe_encounter = function() end   -- an encounter would leave us off the map screen
     for _ = 1, 6 do g:move_dir(1, 0); g:tick() end
     g:rest(); g:tick()
     g:scavenge(); g:tick()
     g:push_log('A "quoted" line\nwith a newline and \\ backslash')
     g.player.health = g.player.health - 0.25   -- a float must survive too
+    g.maybe_encounter = nil
     return g
 end
 

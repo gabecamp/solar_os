@@ -110,6 +110,8 @@ local TRADE = {
         earmuffs = 4, sunglasses = 4, scarf = 4, bracers = 5, tshirt = 2, jeans = 3,
         weeping_stone = 35, drowned_eye = 35, flesh_knot = 35, hollow_star = 35,
         quiet_shell = 35, permit = 120,
+        leather_belt = 10, rope_belt = 4, scrap_metal = 3, jerky = 6,
+        shiv = 6, machete = 18, spiked_club = 12, pipe_spear = 15,
     },
     stock = {{"antirad", 3}, {"water_bottle", 4}, {"canned_beans", 4}, {"bandage", 2},
              {"vodka", 2}, {"empty_bottle", 3}, {"geiger", 1}, {"gasmask", 1},
@@ -124,7 +126,7 @@ local POCKET_CELLS = 4       -- bag cells with nothing worn on your back
 
 -- Also the cursor order on the paperdoll: top of the body to the bottom.
 local EQUIP_SLOTS = {
-    "head", "ears", "eyes", "neck", "back", "jacket", "shirt",
+    "head", "ears", "eyes", "neck", "back", "jacket", "shirt", "belt",
     "hands", "wrists", "pants", "lhand", "rhand", "feet",
 }
 -- Hand slots hold any item (a rock, a bottle, a spare jacket); every other
@@ -167,6 +169,11 @@ local ITEM_DB = {
     gasmask      = {name = "Gas Mask",     slot = "eyes",  consumable = nil, warmth = 1,
                     rad_armor = 0.5, desc = "Worn: halves radiation",
                     wear = {{"head", 125, 139, "BLACK", 0, 10}}},
+    -- belts: belt_cells more bag cells (pouches), on top of the bag
+    leather_belt = {name = "Leather Belt", slot = "belt", consumable = nil, belt_cells = 2,
+                    desc = "Worn: +2 bag cells", wear = {{"torso", 209, 214, "BLACK"}}},
+    rope_belt    = {name = "Rope Belt",    slot = "belt", consumable = nil, belt_cells = 1,
+                    desc = "Worn: +1 bag cell", wear = {{"torso", 210, 213, "BLACK"}}},
     satchel      = {name = "Satchel",      slot = "back", consumable = nil, bag_cells = 8,
                     wear = {{"torso", 147, 210, "BLACK", 12, 15}}},
     canned_beans = {name = "Canned Beans", slot = nil, consumable = {hunger = 40}},
@@ -207,6 +214,16 @@ local ITEM_DB = {
                     weapon = {dmg = 10, reach = "near", bleed = 15}},
     stone_club   = {name = "Stone Club",   slot = nil, consumable = nil,
                     weapon = {dmg = 13, reach = "close"}, desc = "Weapon: 13 dmg"},
+    shiv         = {name = "Shiv",         slot = nil, consumable = nil,
+                    weapon = {dmg = 9, reach = "close", bleed = 25}, desc = "Weapon: 9 dmg, bleeds"},
+    machete      = {name = "Machete",      slot = nil, consumable = nil,
+                    weapon = {dmg = 17, reach = "close", bleed = 25}, desc = "Weapon: 17 dmg, bleeds"},
+    spiked_club  = {name = "Spiked Club",  slot = nil, consumable = nil,
+                    weapon = {dmg = 16, reach = "close", bleed = 10}, desc = "Weapon: 16 dmg"},
+    pipe_spear   = {name = "Pipe Spear",   slot = nil, consumable = nil,
+                    weapon = {dmg = 14, reach = "near", bleed = 20}, desc = "Weapon: 14 dmg, reach"},
+    scrap_metal  = {name = "Scrap Metal",  slot = nil, consumable = nil, desc = "For crafting"},
+    jerky        = {name = "Jerky",        slot = nil, consumable = {hunger = 25, thirst = -5}},
     -- crafting materials and crafted goods (see RECIPES)
     stick        = {name = "Stick",        slot = nil, consumable = nil, desc = "For crafting"},
     rope         = {name = "Rope",         slot = nil, consumable = nil, desc = "For crafting"},
@@ -237,21 +254,23 @@ local ARTIFACTS = {"weeping_stone", "drowned_eye", "flesh_knot", "hollow_star", 
 -- dud roll. Plains are old roadside junk, forest is food and cold-weather
 -- gear, hills are rock and whatever hikers left behind.
 local SCAVENGE_LOOT = {
-    plains = {{"nothing", 8}, {"rock", 3}, {"cloth_scrap", 4}, {"canned_beans", 3},
-              {"water_bottle", 3}, {"cap", 1}, {"sunglasses", 1}, {"gloves", 1},
+    plains = {{"nothing", 30}, {"rock", 3}, {"cloth_scrap", 3}, {"canned_beans", 2},
+              {"water_bottle", 2}, {"cap", 1}, {"sunglasses", 1}, {"gloves", 1},
               {"satchel", 1}, {"pipe", 1}, {"knife", 1}, {"stick", 2},
-              {"scrawled_notes", 1}, {"bolts", 1}, {"vodka", 1}, {"empty_bottle", 2}},
-    forest = {{"nothing", 7}, {"berries", 6}, {"cloth_scrap", 2}, {"water_bottle", 2},
-              {"scarf", 1}, {"earmuffs", 1}, {"gloves", 1}, {"spear", 1}, {"stick", 7}},
+              {"scrawled_notes", 1}, {"bolts", 1}, {"vodka", 1}, {"empty_bottle", 2},
+              {"scrap_metal", 2}, {"jerky", 1}},
+    forest = {{"nothing", 22}, {"berries", 5}, {"cloth_scrap", 1}, {"water_bottle", 1},
+              {"scarf", 1}, {"earmuffs", 1}, {"gloves", 1}, {"spear", 1}, {"stick", 6}},
     -- ruins: what's left in houses and cars
-    ruins  = {{"nothing", 8}, {"canned_beans", 4}, {"water_bottle", 3}, {"cloth_scrap", 4},
-              {"scrawled_notes", 3}, {"rope", 1}, {"knife", 1}, {"pipe", 1}, {"stick", 1},
-              {"jacket", 1}, {"backpack", 1}, {"antirad", 2}, {"vodka", 2}, {"bolts", 2},
-              {"geiger", 1}, {"gasmask", 1}, {"empty_bottle", 2}},
-    ford   = {{"nothing", 12}, {"rock", 4}, {"stick", 2}, {"water_bottle", 1}},
-    hills  = {{"nothing", 9}, {"rock", 6}, {"water_bottle", 2}, {"canned_beans", 1},
+    ruins  = {{"nothing", 34}, {"canned_beans", 3}, {"water_bottle", 2}, {"cloth_scrap", 3},
+              {"scrawled_notes", 2}, {"rope", 1}, {"knife", 1}, {"pipe", 1}, {"stick", 1},
+              {"jacket", 1}, {"backpack", 1}, {"antirad", 1}, {"vodka", 1}, {"bolts", 2},
+              {"geiger", 1}, {"gasmask", 1}, {"empty_bottle", 2}, {"scrap_metal", 3},
+              {"leather_belt", 1}, {"jerky", 2}},
+    ford   = {{"nothing", 24}, {"rock", 4}, {"stick", 2}, {"water_bottle", 1}, {"scrap_metal", 1}},
+    hills  = {{"nothing", 28}, {"rock", 5}, {"water_bottle", 1}, {"canned_beans", 1},
               {"jacket", 1}, {"bracers", 1}, {"boots", 1}, {"knife", 1}, {"stick", 1},
-              {"scrawled_notes", 1}, {"antirad", 1}},
+              {"scrawled_notes", 1}, {"antirad", 1}, {"scrap_metal", 1}},
 }
 
 -- Crafting, NEO Scavenger style: inputs come from your bag, your hands and
@@ -270,17 +289,27 @@ local RECIPES = {
      out = {"cooked_meat", 1}, known = true},
     {id = "boil", name = "Boil Water", inputs = {dirty_water = 1}, fire = true, hours = 1,
      out = {"water_bottle", 1}, known = true},
+    {id = "rope_belt", name = "Rope Belt", inputs = {rope = 1, cloth_scrap = 1}, hours = 1,
+     out = {"rope_belt", 1}, known = true},
+    {id = "shiv", name = "Shiv", inputs = {scrap_metal = 1, cloth_scrap = 1}, hours = 1,
+     out = {"shiv", 1}, known = true},
     {id = "rope", name = "Rope", inputs = {cloth_scrap = 3}, hours = 1, out = {"rope", 1}},
     {id = "spear", name = "Spear", inputs = {stick = 1, rope = 1}, tools = {"knife"},
      hours = 2, out = {"spear", 1}},
     {id = "club", name = "Stone Club", inputs = {stick = 1, rock = 1, rope = 1}, hours = 2,
      out = {"stone_club", 1}},
+    {id = "machete", name = "Machete", inputs = {scrap_metal = 2, stick = 1, rope = 1},
+     tools = {"rock"}, hours = 3, out = {"machete", 1}},
+    {id = "spiked_club", name = "Spiked Club", inputs = {stone_club = 1, scrap_metal = 1},
+     hours = 1, out = {"spiked_club", 1}},
+    {id = "pipe_spear", name = "Pipe Spear", inputs = {pipe = 1, knife = 1, rope = 1},
+     hours = 2, out = {"pipe_spear", 1}},
 }
 RECIPES.campfire_hours = 12   -- a fire burns this long after it's built
 
 -- Worn gear that is scattered around the map (the starting clothes aren't).
 local WORLD_WEARABLES = {"cap", "gloves", "earmuffs", "sunglasses", "scarf",
-                         "jacket", "bracers", "satchel"}
+                         "jacket", "bracers", "satchel", "leather_belt"}
 
 -- ---------------------------------------------------------------------
 -- Encounters: rolled after each move. A fight is a series of choices at a

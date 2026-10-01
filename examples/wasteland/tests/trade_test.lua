@@ -191,7 +191,7 @@ assert(count(g, "water_bottle") == 1 and g.player.equipped.rhand == nil)
 
 print("10. notes and the wanderer point the way")
 g = fresh()
-for _, r in ipairs({"rope", "spear", "club"}) do g.known[r] = true end
+for id in pairs(T.RECIPE_IDS) do g.known[id] = true end
 g.player.inventory = {{item = "scrawled_notes", qty = 1}}
 g:use_item("inventory", 1)
 assert(g.sites_known.checkpoint and count(g, "scrawled_notes") == 0)

@@ -10,23 +10,24 @@ local EQUIP_RECT = {
     eyes   = {140,  84, 20, 18},   -- the face
     neck   = {140, 105, 20, 18},   -- throat / collar
     jacket = {116, 126, 68, 38},   -- chest and shoulders
-    shirt  = {124, 167, 52, 36},   -- belly
+    shirt  = {124, 167, 52, 22},   -- belly
+    belt   = {124, 192, 52, 17},   -- the waist
     hands  = { 73, 212, 22, 22},   -- gloves: the left forearm and hand
     wrists = {205, 212, 22, 22},   -- the right wrist
     lhand  = { 70, 236, 24, 24},   -- held in the left hand (anything)
     rhand  = {206, 236, 24, 24},   -- held in the right hand (anything)
     back   = {230, 118, 40, 40},   -- worn on the back, drawn beside the shoulder
-    pants  = {122, 206, 56, 58},   -- hips and legs
+    pants  = {122, 212, 56, 52},   -- hips and legs
     feet   = {120, 267, 60, 20},   -- both feet
 }
 -- shown inside an empty slot; the long form when it fits the box
 local EQUIP_NAME = {head = "Head", ears = "Ears", eyes = "Eyes", neck = "Neck",
                     jacket = "Jacket", shirt = "Shirt", hands = "Gloves",
                     wrists = "Wrists", pants = "Pants", feet = "Feet",
-                    lhand = "L Hand", rhand = "R Hand", back = "Back"}
+                    lhand = "L Hand", rhand = "R Hand", back = "Back", belt = "Belt"}
 local EQUIP_ABBR = {head = "Hd", ears = "Ea", eyes = "Ey", neck = "Nk", jacket = "Jk",
                     shirt = "Sh", hands = "Gl", wrists = "Wr", pants = "Pt", feet = "Ft",
-                    lhand = "LH", rhand = "RH", back = "Bk"}
+                    lhand = "LH", rhand = "RH", back = "Bk", belt = "Bt"}
 -- where the doll sits on the 400x300 screen: the left column, head at the top
 local BODY_DX, BODY_DY = -66, -46
 for _, r in pairs(EQUIP_RECT) do r[1], r[2] = r[1] + BODY_DX, r[2] + BODY_DY end

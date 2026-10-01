@@ -148,6 +148,9 @@ for _, slot in ipairs(EQUIP_SLOTS) do
     assert(ITEM_DB[found].wear, found .. " has no look on the doll")
   end
 end
+local _, CR = dofile("lib_crafting.lua")
+local crafted = {}   -- wearables you make (e.g. the Rope Belt) don't have to spawn
+for _, r in ipairs(CR.RECIPES) do if r.out then crafted[r.out[1]] = true end end
 for seed_try = 1, 5 do
     g = Game2.new()
     local start = {}
@@ -158,7 +161,7 @@ for seed_try = 1, 5 do
         for _, st in ipairs(pile) do seen[st.item] = true end
     end
     for id, def in pairs(ITEM_DB) do
-        if def.slot and not start[id] then assert(seen[id], id .. " never spawns") end
+        if def.slot and not start[id] and not crafted[id] then assert(seen[id], id .. " never spawns") end
     end
 end
 print("    OK")

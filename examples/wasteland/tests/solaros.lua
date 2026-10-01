@@ -87,6 +87,11 @@ end
 
 function M.audio.tone(freq, ms, vol) end
 
+-- Game.new seeds its world from uptime. run_tests.sh sets WASTELAND_SEED (and
+-- prints it) so a failure can be replayed: WASTELAND_SEED=1234 bash tests/run_tests.sh
+local SEED = tonumber(os.getenv("WASTELAND_SEED") or "") or os.time()
+M.time = {uptime_ms = function() return SEED end}
+
 -- In-memory storage with the real API's shape (read_file raises on a missing
 -- file, like the device). write_file is the new call from firmware/; tests set
 -- M.storage.write_file = nil to play an older SolarOS that can't save.

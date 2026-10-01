@@ -259,6 +259,7 @@ end
 function Game:bag_capacity()
     local p = self.player
     local bag = p.equipped.back and ITEM_DB[p.equipped.back].bag_cells or POCKET_CELLS
+    if p.equipped.belt then bag = bag + (ITEM_DB[p.equipped.belt].belt_cells or 0) end
     return math.max(2, math.min(BACKPACK_CAP, bag + (p.bag_bonus or 0)))
 end
 
