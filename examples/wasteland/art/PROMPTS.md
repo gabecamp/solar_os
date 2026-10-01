@@ -8,17 +8,22 @@ python3 tools/paint_portraits.py   # converts art/ into the game's 1-bit portrai
 python3 tools/build.py             # rebuilds wasteland.lua
 ```
 
-Done so far: `jawhound.jpg`, `stag.jpg` (the user's own); `boar.jpg`, `crows.jpg`,
-`fused.jpg`, `bloom.jpg`, `bandits.jpg` (generated with Z-Image Turbo through
-the Hugging Face connector, seeds 1001/1003/1004/1006/1007, from the prompts
-below). Still to make: mouthless, tollman, medic, wanderer and the five
-anomalies. The free Hugging Face GPU quota ran out after 7 images; it refills
-over time.
+Done so far: `jawhound.jpg`, `stag.jpg` (the user's own); `bandits.jpg` and
+`fused.jpg` (Z-Image Turbo, seeds 1007/1004, first style); `boar.jpg`,
+`crows.jpg`, `bloom.jpg`, `tollman.jpg`, `medic.jpg` (Z-Image Turbo, new
+Cronenberg / S.T.A.L.K.E.R. / Lovecraft style, seeds 2101/2103/2106/2108/2109,
+from the prompts below with the style blocks appended). Still to make:
+wanderer, mouthless and the five anomalies. The free Hugging Face GPU quota
+covers about 7 images before it runs out; it refills over time.
 
-Note: the model wouldn't leave out the Mouthless Man's mouth (two tries,
-seeds 1005 and 1015, both drew one), so he keeps his painted portrait for now.
-Wording to try next: "the skin of the lower face is stitched shut and healed
-into scar tissue", or an image editor to paint the mouth out.
+Notes:
+- The Fused: the model won't draw two bodies conjoined (seeds 2104, 2114 drew
+  two separate people with bare ribcages), so the first-style `fused.jpg`
+  stays. Next try: "Siamese twins, one shared torso".
+- The Mouthless Man: the model wouldn't leave out the mouth (seeds 1005,
+  1015), so he keeps his painted portrait for now. Wording to try next: "the
+  skin of the lower face is stitched shut and healed into scar tissue", or an
+  image editor to paint the mouth out.
 
 **karl.jpg** (Karl, the riddling fisherman) will be the user's own photo of a
 real person: no prompt, and never generated. Until it's added he shows a

@@ -127,14 +127,20 @@ PHOTO = {
              "close": (860, 10, 1230, 480), "gamma": 1.0, "edge": 0.8},
     # generated with Z-Image Turbo (Hugging Face) from art/PROMPTS.md; their
     # backgrounds are light gray, not white, hence bg 0.78 where it shows
-    "boar": {"far": (52, 131, 1087, 853), "near": (520, 130, 1110, 790),
-             "close": (720, 130, 1110, 560), "gamma": 1.0, "edge": 0.8},
-    "crows": {"far": (111, 122, 928, 944), "near": (111, 100, 928, 800),
-              "close": (260, 110, 920, 560), "gamma": 0.4, "edge": 0.6},
+    "boar": {"far": (60, 150, 960, 960), "near": (480, 150, 960, 720),
+             "close": (560, 230, 960, 630), "gamma": 0.85, "edge": 0.7},
+    "crows": {"far": (130, 50, 920, 990), "near": (140, 50, 910, 700),
+              "close": (300, 180, 760, 620), "gamma": 0.35, "edge": 0.7},
     "fused": {"far": (0, 0, 1024, 1024), "near": (40, 40, 990, 990),
               "close": (140, 40, 900, 560), "gamma": 1.0, "edge": 0.7, "bg": 0.78},
-    "bloom": {"far": (0, 36, 1024, 1024), "near": (130, 20, 900, 790),
-              "close": (250, 30, 800, 580), "gamma": 1.0, "edge": 0.7, "bg": 0.78},
+    "bloom": {"far": (0, 40, 1024, 1024), "near": (220, 40, 880, 760),
+              "close": (320, 60, 780, 640), "gamma": 1.4, "edge": 0.8},
+    # 2026-10-01, seeds 2101/2103/2106/2108/2109 (boar, crows, bloom, tollman,
+    # medic): white backgrounds, so the default bg level
+    "tollman": {"far": (40, 60, 1000, 1024), "near": (150, 60, 900, 810),
+                "close": (380, 80, 760, 560), "gamma": 0.6, "edge": 0.6},
+    "medic": {"far": (0, 60, 1024, 1024), "near": (120, 60, 960, 900),
+              "close": (360, 80, 720, 580), "gamma": 1.3, "edge": 0.8},
     "bandits": {"far": (0, 95, 1024, 1024), "near": (220, 80, 860, 760),
                 "close": (440, 90, 740, 390), "gamma": 0.5, "edge": 0.5, "bg": 0.78},
 }
