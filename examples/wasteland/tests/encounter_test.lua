@@ -142,7 +142,7 @@ g.player.health = 1
 g:start_encounter(def_named("Skinless Boar"))
 g.enc.range = "close"
 for _ = 1, 50 do if g.screen == "encounter" then act(g, "watch") end end
-assert(g.screen == "dead" and g.death_cause:find("Boar"), tostring(g.death_cause))
+assert(g.screen == "dead" and g.death_cause == "Killed by the boar.", tostring(g.death_cause))
 print("   OK")
 
 print("10. fleeing costs 1 MP and Continue returns to the map")

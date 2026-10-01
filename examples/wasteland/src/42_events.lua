@@ -51,12 +51,12 @@ function Game:emission_log()
     self.emission_caught = n and n.caught
     if not n then return end
     if n.warn then
-        self:push_log(("The sky bruises purple. Emission in %dh: get to ruins!"):format(RAD.emission.warn))
+        self:push_log(("The sky bruises purple. Emission in %dh! Ruins/hills!"):format(RAD.emission.warn))
     end
     if n.caught then
-        self:push_log("The EMISSION tears through you! Find ruins!")
+        self:push_log("The EMISSION tears through you! Find cover!")
     elseif n.sheltered then
-        self:push_log("The emission howls over the ruins. You hold on.")
+        self:push_log("The emission howls overhead. You hold on in cover.")
     end
     if n.ended then self:push_log("The emission passes. The fields glitter.") end
     self.emission_news = nil

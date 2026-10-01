@@ -239,4 +239,12 @@ g.player.q, g.player.r = 0, 0
 g:site_action()
 assert(has_log(g, "Nobody here"))
 
+print("14. seeing the trader's stall is enough to know it")
+g = fresh()
+local sq, sr = parse(g.sites.trader)
+g.player.q, g.player.r = sq + 1, sr
+g.player.hours = g.player.hours + 1
+g:tick()
+assert(g.sites_known.trader and has_log(g, "trader's stall in the ruins"))
+
 print("TRADE TESTS PASSED")

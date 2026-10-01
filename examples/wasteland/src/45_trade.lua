@@ -57,6 +57,20 @@ function Game:hear_of_exit(who)
     return false
 end
 
+-- A site you can see is a site you know (called from Game:tick).
+function Game:spot_sites()
+    if self:learn_site_seen("trader") then
+        self:push_log("A trader's stall in the ruins, " .. self:site_bearing("trader") .. ".")
+    end
+    if self:learn_site_seen("checkpoint") then
+        self:push_log("A guard tower on the horizon: the Checkpoint.")
+    end
+end
+
+function Game:learn_site_seen(name)
+    return self.player.visible[self.sites[name]] and self:learn_site(name)
+end
+
 -- After a move: sites are safe (no encounters) and announce themselves.
 function Game:arrive_site()
     local site = self:site_here()

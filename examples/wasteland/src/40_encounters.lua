@@ -177,7 +177,7 @@ function Game:enemy_turn()
         text = text .. " It leaves a deep wound."
     end
     self:enc_say(text)
-    self:check_death("Killed by the " .. d.name .. ".")
+    self:check_death("Killed by the " .. d.who .. ".")   -- "who", not "name": "The Fused"
 end
 
 function Game:enc_hit(dmg, bleed, how)

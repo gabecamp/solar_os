@@ -53,6 +53,14 @@ assert(g.player.health >= hp and (g.player.rads or 0) <= rads, "ruins shelter yo
 assert(has_log(g, "emission passes"))
 assert(g.next_emission >= E.first + E.every[1] and g.next_emission <= E.first + E.every[2])
 
+print("2b. hills count as cover too (caves)")
+g = fresh()
+stand_on(g, "hills")
+to_hour(g, E.first - 1)
+hp = g.player.health
+to_hour(g, E.first + E.hours)
+assert(g.player.health >= hp, "hills shelter you")
+
 print("3. caught in the open: HP and rads, and it can kill")
 g = fresh()
 stand_on(g, "plains")

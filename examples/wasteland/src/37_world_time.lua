@@ -96,5 +96,6 @@ function Game:tick()
     self:emission_log()
     self:geiger_scan()
     self:refresh_view()
+    self:spot_sites()
     self:check_death(self:death_reason())
 end

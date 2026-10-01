@@ -178,4 +178,17 @@ assert(loot.empty_bottle)
 local src = io.open("wasteland_run.lua"):read("a")
 assert(src:find("game:water_action()", 1, true) and src:find("E:water", 1, true))
 
+print("10. bleeding clots on its own; a starving body doesn't heal while resting")
+g = fresh()
+g.player.injuries.bleeding = true
+for _ = 1, SURVIVE.clot_hours do g:survive_hour() end
+assert(not g.player.injuries.bleeding and has_log(g, "bleeding slows"))
+g = fresh()
+g.player.needs.hunger, g.player.health, g.player.mp = 0, 50, 0
+g:rest()
+assert(g.player.health == 50, "healed while starving: " .. g.player.health)
+g.player.needs.hunger, g.player.mp = 80, 0
+g:rest()
+assert(g.player.health > 50, "fed: heals")
+
 print("SURVIVAL TESTS PASSED")

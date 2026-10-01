@@ -110,6 +110,15 @@ function Game:survive_hour()
         hurt = hurt + s.hurt
         if p.sick_hours == 0 then self:push_log("The sickness passes.") end
     end
+    if p.injuries.bleeding then
+        p.injuries.bleed_hours = (p.injuries.bleed_hours or 0) + 1
+        if p.injuries.bleed_hours >= SURVIVE.clot_hours then
+            p.injuries.bleeding = false
+            self:push_log("The bleeding slows, then stops.")
+        end
+    else
+        p.injuries.bleed_hours = 0
+    end
     if p.needs.thirst <= 0 then hurt = hurt + SURVIVE.thirst_hurt end
     if p.needs.hunger <= 0 then hurt = hurt + SURVIVE.hunger_hurt end
     p.health = clamp(p.health - hurt)

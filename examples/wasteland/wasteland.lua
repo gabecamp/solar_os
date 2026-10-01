@@ -117,11 +117,11 @@ local WORLD = {
 -- you sick (stages: HP and rest lost per hour). A carried Geiger counter
 -- shows the level around you and marks hot hexes on the map.
 local RAD = {
-    fields = 7, min_dist = 4, dose = {2, 5, 12}, decay = 0.5, max = 100,
+    fields = 5, min_dist = 4, dose = {1, 4, 10}, decay = 1, max = 100,
     level_name = {[0] = "clean", "low", "high", "deadly"},
-    stages = {{at = 25, name = "Irradiated", hurt = 0, tire = 1},
-              {at = 50, name = "Rad sick", hurt = 1, tire = 2},
-              {at = 80, name = "Rad poisoned", hurt = 3, tire = 3}},
+    stages = {{at = 30, name = "Irradiated", hurt = 0, tire = 1},
+              {at = 60, name = "Rad sick", hurt = 1, tire = 2},
+              {at = 85, name = "Rad poisoned", hurt = 2, tire = 3}},
     artifact_find = 20,   -- % a search on a level 2+ hex also turns up an artifact
     bolts_bonus = 2,      -- extra throws in the bolts puzzle while you carry bolts
     world_items = {"geiger", "gasmask", "antirad", "antirad", "bolts"},   -- dropped once each
@@ -130,8 +130,8 @@ local RAD = {
     -- `hours` it rages: off `shelter` terrain you lose `hurt` HP and gain
     -- `rads` rads (spread over the hours). After it, every field center
     -- without an artifact grows a new one.
-    emission = {first = 50, every = {60, 110}, warn = 6, hours = 2, hurt = 30, rads = 40,
-                shelter = {ruins = true}},
+    emission = {first = 50, every = {60, 110}, warn = 10, hours = 2, hurt = 20, rads = 20,
+                shelter = {ruins = true, hills = true}},   -- houses, and caves in the hills
     -- Stashes some scrawled notes point to: `items` picks from `loot`.
     stash = {items = 3, near = 4, far = 9,
              loot = {"antirad", "canned_beans", "water_bottle", "bandage", "jerky", "knife",
@@ -150,6 +150,7 @@ local SURVIVE = {
     sick_hours = {12, 24},
     sick = {thirst = 3, hunger = 2, hurt = 1, rest = 1},
     drink_here = 30, drink_hours = 1,
+    clot_hours = 8,   -- bleeding stops on its own after this many hours
     thirst_hurt = 2, hunger_hurt = 1,
 }
 
@@ -170,7 +171,7 @@ local TRADE = {
         jacket = 20, backpack = 25, satchel = 12, boots = 8, gloves = 5, cap = 3,
         earmuffs = 4, sunglasses = 4, scarf = 4, bracers = 5, tshirt = 2, jeans = 3,
         weeping_stone = 35, drowned_eye = 35, flesh_knot = 35, hollow_star = 35,
-        quiet_shell = 35, permit = 120,
+        quiet_shell = 35, permit = 80,
         leather_belt = 10, rope_belt = 4, scrap_metal = 3, jerky = 6,
         shiv = 6, machete = 18, spiked_club = 12, pipe_spear = 15, splint = 5,
     },
@@ -317,21 +318,21 @@ local ARTIFACTS = {"weeping_stone", "drowned_eye", "flesh_knot", "hollow_star", 
 -- dud roll. Plains are old roadside junk, forest is food and cold-weather
 -- gear, hills are rock and whatever hikers left behind.
 local SCAVENGE_LOOT = {
-    plains = {{"nothing", 30}, {"rock", 3}, {"cloth_scrap", 3}, {"canned_beans", 2},
+    plains = {{"nothing", 22}, {"rock", 3}, {"cloth_scrap", 3}, {"canned_beans", 3},
               {"water_bottle", 2}, {"cap", 1}, {"sunglasses", 1}, {"gloves", 1},
               {"satchel", 1}, {"pipe", 1}, {"knife", 1}, {"stick", 2},
               {"scrawled_notes", 1}, {"bolts", 1}, {"vodka", 1}, {"empty_bottle", 2},
-              {"scrap_metal", 2}, {"jerky", 1}},
-    forest = {{"nothing", 22}, {"berries", 5}, {"cloth_scrap", 1}, {"water_bottle", 1},
+              {"scrap_metal", 2}, {"jerky", 2}},
+    forest = {{"nothing", 16}, {"berries", 9}, {"cloth_scrap", 1}, {"water_bottle", 1},
               {"scarf", 1}, {"earmuffs", 1}, {"gloves", 1}, {"spear", 1}, {"stick", 6}},
     -- ruins: what's left in houses and cars
-    ruins  = {{"nothing", 34}, {"canned_beans", 3}, {"water_bottle", 2}, {"cloth_scrap", 3},
+    ruins  = {{"nothing", 25}, {"canned_beans", 5}, {"water_bottle", 2}, {"cloth_scrap", 3},
               {"scrawled_notes", 2}, {"rope", 1}, {"knife", 1}, {"pipe", 1}, {"stick", 1},
               {"jacket", 1}, {"backpack", 1}, {"antirad", 1}, {"vodka", 1}, {"bolts", 2},
               {"geiger", 1}, {"gasmask", 1}, {"empty_bottle", 2}, {"scrap_metal", 3},
-              {"leather_belt", 1}, {"jerky", 2}},
-    ford   = {{"nothing", 24}, {"rock", 4}, {"stick", 2}, {"water_bottle", 1}, {"scrap_metal", 1}},
-    hills  = {{"nothing", 28}, {"rock", 5}, {"water_bottle", 1}, {"canned_beans", 1},
+              {"leather_belt", 1}, {"jerky", 3}},
+    ford   = {{"nothing", 18}, {"rock", 4}, {"stick", 2}, {"water_bottle", 1}, {"scrap_metal", 1}},
+    hills  = {{"nothing", 20}, {"rock", 5}, {"water_bottle", 1}, {"canned_beans", 2},
               {"jacket", 1}, {"bracers", 1}, {"boots", 1}, {"knife", 1}, {"stick", 1},
               {"scrawled_notes", 1}, {"antirad", 1}, {"scrap_metal", 1}},
 }
@@ -2158,6 +2159,9 @@ local function apply_rest_hours(player, hours)
     local inj = player.injuries
     if inj.bleeding then
         player.health = clamp(player.health - hours * BLEED_PER_HOUR)
+    elseif player.needs.hunger <= 0 or player.needs.thirst <= 0 then
+        -- a starving or parched body doesn't mend
+        inj.wounded_hours = math.max(0, inj.wounded_hours - hours)
     else
         local heal = REST_HEAL_PER_HOUR * (1 + 0.1 * (player.attrs.Endurance - 3))
         player.health = clamp(player.health + hours * heal)
@@ -2875,6 +2879,15 @@ function Game:survive_hour()
         hurt = hurt + s.hurt
         if p.sick_hours == 0 then self:push_log("The sickness passes.") end
     end
+    if p.injuries.bleeding then
+        p.injuries.bleed_hours = (p.injuries.bleed_hours or 0) + 1
+        if p.injuries.bleed_hours >= SURVIVE.clot_hours then
+            p.injuries.bleeding = false
+            self:push_log("The bleeding slows, then stops.")
+        end
+    else
+        p.injuries.bleed_hours = 0
+    end
     if p.needs.thirst <= 0 then hurt = hurt + SURVIVE.thirst_hurt end
     if p.needs.hunger <= 0 then hurt = hurt + SURVIVE.hunger_hurt end
     p.health = clamp(p.health - hurt)
@@ -3021,6 +3034,7 @@ function Game:tick()
     self:emission_log()
     self:geiger_scan()
     self:refresh_view()
+    self:spot_sites()
     self:check_death(self:death_reason())
 end
 -- ---------------------------------------------------------------------
@@ -3503,7 +3517,7 @@ function Game:enemy_turn()
         text = text .. " It leaves a deep wound."
     end
     self:enc_say(text)
-    self:check_death("Killed by the " .. d.name .. ".")
+    self:check_death("Killed by the " .. d.who .. ".")   -- "who", not "name": "The Fused"
 end
 
 function Game:enc_hit(dmg, bleed, how)
@@ -3877,12 +3891,12 @@ function Game:emission_log()
     self.emission_caught = n and n.caught
     if not n then return end
     if n.warn then
-        self:push_log(("The sky bruises purple. Emission in %dh: get to ruins!"):format(RAD.emission.warn))
+        self:push_log(("The sky bruises purple. Emission in %dh! Ruins/hills!"):format(RAD.emission.warn))
     end
     if n.caught then
-        self:push_log("The EMISSION tears through you! Find ruins!")
+        self:push_log("The EMISSION tears through you! Find cover!")
     elseif n.sheltered then
-        self:push_log("The emission howls over the ruins. You hold on.")
+        self:push_log("The emission howls overhead. You hold on in cover.")
     end
     if n.ended then self:push_log("The emission passes. The fields glitter.") end
     self.emission_news = nil
@@ -3989,6 +4003,20 @@ function Game:hear_of_exit(who)
         return true
     end
     return false
+end
+
+-- A site you can see is a site you know (called from Game:tick).
+function Game:spot_sites()
+    if self:learn_site_seen("trader") then
+        self:push_log("A trader's stall in the ruins, " .. self:site_bearing("trader") .. ".")
+    end
+    if self:learn_site_seen("checkpoint") then
+        self:push_log("A guard tower on the horizon: the Checkpoint.")
+    end
+end
+
+function Game:learn_site_seen(name)
+    return self.player.visible[self.sites[name]] and self:learn_site(name)
 end
 
 -- After a move: sites are safe (no encounters) and announce themselves.

@@ -457,6 +457,9 @@ local function apply_rest_hours(player, hours)
     local inj = player.injuries
     if inj.bleeding then
         player.health = clamp(player.health - hours * BLEED_PER_HOUR)
+    elseif player.needs.hunger <= 0 or player.needs.thirst <= 0 then
+        -- a starving or parched body doesn't mend
+        inj.wounded_hours = math.max(0, inj.wounded_hours - hours)
     else
         local heal = REST_HEAL_PER_HOUR * (1 + 0.1 * (player.attrs.Endurance - 3))
         player.health = clamp(player.health + hours * heal)
