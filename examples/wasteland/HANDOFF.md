@@ -74,6 +74,8 @@ bash tests/render.sh                       # previews/*.png: open them and LOOK
 cd tests && lua5.4 ../tools/balance_sim.lua 300 1 normal   # balance (easy|normal|hard)
 ```
 
+`README.md` is the player guide: keys, the world lore, every NPC's role and lore, and the story pages (in a spoiler block). Its numbers come from the data parts; update it when NPCs, lore or their numbers change.
+
 The sim is not byte-reproducible between processes (Lua 5.4 varies `pairs` order), so compare rates, not output. Only `wasteland.lua` is shipped; `tests/lib_*.lua` and `tests/wasteland_run.lua` are generated test copies.
 
 **Gotchas (each cost real time):**
