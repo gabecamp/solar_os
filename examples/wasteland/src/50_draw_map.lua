@@ -129,6 +129,15 @@ function Game:draw_map(w, h)
                 gfx.line(sx + 1, sy + 1, sx + 5, sy + 5)
                 gfx.line(sx + 5, sy + 1, sx + 1, sy + 5)
             end
+            if self.snares[key] and (p.visible[key] or p.explored[key]) then
+                -- your snare: a small loop at the bottom of the hex
+                local sx, sy = rnd(px) - 3, rnd(py) + 6
+                gfx.color(gfx.WHITE)
+                gfx.fill_rect(sx - 1, sy - 1, 8, 8)
+                gfx.color(gfx.BLACK)
+                gfx.rect(sx, sy, 6, 6)
+                gfx.line(sx + 3, sy + 6, sx + 3, sy + 8)
+            end
             local hot = self.rad_known[key]
             if hot and hot > 0 and (p.visible[key] or p.explored[key]) then
                 -- measured radiation: a trefoil in the upper left, inverted
@@ -173,7 +182,7 @@ function Game:draw_map(w, h)
         gfx.text(6, ly, line)
         ly = ly + 14
     end
-    gfx.text(6, h - 8, "Arrows Spc:rest F:search E:water C:craft I:inv Q:quit")
+    gfx.text(6, h - 8, "Arrows Spc:rest F:search E:water I:bag H:help")
 
     gfx.refresh()
 end

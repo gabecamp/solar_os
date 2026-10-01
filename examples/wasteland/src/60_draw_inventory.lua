@@ -124,140 +124,145 @@ local BODY_SCALE, BODY_SRC_Y0, BODY_Y0 = 1.25, 117, 72 + BODY_DY
 local BODY_TOP = BODY_Y0
 local BODY_BOTTOM = BODY_Y0 + math.ceil((289 - BODY_SRC_Y0) * BODY_SCALE)   -- exclusive
 
-local function mirror_x(pts)
-    local out = {}
-    for i = 1, #pts, 2 do
-        out[i] = -pts[i]
-        out[i + 1] = pts[i + 1]
-    end
-    return out
-end
-
--- Build a full polygon from its right half (listed top to bottom, starting and
--- ending on the center line) by appending the mirrored points in reverse.
-local function symmetric(right)
-    local pts = {}
-    for i = 1, #right do pts[i] = right[i] end
-    for i = #right - 1, 1, -2 do
-        pts[#pts + 1] = -right[i]
-        pts[#pts + 1] = right[i + 1]
-    end
-    return pts
-end
-
-local function ellipse_points(cy, rx, ry, n)
-    local pts = {}
-    for i = 0, n - 1 do
-        local a = 2 * math.pi * i / n
-        pts[#pts + 1] = rx * math.cos(a)
-        pts[#pts + 1] = cy + ry * math.sin(a)
-    end
-    return pts
-end
-
-local BODY_POLYGONS = {}
-local BODY_PART
-local function add_body_polygon(pts)
-    local out = {}
-    for i = 1, #pts, 2 do
-        out[i] = pts[i] * BODY_SCALE
-        out[i + 1] = BODY_Y0 + (pts[i + 1] - BODY_SRC_Y0) * BODY_SCALE
-    end
-    BODY_POLYGONS[#BODY_POLYGONS + 1] = out
-end
-
--- head (which part each polygon is: BODY_PART[i], used to paint worn clothes)
-BODY_PART = {}
-local function add_part(part, pts)
-    add_body_polygon(pts)
-    BODY_PART[#BODY_POLYGONS] = part
-end
-add_part("head", ellipse_points(130, 11, 13, 28))
--- neck, sloped shoulders, tapered torso down to the hips
-add_part("torso", symmetric({
-    0, 139,  4, 139,  4, 146,  14, 148,  27, 151,  31, 156,  30, 164,
-    25, 170,  22, 182,  19, 200,  21, 214,  23, 226,  0, 226,
-}))
--- arms hang slightly away from the body and end in hands
-local ARM = {
-    30, 151,  38, 154,  42, 175,  46, 195,  50, 215,  53, 230,
-    56, 238,  56, 246,  52, 250,  48, 246,  47, 238,  47, 230,
-    43, 215,  37, 195,  31, 178,  27, 166,  28, 158,
-}
-add_part("arms", ARM)
-add_part("arms", mirror_x(ARM))
--- legs: thigh, knee, calf, ankle, and a foot angled outward
-local LEG = {
-    1, 224,  23, 224,  22, 240,  20, 254,  18, 266,  15, 278,
-    20, 284,  21, 288,  3, 288,  3, 282,  5, 270,  4, 254,  2, 240,
-}
-add_part("legs", LEG)
-add_part("legs", mirror_x(LEG))
-
--- x-intervals [a, b) covered by one polygon on the pixel row whose center is yc
-local function polygon_row_spans(pts, yc)
-    local xs = {}
-    local n = #pts // 2
-    for i = 1, n do
-        local j = i % n + 1
-        local x1, y1 = pts[2 * i - 1], pts[2 * i]
-        local x2, y2 = pts[2 * j - 1], pts[2 * j]
-        if y1 ~= y2 and ((y1 <= yc and yc < y2) or (y2 <= yc and yc < y1)) then
-            xs[#xs + 1] = x1 + (yc - y1) * (x2 - x1) / (y2 - y1)
+-- The polygons and the rasterizer only run here, once, so they live in a
+-- do-block: the bundle is one Lua chunk with a 200-local limit, and only
+-- the finished blocks are needed afterwards.
+local BODY_BLOCKS, PART_BLOCKS = nil, {}
+do
+    local function mirror_x(pts)
+        local out = {}
+        for i = 1, #pts, 2 do
+            out[i] = -pts[i]
+            out[i + 1] = pts[i + 1]
         end
+        return out
     end
-    table.sort(xs)
-    local spans = {}
-    for k = 1, #xs - 1, 2 do
-        -- Pixel i is covered when its center (i + 0.5) lies strictly inside the
-        -- edges. Strict on BOTH sides so an edge landing exactly on a pixel
-        -- center is treated the same left and right - keeps the figure symmetric.
-        local a = math.floor(BODY_CX + xs[k] - 0.5) + 1
-        local b = math.ceil(BODY_CX + xs[k + 1] - 0.5)
-        if b > a then spans[#spans + 1] = {a, b} end
-    end
-    return spans
-end
 
--- part: only that body part's polygons (nil = the whole figure)
-local function build_body_blocks(part)
-    local blocks, prev_key = {}, nil
-    for y = BODY_TOP, BODY_BOTTOM - 1 do
-        local all = {}
-        for i, poly in ipairs(BODY_POLYGONS) do
-            if part == nil or BODY_PART[i] == part then
-                for _, sp in ipairs(polygon_row_spans(poly, y + 0.5)) do
-                    all[#all + 1] = sp
+    -- Build a full polygon from its right half (listed top to bottom, starting and
+    -- ending on the center line) by appending the mirrored points in reverse.
+    local function symmetric(right)
+        local pts = {}
+        for i = 1, #right do pts[i] = right[i] end
+        for i = #right - 1, 1, -2 do
+            pts[#pts + 1] = -right[i]
+            pts[#pts + 1] = right[i + 1]
+        end
+        return pts
+    end
+
+    local function ellipse_points(cy, rx, ry, n)
+        local pts = {}
+        for i = 0, n - 1 do
+            local a = 2 * math.pi * i / n
+            pts[#pts + 1] = rx * math.cos(a)
+            pts[#pts + 1] = cy + ry * math.sin(a)
+        end
+        return pts
+    end
+
+    local BODY_POLYGONS = {}
+    local BODY_PART
+    local function add_body_polygon(pts)
+        local out = {}
+        for i = 1, #pts, 2 do
+            out[i] = pts[i] * BODY_SCALE
+            out[i + 1] = BODY_Y0 + (pts[i + 1] - BODY_SRC_Y0) * BODY_SCALE
+        end
+        BODY_POLYGONS[#BODY_POLYGONS + 1] = out
+    end
+
+    -- head (which part each polygon is: BODY_PART[i], used to paint worn clothes)
+    BODY_PART = {}
+    local function add_part(part, pts)
+        add_body_polygon(pts)
+        BODY_PART[#BODY_POLYGONS] = part
+    end
+    add_part("head", ellipse_points(130, 11, 13, 28))
+    -- neck, sloped shoulders, tapered torso down to the hips
+    add_part("torso", symmetric({
+        0, 139,  4, 139,  4, 146,  14, 148,  27, 151,  31, 156,  30, 164,
+        25, 170,  22, 182,  19, 200,  21, 214,  23, 226,  0, 226,
+    }))
+    -- arms hang slightly away from the body and end in hands
+    local ARM = {
+        30, 151,  38, 154,  42, 175,  46, 195,  50, 215,  53, 230,
+        56, 238,  56, 246,  52, 250,  48, 246,  47, 238,  47, 230,
+        43, 215,  37, 195,  31, 178,  27, 166,  28, 158,
+    }
+    add_part("arms", ARM)
+    add_part("arms", mirror_x(ARM))
+    -- legs: thigh, knee, calf, ankle, and a foot angled outward
+    local LEG = {
+        1, 224,  23, 224,  22, 240,  20, 254,  18, 266,  15, 278,
+        20, 284,  21, 288,  3, 288,  3, 282,  5, 270,  4, 254,  2, 240,
+    }
+    add_part("legs", LEG)
+    add_part("legs", mirror_x(LEG))
+
+    -- x-intervals [a, b) covered by one polygon on the pixel row whose center is yc
+    local function polygon_row_spans(pts, yc)
+        local xs = {}
+        local n = #pts // 2
+        for i = 1, n do
+            local j = i % n + 1
+            local x1, y1 = pts[2 * i - 1], pts[2 * i]
+            local x2, y2 = pts[2 * j - 1], pts[2 * j]
+            if y1 ~= y2 and ((y1 <= yc and yc < y2) or (y2 <= yc and yc < y1)) then
+                xs[#xs + 1] = x1 + (yc - y1) * (x2 - x1) / (y2 - y1)
+            end
+        end
+        table.sort(xs)
+        local spans = {}
+        for k = 1, #xs - 1, 2 do
+            -- Pixel i is covered when its center (i + 0.5) lies strictly inside the
+            -- edges. Strict on BOTH sides so an edge landing exactly on a pixel
+            -- center is treated the same left and right - keeps the figure symmetric.
+            local a = math.floor(BODY_CX + xs[k] - 0.5) + 1
+            local b = math.ceil(BODY_CX + xs[k + 1] - 0.5)
+            if b > a then spans[#spans + 1] = {a, b} end
+        end
+        return spans
+    end
+
+    -- part: only that body part's polygons (nil = the whole figure)
+    local function build_body_blocks(part)
+        local blocks, prev_key = {}, nil
+        for y = BODY_TOP, BODY_BOTTOM - 1 do
+            local all = {}
+            for i, poly in ipairs(BODY_POLYGONS) do
+                if part == nil or BODY_PART[i] == part then
+                    for _, sp in ipairs(polygon_row_spans(poly, y + 0.5)) do
+                        all[#all + 1] = sp
+                    end
                 end
             end
-        end
-        table.sort(all, function(p, q) return p[1] < q[1] end)
-        local merged = {}
-        for _, sp in ipairs(all) do
-            local last = merged[#merged]
-            if last and sp[1] <= last[2] then
-                if sp[2] > last[2] then last[2] = sp[2] end
-            else
-                merged[#merged + 1] = {sp[1], sp[2]}
+            table.sort(all, function(p, q) return p[1] < q[1] end)
+            local merged = {}
+            for _, sp in ipairs(all) do
+                local last = merged[#merged]
+                if last and sp[1] <= last[2] then
+                    if sp[2] > last[2] then last[2] = sp[2] end
+                else
+                    merged[#merged + 1] = {sp[1], sp[2]}
+                end
             end
+            local parts = {}
+            for _, m in ipairs(merged) do parts[#parts + 1] = m[1] .. "," .. m[2] end
+            local key = table.concat(parts, ";")
+            if key ~= "" and key == prev_key then
+                blocks[#blocks].h = blocks[#blocks].h + 1
+            elseif key ~= "" then
+                blocks[#blocks + 1] = {y = y, h = 1, spans = merged}
+            end
+            prev_key = key
         end
-        local parts = {}
-        for _, m in ipairs(merged) do parts[#parts + 1] = m[1] .. "," .. m[2] end
-        local key = table.concat(parts, ";")
-        if key ~= "" and key == prev_key then
-            blocks[#blocks].h = blocks[#blocks].h + 1
-        elseif key ~= "" then
-            blocks[#blocks + 1] = {y = y, h = 1, spans = merged}
-        end
-        prev_key = key
+        return blocks
     end
-    return blocks
-end
 
-local BODY_BLOCKS = build_body_blocks()
-local PART_BLOCKS = {}
-for _, part in ipairs({"head", "torso", "arms", "legs"}) do
-    PART_BLOCKS[part] = build_body_blocks(part)
+    BODY_BLOCKS = build_body_blocks()
+    for _, part in ipairs({"head", "torso", "arms", "legs"}) do
+        PART_BLOCKS[part] = build_body_blocks(part)
+    end
 end
 
 local function body_row(src_y)
@@ -411,7 +416,7 @@ function Game:draw_inventory(w, h)
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
     gfx.font(gfx.FONT_MONO_12)
-    gfx.text(4, 12, "Up/Dn Enter:move E:use C:craft I:map")
+    gfx.text(4, 12, "Up/Dn Enter:move E:use C:craft I:map H:help")
 
     INV_ROWS = {}
     INV_POS = {}

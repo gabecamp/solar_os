@@ -1,0 +1,49 @@
+# Device test checklist
+
+About 10 minutes on the board. Copy `wasteland.lua` over the way you did
+before and start it. For anything that goes wrong, a photo of the screen
+(or the error text) is the most useful thing to send back.
+
+## 1. First look (1 min)
+1. The character creator appears. Up/Down move the cursor, Left/Right change
+   an attribute, Space toggles a trait. **Expect:** nothing cut off at the
+   bottom; the stats line updates.
+2. Press Enter. **Expect:** the hex map on the left, the panel on the right
+   (day/time, weather, MP, needs, HP), three log lines and a key line at the
+   bottom.
+3. Press **H**, then **V**. **Expect:** the device info page. **Take a photo
+   of it**: it shows the game version, memory use, the storage path and
+   whether saving works.
+
+## 2. Moving and the clock (2 min)
+4. Move a few hexes with the arrows (and WASD). **Expect:** the map scrolls
+   to keep you centered; MP drops; the hour goes up.
+5. Space to rest. **Expect:** +4 hours, MP back.
+6. F to search. **Expect:** "Found: ..." or "Found nothing", and the
+   "Scav n/3" count drops.
+
+## 3. Inventory and crafting (2 min)
+7. I opens the bag. Arrows move the cursor over the ground, the body slots
+   and the bag. Enter picks something up, Enter again drops it somewhere.
+   **Expect:** icons are drawn (not blank boxes); the doll shows worn clothes.
+8. E on the water bottle. **Expect:** thirst goes up and an Empty Bottle
+   appears.
+9. C opens crafting. **Expect:** a list of recipes with what each needs.
+
+## 4. Things that make sound or use storage (2 min)
+10. If you find a Geiger Counter, step onto a hot hex. **Expect:** a click
+    and a "Geiger crackles" line.
+11. Quit with Q and start again. **Expect:** with the `write_file` firmware
+    patch, a title screen with **Continue**; without it, straight to the
+    creator (that's correct, not a bug).
+
+## 5. An encounter (2 min)
+12. Walk until something happens (forest is busiest), or press **G** in a
+    forest to hunt. **Expect:** a 96x96 picture top right, the story text,
+    and a list of choices.
+
+## What to send back
+- The photo of the device info page (H then V).
+- Any error text, or a photo of anything that looks wrong.
+- Whether the arrow keys work, or only WASD.
+- Whether the screen feels slow to redraw after a key press.

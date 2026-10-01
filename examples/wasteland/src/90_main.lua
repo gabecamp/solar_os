@@ -33,6 +33,10 @@ local ok, err = pcall(function()
             game:water_action()
         elseif key == KEY.T then
             game:site_action()
+        elseif key == KEY.H then
+            game:open_help()
+        elseif key == KEY.G then
+            game:gather()
         elseif key == KEY.C then
             game:open_crafting()
         elseif key == KEY.I then
@@ -47,6 +51,8 @@ local ok, err = pcall(function()
             game.quit = true
         elseif key == KEY.I then
             game.screen = "map"
+        elseif key == KEY.H then
+            game:open_help()
         elseif key == KEY.C then
             game.inv_selected = nil
             game:open_crafting()
@@ -89,6 +95,10 @@ local ok, err = pcall(function()
                 game:draw_dead(w, h)
             elseif game.screen == "ending" then
                 game:draw_ending(w, h)
+            elseif game.screen == "help" then
+                game:draw_help(w, h)
+            elseif game.screen == "info" then
+                game:draw_info(w, h)
             elseif game.screen == "trade" then
                 game:draw_trade(w, h)
             elseif game.screen == "gate" then
@@ -129,6 +139,8 @@ local ok, err = pcall(function()
                 if key == KEY.Q then game.quit = true else game:craft_key(key) end
             elseif game.screen == "trade" then
                 game:trade_key(key)
+            elseif game.screen == "help" or game.screen == "info" then
+                game:help_key(key)
             elseif game.screen == "gate" then
                 game:gate_key(key)
             elseif game.screen == "dead" or game.screen == "ending" then

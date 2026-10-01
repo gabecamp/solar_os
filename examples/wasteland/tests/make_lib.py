@@ -18,6 +18,7 @@ Outputs (git-ignored, regenerated on every run):
   lib_rad.lua        -> radiation_test
   lib_survive.lua    -> survival_test
   lib_trade.lua      -> trade_test
+  lib_hunt.lua       -> hunting_test, help_test
   wasteland_run.lua  -> full copy, run under the fake solaros by run_tests.sh / soak
 """
 import pathlib
@@ -86,5 +87,8 @@ lib = src[:cut]
           "TERRAIN = TERRAIN, GRID_RADIUS = GRID_RADIUS, AXIAL_DIRS = AXIAL_DIRS, "
           "SPRITES = SPRITES, generate_world = generate_world, ARTIFACTS = ARTIFACTS, "
           "RECIPE_IDS = (function() local t = {} for _, r in ipairs(RECIPES) do t[r.id] = true end return t end)()}\n")
+(here / "lib_hunt.lua").write_text(
+    lib + "\nreturn Game, {HUNT = HUNT, ITEM_DB = ITEM_DB, KEY = KEY, SPRITES = SPRITES, "
+          "RECIPES = RECIPES, FIGHT = FIGHT}\n")
 (here / "wasteland_run.lua").write_text(src)
 print("generated lib_*.lua, wasteland_run.lua")

@@ -320,3 +320,12 @@ g.player.inventory = {{item = "shiv", qty = 1}, {item = "spiked_club", qty = 1},
 g.inv_cursor = 1
 g:draw_inventory(400, 300)
 solaros.dump("ops_inventory_belt.txt")
+
+-- Scenes: help (H) and device info (V)
+g = fresh()
+g:open_help()
+g:draw_help(400, 300)
+solaros.dump("ops_help.txt")
+g:help_key(118)
+g:draw_info(400, 300)
+solaros.dump("ops_info.txt")

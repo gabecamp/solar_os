@@ -74,7 +74,7 @@ local POLL_MS = 250
 -- SolarOS sends Enter as '\n' (LF); CR is kept just in case.
 local KEY = {SPACE = 32, ENTER = 13, LF = 10, ESC = 27,
              A = 97, C = 99, D = 100, E = 101, F = 102, I = 105, Q = 113,
-             S = 115, T = 116, W = 119}
+             S = 115, T = 116, W = 119, H = 104, V = 118, G = 103}
 
 -- Terrain: id -> {name, cost (MP + hours), passable, shade}
 -- shade is one of gfx.WHITE / gfx.LIGHT / gfx.DARK / gfx.BLACK, used as
@@ -174,6 +174,7 @@ local TRADE = {
         quiet_shell = 35, permit = 80,
         leather_belt = 10, rope_belt = 4, scrap_metal = 3, jerky = 6,
         shiv = 6, machete = 18, spiked_club = 12, pipe_spear = 15, splint = 5,
+        fishing_rod = 8, snare = 4, raw_fish = 3, cooked_fish = 6,
     },
     stock = {{"antirad", 3}, {"water_bottle", 4}, {"canned_beans", 4}, {"bandage", 2},
              {"vodka", 2}, {"empty_bottle", 3}, {"geiger", 1}, {"gasmask", 1},
@@ -182,6 +183,18 @@ local TRADE = {
 }
 -- The guards let you through with a Zone Permit, or for `bribe` artifacts.
 local GOAL = {bribe = 3}
+
+-- Hunting and fishing (G on the map). Fishing: by open water or on a ford
+-- with a Fishing Rod, fish_hours for a fish_chance % (+5 per Perception over
+-- 3) catch. Hunting: elsewhere, hunt_hours of tracking, hunt_chance % (+10
+-- per Perception over 3) to find an animal, which you meet already studied
+-- (aim bonus). Snares: E sets one on the hex; each hour it has snare_chance
+-- [terrain] % to catch, collected when you step back onto it.
+local HUNT = {
+    fish_hours = 2, fish_chance = 40, hunt_hours = 2, hunt_chance = 45,
+    snare_chance = {forest = 5, plains = 3, hills = 3},
+    snare_catch = {"strange_meat", 2},
+}
 
 local BACKPACK_CAP = 16      -- most bag cells any build can have (the layout's limit)
 local POCKET_CELLS = 4       -- bag cells with nothing worn on your back
@@ -284,6 +297,14 @@ local ITEM_DB = {
                     weapon = {dmg = 16, reach = "close", bleed = 10}, desc = "Weapon: 16 dmg"},
     pipe_spear   = {name = "Pipe Spear",   slot = nil, consumable = nil,
                     weapon = {dmg = 14, reach = "near", bleed = 20}, desc = "Weapon: 14 dmg, reach"},
+    fishing_rod  = {name = "Fishing Rod",  slot = nil, consumable = nil,
+                    desc = "G by water: fish"},
+    snare        = {name = "Snare",        slot = nil, consumable = nil,
+                    desc = "E: set it here, check later"},
+    raw_fish     = {name = "Pale Fish",    slot = nil, consumable = {hunger = 20, thirst = 5},
+                    sick = 15, perish = {hours = 24, into = "rotten_meat"}, desc = "Too many eyes. Cook it"},
+    cooked_fish  = {name = "Cooked Fish",  slot = nil, consumable = {hunger = 35},
+                    perish = {hours = 48, into = "rotten_meat"}},
     scrap_metal  = {name = "Scrap Metal",  slot = nil, consumable = nil, desc = "For crafting"},
     jerky        = {name = "Jerky",        slot = nil, consumable = {hunger = 25, thirst = -5}},
     -- crafting materials and crafted goods (see RECIPES)
@@ -357,6 +378,12 @@ local RECIPES = {
      out = {"rope_belt", 1}, known = true},
     {id = "shiv", name = "Shiv", inputs = {scrap_metal = 1, cloth_scrap = 1}, hours = 1,
      out = {"shiv", 1}, known = true},
+    {id = "fishing_rod", name = "Fishing Rod", inputs = {stick = 1, rope = 1, scrap_metal = 1},
+     hours = 1, out = {"fishing_rod", 1}, known = true},
+    {id = "snare", name = "Snare", inputs = {rope = 1, stick = 2}, hours = 1,
+     out = {"snare", 1}, known = true},
+    {id = "cook_fish", name = "Cooked Fish", inputs = {raw_fish = 1}, fire = true, hours = 1,
+     out = {"cooked_fish", 1}, known = true},
     {id = "filter", name = "Filter Water", inputs = {dirty_water = 1, cloth_scrap = 1}, hours = 1,
      out = {"water_bottle", 1}, known = true},
     {id = "splint", name = "Splint", inputs = {stick = 2, cloth_scrap = 1}, hours = 1,
@@ -385,25 +412,28 @@ local WORLD_WEARABLES = {"cap", "gloves", "earmuffs", "sunglasses", "scarf",
 -- attribute, then the other side acts.
 -- ---------------------------------------------------------------------
 
-local ENCOUNTER_CHANCE = {plains = 10, forest = 15, hills = 12, ruins = 14, ford = 8}   -- % per move onto it
-local ENCOUNTER_COOLDOWN = 2   -- moves after an encounter before another can happen
+-- Fight and encounter numbers, as one table (the bundle has a 200-local limit).
+local FIGHT = {
+    ENCOUNTER_CHANCE = {plains = 10, forest = 15, hills = 12, ruins = 14, ford = 8},   -- % per move onto it
+    ENCOUNTER_COOLDOWN = 2,                                 -- moves after an encounter before another can happen
+    PLAYER_HIT = 55,                                        -- % to hit, +8 per Speed over 3
+    WATCH_AIM = 15,                                         -- extra % on your next hit after a good look
+    THROW_HIT = 50,                                         -- % to hit with a throw, +8 per Perception over 3
+    WATCH_CHANCE = 60,                                      -- % to read the enemy, +10 per Perception over 3
+    HIDE_CHANCE = 35,                                       -- % at Far, +10 per Perception over 3, -10 vs animals
+    FLEE_CHANCE = {far = 70, near = 50, close = 30},        -- +10 per Speed over the enemy's
+    ADVANCE_CHANCE = 60,                                    -- % an enemy closes in per turn, +10 per speed over yours
+    ENEMY_DODGE = 5,                                        -- enemy hit % lost per point of your Speed over 3
+    WOUND_DAMAGE = 12,                                      -- one enemy hit this hard leaves a wound
+    ENEMY_BLEED_DMG = 3,                                    -- per turn while an enemy bleeds
+    ENEMY_FLEE_CHANCE = 30,                                 -- % per turn a beaten enemy (hp <= flees_at) runs
+}
 local ENCOUNTER_KINDS = {{"animal", 40}, {"mutant", 25}, {"anomaly", 20},
                          {"bandit", 12}, {"helper", 3}}
 local RANGE_NAME = {far = "Far", near = "Near", close = "Close"}
 local CLOSER = {far = "near", near = "close"}
 local FARTHER = {close = "near", near = "far"}
 local FISTS = {dmg = 4, reach = "close"}
-local PLAYER_HIT = 55          -- % to hit, +8 per Speed over 3
-local WATCH_AIM = 15           -- extra % on your next hit after a good look
-local THROW_HIT = 50           -- % to hit with a throw, +8 per Perception over 3
-local WATCH_CHANCE = 60        -- % to read the enemy, +10 per Perception over 3
-local HIDE_CHANCE = 35         -- % at Far, +10 per Perception over 3, -10 vs animals
-local FLEE_CHANCE = {far = 70, near = 50, close = 30}   -- +10 per Speed over the enemy's
-local ADVANCE_CHANCE = 60      -- % an enemy closes in per turn, +10 per speed over yours
-local ENEMY_DODGE = 5          -- enemy hit % lost per point of your Speed over 3
-local WOUND_DAMAGE = 12        -- one enemy hit this hard leaves a wound
-local ENEMY_BLEED_DMG = 3      -- per turn while an enemy bleeds
-local ENEMY_FLEE_CHANCE = 30   -- % per turn a beaten enemy (hp <= flees_at) runs
 
 -- kind: animal / mutant (hostile, can't be reasoned with), bandit (demands
 -- food first), helper (never fights), anomaly (step 3). hp, dmg {lo, hi},
@@ -532,6 +562,78 @@ end
 local SPRITE_W, SPRITE_H = 16, 16
 
 local SPRITE_ART = {
+    fishing_rod = {
+        "..............#.",
+        ".............#.#",
+        "............#..#",
+        "...........#...#",
+        "..........#....#",
+        ".........#.....#",
+        "........#......#",
+        ".......#.......#",
+        "......#........#",
+        ".....#.........#",
+        "....#..........#",
+        "...##.........#.",
+        "..##.........#..",
+        ".##.........##..",
+        "##..........#...",
+        "................",
+    },
+    snare = {
+        "................",
+        "......####......",
+        ".....#....#.....",
+        "....#......#....",
+        "....#......#....",
+        ".....#....#.....",
+        "......####......",
+        ".......##.......",
+        ".......#........",
+        "........#.......",
+        ".......#........",
+        "........#.......",
+        "..#.....#....#..",
+        "..#############.",
+        "..#..........#..",
+        "................",
+    },
+    raw_fish = {
+        "................",
+        "................",
+        "................",
+        "..........#.....",
+        "....######.#....",
+        "..###.#.#.#.##.#",
+        ".##.#.#.#.#.#.##",
+        "####.#.#.#.#..##",
+        ".##.#.#.#.#.#.##",
+        "..###.#.#.#.##.#",
+        "....######.#....",
+        "..........#.....",
+        "................",
+        "................",
+        "................",
+        "................",
+    },
+    cooked_fish = {
+        "..#..#..#.......",
+        "...#..#..#......",
+        "..#..#..#.......",
+        "................",
+        "....######......",
+        "..##########...#",
+        ".############.##",
+        "################",
+        ".############.##",
+        "..##########...#",
+        "....######......",
+        "................",
+        "..############..",
+        "................",
+        "................",
+        "................",
+    },
     splint = {
         "................",
         "..##........##..",
@@ -2204,6 +2306,7 @@ function Game.new()
     end
     self.sites_known = {}        -- site name -> true once you know where it is
     self.stashes = {}            -- tile key -> true: a stash a note told you about
+    self.snares = {}             -- tile key -> {set = hour}: snares you've set
     self.next_emission = RAD.emission.first
     self.rad_known = {}          -- tile key -> rad level you've measured or felt there
     self.seed = seed             -- RNG state for scavenging
@@ -2289,6 +2392,7 @@ function Game:try_move(q, r)
     if p.needs.hunger <= 0 then self:push_log("You are starving!") end
     if p.needs.thirst <= 0 then self:push_log("You are dehydrated!") end
     self:find_stash()
+    self:check_snare()
     if not self:check_death("You bled out.") and not self:arrive_site() then
         self:maybe_encounter(terrain_id)
     end
@@ -2566,6 +2670,13 @@ function Game:use_item(kind, k)
         stack.qty = stack.qty - 1
         if stack.qty <= 0 then self:remove_stack(kind, k) end
         self:push_log("You bandage yourself up. (+15 HP)")
+        return
+    end
+    if stack.item == "snare" then
+        if self:set_snare() then
+            stack.qty = stack.qty - 1
+            if stack.qty <= 0 then self:remove_stack(kind, k) end
+        end
         return
     end
     if stack.item == "splint" then
@@ -3055,7 +3166,7 @@ end
 local SAVE = {version = 1, dir = "wasteland", file = "save.lua",
               fields = {"world_seed", "seed", "weather_seed", "scavenged", "camps",
                         "known", "ground", "log", "enc_cooldown", "ticked_hour", "rad_known",
-                        "trader", "sites_known", "stashes", "next_emission"}}
+                        "trader", "sites_known", "stashes", "next_emission", "snares"}}
 
 -- Where the save lives: <preferred storage>/wasteland/save.lua
 function SAVE.path()
@@ -3360,7 +3471,7 @@ function Game:maybe_encounter(terrain_id)
         self.enc_cooldown = self.enc_cooldown - 1
         return
     end
-    local chance = ENCOUNTER_CHANCE[terrain_id]
+    local chance = FIGHT.ENCOUNTER_CHANCE[terrain_id]
     if chance and self:is_night() then chance = chance * WORLD.night_encounters end
     if chance and self:roll(chance * self.player.encounter_mult) then self:start_encounter(self:pick_encounter()) end
 end
@@ -3393,7 +3504,7 @@ end
 
 function Game:end_encounter(summary)
     self.enc.over = true
-    self.enc_cooldown = ENCOUNTER_COOLDOWN
+    self.enc_cooldown = FIGHT.ENCOUNTER_COOLDOWN
     if summary then self:push_log(summary) end
 end
 
@@ -3484,16 +3595,16 @@ function Game:enemy_turn()
     local e, p, d = self.enc, self.player, self.enc.def
     if e.over or self.screen ~= "encounter" then return end
     if e.bleeding then
-        e.hp = e.hp - ENEMY_BLEED_DMG
+        e.hp = e.hp - FIGHT.ENEMY_BLEED_DMG
         if e.hp <= 0 then return self:enemy_dies() end
     end
-    if d.flees_at and e.hp <= d.flees_at and self:roll(ENEMY_FLEE_CHANCE) then
+    if d.flees_at and e.hp <= d.flees_at and self:roll(FIGHT.ENEMY_FLEE_CHANCE) then
         self:enc_say("The " .. d.who .. " breaks away and flees.")
         e.outcome = "fled"
         return self:end_encounter("The " .. d.who .. " fled.")
     end
     if e.range ~= "close" then
-        if self:roll(ADVANCE_CHANCE + 10 * (d.speed - p.attrs.Speed)) then
+        if self:roll(FIGHT.ADVANCE_CHANCE + 10 * (d.speed - p.attrs.Speed)) then
             e.range = CLOSER[e.range]
             self:enc_say("The " .. d.who .. " closes in.")
         else
@@ -3501,7 +3612,7 @@ function Game:enemy_turn()
         end
         return
     end
-    if not self:roll(d.hit - ENEMY_DODGE * (p.attrs.Speed - 3)) then
+    if not self:roll(d.hit - FIGHT.ENEMY_DODGE * (p.attrs.Speed - 3)) then
         self:enc_say("The " .. d.who .. " lunges and misses.")
         return
     end
@@ -3512,7 +3623,7 @@ function Game:enemy_turn()
         p.injuries.bleeding = true
         text = text .. " You're bleeding."
     end
-    if dmg >= WOUND_DAMAGE and p.injuries.wounded_hours == 0 then
+    if dmg >= FIGHT.WOUND_DAMAGE and p.injuries.wounded_hours == 0 then
         p.injuries.wounded_hours = WOUND_REST_HOURS
         text = text .. " It leaves a deep wound."
     end
@@ -3564,7 +3675,7 @@ function Game:encounter_action(action)
         return self:start_puzzle()
     elseif action == "leave" or action == "leave_quietly" then
         if action == "leave_quietly" then
-            self.enc_cooldown = ENCOUNTER_COOLDOWN
+            self.enc_cooldown = FIGHT.ENCOUNTER_COOLDOWN
             self:push_log("You nod and walk on.")
         end
         self.enc = nil
@@ -3593,7 +3704,7 @@ function Game:encounter_action(action)
         self:enc_say("You back away. Range: " .. RANGE_NAME[e.range] .. ".")
     elseif action == "attack" then
         local w, wname = self:weapon()
-        local hit = PLAYER_HIT + 8 * (p.attrs.Speed - 3) + e.aim
+        local hit = FIGHT.PLAYER_HIT + 8 * (p.attrs.Speed - 3) + e.aim
         e.aim = 0
         if self:roll(hit) then
             local dmg = math.max(1, w.dmg - self:rand(w.dmg // 4 + 1) + 2 * (p.attrs.Strength - 3))
@@ -3608,23 +3719,23 @@ function Game:encounter_action(action)
         p.equipped[slot] = nil
         recompute_stats(p)
         self:put_stack("ground", nil, {item = item, qty = 1})
-        if self:roll(THROW_HIT + 8 * (p.attrs.Perception - 3) + e.aim) then
+        if self:roll(FIGHT.THROW_HIT + 8 * (p.attrs.Perception - 3) + e.aim) then
             self:enc_hit(w.dmg, w.bleed, "Your " .. ITEM_DB[item].name:lower() .. " strikes the " .. e.def.who)
         else
             self:enc_say("Your " .. ITEM_DB[item].name:lower() .. " sails wide.")
         end
         e.aim = 0
     elseif action == "watch" then
-        if self:roll(WATCH_CHANCE + 10 * (p.attrs.Perception - 3)) then
+        if self:roll(FIGHT.WATCH_CHANCE + 10 * (p.attrs.Perception - 3)) then
             e.seen = true
-            e.aim = WATCH_AIM
+            e.aim = FIGHT.WATCH_AIM
             self:enc_say("You study how it moves. It looks " .. self:enemy_condition()
                 .. ", and you see an opening.")
         else
             self:enc_say("You can't make out much.")
         end
     elseif action == "hide" then
-        local chance = HIDE_CHANCE + 10 * (p.attrs.Perception - 3)
+        local chance = FIGHT.HIDE_CHANCE + 10 * (p.attrs.Perception - 3)
         if e.def.kind == "animal" then chance = chance - 10 end
         if self:roll(chance) then
             self:enc_say("You drop into cover and keep very still. It passes you by.")
@@ -3632,7 +3743,7 @@ function Game:encounter_action(action)
         end
         self:enc_say("It has seen where you went.")
     elseif action == "flee" then
-        if self:roll(FLEE_CHANCE[e.range] + 10 * (p.attrs.Speed - e.def.speed)) then
+        if self:roll(FIGHT.FLEE_CHANCE[e.range] + 10 * (p.attrs.Speed - e.def.speed)) then
             p.mp = p.mp - 1
             self:enc_say("You run until your lungs burn. It doesn't follow. (-1 MP)")
             return self:end_encounter("You ran from the " .. e.def.who .. ".")
@@ -3735,7 +3846,7 @@ end
 function Game:finish_puzzle(result)
     local p, who = self.player, self.enc.def.who
     self.enc, self.puz = nil, nil
-    self.enc_cooldown = ENCOUNTER_COOLDOWN
+    self.enc_cooldown = FIGHT.ENCOUNTER_COOLDOWN
     self.screen = "map"
     if result == "backed_off" then
         self:push_log("You back away from the " .. who .. ".")
@@ -3944,6 +4055,99 @@ function Game:find_stash()
     if self.stashes[key] then
         self.stashes[key] = nil
         self:push_log("You dig up the stash. (I to look)")
+    end
+end
+-- ---------------------------------------------------------------------
+-- Hunting, fishing and snares (numbers in HUNT, 05_data)
+--
+-- G on the map: by open water (or on a ford) with a Fishing Rod you fish;
+-- anywhere else you track game, and finding it starts an animal encounter
+-- in which you've already studied it. E on a Snare sets it on your hex
+-- (self.snares, saved); stepping back onto it collects whatever it caught
+-- since, worked out then from the hours that passed.
+-- ---------------------------------------------------------------------
+
+function Game:gather()
+    local p = self.player
+    if p.mp <= 0 then
+        self:push_log("Too tired. Rest first.")
+        return
+    end
+    if self:near_water() and self:carrying("fishing_rod") then return self:fish() end
+    local terrain = self.tiles[hex_key(p.q, p.r)]
+    if not HUNT.snare_chance[terrain] then
+        self:push_log(self:near_water() and "No rod to fish with. (C to make one)" or "No game here.")
+        return
+    end
+    self:hunt()
+end
+
+-- Time passes as for a search: MP, hours, needs.
+function Game:spend_hours(n)
+    local p = self.player
+    p.mp = p.mp - 1
+    p.hours = p.hours + n
+    apply_awake_hours(p, n)
+end
+
+function Game:fish()
+    local p = self.player
+    self:spend_hours(HUNT.fish_hours)
+    if self:roll(HUNT.fish_chance + 5 * (p.attrs.Perception - 3)) then
+        local fish = {item = "raw_fish", qty = 1}
+        if not self:put_stack("inventory", nil, fish) then self:put_stack("ground", nil, fish) end
+        self:push_log("A pale fish, too many eyes. Got it.")
+    else
+        self:push_log(("Fished %dh. Nothing bites."):format(HUNT.fish_hours))
+    end
+end
+
+function Game:hunt()
+    local p = self.player
+    self:spend_hours(HUNT.hunt_hours)
+    if not self:roll(HUNT.hunt_chance + 10 * (p.attrs.Perception - 3)) then
+        self:push_log(("Tracked %dh. Nothing but old prints."):format(HUNT.hunt_hours))
+        return
+    end
+    local animals = ENCOUNTERS_BY_KIND.animal
+    self:start_encounter(animals[self:rand(#animals) + 1])
+    -- you found it first: it hasn't seen you, and you've watched how it moves
+    self.enc.seen, self.enc.aim = true, FIGHT.WATCH_AIM
+    self:enc_say("You found its trail and crept up downwind. It hasn't seen you yet.")
+end
+
+-- E on a Snare. Returns true if it was set (the caller uses one up).
+function Game:set_snare()
+    local p = self.player
+    local key = hex_key(p.q, p.r)
+    if not HUNT.snare_chance[self.tiles[key]] then
+        self:push_log("Nothing would walk into a snare here.")
+        return false
+    end
+    if self.snares[key] then
+        self:push_log("There's already a snare here.")
+        return false
+    end
+    self.snares[key] = {set = p.hours}
+    self:push_log("Snare set. Come back later.")
+    return true
+end
+
+-- Stepping onto a hex with your snare.
+function Game:check_snare()
+    local p = self.player
+    local key = hex_key(p.q, p.r)
+    local snare = self.snares[key]
+    if not snare then return end
+    local hours = p.hours - snare.set
+    local per_hour = (HUNT.snare_chance[self.tiles[key]] or 0) / 100
+    local pct = math.floor(100 * (1 - (1 - per_hour) ^ hours))
+    if hours > 0 and self:roll(pct) then
+        self:put_stack("ground", nil, {item = HUNT.snare_catch[1], qty = HUNT.snare_catch[2]})
+        snare.set = p.hours
+        self:push_log("Your snare caught a two-headed hare. (I to take it)")
+    else
+        self:push_log("Your snare is empty.")
     end
 end
 -- ---------------------------------------------------------------------
@@ -4356,6 +4560,15 @@ function Game:draw_map(w, h)
                 gfx.line(sx + 1, sy + 1, sx + 5, sy + 5)
                 gfx.line(sx + 5, sy + 1, sx + 1, sy + 5)
             end
+            if self.snares[key] and (p.visible[key] or p.explored[key]) then
+                -- your snare: a small loop at the bottom of the hex
+                local sx, sy = rnd(px) - 3, rnd(py) + 6
+                gfx.color(gfx.WHITE)
+                gfx.fill_rect(sx - 1, sy - 1, 8, 8)
+                gfx.color(gfx.BLACK)
+                gfx.rect(sx, sy, 6, 6)
+                gfx.line(sx + 3, sy + 6, sx + 3, sy + 8)
+            end
             local hot = self.rad_known[key]
             if hot and hot > 0 and (p.visible[key] or p.explored[key]) then
                 -- measured radiation: a trefoil in the upper left, inverted
@@ -4400,7 +4613,7 @@ function Game:draw_map(w, h)
         gfx.text(6, ly, line)
         ly = ly + 14
     end
-    gfx.text(6, h - 8, "Arrows Spc:rest F:search E:water C:craft I:inv Q:quit")
+    gfx.text(6, h - 8, "Arrows Spc:rest F:search E:water I:bag H:help")
 
     gfx.refresh()
 end
@@ -4601,140 +4814,145 @@ local BODY_SCALE, BODY_SRC_Y0, BODY_Y0 = 1.25, 117, 72 + BODY_DY
 local BODY_TOP = BODY_Y0
 local BODY_BOTTOM = BODY_Y0 + math.ceil((289 - BODY_SRC_Y0) * BODY_SCALE)   -- exclusive
 
-local function mirror_x(pts)
-    local out = {}
-    for i = 1, #pts, 2 do
-        out[i] = -pts[i]
-        out[i + 1] = pts[i + 1]
-    end
-    return out
-end
-
--- Build a full polygon from its right half (listed top to bottom, starting and
--- ending on the center line) by appending the mirrored points in reverse.
-local function symmetric(right)
-    local pts = {}
-    for i = 1, #right do pts[i] = right[i] end
-    for i = #right - 1, 1, -2 do
-        pts[#pts + 1] = -right[i]
-        pts[#pts + 1] = right[i + 1]
-    end
-    return pts
-end
-
-local function ellipse_points(cy, rx, ry, n)
-    local pts = {}
-    for i = 0, n - 1 do
-        local a = 2 * math.pi * i / n
-        pts[#pts + 1] = rx * math.cos(a)
-        pts[#pts + 1] = cy + ry * math.sin(a)
-    end
-    return pts
-end
-
-local BODY_POLYGONS = {}
-local BODY_PART
-local function add_body_polygon(pts)
-    local out = {}
-    for i = 1, #pts, 2 do
-        out[i] = pts[i] * BODY_SCALE
-        out[i + 1] = BODY_Y0 + (pts[i + 1] - BODY_SRC_Y0) * BODY_SCALE
-    end
-    BODY_POLYGONS[#BODY_POLYGONS + 1] = out
-end
-
--- head (which part each polygon is: BODY_PART[i], used to paint worn clothes)
-BODY_PART = {}
-local function add_part(part, pts)
-    add_body_polygon(pts)
-    BODY_PART[#BODY_POLYGONS] = part
-end
-add_part("head", ellipse_points(130, 11, 13, 28))
--- neck, sloped shoulders, tapered torso down to the hips
-add_part("torso", symmetric({
-    0, 139,  4, 139,  4, 146,  14, 148,  27, 151,  31, 156,  30, 164,
-    25, 170,  22, 182,  19, 200,  21, 214,  23, 226,  0, 226,
-}))
--- arms hang slightly away from the body and end in hands
-local ARM = {
-    30, 151,  38, 154,  42, 175,  46, 195,  50, 215,  53, 230,
-    56, 238,  56, 246,  52, 250,  48, 246,  47, 238,  47, 230,
-    43, 215,  37, 195,  31, 178,  27, 166,  28, 158,
-}
-add_part("arms", ARM)
-add_part("arms", mirror_x(ARM))
--- legs: thigh, knee, calf, ankle, and a foot angled outward
-local LEG = {
-    1, 224,  23, 224,  22, 240,  20, 254,  18, 266,  15, 278,
-    20, 284,  21, 288,  3, 288,  3, 282,  5, 270,  4, 254,  2, 240,
-}
-add_part("legs", LEG)
-add_part("legs", mirror_x(LEG))
-
--- x-intervals [a, b) covered by one polygon on the pixel row whose center is yc
-local function polygon_row_spans(pts, yc)
-    local xs = {}
-    local n = #pts // 2
-    for i = 1, n do
-        local j = i % n + 1
-        local x1, y1 = pts[2 * i - 1], pts[2 * i]
-        local x2, y2 = pts[2 * j - 1], pts[2 * j]
-        if y1 ~= y2 and ((y1 <= yc and yc < y2) or (y2 <= yc and yc < y1)) then
-            xs[#xs + 1] = x1 + (yc - y1) * (x2 - x1) / (y2 - y1)
+-- The polygons and the rasterizer only run here, once, so they live in a
+-- do-block: the bundle is one Lua chunk with a 200-local limit, and only
+-- the finished blocks are needed afterwards.
+local BODY_BLOCKS, PART_BLOCKS = nil, {}
+do
+    local function mirror_x(pts)
+        local out = {}
+        for i = 1, #pts, 2 do
+            out[i] = -pts[i]
+            out[i + 1] = pts[i + 1]
         end
+        return out
     end
-    table.sort(xs)
-    local spans = {}
-    for k = 1, #xs - 1, 2 do
-        -- Pixel i is covered when its center (i + 0.5) lies strictly inside the
-        -- edges. Strict on BOTH sides so an edge landing exactly on a pixel
-        -- center is treated the same left and right - keeps the figure symmetric.
-        local a = math.floor(BODY_CX + xs[k] - 0.5) + 1
-        local b = math.ceil(BODY_CX + xs[k + 1] - 0.5)
-        if b > a then spans[#spans + 1] = {a, b} end
-    end
-    return spans
-end
 
--- part: only that body part's polygons (nil = the whole figure)
-local function build_body_blocks(part)
-    local blocks, prev_key = {}, nil
-    for y = BODY_TOP, BODY_BOTTOM - 1 do
-        local all = {}
-        for i, poly in ipairs(BODY_POLYGONS) do
-            if part == nil or BODY_PART[i] == part then
-                for _, sp in ipairs(polygon_row_spans(poly, y + 0.5)) do
-                    all[#all + 1] = sp
+    -- Build a full polygon from its right half (listed top to bottom, starting and
+    -- ending on the center line) by appending the mirrored points in reverse.
+    local function symmetric(right)
+        local pts = {}
+        for i = 1, #right do pts[i] = right[i] end
+        for i = #right - 1, 1, -2 do
+            pts[#pts + 1] = -right[i]
+            pts[#pts + 1] = right[i + 1]
+        end
+        return pts
+    end
+
+    local function ellipse_points(cy, rx, ry, n)
+        local pts = {}
+        for i = 0, n - 1 do
+            local a = 2 * math.pi * i / n
+            pts[#pts + 1] = rx * math.cos(a)
+            pts[#pts + 1] = cy + ry * math.sin(a)
+        end
+        return pts
+    end
+
+    local BODY_POLYGONS = {}
+    local BODY_PART
+    local function add_body_polygon(pts)
+        local out = {}
+        for i = 1, #pts, 2 do
+            out[i] = pts[i] * BODY_SCALE
+            out[i + 1] = BODY_Y0 + (pts[i + 1] - BODY_SRC_Y0) * BODY_SCALE
+        end
+        BODY_POLYGONS[#BODY_POLYGONS + 1] = out
+    end
+
+    -- head (which part each polygon is: BODY_PART[i], used to paint worn clothes)
+    BODY_PART = {}
+    local function add_part(part, pts)
+        add_body_polygon(pts)
+        BODY_PART[#BODY_POLYGONS] = part
+    end
+    add_part("head", ellipse_points(130, 11, 13, 28))
+    -- neck, sloped shoulders, tapered torso down to the hips
+    add_part("torso", symmetric({
+        0, 139,  4, 139,  4, 146,  14, 148,  27, 151,  31, 156,  30, 164,
+        25, 170,  22, 182,  19, 200,  21, 214,  23, 226,  0, 226,
+    }))
+    -- arms hang slightly away from the body and end in hands
+    local ARM = {
+        30, 151,  38, 154,  42, 175,  46, 195,  50, 215,  53, 230,
+        56, 238,  56, 246,  52, 250,  48, 246,  47, 238,  47, 230,
+        43, 215,  37, 195,  31, 178,  27, 166,  28, 158,
+    }
+    add_part("arms", ARM)
+    add_part("arms", mirror_x(ARM))
+    -- legs: thigh, knee, calf, ankle, and a foot angled outward
+    local LEG = {
+        1, 224,  23, 224,  22, 240,  20, 254,  18, 266,  15, 278,
+        20, 284,  21, 288,  3, 288,  3, 282,  5, 270,  4, 254,  2, 240,
+    }
+    add_part("legs", LEG)
+    add_part("legs", mirror_x(LEG))
+
+    -- x-intervals [a, b) covered by one polygon on the pixel row whose center is yc
+    local function polygon_row_spans(pts, yc)
+        local xs = {}
+        local n = #pts // 2
+        for i = 1, n do
+            local j = i % n + 1
+            local x1, y1 = pts[2 * i - 1], pts[2 * i]
+            local x2, y2 = pts[2 * j - 1], pts[2 * j]
+            if y1 ~= y2 and ((y1 <= yc and yc < y2) or (y2 <= yc and yc < y1)) then
+                xs[#xs + 1] = x1 + (yc - y1) * (x2 - x1) / (y2 - y1)
+            end
+        end
+        table.sort(xs)
+        local spans = {}
+        for k = 1, #xs - 1, 2 do
+            -- Pixel i is covered when its center (i + 0.5) lies strictly inside the
+            -- edges. Strict on BOTH sides so an edge landing exactly on a pixel
+            -- center is treated the same left and right - keeps the figure symmetric.
+            local a = math.floor(BODY_CX + xs[k] - 0.5) + 1
+            local b = math.ceil(BODY_CX + xs[k + 1] - 0.5)
+            if b > a then spans[#spans + 1] = {a, b} end
+        end
+        return spans
+    end
+
+    -- part: only that body part's polygons (nil = the whole figure)
+    local function build_body_blocks(part)
+        local blocks, prev_key = {}, nil
+        for y = BODY_TOP, BODY_BOTTOM - 1 do
+            local all = {}
+            for i, poly in ipairs(BODY_POLYGONS) do
+                if part == nil or BODY_PART[i] == part then
+                    for _, sp in ipairs(polygon_row_spans(poly, y + 0.5)) do
+                        all[#all + 1] = sp
+                    end
                 end
             end
-        end
-        table.sort(all, function(p, q) return p[1] < q[1] end)
-        local merged = {}
-        for _, sp in ipairs(all) do
-            local last = merged[#merged]
-            if last and sp[1] <= last[2] then
-                if sp[2] > last[2] then last[2] = sp[2] end
-            else
-                merged[#merged + 1] = {sp[1], sp[2]}
+            table.sort(all, function(p, q) return p[1] < q[1] end)
+            local merged = {}
+            for _, sp in ipairs(all) do
+                local last = merged[#merged]
+                if last and sp[1] <= last[2] then
+                    if sp[2] > last[2] then last[2] = sp[2] end
+                else
+                    merged[#merged + 1] = {sp[1], sp[2]}
+                end
             end
+            local parts = {}
+            for _, m in ipairs(merged) do parts[#parts + 1] = m[1] .. "," .. m[2] end
+            local key = table.concat(parts, ";")
+            if key ~= "" and key == prev_key then
+                blocks[#blocks].h = blocks[#blocks].h + 1
+            elseif key ~= "" then
+                blocks[#blocks + 1] = {y = y, h = 1, spans = merged}
+            end
+            prev_key = key
         end
-        local parts = {}
-        for _, m in ipairs(merged) do parts[#parts + 1] = m[1] .. "," .. m[2] end
-        local key = table.concat(parts, ";")
-        if key ~= "" and key == prev_key then
-            blocks[#blocks].h = blocks[#blocks].h + 1
-        elseif key ~= "" then
-            blocks[#blocks + 1] = {y = y, h = 1, spans = merged}
-        end
-        prev_key = key
+        return blocks
     end
-    return blocks
-end
 
-local BODY_BLOCKS = build_body_blocks()
-local PART_BLOCKS = {}
-for _, part in ipairs({"head", "torso", "arms", "legs"}) do
-    PART_BLOCKS[part] = build_body_blocks(part)
+    BODY_BLOCKS = build_body_blocks()
+    for _, part in ipairs({"head", "torso", "arms", "legs"}) do
+        PART_BLOCKS[part] = build_body_blocks(part)
+    end
 end
 
 local function body_row(src_y)
@@ -4888,7 +5106,7 @@ function Game:draw_inventory(w, h)
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
     gfx.font(gfx.FONT_MONO_12)
-    gfx.text(4, 12, "Up/Dn Enter:move E:use C:craft I:map")
+    gfx.text(4, 12, "Up/Dn Enter:move E:use C:craft I:map H:help")
 
     INV_ROWS = {}
     INV_POS = {}
@@ -5747,6 +5965,103 @@ function Game:draw_ending(w, h)
     gfx.refresh()
 end
 -- ---------------------------------------------------------------------
+-- Help (H) and device info (V on the help screen)
+--
+-- The map's hint line has room for only a few keys; H lists them all. The
+-- info page is for testing on a new board: what the game sees of SolarOS.
+-- ---------------------------------------------------------------------
+
+Game.VERSION = "0.10 (2026-10-01)"
+
+local HELP = {
+    {"MAP", "Arrows/WASD move    Space rest 4h"},
+    {"", "F search the hex   E water: fill/drink"},
+    {"", "T trade / Checkpoint   C craft   I bag"},
+    {"", "G hunt, or fish by water with a rod"},
+    {"BAG", "Arrows pick  Enter select, Enter move"},
+    {"", "E use: eat, drink, wear, read, set snare"},
+    {"CRAFT", "Up/Dn pick  Enter make  C/Q back"},
+    {"TRADE", "Lt/Rt side  Enter +1  E -1  T deal"},
+    {"FIGHTS", "Up/Dn pick  Enter choose"},
+    {"PUZZLE", "Arrows move  T+arrow throw  1-4 sigils"},
+    {"", "Q backs away from a puzzle unharmed"},
+    {"TIPS", "Shelter in ruins/hills when the sky"},
+    {"", "bruises. Boil or filter river water."},
+    {"", "3 artifacts or a permit get you out."},
+}
+
+function Game:open_help()
+    self.help_back = self.screen
+    self.screen = "help"
+end
+
+function Game:help_key(key)
+    if self.screen == "help" and key == KEY.V then
+        self.screen = "info"
+    else
+        self.screen = self.help_back or "map"
+    end
+end
+
+function Game:draw_help(w, h)
+    gfx.clear(gfx.WHITE)
+    gfx.color(gfx.BLACK)
+    gfx.font(gfx.FONT_BOLD_14)
+    gfx.text(6, 16, "Keys")
+    gfx.font(gfx.FONT_MONO_12)
+    local y = 36
+    for _, row in ipairs(HELP) do
+        if row[1] ~= "" then y = y + 3 end
+        gfx.text(6, y, row[1])
+        gfx.text(62, y, row[2])
+        y = y + 15
+    end
+    gfx.text(6, h - 8, "Any key: back   V: device info")
+    gfx.refresh()
+end
+
+-- What the game sees of the device, one line each.
+function Game:device_lines()
+    local st = solaros.storage
+    local lines = {
+        "Game " .. Game.VERSION,
+        (_VERSION or "Lua ?") .. ", memory " .. math.floor(collectgarbage("count")) .. " KB",
+        ("Screen %dx%d"):format(gfx.size()),
+    }
+    local clock = solaros.time and solaros.time.uptime_ms
+    lines[#lines + 1] = "Uptime " .. (clock and (math.floor(clock() / 1000) .. " s") or "unknown")
+    if st then
+        local ok, root = pcall(function() return st.mount_point and st.mount_point() end)
+        lines[#lines + 1] = "Storage " .. (ok and tostring(root) or "error: " .. tostring(root))
+    else
+        lines[#lines + 1] = "Storage: no solaros.storage"
+    end
+    lines[#lines + 1] = "Can save: " .. (SAVE.can_write() and "yes (write_file)" or "no (needs the firmware patch)")
+    local _, path = SAVE.path()
+    if path and st and st.exists then
+        local ok, there = pcall(st.exists, path)
+        lines[#lines + 1] = "Save " .. path .. ": " .. (ok and (there and "found" or "none") or "error")
+    end
+    lines[#lines + 1] = ("World seed %d, hour %d"):format(self.world_seed or 0, self.player.hours)
+    lines[#lines + 1] = "Audio: " .. ((solaros.audio and solaros.audio.tone) and "tone ok" or "none")
+    return lines
+end
+
+function Game:draw_info(w, h)
+    gfx.clear(gfx.WHITE)
+    gfx.color(gfx.BLACK)
+    gfx.font(gfx.FONT_BOLD_14)
+    gfx.text(6, 16, "Device info")
+    gfx.font(gfx.FONT_MONO_12)
+    local y = 40
+    for _, line in ipairs(self:device_lines()) do
+        gfx.text(6, y, line:sub(1, 56))
+        y = y + 16
+    end
+    gfx.text(6, h - 8, "Any key: back")
+    gfx.refresh()
+end
+-- ---------------------------------------------------------------------
 -- Main loop
 -- ---------------------------------------------------------------------
 
@@ -5781,6 +6096,10 @@ local ok, err = pcall(function()
             game:water_action()
         elseif key == KEY.T then
             game:site_action()
+        elseif key == KEY.H then
+            game:open_help()
+        elseif key == KEY.G then
+            game:gather()
         elseif key == KEY.C then
             game:open_crafting()
         elseif key == KEY.I then
@@ -5795,6 +6114,8 @@ local ok, err = pcall(function()
             game.quit = true
         elseif key == KEY.I then
             game.screen = "map"
+        elseif key == KEY.H then
+            game:open_help()
         elseif key == KEY.C then
             game.inv_selected = nil
             game:open_crafting()
@@ -5837,6 +6158,10 @@ local ok, err = pcall(function()
                 game:draw_dead(w, h)
             elseif game.screen == "ending" then
                 game:draw_ending(w, h)
+            elseif game.screen == "help" then
+                game:draw_help(w, h)
+            elseif game.screen == "info" then
+                game:draw_info(w, h)
             elseif game.screen == "trade" then
                 game:draw_trade(w, h)
             elseif game.screen == "gate" then
@@ -5877,6 +6202,8 @@ local ok, err = pcall(function()
                 if key == KEY.Q then game.quit = true else game:craft_key(key) end
             elseif game.screen == "trade" then
                 game:trade_key(key)
+            elseif game.screen == "help" or game.screen == "info" then
+                game:help_key(key)
             elseif game.screen == "gate" then
                 game:gate_key(key)
             elseif game.screen == "dead" or game.screen == "ending" then

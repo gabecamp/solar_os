@@ -20,7 +20,7 @@ function Game:maybe_encounter(terrain_id)
         self.enc_cooldown = self.enc_cooldown - 1
         return
     end
-    local chance = ENCOUNTER_CHANCE[terrain_id]
+    local chance = FIGHT.ENCOUNTER_CHANCE[terrain_id]
     if chance and self:is_night() then chance = chance * WORLD.night_encounters end
     if chance and self:roll(chance * self.player.encounter_mult) then self:start_encounter(self:pick_encounter()) end
 end
@@ -53,7 +53,7 @@ end
 
 function Game:end_encounter(summary)
     self.enc.over = true
-    self.enc_cooldown = ENCOUNTER_COOLDOWN
+    self.enc_cooldown = FIGHT.ENCOUNTER_COOLDOWN
     if summary then self:push_log(summary) end
 end
 
@@ -144,16 +144,16 @@ function Game:enemy_turn()
     local e, p, d = self.enc, self.player, self.enc.def
     if e.over or self.screen ~= "encounter" then return end
     if e.bleeding then
-        e.hp = e.hp - ENEMY_BLEED_DMG
+        e.hp = e.hp - FIGHT.ENEMY_BLEED_DMG
         if e.hp <= 0 then return self:enemy_dies() end
     end
-    if d.flees_at and e.hp <= d.flees_at and self:roll(ENEMY_FLEE_CHANCE) then
+    if d.flees_at and e.hp <= d.flees_at and self:roll(FIGHT.ENEMY_FLEE_CHANCE) then
         self:enc_say("The " .. d.who .. " breaks away and flees.")
         e.outcome = "fled"
         return self:end_encounter("The " .. d.who .. " fled.")
     end
     if e.range ~= "close" then
-        if self:roll(ADVANCE_CHANCE + 10 * (d.speed - p.attrs.Speed)) then
+        if self:roll(FIGHT.ADVANCE_CHANCE + 10 * (d.speed - p.attrs.Speed)) then
             e.range = CLOSER[e.range]
             self:enc_say("The " .. d.who .. " closes in.")
         else
@@ -161,7 +161,7 @@ function Game:enemy_turn()
         end
         return
     end
-    if not self:roll(d.hit - ENEMY_DODGE * (p.attrs.Speed - 3)) then
+    if not self:roll(d.hit - FIGHT.ENEMY_DODGE * (p.attrs.Speed - 3)) then
         self:enc_say("The " .. d.who .. " lunges and misses.")
         return
     end
@@ -172,7 +172,7 @@ function Game:enemy_turn()
         p.injuries.bleeding = true
         text = text .. " You're bleeding."
     end
-    if dmg >= WOUND_DAMAGE and p.injuries.wounded_hours == 0 then
+    if dmg >= FIGHT.WOUND_DAMAGE and p.injuries.wounded_hours == 0 then
         p.injuries.wounded_hours = WOUND_REST_HOURS
         text = text .. " It leaves a deep wound."
     end
@@ -224,7 +224,7 @@ function Game:encounter_action(action)
         return self:start_puzzle()
     elseif action == "leave" or action == "leave_quietly" then
         if action == "leave_quietly" then
-            self.enc_cooldown = ENCOUNTER_COOLDOWN
+            self.enc_cooldown = FIGHT.ENCOUNTER_COOLDOWN
             self:push_log("You nod and walk on.")
         end
         self.enc = nil
@@ -253,7 +253,7 @@ function Game:encounter_action(action)
         self:enc_say("You back away. Range: " .. RANGE_NAME[e.range] .. ".")
     elseif action == "attack" then
         local w, wname = self:weapon()
-        local hit = PLAYER_HIT + 8 * (p.attrs.Speed - 3) + e.aim
+        local hit = FIGHT.PLAYER_HIT + 8 * (p.attrs.Speed - 3) + e.aim
         e.aim = 0
         if self:roll(hit) then
             local dmg = math.max(1, w.dmg - self:rand(w.dmg // 4 + 1) + 2 * (p.attrs.Strength - 3))
@@ -268,23 +268,23 @@ function Game:encounter_action(action)
         p.equipped[slot] = nil
         recompute_stats(p)
         self:put_stack("ground", nil, {item = item, qty = 1})
-        if self:roll(THROW_HIT + 8 * (p.attrs.Perception - 3) + e.aim) then
+        if self:roll(FIGHT.THROW_HIT + 8 * (p.attrs.Perception - 3) + e.aim) then
             self:enc_hit(w.dmg, w.bleed, "Your " .. ITEM_DB[item].name:lower() .. " strikes the " .. e.def.who)
         else
             self:enc_say("Your " .. ITEM_DB[item].name:lower() .. " sails wide.")
         end
         e.aim = 0
     elseif action == "watch" then
-        if self:roll(WATCH_CHANCE + 10 * (p.attrs.Perception - 3)) then
+        if self:roll(FIGHT.WATCH_CHANCE + 10 * (p.attrs.Perception - 3)) then
             e.seen = true
-            e.aim = WATCH_AIM
+            e.aim = FIGHT.WATCH_AIM
             self:enc_say("You study how it moves. It looks " .. self:enemy_condition()
                 .. ", and you see an opening.")
         else
             self:enc_say("You can't make out much.")
         end
     elseif action == "hide" then
-        local chance = HIDE_CHANCE + 10 * (p.attrs.Perception - 3)
+        local chance = FIGHT.HIDE_CHANCE + 10 * (p.attrs.Perception - 3)
         if e.def.kind == "animal" then chance = chance - 10 end
         if self:roll(chance) then
             self:enc_say("You drop into cover and keep very still. It passes you by.")
@@ -292,7 +292,7 @@ function Game:encounter_action(action)
         end
         self:enc_say("It has seen where you went.")
     elseif action == "flee" then
-        if self:roll(FLEE_CHANCE[e.range] + 10 * (p.attrs.Speed - e.def.speed)) then
+        if self:roll(FIGHT.FLEE_CHANCE[e.range] + 10 * (p.attrs.Speed - e.def.speed)) then
             p.mp = p.mp - 1
             self:enc_say("You run until your lungs burn. It doesn't follow. (-1 MP)")
             return self:end_encounter("You ran from the " .. e.def.who .. ".")
@@ -395,7 +395,7 @@ end
 function Game:finish_puzzle(result)
     local p, who = self.player, self.enc.def.who
     self.enc, self.puz = nil, nil
-    self.enc_cooldown = ENCOUNTER_COOLDOWN
+    self.enc_cooldown = FIGHT.ENCOUNTER_COOLDOWN
     self.screen = "map"
     if result == "backed_off" then
         self:push_log("You back away from the " .. who .. ".")

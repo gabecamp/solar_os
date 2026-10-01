@@ -24,7 +24,7 @@ local POLL_MS = 250
 -- SolarOS sends Enter as '\n' (LF); CR is kept just in case.
 local KEY = {SPACE = 32, ENTER = 13, LF = 10, ESC = 27,
              A = 97, C = 99, D = 100, E = 101, F = 102, I = 105, Q = 113,
-             S = 115, T = 116, W = 119}
+             S = 115, T = 116, W = 119, H = 104, V = 118, G = 103}
 
 -- Terrain: id -> {name, cost (MP + hours), passable, shade}
 -- shade is one of gfx.WHITE / gfx.LIGHT / gfx.DARK / gfx.BLACK, used as
@@ -124,6 +124,7 @@ local TRADE = {
         quiet_shell = 35, permit = 80,
         leather_belt = 10, rope_belt = 4, scrap_metal = 3, jerky = 6,
         shiv = 6, machete = 18, spiked_club = 12, pipe_spear = 15, splint = 5,
+        fishing_rod = 8, snare = 4, raw_fish = 3, cooked_fish = 6,
     },
     stock = {{"antirad", 3}, {"water_bottle", 4}, {"canned_beans", 4}, {"bandage", 2},
              {"vodka", 2}, {"empty_bottle", 3}, {"geiger", 1}, {"gasmask", 1},
@@ -132,6 +133,18 @@ local TRADE = {
 }
 -- The guards let you through with a Zone Permit, or for `bribe` artifacts.
 local GOAL = {bribe = 3}
+
+-- Hunting and fishing (G on the map). Fishing: by open water or on a ford
+-- with a Fishing Rod, fish_hours for a fish_chance % (+5 per Perception over
+-- 3) catch. Hunting: elsewhere, hunt_hours of tracking, hunt_chance % (+10
+-- per Perception over 3) to find an animal, which you meet already studied
+-- (aim bonus). Snares: E sets one on the hex; each hour it has snare_chance
+-- [terrain] % to catch, collected when you step back onto it.
+local HUNT = {
+    fish_hours = 2, fish_chance = 40, hunt_hours = 2, hunt_chance = 45,
+    snare_chance = {forest = 5, plains = 3, hills = 3},
+    snare_catch = {"strange_meat", 2},
+}
 
 local BACKPACK_CAP = 16      -- most bag cells any build can have (the layout's limit)
 local POCKET_CELLS = 4       -- bag cells with nothing worn on your back
@@ -234,6 +247,14 @@ local ITEM_DB = {
                     weapon = {dmg = 16, reach = "close", bleed = 10}, desc = "Weapon: 16 dmg"},
     pipe_spear   = {name = "Pipe Spear",   slot = nil, consumable = nil,
                     weapon = {dmg = 14, reach = "near", bleed = 20}, desc = "Weapon: 14 dmg, reach"},
+    fishing_rod  = {name = "Fishing Rod",  slot = nil, consumable = nil,
+                    desc = "G by water: fish"},
+    snare        = {name = "Snare",        slot = nil, consumable = nil,
+                    desc = "E: set it here, check later"},
+    raw_fish     = {name = "Pale Fish",    slot = nil, consumable = {hunger = 20, thirst = 5},
+                    sick = 15, perish = {hours = 24, into = "rotten_meat"}, desc = "Too many eyes. Cook it"},
+    cooked_fish  = {name = "Cooked Fish",  slot = nil, consumable = {hunger = 35},
+                    perish = {hours = 48, into = "rotten_meat"}},
     scrap_metal  = {name = "Scrap Metal",  slot = nil, consumable = nil, desc = "For crafting"},
     jerky        = {name = "Jerky",        slot = nil, consumable = {hunger = 25, thirst = -5}},
     -- crafting materials and crafted goods (see RECIPES)
@@ -307,6 +328,12 @@ local RECIPES = {
      out = {"rope_belt", 1}, known = true},
     {id = "shiv", name = "Shiv", inputs = {scrap_metal = 1, cloth_scrap = 1}, hours = 1,
      out = {"shiv", 1}, known = true},
+    {id = "fishing_rod", name = "Fishing Rod", inputs = {stick = 1, rope = 1, scrap_metal = 1},
+     hours = 1, out = {"fishing_rod", 1}, known = true},
+    {id = "snare", name = "Snare", inputs = {rope = 1, stick = 2}, hours = 1,
+     out = {"snare", 1}, known = true},
+    {id = "cook_fish", name = "Cooked Fish", inputs = {raw_fish = 1}, fire = true, hours = 1,
+     out = {"cooked_fish", 1}, known = true},
     {id = "filter", name = "Filter Water", inputs = {dirty_water = 1, cloth_scrap = 1}, hours = 1,
      out = {"water_bottle", 1}, known = true},
     {id = "splint", name = "Splint", inputs = {stick = 2, cloth_scrap = 1}, hours = 1,
@@ -335,25 +362,28 @@ local WORLD_WEARABLES = {"cap", "gloves", "earmuffs", "sunglasses", "scarf",
 -- attribute, then the other side acts.
 -- ---------------------------------------------------------------------
 
-local ENCOUNTER_CHANCE = {plains = 10, forest = 15, hills = 12, ruins = 14, ford = 8}   -- % per move onto it
-local ENCOUNTER_COOLDOWN = 2   -- moves after an encounter before another can happen
+-- Fight and encounter numbers, as one table (the bundle has a 200-local limit).
+local FIGHT = {
+    ENCOUNTER_CHANCE = {plains = 10, forest = 15, hills = 12, ruins = 14, ford = 8},   -- % per move onto it
+    ENCOUNTER_COOLDOWN = 2,                                 -- moves after an encounter before another can happen
+    PLAYER_HIT = 55,                                        -- % to hit, +8 per Speed over 3
+    WATCH_AIM = 15,                                         -- extra % on your next hit after a good look
+    THROW_HIT = 50,                                         -- % to hit with a throw, +8 per Perception over 3
+    WATCH_CHANCE = 60,                                      -- % to read the enemy, +10 per Perception over 3
+    HIDE_CHANCE = 35,                                       -- % at Far, +10 per Perception over 3, -10 vs animals
+    FLEE_CHANCE = {far = 70, near = 50, close = 30},        -- +10 per Speed over the enemy's
+    ADVANCE_CHANCE = 60,                                    -- % an enemy closes in per turn, +10 per speed over yours
+    ENEMY_DODGE = 5,                                        -- enemy hit % lost per point of your Speed over 3
+    WOUND_DAMAGE = 12,                                      -- one enemy hit this hard leaves a wound
+    ENEMY_BLEED_DMG = 3,                                    -- per turn while an enemy bleeds
+    ENEMY_FLEE_CHANCE = 30,                                 -- % per turn a beaten enemy (hp <= flees_at) runs
+}
 local ENCOUNTER_KINDS = {{"animal", 40}, {"mutant", 25}, {"anomaly", 20},
                          {"bandit", 12}, {"helper", 3}}
 local RANGE_NAME = {far = "Far", near = "Near", close = "Close"}
 local CLOSER = {far = "near", near = "close"}
 local FARTHER = {close = "near", near = "far"}
 local FISTS = {dmg = 4, reach = "close"}
-local PLAYER_HIT = 55          -- % to hit, +8 per Speed over 3
-local WATCH_AIM = 15           -- extra % on your next hit after a good look
-local THROW_HIT = 50           -- % to hit with a throw, +8 per Perception over 3
-local WATCH_CHANCE = 60        -- % to read the enemy, +10 per Perception over 3
-local HIDE_CHANCE = 35         -- % at Far, +10 per Perception over 3, -10 vs animals
-local FLEE_CHANCE = {far = 70, near = 50, close = 30}   -- +10 per Speed over the enemy's
-local ADVANCE_CHANCE = 60      -- % an enemy closes in per turn, +10 per speed over yours
-local ENEMY_DODGE = 5          -- enemy hit % lost per point of your Speed over 3
-local WOUND_DAMAGE = 12        -- one enemy hit this hard leaves a wound
-local ENEMY_BLEED_DMG = 3      -- per turn while an enemy bleeds
-local ENEMY_FLEE_CHANCE = 30   -- % per turn a beaten enemy (hp <= flees_at) runs
 
 -- kind: animal / mutant (hostile, can't be reasoned with), bandit (demands
 -- food first), helper (never fights), anomaly (step 3). hp, dmg {lo, hi},
