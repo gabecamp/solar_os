@@ -280,7 +280,7 @@ end
 -- Out of the Zone: the run is over (and so is its save).
 function Game:finish_run(how)
     self.ending = {how = how, day = (self:clock()), hours = self.player.hours,
-                   artifacts = self:artifact_count()}
+                   artifacts = self:artifact_count(), lore = self:lore_ending_line()}
     self.screen = "ending"
     self:sfx("escape")
     Game.delete_save()

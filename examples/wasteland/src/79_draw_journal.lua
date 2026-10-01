@@ -21,6 +21,9 @@ function Game:journal_lines()
         add("The way out: unknown. Find the trader, or read notes.")
     end
     if self.sites_known.trader then add("Trader: " .. self:site_bearing("trader") .. ".") end
+    if self:lore_count() > 0 then
+        add(("Pages read: %d/%d. L to reread them."):format(self:lore_count(), #LORE.pages))
+    end
     local quest = self:quest_text()
     if quest then add("Quest - " .. quest) end
     local camp = self:base_text()
@@ -84,6 +87,6 @@ function Game:draw_journal(w, h)
         gfx.text(6, y, line)
         y = y + 14
     end
-    gfx.text(6, h - 8, "Any key: back")
+    gfx.text(6, h - 8, self:lore_count() > 0 and "L: read pages   any key: back" or "Any key: back")
     gfx.refresh()
 end

@@ -74,7 +74,7 @@ local POLL_MS = 250
 -- SolarOS sends Enter as '\n' (LF); CR is kept just in case.
 local KEY = {SPACE = 32, ENTER = 13, LF = 10, ESC = 27,
              A = 97, C = 99, D = 100, E = 101, F = 102, I = 105, Q = 113,
-             S = 115, T = 116, W = 119, H = 104, V = 118, G = 103, M = 109, J = 106, R = 114, O = 111}
+             S = 115, T = 116, W = 119, H = 104, V = 118, G = 103, M = 109, J = 106, R = 114, O = 111, L = 108}
 
 -- Terrain: id -> {name, cost (MP + hours), passable, shade}
 -- shade is one of gfx.WHITE / gfx.LIGHT / gfx.DARK / gfx.BLACK, used as
@@ -185,7 +185,7 @@ local TRADE = {
         pilk = 7, lucky_lure = 12, karls_waders = 14, karls_hat = 10,
         broken_radio = 15, lora_radio = 60, broken_detector = 12, anomaly_detector = 45,
         broken_headlamp = 6, headlamp = 25, circuit_board = 10, copper_wire = 5,
-        battery_cell = 8, antenna = 6, multitool = 20, medkit = 15,
+        battery_cell = 8, antenna = 6, multitool = 20, medkit = 15, lore_page = 2,
     },
     stock = {{"antirad", 3}, {"water_bottle", 4}, {"canned_beans", 4}, {"bandage", 2},
              {"multitool", 1}, {"battery_cell", 1},
@@ -276,7 +276,7 @@ local TECH = {
          parts = {copper_wire = 1, battery_cell = 1}},
     },
     repair_hours = 3, per_point = 8, tool = "multitool",
-    world_items = {"broken_radio", "multitool"},   -- dropped once each
+    world_items = {"broken_radio", "multitool", "lore_page", "lore_page"},   -- dropped once each
     radio_max = 5, radio_start = 3, detector_range = 3, signal_rads = 10,
     channels = {
         {id = "trader", name = "Trader's net", cooldown = 72},
@@ -445,6 +445,7 @@ local ITEM_DB = {
     battery_cell = {name = "Battery Cell", slot = nil, consumable = nil, desc = "Part; E: charge radio"},
     antenna      = {name = "Antenna",      slot = nil, consumable = nil, desc = "A repair part"},
     multitool    = {name = "Multitool",    slot = nil, consumable = nil, desc = "Tool for repairs"},
+    lore_page    = {name = "Torn Page",    slot = nil, consumable = nil, desc = "E: read it"},
     scrap_metal  = {name = "Scrap Metal",  slot = nil, consumable = nil, desc = "For crafting"},
     jerky        = {name = "Jerky",        slot = nil, consumable = {hunger = 25, thirst = -5}},
     -- crafting materials and crafted goods (see RECIPES)
@@ -489,13 +490,13 @@ local SCAVENGE_LOOT = {
     forest = {{"nothing", 16}, {"berries", 9}, {"cloth_scrap", 1}, {"water_bottle", 1},
               {"scarf", 1}, {"earmuffs", 1}, {"gloves", 1}, {"spear", 1}, {"stick", 6}},
     -- ruins: what's left in houses and cars
-    ruins  = {{"nothing", 32}, {"canned_beans", 7}, {"water_bottle", 3}, {"cloth_scrap", 3},
+    ruins  = {{"nothing", 34}, {"canned_beans", 7}, {"water_bottle", 3}, {"cloth_scrap", 3},
               {"scrawled_notes", 2}, {"rope", 1}, {"knife", 1}, {"pipe", 1}, {"stick", 1},
               {"jacket", 1}, {"backpack", 1}, {"antirad", 1}, {"vodka", 1}, {"bolts", 2},
               {"geiger", 1}, {"gasmask", 1}, {"empty_bottle", 2}, {"scrap_metal", 3},
               {"leather_belt", 1}, {"jerky", 5}, {"broken_radio", 1}, {"broken_detector", 1},
               {"broken_headlamp", 1}, {"circuit_board", 1}, {"copper_wire", 2}, {"battery_cell", 1},
-              {"antenna", 1}, {"multitool", 1}},
+              {"antenna", 1}, {"multitool", 1}, {"lore_page", 2}},
     ford   = {{"nothing", 18}, {"rock", 4}, {"stick", 2}, {"water_bottle", 1}, {"scrap_metal", 1}},
     hills  = {{"nothing", 20}, {"rock", 5}, {"water_bottle", 1}, {"canned_beans", 2},
               {"jacket", 1}, {"bracers", 1}, {"boots", 1}, {"knife", 1}, {"stick", 1},
@@ -717,6 +718,24 @@ end
 local SPRITE_W, SPRITE_H = 16, 16
 
 local SPRITE_ART = {
+    lore_page = {
+        "................",
+        "...#########....",
+        "...#.......##...",
+        "...#.......#.#..",
+        "...#.####..####.",
+        "...#..........#.",
+        "...#.#######..#.",
+        "...#..........#.",
+        "...#.######...#.",
+        "...#..........#.",
+        "...#.#######..#.",
+        "...#.........#..",
+        "...#..#####.#...",
+        "...#.......#....",
+        "...#########....",
+        "................",
+    },
     medkit = {
         "................",
         "....########....",
@@ -3146,6 +3165,10 @@ function Game:use_item(kind, k)
     if not stack then return end
     local def = ITEM_DB[stack.item]
     local p = self.player
+    if stack.item == "lore_page" then
+        if self:read_lore() then self:use_one(kind, k, stack) end
+        return
+    end
     if stack.item == "medkit" then
         p.injuries.bleeding = false
         p.injuries.wounded_hours = math.max(0, p.injuries.wounded_hours - 12)
@@ -3676,7 +3699,8 @@ local SAVE = {version = 1, dir = "wasteland", file = "save.lua",
                         "trader", "sites_known", "stashes", "next_emission", "snares",
                         "karl_asked", "karl_next", "karl_gave", "muted",
                         "difficulty", "dog", "radio", "karl_hint",
-                        "base", "quest", "quests_done"}}
+                        "base", "quest", "quests_done",
+                        "lore_read", "signal_page"}}
 
 -- Where the save lives: <preferred storage>/wasteland/save.lua
 function SAVE.path()
@@ -5125,7 +5149,7 @@ end
 -- Out of the Zone: the run is over (and so is its save).
 function Game:finish_run(how)
     self.ending = {how = how, day = (self:clock()), hours = self.player.hours,
-                   artifacts = self:artifact_count()}
+                   artifacts = self:artifact_count(), lore = self:lore_ending_line()}
     self.screen = "ending"
     self:sfx("escape")
     Game.delete_save()
@@ -5425,6 +5449,10 @@ function RADIO.karl(self)
 end
 function RADIO.signal(self)
     local p = self.player
+    if not self.signal_page then   -- the first time, it reads you something
+        self.signal_page = true
+        self:read_lore("The Signal")
+    end
     p.rads = math.min(RAD.max, (p.rads or 0) + TECH.signal_rads)
     self:sfx("emission")
     local key = self:nearest_artifact()
@@ -6030,6 +6058,124 @@ function Game:quest_text()
     if not q then return nil end
     local where = q.target and (" " .. self:bearing_to(q.target) .. ".") or ""
     return q.giver .. ": " .. QUESTS[q.kind].journal .. where
+end
+-- ---------------------------------------------------------------------
+-- Lore: torn pages that tell what happened here (LORE.pages, in order)
+--
+-- E on a Torn Page reads the next unread page (self.lore_read, saved);
+-- the Signal on the radio gives one the first time. J then L opens the
+-- reader. How much you've read changes the ending (lore_ending_line).
+-- ---------------------------------------------------------------------
+
+LORE = {
+    pages = {
+        {title = "Institute memo, day 0",
+         text = "Instrument readings over the old quarry are 'within tolerance'. Staff are "
+             .. "reminded that the hum is a transformer fault. Do not discuss the birds."},
+        {title = "A driver's notebook",
+         text = "Third run out to the Institute this week. They load crates at night now. "
+             .. "One was warm. One was singing, I swear on my mother."},
+        {title = "Radio log, 03:12",
+         text = "- Say again, the sky over the quarry is what?\n- Purple. It's purple and "
+             .. "it's breathing.\n- Breathing.\n- Get everyone inside. Everyone. Now."},
+        {title = "The first emission",
+         text = "Nobody outside lived. The ones in the cellars came up two days later and "
+             .. "the fields had changed. The grass grew in spirals. The dogs came back wrong."},
+        {title = "Evacuation order 14",
+         text = "All residents will assemble at the school. Bring nothing. Do not bring pets. "
+             .. "Do not bring anything that is warm to the touch."},
+        {title = "Anna's diary",
+         text = "They told the doctors to go. I stayed. Somebody has to sew up the fools who "
+             .. "come back for the money. I keep a candle in the window. Nobody asks why."},
+        {title = "Karl, written on a tackle box lid",
+         text = "Fished this river forty years. Fish came back with too many eyes. Still bite "
+             .. "at dusk. A river doesn't care what happened. That's the comfort of it."},
+        {title = "The Checkpoint's standing orders",
+         text = "No one leaves without paper. Confiscate all objects. Do not hold any object "
+             .. "longer than necessary. If an object speaks, report to the sergeant."},
+        {title = "A stalker's last note",
+         text = "Third artifact today. They're easy if you don't mind the dreams. I dream "
+             .. "of a door in a field. Every night it's open a little wider."},
+        {title = "Institute memo, day 400",
+         text = "The broadcast on the old military band is not ours. It began the night of "
+             .. "the first emission. It reads numbers. Lately it reads names."},
+        {title = "The numbers",
+         text = "We decoded it. They aren't coordinates. They're a count. It counts us, the "
+             .. "ones still here, and every time it reads the list, it is shorter."},
+        {title = "Unsigned, in the Checkpoint's tower",
+         text = "The Zone isn't a wound. It's an eye opening. Everything we take out of it "
+             .. "is something it lets us carry, so it can see where we go."},
+    },
+    -- the ending's last line, by pages read (first match from the top)
+    ending = {
+        {at = 9, text = "You know what the Signal counts now. As the barrier drops you "
+            .. "hear it begin again, one name shorter. It doesn't say yours. Not yet."},
+        {at = 4, text = "You've read enough to wonder what you're carrying out, and who "
+            .. "is looking through it."},
+    },
+}
+
+function Game:lore_count()
+    return #(self.lore_read or {})
+end
+
+-- Read the next page. Returns false if there are none left.
+function Game:read_lore(how)
+    self.lore_read = self.lore_read or {}
+    local n = #self.lore_read + 1
+    local page = LORE.pages[n]
+    if not page then
+        self:push_log("Nothing new on it. You've read them all.")
+        return false
+    end
+    self.lore_read[n] = true
+    self:sfx("chime")
+    self:push_log(("%s: '%s' (%d/%d, J then L)"):format(how or "A torn page", page.title, n, #LORE.pages))
+    return true
+end
+
+function Game:lore_ending_line()
+    local n = self:lore_count()
+    for _, e in ipairs(LORE.ending) do
+        if n >= e.at then return e.text end
+    end
+end
+
+function Game:open_lore()
+    if self:lore_count() == 0 then return end
+    self.lore_page = math.min(self.lore_page or 1, self:lore_count())
+    self.screen = "lore"
+end
+
+function Game:lore_key(key)
+    local n = self:lore_count()
+    if key == gfx.KEY_UP or key == KEY.W or key == gfx.KEY_LEFT or key == KEY.A then
+        self.lore_page = math.max(1, self.lore_page - 1)
+    elseif key == gfx.KEY_DOWN or key == KEY.S or key == gfx.KEY_RIGHT or key == KEY.D then
+        self.lore_page = math.min(n, self.lore_page + 1)
+    else
+        self.screen = "journal"
+    end
+end
+
+function Game:draw_lore(w, h)
+    local page = LORE.pages[self.lore_page]
+    gfx.clear(gfx.WHITE)
+    gfx.color(gfx.BLACK)
+    gfx.font(gfx.FONT_BOLD_14)
+    gfx.text(6, 18, page.title)
+    gfx.font(gfx.FONT_MONO_12)
+    gfx.text(w - 60, 18, self.lore_page .. "/" .. self:lore_count())
+    gfx.line(6, 26, w - 6, 26)
+    local y = 48
+    for para in (page.text .. "\n"):gmatch("(.-)\n") do   -- "\n" starts a new line
+        for _, line in ipairs(wrap(para, 54)) do
+            gfx.text(6, y, line)
+            y = y + 16
+        end
+    end
+    gfx.text(6, h - 8, "Up/Dn page  any other key: back")
+    gfx.refresh()
 end
 
 -- Equip slots sit ON the body part they dress, NEO Scavenger style: a box over
@@ -7339,7 +7485,8 @@ function Game:draw_ending(w, h)
     gfx.text(6, 30, "You left the Zone.")
     gfx.font(gfx.FONT_MONO_12)
     local y = 60
-    for _, line in ipairs(wrap(TRADE_UI.ending[e.how] or "", 54)) do
+    local text = (TRADE_UI.ending[e.how] or "") .. (e.lore and (" " .. e.lore) or "")
+    for _, line in ipairs(wrap(text, 54)) do
         gfx.text(6, y, line)
         y = y + 14
     end
@@ -7382,6 +7529,9 @@ function Game:open_help()
 end
 
 function Game:help_key(key)   -- help, info and journal: any key goes back
+    if self.screen == "journal" and key == KEY.L and self:lore_count() > 0 then
+        return self:open_lore()
+    end
     if self.screen == "help" and key == KEY.V then
         self.screen = "info"
     else
@@ -7471,6 +7621,9 @@ function Game:journal_lines()
         add("The way out: unknown. Find the trader, or read notes.")
     end
     if self.sites_known.trader then add("Trader: " .. self:site_bearing("trader") .. ".") end
+    if self:lore_count() > 0 then
+        add(("Pages read: %d/%d. L to reread them."):format(self:lore_count(), #LORE.pages))
+    end
     local quest = self:quest_text()
     if quest then add("Quest - " .. quest) end
     local camp = self:base_text()
@@ -7534,7 +7687,7 @@ function Game:draw_journal(w, h)
         gfx.text(6, y, line)
         y = y + 14
     end
-    gfx.text(6, h - 8, "Any key: back")
+    gfx.text(6, h - 8, self:lore_count() > 0 and "L: read pages   any key: back" or "Any key: back")
     gfx.refresh()
 end
 -- ---------------------------------------------------------------------
@@ -7648,6 +7801,8 @@ local ok, err = pcall(function()
                 game:draw_radio(w, h)
             elseif game.screen == "journal" then
                 game:draw_journal(w, h)
+            elseif game.screen == "lore" then
+                game:draw_lore(w, h)
             elseif game.screen == "info" then
                 game:draw_info(w, h)
             elseif game.screen == "trade" then
@@ -7694,6 +7849,8 @@ local ok, err = pcall(function()
                 game:help_key(key)
             elseif game.screen == "radio" then
                 game:radio_key(key)
+            elseif game.screen == "lore" then
+                game:lore_key(key)
             elseif game.screen == "gate" then
                 game:gate_key(key)
             elseif game.screen == "dead" or game.screen == "ending" then

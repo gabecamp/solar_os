@@ -24,7 +24,7 @@ local POLL_MS = 250
 -- SolarOS sends Enter as '\n' (LF); CR is kept just in case.
 local KEY = {SPACE = 32, ENTER = 13, LF = 10, ESC = 27,
              A = 97, C = 99, D = 100, E = 101, F = 102, I = 105, Q = 113,
-             S = 115, T = 116, W = 119, H = 104, V = 118, G = 103, M = 109, J = 106, R = 114, O = 111}
+             S = 115, T = 116, W = 119, H = 104, V = 118, G = 103, M = 109, J = 106, R = 114, O = 111, L = 108}
 
 -- Terrain: id -> {name, cost (MP + hours), passable, shade}
 -- shade is one of gfx.WHITE / gfx.LIGHT / gfx.DARK / gfx.BLACK, used as
@@ -135,7 +135,7 @@ local TRADE = {
         pilk = 7, lucky_lure = 12, karls_waders = 14, karls_hat = 10,
         broken_radio = 15, lora_radio = 60, broken_detector = 12, anomaly_detector = 45,
         broken_headlamp = 6, headlamp = 25, circuit_board = 10, copper_wire = 5,
-        battery_cell = 8, antenna = 6, multitool = 20, medkit = 15,
+        battery_cell = 8, antenna = 6, multitool = 20, medkit = 15, lore_page = 2,
     },
     stock = {{"antirad", 3}, {"water_bottle", 4}, {"canned_beans", 4}, {"bandage", 2},
              {"multitool", 1}, {"battery_cell", 1},
@@ -226,7 +226,7 @@ local TECH = {
          parts = {copper_wire = 1, battery_cell = 1}},
     },
     repair_hours = 3, per_point = 8, tool = "multitool",
-    world_items = {"broken_radio", "multitool"},   -- dropped once each
+    world_items = {"broken_radio", "multitool", "lore_page", "lore_page"},   -- dropped once each
     radio_max = 5, radio_start = 3, detector_range = 3, signal_rads = 10,
     channels = {
         {id = "trader", name = "Trader's net", cooldown = 72},
@@ -395,6 +395,7 @@ local ITEM_DB = {
     battery_cell = {name = "Battery Cell", slot = nil, consumable = nil, desc = "Part; E: charge radio"},
     antenna      = {name = "Antenna",      slot = nil, consumable = nil, desc = "A repair part"},
     multitool    = {name = "Multitool",    slot = nil, consumable = nil, desc = "Tool for repairs"},
+    lore_page    = {name = "Torn Page",    slot = nil, consumable = nil, desc = "E: read it"},
     scrap_metal  = {name = "Scrap Metal",  slot = nil, consumable = nil, desc = "For crafting"},
     jerky        = {name = "Jerky",        slot = nil, consumable = {hunger = 25, thirst = -5}},
     -- crafting materials and crafted goods (see RECIPES)
@@ -439,13 +440,13 @@ local SCAVENGE_LOOT = {
     forest = {{"nothing", 16}, {"berries", 9}, {"cloth_scrap", 1}, {"water_bottle", 1},
               {"scarf", 1}, {"earmuffs", 1}, {"gloves", 1}, {"spear", 1}, {"stick", 6}},
     -- ruins: what's left in houses and cars
-    ruins  = {{"nothing", 32}, {"canned_beans", 7}, {"water_bottle", 3}, {"cloth_scrap", 3},
+    ruins  = {{"nothing", 34}, {"canned_beans", 7}, {"water_bottle", 3}, {"cloth_scrap", 3},
               {"scrawled_notes", 2}, {"rope", 1}, {"knife", 1}, {"pipe", 1}, {"stick", 1},
               {"jacket", 1}, {"backpack", 1}, {"antirad", 1}, {"vodka", 1}, {"bolts", 2},
               {"geiger", 1}, {"gasmask", 1}, {"empty_bottle", 2}, {"scrap_metal", 3},
               {"leather_belt", 1}, {"jerky", 5}, {"broken_radio", 1}, {"broken_detector", 1},
               {"broken_headlamp", 1}, {"circuit_board", 1}, {"copper_wire", 2}, {"battery_cell", 1},
-              {"antenna", 1}, {"multitool", 1}},
+              {"antenna", 1}, {"multitool", 1}, {"lore_page", 2}},
     ford   = {{"nothing", 18}, {"rock", 4}, {"stick", 2}, {"water_bottle", 1}, {"scrap_metal", 1}},
     hills  = {{"nothing", 20}, {"rock", 5}, {"water_bottle", 1}, {"canned_beans", 2},
               {"jacket", 1}, {"bracers", 1}, {"boots", 1}, {"knife", 1}, {"stick", 1},

@@ -408,6 +408,10 @@ function Game:use_item(kind, k)
     if not stack then return end
     local def = ITEM_DB[stack.item]
     local p = self.player
+    if stack.item == "lore_page" then
+        if self:read_lore() then self:use_one(kind, k, stack) end
+        return
+    end
     if stack.item == "medkit" then
         p.injuries.bleeding = false
         p.injuries.wounded_hours = math.max(0, p.injuries.wounded_hours - 12)

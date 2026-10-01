@@ -142,6 +142,10 @@ function RADIO.karl(self)
 end
 function RADIO.signal(self)
     local p = self.player
+    if not self.signal_page then   -- the first time, it reads you something
+        self.signal_page = true
+        self:read_lore("The Signal")
+    end
     p.rads = math.min(RAD.max, (p.rads or 0) + TECH.signal_rads)
     self:sfx("emission")
     local key = self:nearest_artifact()

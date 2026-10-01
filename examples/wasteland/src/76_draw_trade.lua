@@ -97,7 +97,8 @@ function Game:draw_ending(w, h)
     gfx.text(6, 30, "You left the Zone.")
     gfx.font(gfx.FONT_MONO_12)
     local y = 60
-    for _, line in ipairs(wrap(TRADE_UI.ending[e.how] or "", 54)) do
+    local text = (TRADE_UI.ending[e.how] or "") .. (e.lore and (" " .. e.lore) or "")
+    for _, line in ipairs(wrap(text, 54)) do
         gfx.text(6, y, line)
         y = y + 14
     end

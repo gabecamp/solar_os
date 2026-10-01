@@ -395,3 +395,12 @@ g:refresh_view()
 g.inv_cursor = 1
 g:draw_inventory(400, 300)
 solaros.dump("ops_inventory_camp.txt")
+
+-- Scene: the lore reader
+g = fresh()
+g:start_game()
+for _ = 1, 4 do g:read_lore() end
+g.lore_page = 3
+g.screen = "lore"
+g:draw_lore(400, 300)
+solaros.dump("ops_lore.txt")
