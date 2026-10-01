@@ -69,14 +69,47 @@ function Game.records()
         local chunk = ok and type(text) == "string" and text ~= "" and load("return " .. text, "=records", "t", {})
         local good, data = false, nil
         if chunk then good, data = pcall(chunk) end
-        if good and type(data) == "table" then rec = data end
+        if good and type(data) == "table" then
+            rec = data
+        elseif ok and type(text) == "string" and text ~= "" then
+            -- unreadable (cut short by a power loss?): keep a copy before the
+            -- next write replaces it
+            RECORDS.bad_text = text
+        end
     end
-    rec = rec or {}
-    rec.runs, rec.escapes, rec.kills = rec.runs or 0, rec.escapes or 0, rec.kills or 0
-    rec.longest, rec.most_out = rec.longest or 0, rec.most_out or 0
-    rec.deaths, rec.achieved = rec.deaths or {}, rec.achieved or {}
-    RECORDS.data = rec
-    return rec
+    RECORDS.data = Game.clean_records(rec or {})
+    return RECORDS.data
+end
+
+-- Whatever the file held, a records table the game can use: counts are
+-- whole numbers >= 0, tables are tables, the best escape a real difficulty.
+function Game.clean_records(rec)
+    local function count(v)
+        v = math.tointeger(tonumber(v) or 0) or 0
+        return v > 0 and v or 0
+    end
+    local out = {runs = count(rec.runs), escapes = count(rec.escapes), kills = count(rec.kills),
+                 longest = count(rec.longest), most_out = count(rec.most_out),
+                 deaths = {}, achieved = {}, counted = {}}
+    if type(rec.deaths) == "table" then
+        for why, n in pairs(rec.deaths) do
+            if type(why) == "string" and count(n) > 0 then out.deaths[why] = count(n) end
+        end
+    end
+    if type(rec.achieved) == "table" then
+        for id, on in pairs(rec.achieved) do
+            if type(id) == "string" and on == true then out.achieved[id] = true end
+        end
+    end
+    if type(rec.counted) == "table" then
+        for _, id in ipairs(rec.counted) do
+            if type(id) == "string" then out.counted[#out.counted + 1] = id end
+        end
+    end
+    if type(rec.best_escape) == "string" and DIFFICULTY[rec.best_escape] then
+        out.best_escape = rec.best_escape
+    end
+    return out
 end
 
 -- Forget the loaded records (tests: read them back from storage).
@@ -89,12 +122,16 @@ function Game.write_records()
     local dir, path = records_path()
     return pcall(function()
         if solaros.storage.makedirs then solaros.storage.makedirs(dir) end
+        if RECORDS.bad_text then   -- the unreadable old file, kept once
+            solaros.storage.write_file(dir .. "/records.bad.lua", RECORDS.bad_text)
+            RECORDS.bad_text = nil
+        end
         solaros.storage.write_file(path, table.concat(SAVE.serialize(Game.records(), {})))
     end)
 end
 
 -- Unlock what this run has earned (from tick, and when the run ends).
-function Game:check_achievements(how)
+function Game:check_achievements(how, no_write)
     local rec, new = Game.records(), false
     for _, a in ipairs(RECORDS.list) do
         if not rec.achieved[a[1]] and a[4](self, how) then
@@ -105,7 +142,7 @@ function Game:check_achievements(how)
             new = true
         end
     end
-    if new then Game.write_records() end
+    if new and not no_write then Game.write_records() end
 end
 
 -- A run is over: how = "permit"/"bribe" for an escape, nil for a death.
@@ -113,6 +150,13 @@ function Game:record_run(how, cause)
     if self.run_recorded then return end
     self.run_recorded = true
     local rec, p, best = Game.records(), self.player, {}
+    -- a run is counted once, even if its save survives and is continued
+    local id = tostring(self.world_seed)
+    for _, seen in ipairs(rec.counted) do
+        if seen == id then return end
+    end
+    table.insert(rec.counted, id)
+    while #rec.counted > 20 do table.remove(rec.counted, 1) end
     rec.runs = rec.runs + 1
     rec.kills = rec.kills + self:stat_of("kills")
     if p.hours > rec.longest then
@@ -135,7 +179,7 @@ function Game:record_run(how, cause)
         rec.deaths[why] = (rec.deaths[why] or 0) + 1
     end
     self.run_best = best
-    self:check_achievements(how)
+    self:check_achievements(how, true)
     Game.write_records()
 end
 
@@ -175,7 +219,7 @@ function Game:records_lines()
     local deaths, worst, worst_n = 0, nil, 0
     for why, n in pairs(rec.deaths) do
         deaths = deaths + n
-        if n > worst_n or (n == worst_n and why < worst) then worst, worst_n = why, n end
+        if n > worst_n or (n == worst_n and worst and why < worst) then worst, worst_n = why, n end
     end
     local lines = {
         ("Runs %d   Escapes %d   Deaths %d"):format(rec.runs, rec.escapes, deaths),

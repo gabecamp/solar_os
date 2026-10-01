@@ -284,7 +284,8 @@ local NIGHT = {
 }
 
 -- Skills that grow with use (src/55_skills.lua). levels = XP needed for
--- levels 1-5; xp = what each action earns; bonus = per level: % fewer duds
+-- levels 1-5; xp = what each action earns (catches and found trails, not
+-- empty casts or tracks); bonus = per level: % fewer duds
 -- (scav), % catch and find (fish), % to hit (fight), % repair (tinker).
 -- Tinker at fast_craft or more takes an hour off crafting (min 1).
 local SKILLS = {
@@ -293,7 +294,7 @@ local SKILLS = {
     long = {scav = "Scavenging", fish = "Fishing and hunting", fight = "Fighting",
             tinker = "Tinkering"},
     levels = {10, 25, 50, 90, 150},
-    xp = {search = 1, find = 1, fish = 1, catch = 2, hunt = 1, hit = 1, kill = 3,
+    xp = {search = 1, find = 1, catch = 3, hunt = 2, hit = 1, kill = 3,
           craft = 1, repair = 2, repaired = 3},
     bonus = {scav = 5, fish = 4, fight = 3, tinker = 5},
     fast_craft = 3,

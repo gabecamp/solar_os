@@ -481,8 +481,8 @@ end
 -- exactly what a full redraw paints there) and cached until the clothes change.
 -- Cached drawings of the doll for what you wear now (reset when it changes).
 function Game:doll_cache()
-    local worn = {}
-    for _, s in ipairs(EQUIP_SLOTS) do worn[#worn + 1] = self.player.equipped[s] or "-" end
+    local worn = {}   -- (only what is painted on the doll: not what's in your hands)
+    for _, s in ipairs(WEAR_ORDER) do worn[#worn + 1] = self.player.equipped[s] or "-" end
     worn = table.concat(worn, ",")
     if not (self.ring_cache and self.ring_cache.worn == worn) then self.ring_cache = {worn = worn} end
     return self.ring_cache
@@ -641,6 +641,10 @@ function Game:move_inv_cursor_drawn(old, w)
         end
     end
     self:draw_inv_desc(w, true)
+    -- the cells' erase boxes reach the labels' descenders: write them again
+    gfx.color(gfx.BLACK)
+    gfx.font(gfx.FONT_MONO_12)
+    for _, l in ipairs(self.inv_labels or {}) do gfx.text(INV_COL_X, l[1], l[2]) end
     self.inv_drawn.cursor = self.inv_cursor
     gfx.refresh()
 end
@@ -686,6 +690,7 @@ function Game:draw_inventory(w, h)
             .. "/" .. #ground
     end
     gfx.text(INV_COL_X, GROUND_Y - 5, label)
+    self.inv_labels = {{GROUND_Y - 5, label}}
     for i = 1, n_ground do
         if i > off and i <= off + per_page then
             local col = (i - off - 1) % GROUND_GRID_COLS
@@ -755,8 +760,9 @@ function Game:draw_inventory(w, h)
     self:draw_inv_desc(w, false)
 
     local back = self.player.equipped.back
-    gfx.text(INV_COL_X, BAG_LABEL_Y, (back and ITEM_DB[back].name or "Pockets")
-        .. " " .. n_inv .. "/" .. capacity)
+    local bag_label = (back and ITEM_DB[back].name or "Pockets") .. " " .. n_inv .. "/" .. capacity
+    gfx.text(INV_COL_X, BAG_LABEL_Y, bag_label)
+    self.inv_labels[2] = {BAG_LABEL_Y, bag_label}
 
     -- log: the newest INV_LOG_LINES lines, the last one at h - 8
     local ly = h - 8 - 12 * (INV_LOG_LINES - 1)

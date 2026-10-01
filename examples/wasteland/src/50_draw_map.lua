@@ -177,6 +177,11 @@ function Game:draw_map(w, h)
                     draw_sprite(rnd(px) - 4, rnd(py) - 6, 9, 13, GLYPHS.player_halo)
                     gfx.color(gfx.BLACK)
                     draw_sprite(rnd(px) - 3, rnd(py) - 5, 7, 11, GLYPHS.player)
+                else   -- no bitmaps on this board: a black block on a white halo
+                    gfx.color(gfx.WHITE)
+                    gfx.fill_rect(rnd(px) - 5, rnd(py) - 5, 10, 10)
+                    gfx.color(gfx.BLACK)
+                    gfx.fill_rect(rnd(px) - 3, rnd(py) - 3, 6, 6)
                 end
                 if self.dog then   -- your dog at your heel: a small block with an ear
                     gfx.color(gfx.WHITE)
@@ -321,7 +326,7 @@ function Game.hex_mask(size)
     if not ok then error(err) end
     local function pack(layer)
         local chunks = {}
-        if not layer then return chunks end
+        if not layer or layer.x1 < layer.x0 then return chunks end   -- (nothing plotted)
         local w = layer.x1 - layer.x0 + 1
         local bpr = (w + 7) // 8
         local rows = 128 // bpr

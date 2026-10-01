@@ -16,9 +16,12 @@ gfx.text = function(x, y, s)
 end
 local function screen_text() local s = table.concat(texts, "\n"); texts = {}; return s end
 
+local runs_made = 0
 local function fresh()
     local g = Game.new()
     g:start_game()
+    runs_made = runs_made + 1
+    g.world_seed = 9000 + runs_made   -- (each a different run: one fake clock seeds them all alike)
     return g
 end
 local function achieved(id) return Game.records().achieved[id] == true end

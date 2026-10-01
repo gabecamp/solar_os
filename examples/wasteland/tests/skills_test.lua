@@ -68,21 +68,21 @@ local d0, d5 = dud_share(0), dud_share(5)
 print(("   empty searches: level 0 %.2f, level 5 %.2f"):format(d0, d5))
 assert(d5 < d0, "level 5 should find more")
 
-print("5. fishing and hunting earn fish XP; the bonus raises the odds")
+print("5. a catch and a found trail earn fish XP (empty casts don't); the bonus raises the odds")
 g = fresh()
 g.maybe_karl = function() end   -- (it rolls too)
 local rolled
 local real_roll = g.roll
 g.roll = function(self, pct) rolled = pct; return false end
 g:fish()
-assert(g.skills.fish == SKILLS.xp.fish)
+assert((g.skills.fish or 0) == 0, "an empty cast earns nothing")
 local base_fish = rolled
 g.skills.fish = SKILLS.levels[2]
 g:fish()
 assert(rolled == base_fish + 2 * SKILLS.bonus.fish, rolled .. " vs " .. base_fish)
 g.skills.fish = 0
 g:hunt()
-assert(g.skills.fish == SKILLS.xp.hunt)
+assert(g.skills.fish == 0, "old prints earn nothing")
 local base_hunt = rolled
 g.skills.fish = SKILLS.levels[1]
 g:hunt()
@@ -90,7 +90,12 @@ assert(rolled == base_hunt + SKILLS.bonus.fish)
 g.skills.fish = 0
 g.roll = function(self, pct) rolled = pct; return true end
 g:fish()
-assert(g.skills.fish == SKILLS.xp.fish + SKILLS.xp.catch, "a catch is worth more")
+assert(g.skills.fish == SKILLS.xp.catch, "a catch")
+g.skills.fish = 0
+g:hunt()
+assert(g.skills.fish == SKILLS.xp.hunt, "a found trail")
+g.enc = nil
+g.screen = "map"
 g.roll = real_roll
 
 print("6. fights: hits and kills earn fight XP; the bonus raises the hit chance")

@@ -34,7 +34,6 @@ end
 function Game:fish()
     local p = self.player
     self:spend_hours(HUNT.fish_hours)
-    self:skill_xp("fish", SKILLS.xp.fish)
     if self:roll(HUNT.fish_chance + 5 * (p.attrs.Perception - 3) + self:fish_bonus()
                  + self:skill_bonus("fish")) then
         self:skill_xp("fish", SKILLS.xp.catch)
@@ -52,11 +51,11 @@ end
 function Game:hunt()
     local p = self.player
     self:spend_hours(HUNT.hunt_hours)
-    self:skill_xp("fish", SKILLS.xp.hunt)
     if not self:roll(HUNT.hunt_chance + 10 * (p.attrs.Perception - 3) + self:skill_bonus("fish")) then
         self:push_log(("Tracked %dh. Nothing but old prints."):format(HUNT.hunt_hours))
         return
     end
+    self:skill_xp("fish", SKILLS.xp.hunt)   -- (only for finding it: no grinding on empty hexes)
     local animals = ENCOUNTERS_BY_KIND.animal
     self:start_encounter(animals[self:rand(#animals) + 1])
     -- you found it first: it hasn't seen you, and you've watched how it moves

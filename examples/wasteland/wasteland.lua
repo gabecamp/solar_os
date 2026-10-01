@@ -309,7 +309,8 @@ local NIGHT = {
 }
 
 -- Skills that grow with use (src/55_skills.lua). levels = XP needed for
--- levels 1-5; xp = what each action earns; bonus = per level: % fewer duds
+-- levels 1-5; xp = what each action earns (catches and found trails, not
+-- empty casts or tracks); bonus = per level: % fewer duds
 -- (scav), % catch and find (fish), % to hit (fight), % repair (tinker).
 -- Tinker at fast_craft or more takes an hour off crafting (min 1).
 local SKILLS = {
@@ -318,7 +319,7 @@ local SKILLS = {
     long = {scav = "Scavenging", fish = "Fishing and hunting", fight = "Fighting",
             tinker = "Tinkering"},
     levels = {10, 25, 50, 90, 150},
-    xp = {search = 1, find = 1, fish = 1, catch = 2, hunt = 1, hit = 1, kill = 3,
+    xp = {search = 1, find = 1, catch = 3, hunt = 2, hit = 1, kill = 3,
           craft = 1, repair = 2, repaired = 3},
     bonus = {scav = 5, fish = 4, fight = 3, tinker = 5},
     fast_craft = 3,
@@ -4778,7 +4779,6 @@ end
 function Game:fish()
     local p = self.player
     self:spend_hours(HUNT.fish_hours)
-    self:skill_xp("fish", SKILLS.xp.fish)
     if self:roll(HUNT.fish_chance + 5 * (p.attrs.Perception - 3) + self:fish_bonus()
                  + self:skill_bonus("fish")) then
         self:skill_xp("fish", SKILLS.xp.catch)
@@ -4796,11 +4796,11 @@ end
 function Game:hunt()
     local p = self.player
     self:spend_hours(HUNT.hunt_hours)
-    self:skill_xp("fish", SKILLS.xp.hunt)
     if not self:roll(HUNT.hunt_chance + 10 * (p.attrs.Perception - 3) + self:skill_bonus("fish")) then
         self:push_log(("Tracked %dh. Nothing but old prints."):format(HUNT.hunt_hours))
         return
     end
+    self:skill_xp("fish", SKILLS.xp.hunt)   -- (only for finding it: no grinding on empty hexes)
     local animals = ENCOUNTERS_BY_KIND.animal
     self:start_encounter(animals[self:rand(#animals) + 1])
     -- you found it first: it hasn't seen you, and you've watched how it moves
@@ -5781,6 +5781,11 @@ function Game:draw_map(w, h)
                     draw_sprite(rnd(px) - 4, rnd(py) - 6, 9, 13, GLYPHS.player_halo)
                     gfx.color(gfx.BLACK)
                     draw_sprite(rnd(px) - 3, rnd(py) - 5, 7, 11, GLYPHS.player)
+                else   -- no bitmaps on this board: a black block on a white halo
+                    gfx.color(gfx.WHITE)
+                    gfx.fill_rect(rnd(px) - 5, rnd(py) - 5, 10, 10)
+                    gfx.color(gfx.BLACK)
+                    gfx.fill_rect(rnd(px) - 3, rnd(py) - 3, 6, 6)
                 end
                 if self.dog then   -- your dog at your heel: a small block with an ear
                     gfx.color(gfx.WHITE)
@@ -5925,7 +5930,7 @@ function Game.hex_mask(size)
     if not ok then error(err) end
     local function pack(layer)
         local chunks = {}
-        if not layer then return chunks end
+        if not layer or layer.x1 < layer.x0 then return chunks end   -- (nothing plotted)
         local w = layer.x1 - layer.x0 + 1
         local bpr = (w + 7) // 8
         local rows = 128 // bpr
@@ -6552,14 +6557,47 @@ function Game.records()
         local chunk = ok and type(text) == "string" and text ~= "" and load("return " .. text, "=records", "t", {})
         local good, data = false, nil
         if chunk then good, data = pcall(chunk) end
-        if good and type(data) == "table" then rec = data end
+        if good and type(data) == "table" then
+            rec = data
+        elseif ok and type(text) == "string" and text ~= "" then
+            -- unreadable (cut short by a power loss?): keep a copy before the
+            -- next write replaces it
+            RECORDS.bad_text = text
+        end
     end
-    rec = rec or {}
-    rec.runs, rec.escapes, rec.kills = rec.runs or 0, rec.escapes or 0, rec.kills or 0
-    rec.longest, rec.most_out = rec.longest or 0, rec.most_out or 0
-    rec.deaths, rec.achieved = rec.deaths or {}, rec.achieved or {}
-    RECORDS.data = rec
-    return rec
+    RECORDS.data = Game.clean_records(rec or {})
+    return RECORDS.data
+end
+
+-- Whatever the file held, a records table the game can use: counts are
+-- whole numbers >= 0, tables are tables, the best escape a real difficulty.
+function Game.clean_records(rec)
+    local function count(v)
+        v = math.tointeger(tonumber(v) or 0) or 0
+        return v > 0 and v or 0
+    end
+    local out = {runs = count(rec.runs), escapes = count(rec.escapes), kills = count(rec.kills),
+                 longest = count(rec.longest), most_out = count(rec.most_out),
+                 deaths = {}, achieved = {}, counted = {}}
+    if type(rec.deaths) == "table" then
+        for why, n in pairs(rec.deaths) do
+            if type(why) == "string" and count(n) > 0 then out.deaths[why] = count(n) end
+        end
+    end
+    if type(rec.achieved) == "table" then
+        for id, on in pairs(rec.achieved) do
+            if type(id) == "string" and on == true then out.achieved[id] = true end
+        end
+    end
+    if type(rec.counted) == "table" then
+        for _, id in ipairs(rec.counted) do
+            if type(id) == "string" then out.counted[#out.counted + 1] = id end
+        end
+    end
+    if type(rec.best_escape) == "string" and DIFFICULTY[rec.best_escape] then
+        out.best_escape = rec.best_escape
+    end
+    return out
 end
 
 -- Forget the loaded records (tests: read them back from storage).
@@ -6572,12 +6610,16 @@ function Game.write_records()
     local dir, path = records_path()
     return pcall(function()
         if solaros.storage.makedirs then solaros.storage.makedirs(dir) end
+        if RECORDS.bad_text then   -- the unreadable old file, kept once
+            solaros.storage.write_file(dir .. "/records.bad.lua", RECORDS.bad_text)
+            RECORDS.bad_text = nil
+        end
         solaros.storage.write_file(path, table.concat(SAVE.serialize(Game.records(), {})))
     end)
 end
 
 -- Unlock what this run has earned (from tick, and when the run ends).
-function Game:check_achievements(how)
+function Game:check_achievements(how, no_write)
     local rec, new = Game.records(), false
     for _, a in ipairs(RECORDS.list) do
         if not rec.achieved[a[1]] and a[4](self, how) then
@@ -6588,7 +6630,7 @@ function Game:check_achievements(how)
             new = true
         end
     end
-    if new then Game.write_records() end
+    if new and not no_write then Game.write_records() end
 end
 
 -- A run is over: how = "permit"/"bribe" for an escape, nil for a death.
@@ -6596,6 +6638,13 @@ function Game:record_run(how, cause)
     if self.run_recorded then return end
     self.run_recorded = true
     local rec, p, best = Game.records(), self.player, {}
+    -- a run is counted once, even if its save survives and is continued
+    local id = tostring(self.world_seed)
+    for _, seen in ipairs(rec.counted) do
+        if seen == id then return end
+    end
+    table.insert(rec.counted, id)
+    while #rec.counted > 20 do table.remove(rec.counted, 1) end
     rec.runs = rec.runs + 1
     rec.kills = rec.kills + self:stat_of("kills")
     if p.hours > rec.longest then
@@ -6618,7 +6667,7 @@ function Game:record_run(how, cause)
         rec.deaths[why] = (rec.deaths[why] or 0) + 1
     end
     self.run_best = best
-    self:check_achievements(how)
+    self:check_achievements(how, true)
     Game.write_records()
 end
 
@@ -6658,7 +6707,7 @@ function Game:records_lines()
     local deaths, worst, worst_n = 0, nil, 0
     for why, n in pairs(rec.deaths) do
         deaths = deaths + n
-        if n > worst_n or (n == worst_n and why < worst) then worst, worst_n = why, n end
+        if n > worst_n or (n == worst_n and worst and why < worst) then worst, worst_n = why, n end
     end
     local lines = {
         ("Runs %d   Escapes %d   Deaths %d"):format(rec.runs, rec.escapes, deaths),
@@ -7184,8 +7233,8 @@ end
 -- exactly what a full redraw paints there) and cached until the clothes change.
 -- Cached drawings of the doll for what you wear now (reset when it changes).
 function Game:doll_cache()
-    local worn = {}
-    for _, s in ipairs(EQUIP_SLOTS) do worn[#worn + 1] = self.player.equipped[s] or "-" end
+    local worn = {}   -- (only what is painted on the doll: not what's in your hands)
+    for _, s in ipairs(WEAR_ORDER) do worn[#worn + 1] = self.player.equipped[s] or "-" end
     worn = table.concat(worn, ",")
     if not (self.ring_cache and self.ring_cache.worn == worn) then self.ring_cache = {worn = worn} end
     return self.ring_cache
@@ -7344,6 +7393,10 @@ function Game:move_inv_cursor_drawn(old, w)
         end
     end
     self:draw_inv_desc(w, true)
+    -- the cells' erase boxes reach the labels' descenders: write them again
+    gfx.color(gfx.BLACK)
+    gfx.font(gfx.FONT_MONO_12)
+    for _, l in ipairs(self.inv_labels or {}) do gfx.text(INV_COL_X, l[1], l[2]) end
     self.inv_drawn.cursor = self.inv_cursor
     gfx.refresh()
 end
@@ -7389,6 +7442,7 @@ function Game:draw_inventory(w, h)
             .. "/" .. #ground
     end
     gfx.text(INV_COL_X, GROUND_Y - 5, label)
+    self.inv_labels = {{GROUND_Y - 5, label}}
     for i = 1, n_ground do
         if i > off and i <= off + per_page then
             local col = (i - off - 1) % GROUND_GRID_COLS
@@ -7458,8 +7512,9 @@ function Game:draw_inventory(w, h)
     self:draw_inv_desc(w, false)
 
     local back = self.player.equipped.back
-    gfx.text(INV_COL_X, BAG_LABEL_Y, (back and ITEM_DB[back].name or "Pockets")
-        .. " " .. n_inv .. "/" .. capacity)
+    local bag_label = (back and ITEM_DB[back].name or "Pockets") .. " " .. n_inv .. "/" .. capacity
+    gfx.text(INV_COL_X, BAG_LABEL_Y, bag_label)
+    self.inv_labels[2] = {BAG_LABEL_Y, bag_label}
 
     -- log: the newest INV_LOG_LINES lines, the last one at h - 8
     local ly = h - 8 - 12 * (INV_LOG_LINES - 1)
@@ -8699,7 +8754,9 @@ end)
 
 -- Per SolarOS convention: cleanup must run even when drawing/logic fails,
 -- and the error is re-raised afterward so it still surfaces (with a real
--- traceback) instead of being silently swallowed.
+-- traceback) instead of being silently swallowed. (A draw that failed
+-- mid-frame left the fast event pump on: turn it off first.)
+Game.draw_pump(false)
 gfx["end"]()
 if not ok then
     error(err)

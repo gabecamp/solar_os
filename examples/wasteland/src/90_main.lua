@@ -201,7 +201,9 @@ end)
 
 -- Per SolarOS convention: cleanup must run even when drawing/logic fails,
 -- and the error is re-raised afterward so it still surfaces (with a real
--- traceback) instead of being silently swallowed.
+-- traceback) instead of being silently swallowed. (A draw that failed
+-- mid-frame left the fast event pump on: turn it off first.)
+Game.draw_pump(false)
 gfx["end"]()
 if not ok then
     error(err)
