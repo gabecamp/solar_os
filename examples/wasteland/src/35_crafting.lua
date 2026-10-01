@@ -91,10 +91,11 @@ function Game:craft(r)
     end
     if r.repair then return self:repair(r) end
     if r.base then return self:build_base(r) end
-    local p = self.player
+    local p, hours = self.player, self:craft_hours(r)
     for _, iq in ipairs(Game.recipe_inputs(r)) do self:take_items(iq[1], iq[2]) end
-    p.hours = p.hours + r.hours
-    apply_awake_hours(p, r.hours)
+    p.hours = p.hours + hours
+    apply_awake_hours(p, hours)
+    self:skill_xp("tinker", SKILLS.xp.craft)
     self:sfx("chime")
     if r.place == "campfire" then
         self.camps[hex_key(p.q, p.r)] = {until_hour = p.hours + RECIPES.campfire_hours}

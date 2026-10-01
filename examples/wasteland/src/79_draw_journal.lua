@@ -13,6 +13,7 @@ function Game:journal_lines()
     local day, hour = self:clock()
     add(("Day %d, %02d:00. %d hours in the Zone. %s."):format(day, hour, p.hours,
         DIFFICULTY[self.difficulty or "normal"].name))
+    add(self:skills_line())
     -- the way out
     if self.sites_known.checkpoint then
         add("Checkpoint: " .. self:site_bearing("checkpoint") .. ". Needs a permit or "

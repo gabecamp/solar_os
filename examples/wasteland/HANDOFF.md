@@ -12,7 +12,7 @@
 A complete, playable Lua game for the user's ESP32-S3 SolarTerm (Waveshare RLCD 4.2: 400x300 landscape, 1-bit, 8 MB PSRAM) under SolarOS. Make a survivor (attributes, traits, difficulty), cross a fogged hex Zone with day/night, weather, cold, hunger, thirst, sickness, radiation (hidden without a Geiger counter), emissions and night horrors; scavenge, craft, hunt and fish, fight or talk through encounters with 96x96 dithered portraits, solve anomaly puzzles, repair broken tech (a LoRa radio with NPC channels), tame a dog, claim a camp, run quests, read lore, meet Karl, and leave through the Checkpoint with a permit or a bribe. Saves need the `write_file` firmware patch (`firmware/`; the upstream request is in `firmware/UPSTREAM_REQUEST.md`); without it the game runs but cannot save.
 
 - **Verified on the device:** only the early builds ("it works!"). Everything since is tested on a PC against a fake `solaros` module. `DEVICE_TEST.md` is the 10-minute checklist for the board, and **H then V** in game shows the device info page.
-- **Balance** (`tools/balance_sim.lua`, a bot playing 30-day runs with the real code): deaths Easy ~8%, Normal ~23%, Zone-Hardened ~50%.
+- **Balance** (`tools/balance_sim.lua`, a bot playing 30-day runs with the real code): deaths Easy ~9%, Normal ~22%, Zone-Hardened ~45%.
 - **Perf** (`tools/perf_check.lua`, in the suite): bundle ~390 KB; Lua heap ~730 KB loaded, ~830 KB peak; busiest frame (bag) ~1,300 gfx calls.
 - **Open items:** the portrait regeneration waits for the Hugging Face ZeroGPU quota (a scheduled check-in retries it); the user will supply `art/karl.jpg` themself (Karl is a real person: **never generate him**).
 
@@ -23,7 +23,7 @@ A complete, playable Lua game for the user's ESP32-S3 SolarTerm (Waveshare RLCD 
 | Part | What lives there |
 |---|---|
 | `00_header` | file banner, `solaros` handles (`gfx`, `storage`, ...) |
-| `05_data_world` | tunables, `KEY`, terrain, `WORLD` (time, weather, cold), `RAD`, `SURVIVE`, `TRADE`, `GOAL`, `HUNT`, `KARL`, `DIFFICULTY`, `DOG`, `TECH`, `BASE`, `QUESTS`, `NIGHT` |
+| `05_data_world` | tunables, `KEY`, terrain, `WORLD` (time, weather, cold), `RAD`, `SURVIVE`, `TRADE`, `GOAL`, `HUNT`, `KARL`, `DIFFICULTY`, `DOG`, `TECH`, `BASE`, `QUESTS`, `NIGHT`, `SKILLS` |
 | `06_data_items` | body slots, `ITEM_DB`, `ARTIFACTS`, `SCAVENGE_LOOT`, `RECIPES`, world wearables |
 | `07_data_encounters` | `FIGHT`, encounter kinds and ranges, `ENCOUNTERS`, `ANOMALIES`, puzzle sizes |
 | `10_sprites` | ASCII-art item sprites and terrain glyphs, packed at load |
@@ -48,6 +48,7 @@ A complete, playable Lua game for the user's ESP32-S3 SolarTerm (Waveshare RLCD 
 | `52_quests` | quests from the trader, Anna and Karl |
 | `53_lore` | `LORE` pages (a global), the reader |
 | `54_night` | night horrors |
+| `55_skills` | skills that grow with use: XP, levels, bonuses |
 | `60_draw_inventory` | the bag / body / ground screen |
 | `65_portrait_data` | **generated** by `tools/paint_portraits.py`: base64 portraits |
 | `66_portraits` | portrait decode cache and drawing |
@@ -89,6 +90,8 @@ The sim is not byte-reproducible between processes (Lua 5.4 varies `pairs` order
 
 The dated notes below were written as each feature landed; part names in older notes predate the 2026-10-01 split of `05_data` (now `05_data_world`, `06_data_items`, `07_data_encounters`) and of the puzzles into `41_puzzles`.
 
+> **Skills (2026-10-01):** `src/55_skills.lua`, numbers in `SKILLS` (05_data_world). `self.skills = {scav, fish, fight, tinker -> XP}` (saved). XP: search +1 and +1 per item found; fishing +1, a catch +2 more, hunting +1; a hit +1 (attack or throw), a kill +3; a craft or base build +1, a repair attempt +2 and +3 more on success. Levels 1-5 at 10/25/50/90/150 XP, with a log line and the `level` sound. Bonuses per level via `Game:skill_bonus(name)`: scav -5% dud weight (in `scavenge`), fish +4% to fish and hunt rolls, fight +3% to hit, tinker +5% repair chance; tinker 3+ takes an hour off every recipe, repair and build (`craft_hours`, min 1; the craft screen shows it). Journal line "Skills: Scav 2  Fish 1  Fight 3  Tinker 0". Sim deaths after skills: Easy ~9%, Normal ~22%, Zone-Hardened ~45% (was ~50; left, it is the original target). Test: `skills_test.lua`.
+>
 > **The code lives in `src/` now (split 2026-09-30).** `wasteland.lua` is GENERATED: edit the parts in `src/` (`00_header`, `05_data`, `10_sprites`, `20_world`, `30_game`, `35_crafting`, `36_survival`, `37_world_time`, `38_save`, `39_radiation`, `40_encounters`, `45_trade`, `50_draw_map`, `60_draw_inventory`, `65_portrait_data` (generated), `66_portraits`, `70_draw_screens`, `72_draw_craft`, `76_draw_trade`, `90_main`), then run `python3 tools/build.py` (the test runner does this first). The parts are concatenated in name order and share one scope - chapters, not modules - so a local defined in an earlier part is visible in later ones and order matters. Still ship/copy only `wasteland.lua`; `python3 tools/build.py --check` says whether it is current.
 >
 > **The 200-local limit (hit 2026-09-30):** the bundle is ONE Lua chunk, and Lua allows at most 200 local variables in a chunk's main function. The parts had used ~197. Key codes are now one table (`KEY.A`, `KEY.ENTER`, ... instead of `KEY_A`...), freeing 13. **Rules for new code:** group new constants in a table (`CRAFT_UI = {...}`, `RECIPES.campfire_hours`), make helpers `Game.name` fields or locals inside functions/`do ... end`, not new top-level `local`s. Check headroom by compiling (`luac5.4 -p wasteland.lua`, which fails with "too many local variables").

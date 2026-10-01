@@ -34,7 +34,10 @@ end
 function Game:fish()
     local p = self.player
     self:spend_hours(HUNT.fish_hours)
-    if self:roll(HUNT.fish_chance + 5 * (p.attrs.Perception - 3) + self:fish_bonus()) then
+    self:skill_xp("fish", SKILLS.xp.fish)
+    if self:roll(HUNT.fish_chance + 5 * (p.attrs.Perception - 3) + self:fish_bonus()
+                 + self:skill_bonus("fish")) then
+        self:skill_xp("fish", SKILLS.xp.catch)
         local fish = {item = "raw_fish", qty = 1}
         if not self:put_stack("inventory", nil, fish) then self:put_stack("ground", nil, fish) end
         self:push_log("A pale fish, too many eyes. Got it.")
@@ -48,7 +51,8 @@ end
 function Game:hunt()
     local p = self.player
     self:spend_hours(HUNT.hunt_hours)
-    if not self:roll(HUNT.hunt_chance + 10 * (p.attrs.Perception - 3)) then
+    self:skill_xp("fish", SKILLS.xp.hunt)
+    if not self:roll(HUNT.hunt_chance + 10 * (p.attrs.Perception - 3) + self:skill_bonus("fish")) then
         self:push_log(("Tracked %dh. Nothing but old prints."):format(HUNT.hunt_hours))
         return
     end

@@ -154,6 +154,7 @@ function Game:enemy_dies()
         end
     end
     self:sfx("kill")
+    self:skill_xp("fight", SKILLS.xp.kill)
     self:quest_kill()
     self:enc_say("The " .. e.def.who .. " goes still.")
     if #found > 0 then self:enc_say("Left behind: " .. table.concat(found, ", ") .. ".") end
@@ -284,9 +285,10 @@ function Game:encounter_action(action)
         self:enc_say("You back away. Range: " .. RANGE_NAME[e.range] .. ".")
     elseif action == "attack" then
         local w, wname = self:weapon()
-        local hit = FIGHT.PLAYER_HIT + 8 * (p.attrs.Speed - 3) + e.aim
+        local hit = FIGHT.PLAYER_HIT + 8 * (p.attrs.Speed - 3) + e.aim + self:skill_bonus("fight")
         e.aim = 0
         if self:roll(hit) then
+            self:skill_xp("fight", SKILLS.xp.hit)
             local dmg = math.max(1, w.dmg - self:rand(w.dmg // 4 + 1) + 2 * (p.attrs.Strength - 3))
             dmg = self:dark_damage(dmg)
             self:enc_hit(dmg, w.bleed, "You hit the " .. e.def.who .. " (" .. wname:lower() .. ")")
@@ -301,7 +303,8 @@ function Game:encounter_action(action)
         p.equipped[slot] = nil
         recompute_stats(p)
         self:put_stack("ground", nil, {item = item, qty = 1})
-        if self:roll(FIGHT.THROW_HIT + 8 * (p.attrs.Perception - 3) + e.aim) then
+        if self:roll(FIGHT.THROW_HIT + 8 * (p.attrs.Perception - 3) + e.aim + self:skill_bonus("fight")) then
+            self:skill_xp("fight", SKILLS.xp.hit)
             self:enc_hit(w.dmg, w.bleed, "Your " .. ITEM_DB[item].name:lower() .. " strikes the " .. e.def.who)
         else
             self:enc_say("Your " .. ITEM_DB[item].name:lower() .. " sails wide.")

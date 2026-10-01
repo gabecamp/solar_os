@@ -374,6 +374,7 @@ g.dog = {hp = 24, fed_hour = 0, hungry_days = 0}
 g.player.inventory = {{item = "lora_radio", qty = 1}, {item = "weeping_stone", qty = 1}}
 g.radio = {charge = 3, next = {}}
 g.player.hours = 61
+g.skills = {scav = 30, fish = 12, fight = 55, tinker = 4}
 g:open_journal()
 g:draw_journal(400, 300)
 solaros.dump("ops_journal.txt")

@@ -28,15 +28,19 @@ function Game:repair_recipes()
 end
 
 function Game:repair_chance(fix)
-    return math.max(5, math.min(95, fix.base + TECH.per_point * (self.player.attrs.Perception - 3)))
+    return math.max(5, math.min(95, fix.base + TECH.per_point * (self.player.attrs.Perception - 3)
+                                    + self:skill_bonus("tinker")))
 end
 
 -- Called by Game:craft for a repair recipe (after craft_blocker passed).
 function Game:repair(r)
-    local p, fix = self.player, r.repair
-    p.hours = p.hours + r.hours
-    apply_awake_hours(p, r.hours)
-    if self:roll(self:repair_chance(fix)) then
+    local p, fix, hours = self.player, r.repair, self:craft_hours(r)
+    p.hours = p.hours + hours
+    apply_awake_hours(p, hours)
+    local chance = self:repair_chance(fix)
+    self:skill_xp("tinker", SKILLS.xp.repair)
+    if self:roll(chance) then
+        self:skill_xp("tinker", SKILLS.xp.repaired)
         for _, iq in ipairs(Game.recipe_inputs(r)) do self:take_items(iq[1], iq[2]) end
         local stack = {item = fix.out, qty = 1}
         if not self:put_stack("inventory", nil, stack) then self:put_stack("ground", nil, stack) end

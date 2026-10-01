@@ -27,6 +27,7 @@ function Game.new()
     self.snares = {}             -- tile key -> {set = hour}: snares you've set
     self.next_emission = RAD.emission.first
     self.rad_known = {}          -- tile key -> rad level you've measured or felt there
+    self.skills = {}             -- skill -> XP (src/55_skills.lua)
     self.seed = seed             -- RNG state for scavenging
     self.weather_seed = seed     -- fixed per world: weather is rolled from it (Game:weather)
     self.scavenged = {}          -- tile key -> searches used
@@ -182,7 +183,10 @@ function Game:scavenge()
     local table_ = {}
     for i, entry in ipairs(loot) do
         local w = entry[2]
-        if entry[1] == "nothing" then w = math.max(1, w * (7 - p.attrs.Perception) // 4) end
+        if entry[1] == "nothing" then
+            w = math.max(1, w * (7 - p.attrs.Perception) // 4)
+            w = math.max(1, w * (100 - self:skill_bonus("scav")) // 100)
+        end
         local food = ITEM_DB[entry[1]] and ITEM_DB[entry[1]].consumable
         if food and food.hunger and food.hunger > 0 then
             w = math.max(1, math.floor(w * self:diff("food") + 0.5))
@@ -198,6 +202,7 @@ function Game:scavenge()
             found[#found + 1] = ITEM_DB[item].name
         end
     end
+    self:skill_xp("scav", SKILLS.xp.search + SKILLS.xp.find * #found)
     if #found == 0 then
         self:push_log("Searched " .. SCAVENGE_HOURS .. "h. Found nothing.")
     else

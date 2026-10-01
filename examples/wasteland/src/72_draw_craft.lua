@@ -78,7 +78,7 @@ function Game:draw_craft(w, h)
             gfx.text(x, y, "Needs a fire" .. (self:fire_here() and "" or "  x"))
         end
         y = y + 18
-        gfx.text(x, y, "Takes " .. r.hours .. "h")
+        gfx.text(x, y, "Takes " .. self:craft_hours(r) .. "h")
         if r.repair then   -- repairs can fail (and burn a part)
             y = y + 14
             gfx.text(x, y, "Chance " .. self:repair_chance(r.repair) .. "% (Perception)")

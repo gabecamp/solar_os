@@ -307,6 +307,22 @@ local NIGHT = {
               .. "Pale faces turn just under the surface.", speed = 3},
     },
 }
+
+-- Skills that grow with use (src/55_skills.lua). levels = XP needed for
+-- levels 1-5; xp = what each action earns; bonus = per level: % fewer duds
+-- (scav), % catch and find (fish), % to hit (fight), % repair (tinker).
+-- Tinker at fast_craft or more takes an hour off crafting (min 1).
+local SKILLS = {
+    order = {"scav", "fish", "fight", "tinker"},
+    name = {scav = "Scav", fish = "Fish", fight = "Fight", tinker = "Tinker"},
+    long = {scav = "Scavenging", fish = "Fishing and hunting", fight = "Fighting",
+            tinker = "Tinkering"},
+    levels = {10, 25, 50, 90, 150},
+    xp = {search = 1, find = 1, fish = 1, catch = 2, hunt = 1, hit = 1, kill = 3,
+          craft = 1, repair = 2, repaired = 3},
+    bonus = {scav = 5, fish = 4, fight = 3, tinker = 5},
+    fast_craft = 3,
+}
 -- ---------------------------------------------------------------------
 -- Items: the bag and body slots, ITEM_DB, artifacts, scavenging loot
 -- tables and crafting recipes
@@ -2781,6 +2797,7 @@ function Game.new()
     self.snares = {}             -- tile key -> {set = hour}: snares you've set
     self.next_emission = RAD.emission.first
     self.rad_known = {}          -- tile key -> rad level you've measured or felt there
+    self.skills = {}             -- skill -> XP (src/55_skills.lua)
     self.seed = seed             -- RNG state for scavenging
     self.weather_seed = seed     -- fixed per world: weather is rolled from it (Game:weather)
     self.scavenged = {}          -- tile key -> searches used
@@ -2936,7 +2953,10 @@ function Game:scavenge()
     local table_ = {}
     for i, entry in ipairs(loot) do
         local w = entry[2]
-        if entry[1] == "nothing" then w = math.max(1, w * (7 - p.attrs.Perception) // 4) end
+        if entry[1] == "nothing" then
+            w = math.max(1, w * (7 - p.attrs.Perception) // 4)
+            w = math.max(1, w * (100 - self:skill_bonus("scav")) // 100)
+        end
         local food = ITEM_DB[entry[1]] and ITEM_DB[entry[1]].consumable
         if food and food.hunger and food.hunger > 0 then
             w = math.max(1, math.floor(w * self:diff("food") + 0.5))
@@ -2952,6 +2972,7 @@ function Game:scavenge()
             found[#found + 1] = ITEM_DB[item].name
         end
     end
+    self:skill_xp("scav", SKILLS.xp.search + SKILLS.xp.find * #found)
     if #found == 0 then
         self:push_log("Searched " .. SCAVENGE_HOURS .. "h. Found nothing.")
     else
@@ -3313,10 +3334,11 @@ function Game:craft(r)
     end
     if r.repair then return self:repair(r) end
     if r.base then return self:build_base(r) end
-    local p = self.player
+    local p, hours = self.player, self:craft_hours(r)
     for _, iq in ipairs(Game.recipe_inputs(r)) do self:take_items(iq[1], iq[2]) end
-    p.hours = p.hours + r.hours
-    apply_awake_hours(p, r.hours)
+    p.hours = p.hours + hours
+    apply_awake_hours(p, hours)
+    self:skill_xp("tinker", SKILLS.xp.craft)
     self:sfx("chime")
     if r.place == "campfire" then
         self.camps[hex_key(p.q, p.r)] = {until_hour = p.hours + RECIPES.campfire_hours}
@@ -3688,7 +3710,7 @@ local SAVE = {version = 1, dir = "wasteland", file = "save.lua",
                         "karl_asked", "karl_next", "karl_gave", "muted",
                         "difficulty", "dog", "radio", "karl_hint",
                         "base", "quest", "quests_done",
-                        "lore_read", "signal_page"}}
+                        "lore_read", "signal_page", "skills"}}
 
 -- Where the save lives: <preferred storage>/wasteland/save.lua
 function SAVE.path()
@@ -4183,6 +4205,7 @@ function Game:enemy_dies()
         end
     end
     self:sfx("kill")
+    self:skill_xp("fight", SKILLS.xp.kill)
     self:quest_kill()
     self:enc_say("The " .. e.def.who .. " goes still.")
     if #found > 0 then self:enc_say("Left behind: " .. table.concat(found, ", ") .. ".") end
@@ -4313,9 +4336,10 @@ function Game:encounter_action(action)
         self:enc_say("You back away. Range: " .. RANGE_NAME[e.range] .. ".")
     elseif action == "attack" then
         local w, wname = self:weapon()
-        local hit = FIGHT.PLAYER_HIT + 8 * (p.attrs.Speed - 3) + e.aim
+        local hit = FIGHT.PLAYER_HIT + 8 * (p.attrs.Speed - 3) + e.aim + self:skill_bonus("fight")
         e.aim = 0
         if self:roll(hit) then
+            self:skill_xp("fight", SKILLS.xp.hit)
             local dmg = math.max(1, w.dmg - self:rand(w.dmg // 4 + 1) + 2 * (p.attrs.Strength - 3))
             dmg = self:dark_damage(dmg)
             self:enc_hit(dmg, w.bleed, "You hit the " .. e.def.who .. " (" .. wname:lower() .. ")")
@@ -4330,7 +4354,8 @@ function Game:encounter_action(action)
         p.equipped[slot] = nil
         recompute_stats(p)
         self:put_stack("ground", nil, {item = item, qty = 1})
-        if self:roll(FIGHT.THROW_HIT + 8 * (p.attrs.Perception - 3) + e.aim) then
+        if self:roll(FIGHT.THROW_HIT + 8 * (p.attrs.Perception - 3) + e.aim + self:skill_bonus("fight")) then
+            self:skill_xp("fight", SKILLS.xp.hit)
             self:enc_hit(w.dmg, w.bleed, "Your " .. ITEM_DB[item].name:lower() .. " strikes the " .. e.def.who)
         else
             self:enc_say("Your " .. ITEM_DB[item].name:lower() .. " sails wide.")
@@ -4711,7 +4736,10 @@ end
 function Game:fish()
     local p = self.player
     self:spend_hours(HUNT.fish_hours)
-    if self:roll(HUNT.fish_chance + 5 * (p.attrs.Perception - 3) + self:fish_bonus()) then
+    self:skill_xp("fish", SKILLS.xp.fish)
+    if self:roll(HUNT.fish_chance + 5 * (p.attrs.Perception - 3) + self:fish_bonus()
+                 + self:skill_bonus("fish")) then
+        self:skill_xp("fish", SKILLS.xp.catch)
         local fish = {item = "raw_fish", qty = 1}
         if not self:put_stack("inventory", nil, fish) then self:put_stack("ground", nil, fish) end
         self:push_log("A pale fish, too many eyes. Got it.")
@@ -4725,7 +4753,8 @@ end
 function Game:hunt()
     local p = self.player
     self:spend_hours(HUNT.hunt_hours)
-    if not self:roll(HUNT.hunt_chance + 10 * (p.attrs.Perception - 3)) then
+    self:skill_xp("fish", SKILLS.xp.hunt)
+    if not self:roll(HUNT.hunt_chance + 10 * (p.attrs.Perception - 3) + self:skill_bonus("fish")) then
         self:push_log(("Tracked %dh. Nothing but old prints."):format(HUNT.hunt_hours))
         return
     end
@@ -5173,6 +5202,7 @@ local SFX = {
     escape   = {{523, 100}, {659, 100}, {784, 100}, {1047, 250}},
     bark     = {{500, 40}, {0, 40}, {450, 60}},
     whine    = {{700, 120}, {500, 200}},
+    level    = {{659, 70}, {784, 70}, {988, 70}, {1319, 140}},
 }
 
 function Game:sfx(name)
@@ -5331,15 +5361,19 @@ function Game:repair_recipes()
 end
 
 function Game:repair_chance(fix)
-    return math.max(5, math.min(95, fix.base + TECH.per_point * (self.player.attrs.Perception - 3)))
+    return math.max(5, math.min(95, fix.base + TECH.per_point * (self.player.attrs.Perception - 3)
+                                    + self:skill_bonus("tinker")))
 end
 
 -- Called by Game:craft for a repair recipe (after craft_blocker passed).
 function Game:repair(r)
-    local p, fix = self.player, r.repair
-    p.hours = p.hours + r.hours
-    apply_awake_hours(p, r.hours)
-    if self:roll(self:repair_chance(fix)) then
+    local p, fix, hours = self.player, r.repair, self:craft_hours(r)
+    p.hours = p.hours + hours
+    apply_awake_hours(p, hours)
+    local chance = self:repair_chance(fix)
+    self:skill_xp("tinker", SKILLS.xp.repair)
+    if self:roll(chance) then
+        self:skill_xp("tinker", SKILLS.xp.repaired)
         for _, iq in ipairs(Game.recipe_inputs(r)) do self:take_items(iq[1], iq[2]) end
         local stack = {item = fix.out, qty = 1}
         if not self:put_stack("inventory", nil, stack) then self:put_stack("ground", nil, stack) end
@@ -5838,10 +5872,11 @@ end
 
 -- Called by Game:craft for a base recipe (after craft_blocker passed).
 function Game:build_base(r)
-    local p = self.player
+    local p, hours = self.player, self:craft_hours(r)
     for _, iq in ipairs(Game.recipe_inputs(r)) do self:take_items(iq[1], iq[2]) end
-    p.hours = p.hours + r.hours
-    apply_awake_hours(p, r.hours)
+    p.hours = p.hours + hours
+    apply_awake_hours(p, hours)
+    self:skill_xp("tinker", SKILLS.xp.craft)
     self:sfx("chime")
     if r.base == "claim" then
         local moved = self.base ~= nil
@@ -6264,6 +6299,54 @@ function Game:dark_flees()
     e.outcome = "fled"
     self:end_encounter("The light drove it off.")
     return true
+end
+-- ---------------------------------------------------------------------
+-- Skills that grow with use (numbers in SKILLS, 05_data_world)
+--
+-- self.skills = {skill -> XP} (saved). Doing a thing earns XP in its
+-- skill (search, fish and hunt, fight, craft and repair); every threshold
+-- in SKILLS.levels is a level, up to 5. Each level gives a small bonus
+-- through skill_bonus at the place the roll is made: scavenge (fewer
+-- duds), fish / hunt, attack / throw, repair_chance, and craft_hours.
+-- ---------------------------------------------------------------------
+
+function Game:skill_level(name)
+    local xp, level = (self.skills or {})[name] or 0, 0
+    for i, need in ipairs(SKILLS.levels) do
+        if xp >= need then level = i end
+    end
+    return level
+end
+
+-- The skill's bonus in percent points (0 at level 0).
+function Game:skill_bonus(name)
+    return self:skill_level(name) * SKILLS.bonus[name]
+end
+
+function Game:skill_xp(name, n)
+    self.skills = self.skills or {}
+    local before = self:skill_level(name)
+    self.skills[name] = (self.skills[name] or 0) + n
+    local after = self:skill_level(name)
+    if after > before then
+        self:push_log(("%s improves to %d."):format(SKILLS.long[name], after))
+        self:sfx("level")
+    end
+end
+
+-- Hours a recipe takes: practised tinkerers are an hour quicker.
+function Game:craft_hours(r)
+    if self:skill_level("tinker") >= SKILLS.fast_craft then return math.max(1, r.hours - 1) end
+    return r.hours
+end
+
+-- "Scav 2  Fish 1  Fight 3  Tinker 0" (journal).
+function Game:skills_line()
+    local parts = {}
+    for _, name in ipairs(SKILLS.order) do
+        parts[#parts + 1] = SKILLS.name[name] .. " " .. self:skill_level(name)
+    end
+    return "Skills: " .. table.concat(parts, "  ")
 end
 
 -- Equip slots sit ON the body part they dress, NEO Scavenger style: a box over
@@ -7484,7 +7567,7 @@ function Game:draw_craft(w, h)
             gfx.text(x, y, "Needs a fire" .. (self:fire_here() and "" or "  x"))
         end
         y = y + 18
-        gfx.text(x, y, "Takes " .. r.hours .. "h")
+        gfx.text(x, y, "Takes " .. self:craft_hours(r) .. "h")
         if r.repair then   -- repairs can fail (and burn a part)
             y = y + 14
             gfx.text(x, y, "Chance " .. self:repair_chance(r.repair) .. "% (Perception)")
@@ -7642,6 +7725,7 @@ local HELP = {
     {"", "3 artifacts or a permit get you out."},
     {"", "Karl fishes rivers. Strays like food."},
     {"", "C in a ruin: claim it. Carry light at night."},
+    {"", "Skills grow with use: see them in J."},
 }
 
 function Game:open_help()
@@ -7734,6 +7818,7 @@ function Game:journal_lines()
     local day, hour = self:clock()
     add(("Day %d, %02d:00. %d hours in the Zone. %s."):format(day, hour, p.hours,
         DIFFICULTY[self.difficulty or "normal"].name))
+    add(self:skills_line())
     -- the way out
     if self.sites_known.checkpoint then
         add("Checkpoint: " .. self:site_bearing("checkpoint") .. ". Needs a permit or "

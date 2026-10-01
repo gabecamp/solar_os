@@ -34,10 +34,11 @@ end
 
 -- Called by Game:craft for a base recipe (after craft_blocker passed).
 function Game:build_base(r)
-    local p = self.player
+    local p, hours = self.player, self:craft_hours(r)
     for _, iq in ipairs(Game.recipe_inputs(r)) do self:take_items(iq[1], iq[2]) end
-    p.hours = p.hours + r.hours
-    apply_awake_hours(p, r.hours)
+    p.hours = p.hours + hours
+    apply_awake_hours(p, hours)
+    self:skill_xp("tinker", SKILLS.xp.craft)
     self:sfx("chime")
     if r.base == "claim" then
         local moved = self.base ~= nil
