@@ -41,6 +41,8 @@ local ok, err = pcall(function()
             game:toggle_mute()
         elseif key == KEY.R then
             game:open_radio()
+        elseif key == KEY.J then
+            game:open_journal()
         elseif key == KEY.C then
             game:open_crafting()
         elseif key == KEY.I then
@@ -57,6 +59,8 @@ local ok, err = pcall(function()
             game.screen = "map"
         elseif key == KEY.H then
             game:open_help()
+        elseif key == KEY.J then
+            game:open_journal()
         elseif key == KEY.C then
             game.inv_selected = nil
             game:open_crafting()
@@ -103,6 +107,8 @@ local ok, err = pcall(function()
                 game:draw_help(w, h)
             elseif game.screen == "radio" then
                 game:draw_radio(w, h)
+            elseif game.screen == "journal" then
+                game:draw_journal(w, h)
             elseif game.screen == "info" then
                 game:draw_info(w, h)
             elseif game.screen == "trade" then
@@ -145,7 +151,7 @@ local ok, err = pcall(function()
                 if key == KEY.Q then game.quit = true else game:craft_key(key) end
             elseif game.screen == "trade" then
                 game:trade_key(key)
-            elseif game.screen == "help" or game.screen == "info" then
+            elseif game.screen == "help" or game.screen == "info" or game.screen == "journal" then
                 game:help_key(key)
             elseif game.screen == "radio" then
                 game:radio_key(key)

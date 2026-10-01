@@ -416,7 +416,7 @@ function Game:draw_inventory(w, h)
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
     gfx.font(gfx.FONT_MONO_12)
-    gfx.text(4, 12, "Up/Dn Enter:move E:use C:craft I:map H:help")
+    gfx.text(4, 12, "Up/Dn Enter:move E:use C:craft I:map J:journal H:help")
 
     INV_ROWS = {}
     INV_POS = {}

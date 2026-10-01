@@ -6005,7 +6005,7 @@ function Game:draw_inventory(w, h)
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
     gfx.font(gfx.FONT_MONO_12)
-    gfx.text(4, 12, "Up/Dn Enter:move E:use C:craft I:map H:help")
+    gfx.text(4, 12, "Up/Dn Enter:move E:use C:craft I:map J:journal H:help")
 
     INV_ROWS = {}
     INV_POS = {}
@@ -6914,7 +6914,7 @@ Game.VERSION = "0.10 (2026-10-01)"
 local HELP = {
     {"MAP", "Arrows/WASD move    Space rest 4h"},
     {"", "F search   E water: fill/drink   I bag"},
-    {"", "T trade/Checkpoint   C craft"},
+    {"", "T trade/Checkpoint   C craft   J journal"},
     {"", "G hunt, or fish   R radio   M sound"},
     {"BAG", "Arrows pick  Enter select, Enter move"},
     {"", "E use: eat, drink, wear, read, set snare"},
@@ -6933,7 +6933,7 @@ function Game:open_help()
     self.screen = "help"
 end
 
-function Game:help_key(key)
+function Game:help_key(key)   -- help, info and journal: any key goes back
     if self.screen == "help" and key == KEY.V then
         self.screen = "info"
     else
@@ -7001,6 +7001,87 @@ function Game:draw_info(w, h)
     gfx.refresh()
 end
 -- ---------------------------------------------------------------------
+-- Journal (J): one page of what you know, so you don't have to remember it.
+-- ---------------------------------------------------------------------
+
+function Game:open_journal()
+    self.help_back = self.screen   -- shares help's "any key: back" (help_key)
+    self.screen = "journal"
+end
+
+function Game:journal_lines()
+    local p, lines = self.player, {}
+    local function add(s) lines[#lines + 1] = s end
+    local day, hour = self:clock()
+    add(("Day %d, %02d:00. %d hours in the Zone. %s."):format(day, hour, p.hours,
+        DIFFICULTY[self.difficulty or "normal"].name))
+    -- the way out
+    if self.sites_known.checkpoint then
+        add("Checkpoint: " .. self:site_bearing("checkpoint") .. ". Needs a permit or "
+            .. GOAL.bribe .. " artifacts.")
+    else
+        add("The way out: unknown. Find the trader, or read notes.")
+    end
+    if self.sites_known.trader then add("Trader: " .. self:site_bearing("trader") .. ".") end
+    local permit = self:count_item("permit") > 0
+    add(("Artifacts: %d of %d.%s"):format(self:artifact_count(), GOAL.bribe,
+        permit and " You have a Zone Permit." or ""))
+    -- places
+    for key in pairs(self.stashes) do add("Stash: " .. self:bearing_to(key) .. ".") end
+    for key, snare in pairs(self.snares) do
+        add(("Snare: %s, set %dh ago."):format(self:bearing_to(key), p.hours - snare.set))
+    end
+    local hot, nearest, nearest_d = 0, nil, nil
+    for key, level in pairs(self.rad_known) do
+        if level > 0 then
+            hot = hot + 1
+            local q, r = key:match("(-?%d+),(-?%d+)")
+            local d = axial_distance(p.q, p.r, tonumber(q), tonumber(r))
+            if not nearest or d < nearest_d then nearest, nearest_d = key, d end
+        end
+    end
+    if hot > 0 then
+        add(("Hot hexes known: %d. Nearest: %s."):format(hot, nearest_d == 0 and "here"
+            or self:bearing_to(nearest)))
+    end
+    -- you, and who's with you
+    if (p.rads or 0) > 0 then add(("Radiation: %d rads."):format(math.floor(p.rads))) end
+    local emit = self:emission_text()
+    if emit then add("Emission: " .. emit .. ". Get to ruins or hills.") end
+    if self.dog then
+        local hungry = self.dog.hungry_days > 0 and (", hungry " .. self.dog.hungry_days .. "d") or ", fed"
+        add(("Your dog: %d/%d HP%s."):format(self.dog.hp, DOG.hp, hungry))
+    end
+    if self.radio and self:carrying("lora_radio") then
+        add(("Radio: %d/%d charge."):format(self.radio.charge, TECH.radio_max))
+    end
+    return lines
+end
+
+function Game:draw_journal(w, h)
+    gfx.clear(gfx.WHITE)
+    gfx.color(gfx.BLACK)
+    gfx.font(gfx.FONT_BOLD_14)
+    gfx.text(6, 16, "Journal")
+    gfx.font(gfx.FONT_MONO_12)
+    local y, max_y = 40, h - 24
+    local all = {}
+    for _, line in ipairs(self:journal_lines()) do
+        for _, part in ipairs(wrap(line, 55)) do all[#all + 1] = part end
+    end
+    local fit = (max_y - y) // 14 + 1
+    for i, line in ipairs(all) do
+        if i == fit and #all > fit then
+            gfx.text(6, y, ("+%d more"):format(#all - fit + 1))
+            break
+        end
+        gfx.text(6, y, line)
+        y = y + 14
+    end
+    gfx.text(6, h - 8, "Any key: back")
+    gfx.refresh()
+end
+-- ---------------------------------------------------------------------
 -- Main loop
 -- ---------------------------------------------------------------------
 
@@ -7043,6 +7124,8 @@ local ok, err = pcall(function()
             game:toggle_mute()
         elseif key == KEY.R then
             game:open_radio()
+        elseif key == KEY.J then
+            game:open_journal()
         elseif key == KEY.C then
             game:open_crafting()
         elseif key == KEY.I then
@@ -7059,6 +7142,8 @@ local ok, err = pcall(function()
             game.screen = "map"
         elseif key == KEY.H then
             game:open_help()
+        elseif key == KEY.J then
+            game:open_journal()
         elseif key == KEY.C then
             game.inv_selected = nil
             game:open_crafting()
@@ -7105,6 +7190,8 @@ local ok, err = pcall(function()
                 game:draw_help(w, h)
             elseif game.screen == "radio" then
                 game:draw_radio(w, h)
+            elseif game.screen == "journal" then
+                game:draw_journal(w, h)
             elseif game.screen == "info" then
                 game:draw_info(w, h)
             elseif game.screen == "trade" then
@@ -7147,7 +7234,7 @@ local ok, err = pcall(function()
                 if key == KEY.Q then game.quit = true else game:craft_key(key) end
             elseif game.screen == "trade" then
                 game:trade_key(key)
-            elseif game.screen == "help" or game.screen == "info" then
+            elseif game.screen == "help" or game.screen == "info" or game.screen == "journal" then
                 game:help_key(key)
             elseif game.screen == "radio" then
                 game:radio_key(key)

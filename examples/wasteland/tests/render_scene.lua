@@ -362,3 +362,18 @@ g:open_radio()
 g:radio_call(1)
 g:draw_radio(400, 300)
 solaros.dump("ops_radio.txt")
+
+-- Scene: the journal mid-run
+g = fresh()
+g:start_game()
+g:learn_site("trader"); g:learn_site("checkpoint")
+g:mark_stash()
+g.rad_known["2,0"] = 2
+g.player.rads = 31
+g.dog = {hp = 24, fed_hour = 0, hungry_days = 0}
+g.player.inventory = {{item = "lora_radio", qty = 1}, {item = "weeping_stone", qty = 1}}
+g.radio = {charge = 3, next = {}}
+g.player.hours = 61
+g:open_journal()
+g:draw_journal(400, 300)
+solaros.dump("ops_journal.txt")

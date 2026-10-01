@@ -10,7 +10,7 @@ Game.VERSION = "0.10 (2026-10-01)"
 local HELP = {
     {"MAP", "Arrows/WASD move    Space rest 4h"},
     {"", "F search   E water: fill/drink   I bag"},
-    {"", "T trade/Checkpoint   C craft"},
+    {"", "T trade/Checkpoint   C craft   J journal"},
     {"", "G hunt, or fish   R radio   M sound"},
     {"BAG", "Arrows pick  Enter select, Enter move"},
     {"", "E use: eat, drink, wear, read, set snare"},
@@ -29,7 +29,7 @@ function Game:open_help()
     self.screen = "help"
 end
 
-function Game:help_key(key)
+function Game:help_key(key)   -- help, info and journal: any key goes back
     if self.screen == "help" and key == KEY.V then
         self.screen = "info"
     else
