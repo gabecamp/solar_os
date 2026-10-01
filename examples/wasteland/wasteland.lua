@@ -3,45 +3,20 @@
 --[[
 Wasteland Survivor - a NEO Scavenger-style hex survival game for SolarOS.
 
-Written for a small monochrome landscape display (400x300, the Waveshare
-RLCD's logical size under SolarOS) with no polygon-fill primitive - hex
-tiles are drawn as outlines (gfx.line x6) with an optional gfx.fill_rect
-bounding-box wash underneath for shading, rather than the isometric 3D
-block look used in the desktop/Pi version of this game. That's a
-deliberate simplification for this hardware, not a missing feature.
+Written for the Waveshare RLCD 4.2 (400x300 landscape, 1-bit) on an
+ESP32-S3. SolarOS has no polygon fill, so hexes are filled with
+horizontal fill_rect bands and outlined with gfx.line.
 
-Controls:
-  Arrows / WASD   - move on the map screen; on the inventory screen any
-                    direction steps the cursor (ground, body top-down, bag)
-  Space           - rest (map screen)
-  F               - scavenge the tile you're on (1 MP, 1 hour; finds go on
-                    the ground here - open the inventory to pick them up)
-  Enter / Space   - inventory: pick up the item under the cursor, then press
-                    again on a ground cell, bag cell or body slot to move it
-  E               - inventory: use the item under the cursor - eat/drink one,
-                    wear it, hold it in a free hand, or take it off; on a
-                    Cloth Scrap while bleeding: bandage the wound
-  1-7 / Up,Dn,Enter - encounter screen: pick a choice (moving can run you
-                    into animals, mutants, bandits or, rarely, a helper;
-                    hold a weapon in a hand to fight with it)
-  C               - map or inventory: crafting. Up/Dn pick a recipe, Enter
-                    makes it (uses items from your bag, hands and the ground
-                    here), C/Esc goes back. Scrawled Notes (E) teach recipes.
-  I               - toggle inventory screen
-  (time)          - the HUD shows day, hour and weather. Nights (20:00-06:00)
-                    cut your sight unless you hold a Torch; rain, cold snaps
-                    and nights chill you unless your clothes are warm enough
-                    or you're by a campfire (build one with C)
-  Q / ESC         - quit
+Make a survivor, cross the Zone, stay fed, warm and unirradiated, and get
+out through the Checkpoint with a Zone Permit or a bribe of artifacts.
+Every key is listed in game: press H on the map or in the bag (V there
+shows device info). In short: arrows/WASD move, Space rests, F searches,
+I bag, C craft, E use, G hunt or fish, T trade, J journal, R radio,
+M mute, Q quit.
 
-A new game opens on the character creator: Up/Down pick a row, Left/Right
-change an attribute, Space toggles a trait, Enter starts. You get 5 trait
-points; negative traits give more. Health 0 ends the run (death screen,
-Enter makes a new survivor).
-
-This is a single self-contained script, matching the SolarOS Playground
-convention (see the bundled Snake example) - no extra require()s beyond
-the built-in `solaros` module.
+This file is GENERATED from src/*.lua by tools/build.py; it is still a
+single self-contained script, as SolarOS Playground apps are - no
+require()s beyond the built-in `solaros` module.
 ]]
 
 local solaros = require("solaros")
@@ -49,7 +24,9 @@ local gfx = solaros.gfx
 local audio = solaros.audio
 
 -- ---------------------------------------------------------------------
--- Tunables
+-- Tunables: the map, keys, terrain, time and weather, and the numbers
+-- for each system (radiation, survival, trade, Karl, dog, tech, base,
+-- quests, night). Items are in 06, encounters in 07.
 -- ---------------------------------------------------------------------
 
 local GRID_RADIUS = 12       -- 469 hexes; the map screen follows you
@@ -330,6 +307,10 @@ local NIGHT = {
               .. "Pale faces turn just under the surface.", speed = 3},
     },
 }
+-- ---------------------------------------------------------------------
+-- Items: the bag and body slots, ITEM_DB, artifacts, scavenging loot
+-- tables and crafting recipes
+-- ---------------------------------------------------------------------
 
 local BACKPACK_CAP = 16      -- most bag cells any build can have (the layout's limit)
 local POCKET_CELLS = 4       -- bag cells with nothing worn on your back
@@ -2347,12 +2328,6 @@ local function axial_round(qf, rf)
     return rx, rz
 end
 
-local function pixel_to_axial(x, y, size)
-    local qf = (SQRT3 / 3 * x - 1 / 3 * y) / size
-    local rf = (2 / 3 * y) / size
-    return axial_round(qf, rf)
-end
-
 local function axial_distance(aq, ar, bq, br)
     local ax, az = aq, ar
     local ay = -ax - az
@@ -2830,7 +2805,7 @@ function Game.new()
     return self
 end
 
--- A difficulty multiplier (DIFFICULTY in 05_data); Normal is all 1.
+-- A difficulty multiplier (DIFFICULTY in 05_data_world); Normal is all 1.
 function Game:diff(key)
     return DIFFICULTY[self.difficulty or "normal"][key]
 end
@@ -3101,17 +3076,6 @@ function Game:put_stack(kind, k, stack)
             end
         end
         return true
-    end
-end
-
--- Undo a remove_stack: put the stack back exactly where it came from.
-function Game:restore_stack(kind, k, stack)
-    if kind == "ground" then
-        table.insert(self:ground_list(), k, stack)
-    elseif kind == "inventory" then
-        table.insert(self.player.inventory, k, stack)
-    elseif kind == "equip" then
-        self.player.equipped[k] = stack.item
     end
 end
 
@@ -3431,7 +3395,7 @@ end
 -- straight from it. Resting in the rain fills them clean; the Boil Water
 -- recipe cleans dirty water at a fire. Some food and water can make you
 -- sick (ITEM_DB[..].sick), meat goes bad (perish), and at 0 thirst or
--- hunger you lose HP every hour. Numbers are in SURVIVE (05_data).
+-- hunger you lose HP every hour. Numbers are in SURVIVE (05_data_world).
 -- ---------------------------------------------------------------------
 
 -- After eating/drinking one unit of def (the stack was at kind/k):
@@ -3596,7 +3560,7 @@ end
 -- ---------------------------------------------------------------------
 -- Time of day, weather, cold and light
 --
--- The clock is derived from player.hours (see WORLD in 05_data). Weather is
+-- The clock is derived from player.hours (see WORLD in 05_data_world). Weather is
 -- rolled per WORLD.weather_block hours from the world's seed, so it needs no
 -- state of its own. Game:tick() runs after every key: it walks the hours
 -- that passed since the last tick and applies cold, then refreshes what you
@@ -3901,7 +3865,7 @@ end
 -- Anti-Rad and Vodka take rads off (consumable.rads). A carried Geiger
 -- counter reads the hexes around you, marks them on the map (rad_known,
 -- which is saved) and clicks; without one you only learn a hex was hot by
--- the dose you took there. All numbers are in RAD (05_data).
+-- the dose you took there. All numbers are in RAD (05_data_world).
 -- ---------------------------------------------------------------------
 
 function Game:rad_at(q, r)
@@ -4400,7 +4364,30 @@ function Game:encounter_action(action)
     if not e.over then self:enemy_turn() end
 end
 
--- -- anomaly puzzles ---------------------------------------------------------
+function Game:encounter_key(key)
+    local opts = self:encounter_options()
+    local e = self.enc
+    local pick
+    if key >= 49 and key < 49 + #opts then          -- '1'..
+        pick = key - 48
+    elseif key == gfx.KEY_UP or key == KEY.W then
+        e.cursor = math.max(1, e.cursor - 1)
+    elseif key == gfx.KEY_DOWN or key == KEY.S then
+        e.cursor = math.min(#opts, e.cursor + 1)
+    elseif key == KEY.ENTER or key == KEY.LF or key == KEY.SPACE then
+        pick = e.cursor
+    end
+    if pick and opts[pick] then
+        e.cursor = 1
+        self:encounter_action(opts[pick][2])
+    end
+end
+
+-- ---------------------------------------------------------------------
+-- Anomaly puzzles (bolt field, sequence, runes): started by an anomaly
+-- encounter's Probe, keys routed here by encounter_key. Numbers in
+-- 07_data_encounters (ANOMALIES, BOLT_*, SEQ_LENGTHS, RUNE_*).
+-- ---------------------------------------------------------------------
 
 local function bolt_neighbors(c)
     local out, row, col = {}, (c - 1) // BOLT_N, (c - 1) % BOLT_N
@@ -4576,26 +4563,6 @@ function Game:puzzle_key(key)
         if z.moves <= 0 then return self:finish_puzzle("failed") end
     end
 end
-
-function Game:encounter_key(key)
-    local opts = self:encounter_options()
-    local e = self.enc
-    local pick
-    if key >= 49 and key < 49 + #opts then          -- '1'..
-        pick = key - 48
-    elseif key == gfx.KEY_UP or key == KEY.W then
-        e.cursor = math.max(1, e.cursor - 1)
-    elseif key == gfx.KEY_DOWN or key == KEY.S then
-        e.cursor = math.min(#opts, e.cursor + 1)
-    elseif key == KEY.ENTER or key == KEY.LF or key == KEY.SPACE then
-        pick = e.cursor
-    end
-    if pick and opts[pick] then
-        e.cursor = 1
-        self:encounter_action(opts[pick][2])
-    end
-end
-
 -- ---------------------------------------------------------------------
 -- Emissions and stashes
 --
@@ -4709,7 +4676,7 @@ function Game:find_stash()
     end
 end
 -- ---------------------------------------------------------------------
--- Hunting, fishing and snares (numbers in HUNT, 05_data)
+-- Hunting, fishing and snares (numbers in HUNT, 05_data_world)
 --
 -- G on the map: by open water (or on a ford) with a Fishing Rod you fish;
 -- anywhere else you track game, and finding it starts an animal encounter
@@ -5230,7 +5197,7 @@ function Game:toggle_mute()
     self:push_log(self.muted and "Sound off. (M)" or "Sound on. (M)")
 end
 -- ---------------------------------------------------------------------
--- A dog companion (numbers in DOG, 05_data)
+-- A dog companion (numbers in DOG, 05_data_world)
 --
 -- A rare stray turns up on plains/forest while you have no dog. Offer it
 -- food to tame it (self.dog, saved). It warns you (better hiding and
@@ -5335,7 +5302,7 @@ function Game:dog_hour(hour)
     end
 end
 -- ---------------------------------------------------------------------
--- Broken tech and the LoRa radio (numbers in TECH, 05_data)
+-- Broken tech and the LoRa radio (numbers in TECH, 05_data_world)
 --
 -- Broken devices are very rare finds. While you carry one, the crafting
 -- screen lists "Repair <device>": its parts and the device itself are the
@@ -6207,7 +6174,7 @@ function Game:draw_lore(w, h)
     gfx.refresh()
 end
 -- ---------------------------------------------------------------------
--- Night horrors (NIGHT in 05_data). Only after dark, never in the normal
+-- Night horrors (NIGHT in 05_data_world). Only after dark, never in the normal
 -- encounter pick: maybe_horror runs on each move at night with its own
 -- chance, halved by light in your hand or a fire on the hex, and never at a
 -- camp with a bedroll.

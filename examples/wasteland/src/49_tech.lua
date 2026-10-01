@@ -1,5 +1,5 @@
 -- ---------------------------------------------------------------------
--- Broken tech and the LoRa radio (numbers in TECH, 05_data)
+-- Broken tech and the LoRa radio (numbers in TECH, 05_data_world)
 --
 -- Broken devices are very rare finds. While you carry one, the crafting
 -- screen lists "Repair <device>": its parts and the device itself are the

@@ -1,7 +1,7 @@
 -- ---------------------------------------------------------------------
 -- Time of day, weather, cold and light
 --
--- The clock is derived from player.hours (see WORLD in 05_data). Weather is
+-- The clock is derived from player.hours (see WORLD in 05_data_world). Weather is
 -- rolled per WORLD.weather_block hours from the world's seed, so it needs no
 -- state of its own. Game:tick() runs after every key: it walks the hours
 -- that passed since the last tick and applies cold, then refreshes what you

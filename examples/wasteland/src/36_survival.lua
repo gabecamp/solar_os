@@ -7,7 +7,7 @@
 -- straight from it. Resting in the rain fills them clean; the Boil Water
 -- recipe cleans dirty water at a fire. Some food and water can make you
 -- sick (ITEM_DB[..].sick), meat goes bad (perish), and at 0 thirst or
--- hunger you lose HP every hour. Numbers are in SURVIVE (05_data).
+-- hunger you lose HP every hour. Numbers are in SURVIVE (05_data_world).
 -- ---------------------------------------------------------------------
 
 -- After eating/drinking one unit of def (the stack was at kind/k):

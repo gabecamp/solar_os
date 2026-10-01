@@ -51,7 +51,7 @@ function Game.new()
     return self
 end
 
--- A difficulty multiplier (DIFFICULTY in 05_data); Normal is all 1.
+-- A difficulty multiplier (DIFFICULTY in 05_data_world); Normal is all 1.
 function Game:diff(key)
     return DIFFICULTY[self.difficulty or "normal"][key]
 end
@@ -322,17 +322,6 @@ function Game:put_stack(kind, k, stack)
             end
         end
         return true
-    end
-end
-
--- Undo a remove_stack: put the stack back exactly where it came from.
-function Game:restore_stack(kind, k, stack)
-    if kind == "ground" then
-        table.insert(self:ground_list(), k, stack)
-    elseif kind == "inventory" then
-        table.insert(self.player.inventory, k, stack)
-    elseif kind == "equip" then
-        self.player.equipped[k] = stack.item
     end
 end
 

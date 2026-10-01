@@ -1,5 +1,5 @@
 -- ---------------------------------------------------------------------
--- Night horrors (NIGHT in 05_data). Only after dark, never in the normal
+-- Night horrors (NIGHT in 05_data_world). Only after dark, never in the normal
 -- encounter pick: maybe_horror runs on each move at night with its own
 -- chance, halved by light in your hand or a fire on the hex, and never at a
 -- camp with a bedroll.

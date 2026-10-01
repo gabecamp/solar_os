@@ -1,5 +1,5 @@
 -- ---------------------------------------------------------------------
--- Hunting, fishing and snares (numbers in HUNT, 05_data)
+-- Hunting, fishing and snares (numbers in HUNT, 05_data_world)
 --
 -- G on the map: by open water (or on a ford) with a Fishing Rod you fish;
 -- anywhere else you track game, and finding it starts an animal encounter

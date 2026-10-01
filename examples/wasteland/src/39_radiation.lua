@@ -6,7 +6,7 @@
 -- Anti-Rad and Vodka take rads off (consumable.rads). A carried Geiger
 -- counter reads the hexes around you, marks them on the map (rad_known,
 -- which is saved) and clicks; without one you only learn a hex was hot by
--- the dose you took there. All numbers are in RAD (05_data).
+-- the dose you took there. All numbers are in RAD (05_data_world).
 -- ---------------------------------------------------------------------
 
 function Game:rad_at(q, r)

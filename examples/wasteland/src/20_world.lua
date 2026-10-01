@@ -47,12 +47,6 @@ local function axial_round(qf, rf)
     return rx, rz
 end
 
-local function pixel_to_axial(x, y, size)
-    local qf = (SQRT3 / 3 * x - 1 / 3 * y) / size
-    local rf = (2 / 3 * y) / size
-    return axial_round(qf, rf)
-end
-
 local function axial_distance(aq, ar, bq, br)
     local ax, az = aq, ar
     local ay = -ax - az

@@ -1,12 +1,94 @@
-# Handoff: NEO Scavenger-style survival game (SolarOS Lua app + Python/pygame version)
+# Handoff: Wasteland Survivor, a NEO Scavenger-style survival game for SolarOS
 
-> **Read first:** more than one Claude session works on this branch, and the GitHub branch is the source of truth. Before editing, compare commit hashes and only fetch when they differ (`ls-remote` asks GitHub for one line, not the repo):
+> **Read first:** more than one Claude session works on this branch, and the GitHub branch is the source of truth. Before editing, compare commit hashes and only fetch when they differ:
 > ```sh
 > remote=$(git ls-remote origin refs/heads/claude/new-session-ws67f3 | cut -f1)
 > [ "$remote" = "$(git rev-parse HEAD)" ] || { git fetch origin claude/new-session-ws67f3 && git merge --ff-only FETCH_HEAD; }
 > ```
 > If the fast-forward fails (both sides have new commits), merge as a continuation of GitHub's version; never force-push.
->
+
+## Where we are (2026-10-01)
+
+A complete, playable Lua game for the user's ESP32-S3 SolarTerm (Waveshare RLCD 4.2: 400x300 landscape, 1-bit, 8 MB PSRAM) under SolarOS. Make a survivor (attributes, traits, difficulty), cross a fogged hex Zone with day/night, weather, cold, hunger, thirst, sickness, radiation (hidden without a Geiger counter), emissions and night horrors; scavenge, craft, hunt and fish, fight or talk through encounters with 96x96 dithered portraits, solve anomaly puzzles, repair broken tech (a LoRa radio with NPC channels), tame a dog, claim a camp, run quests, read lore, meet Karl, and leave through the Checkpoint with a permit or a bribe. Saves need the `write_file` firmware patch (`firmware/`; the upstream request is in `firmware/UPSTREAM_REQUEST.md`); without it the game runs but cannot save.
+
+- **Verified on the device:** only the early builds ("it works!"). Everything since is tested on a PC against a fake `solaros` module. `DEVICE_TEST.md` is the 10-minute checklist for the board, and **H then V** in game shows the device info page.
+- **Balance** (`tools/balance_sim.lua`, a bot playing 30-day runs with the real code): deaths Easy ~8%, Normal ~23%, Zone-Hardened ~50%.
+- **Perf** (`tools/perf_check.lua`, in the suite): bundle ~390 KB; Lua heap ~730 KB loaded, ~830 KB peak; busiest frame (bag) ~1,300 gfx calls.
+- **Open items:** the portrait regeneration waits for the Hugging Face ZeroGPU quota (a scheduled check-in retries it); the user will supply `art/karl.jpg` themself (Karl is a real person: **never generate him**).
+
+## Code map
+
+`wasteland.lua` is **generated**: edit the parts in `src/`, then `python3 tools/build.py` (the test runner does it first; `--check` says whether the bundle is current). The parts are concatenated in name order into **one chunk sharing one scope**: chapters, not modules. A local from an earlier part is visible in later ones, so order matters, and the chunk may hold at most 200 locals (`tools/locals_headroom.py`, run by the suite, demands 10 free). Group new numbers into one table per system and new code into `Game` methods.
+
+| Part | What lives there |
+|---|---|
+| `00_header` | file banner, `solaros` handles (`gfx`, `storage`, ...) |
+| `05_data_world` | tunables, `KEY`, terrain, `WORLD` (time, weather, cold), `RAD`, `SURVIVE`, `TRADE`, `GOAL`, `HUNT`, `KARL`, `DIFFICULTY`, `DOG`, `TECH`, `BASE`, `QUESTS`, `NIGHT` |
+| `06_data_items` | body slots, `ITEM_DB`, `ARTIFACTS`, `SCAVENGE_LOOT`, `RECIPES`, world wearables |
+| `07_data_encounters` | `FIGHT`, encounter kinds and ranges, `ENCOUNTERS`, `ANOMALIES`, puzzle sizes |
+| `10_sprites` | ASCII-art item sprites and terrain glyphs, packed at load |
+| `20_world` | hex math, `generate_world` (terrain, rivers, fords, town, sites, radiation), visibility, `recompute_stats` |
+| `30_game` | `Game.new`, the creator, stacks and slots, moving, scavenging, eating |
+| `35_crafting` | recipes known, blockers, `craft` |
+| `36_survival` | water, sickness, perishing food, death reasons |
+| `37_world_time` | clock, weather, cold, `Game:tick` (runs every hour that passed) |
+| `38_save` | `SAVE.fields`, save/load/delete, `write_file` detection |
+| `39_radiation` | doses, sickness stages, Geiger/detector, vague item names |
+| `40_encounters` | encounter rolls, options, fight engine, helpers, `encounter_key` |
+| `41_puzzles` | anomaly puzzles: bolt field, sequence, runes |
+| `42_events` | emissions and stashes |
+| `43_hunting` | hunting, fishing, snares |
+| `44_karl` | Karl (K-A-R-L) and his riddles |
+| `45_trade` | sites and bearings, barter, the Checkpoint, `finish_run` |
+| `47_sound` | `SFX` and `Game:sfx` |
+| `48_dog` | the dog companion |
+| `49_tech` | broken tech, repairs, the LoRa radio |
+| `50_draw_map` | the map screen and panel |
+| `51_base` | claiming a camp, its upgrades |
+| `52_quests` | quests from the trader, Anna and Karl |
+| `53_lore` | `LORE` pages (a global), the reader |
+| `54_night` | night horrors |
+| `60_draw_inventory` | the bag / body / ground screen |
+| `65_portrait_data` | **generated** by `tools/paint_portraits.py`: base64 portraits |
+| `66_portraits` | portrait decode cache and drawing |
+| `70_draw_screens` | title, creator, encounter, death screens |
+| `72_draw_craft` | crafting screen |
+| `76_draw_trade` | trade, Checkpoint and ending screens |
+| `78_draw_help` | `HELP`, the help screen and device info page |
+| `79_draw_journal` | journal (J) |
+| `90_main` | the main loop (`pcall`, always `gfx["end"]()`) |
+
+**Adding a feature, the usual pattern:** a new `src/NN_*.lua` part of `Game` methods; one data table in the right `0x_data_*` part; new state in `SAVE.fields` (`38_save`); a `tests/*_test.lua` plus its lib export in `tests/make_lib.py` and a line in `tests/run_tests.sh`; a `HELP` line; teach the sim bot any new encounter kind; a dated note under History below; render previews and look at them.
+
+## Quick start
+
+```bash
+cd examples/wasteland
+sudo apt-get install -y lua5.4 python3 && pip install pillow   # Pillow: previews only
+python3 tools/build.py                     # src/ -> wasteland.lua
+bash tests/run_tests.sh                    # build, every test, headroom and perf budget
+WASTELAND_SEED=4242 bash tests/run_tests.sh  # tests seed from this; check 3 seeds
+bash tests/render.sh                       # previews/*.png: open them and LOOK
+cd tests && lua5.4 ../tools/balance_sim.lua 300 1 normal   # balance (easy|normal|hard)
+```
+
+The sim is not byte-reproducible between processes (Lua 5.4 varies `pairs` order), so compare rates, not output. Only `wasteland.lua` is shipped; `tests/lib_*.lua` and `tests/wasteland_run.lua` are generated test copies.
+
+**Gotchas (each cost real time):**
+- Lua 5.4 `/` always returns a float; use `//`. Every `gfx` coordinate must be an integer.
+- A `local function` is invisible to code above it, and that includes earlier parts.
+- Never write `function gfx["end"]() … end`; call `gfx["end"]()`. Keep the `pcall` + always-`end` + re-raise pattern.
+- Sprite data must be exactly `((w+7)//8)*h` bytes, ≤ 128. Colors are the `gfx.*` constants only.
+- SolarOS sends Enter as `\n` (and Shift+Enter the same), so the game can't tell them apart.
+- Tests that hard-code loot shares or multipliers break on every balance pass; compare relatively.
+- **Previews are approximations** (a PC font, plain grays, no RLCD dithering). Trust the device.
+
+---
+
+# History (newest first)
+
+The dated notes below were written as each feature landed; part names in older notes predate the 2026-10-01 split of `05_data` (now `05_data_world`, `06_data_items`, `07_data_encounters`) and of the puzzles into `41_puzzles`.
+
 > **The code lives in `src/` now (split 2026-09-30).** `wasteland.lua` is GENERATED: edit the parts in `src/` (`00_header`, `05_data`, `10_sprites`, `20_world`, `30_game`, `35_crafting`, `36_survival`, `37_world_time`, `38_save`, `39_radiation`, `40_encounters`, `45_trade`, `50_draw_map`, `60_draw_inventory`, `65_portrait_data` (generated), `66_portraits`, `70_draw_screens`, `72_draw_craft`, `76_draw_trade`, `90_main`), then run `python3 tools/build.py` (the test runner does this first). The parts are concatenated in name order and share one scope - chapters, not modules - so a local defined in an earlier part is visible in later ones and order matters. Still ship/copy only `wasteland.lua`; `python3 tools/build.py --check` says whether it is current.
 >
 > **The 200-local limit (hit 2026-09-30):** the bundle is ONE Lua chunk, and Lua allows at most 200 local variables in a chunk's main function. The parts had used ~197. Key codes are now one table (`KEY.A`, `KEY.ENTER`, ... instead of `KEY_A`...), freeing 13. **Rules for new code:** group new constants in a table (`CRAFT_UI = {...}`, `RECIPES.campfire_hours`), make helpers `Game.name` fields or locals inside functions/`do ... end`, not new top-level `local`s. Check headroom by compiling (`luac5.4 -p wasteland.lua`, which fails with "too many local variables").
@@ -61,6 +143,10 @@
 >
 > **Encounter portraits (2026-09-30):** every encounter has `art = "<subject>"` and a 96x96 picture in the top-right of the encounter screen (`Game:draw_portrait`, `src/66_portraits.lua`). The art is painted in code by `tools/paint_portraits.py` (engine `tools/paint_lib.py`, one function per subject in `tools/portraits.py`): shaded grayscale at 192x192, then contrast-stretched and **ordered-dithered** (Bayer 4x4; Floyd-Steinberg turned faces into noise at this size) to 1-bit, and baked into the GENERATED part `src/65_portrait_data.lua` as base64 32x32 sprite tiles (~69 KB). Views: `near` (whole), `far` (48x48, small in the frame), `close` (the subject's face zoomed); plus wound-mark points. It reacts: range picks the view, blots appear at hurt/badly hurt (same bands as `enemy_condition`), dead = hatched, fled = empty "gone" frame; helpers/anomalies don't change. Only one creature is decoded at a time. **To use your own picture** for a subject, drop `art/<subject>.png` or `.jpg` (any size; a white background works best) and rerun `python3 tools/paint_portraits.py` then `tools/build.py`. Supplied pictures go through `photo_views`: median smoothing, levels + gamma (lifts dark mid-tones), dark edges, Floyd-Steinberg; per-subject crop boxes (far = whole body, near = head/front, close = face) and gamma/edge live in `PHOTO` in `tools/paint_portraits.py`, otherwise they are guessed from the subject's bounding box. `art/jawhound.jpg` and `art/stag.jpg` are the user's own pictures (both intros rewritten to match; the stag is pale, so it uses gamma 1.0 / edge 0.8 instead of the Jawhound's mid-tone lift). **`art/PROMPTS.md`** has image-generator prompts for every subject. The session has a **Hugging Face connector** whose Z-Image Turbo tool (`mcp__huggingface__gr1_z_image_turbo_generate`) generated boar, crows, fused, bloom and bandits; the free ZeroGPU quota ran out after 7 images. Generated images have light-gray backgrounds: use `"bg": 0.78` in `PHOTO`. The Fused and Bloom intros were rewritten to match their pictures. Previews: `previews/portraits/` (+ `contact_sheet.png`). Tests: `tests/portrait_test.lua`. Needs Pillow + numpy on the PC. The display is **400x300 landscape** (see the note below), not the 300x400 the older sections describe.
 
+### The original handoff (2026-09-30)
+
+Sections 2 (Where We Are), 7 (Where We're Going) and 8 (Quick Start) were replaced by the sections at the top; the rest is kept as written. It describes the 300x400 portrait layout of the time; the game is 400x300 landscape now.
+
 *Written 2026-09-30 at the end of a long chat session. The active work is `wasteland.lua`, a single-file Lua app for a handheld running SolarOS. A parked Python/pygame version lives in `python_version/`. Read "Where We Are" bullets 17–20 before touching anything: an audit done while writing this found four real bugs, one of which makes the Lua game unplayable.*
 
 > **Update 2026-09-30 (second session, now in `gabecamp/solar_os` at `examples/wasteland/`):**
@@ -109,45 +195,6 @@
 - The user chose "Lua/Python script on SolarOS" over "bare-metal Arduino/ESP-IDF firmware" (which would overwrite SolarOS).
 
 **Hard constraints on the Lua app:** single file (SolarOS Playground convention); all `gfx` coordinates must be **integers**; colors only `gfx.WHITE/LIGHT/DARK/BLACK`; no polygon fill (only `line/rect/fill_rect/circle/fill_circle/pixel/text/sprite`); `gfx.sprite` ≤ 128 bytes per call; the panel is 1-bit so LIGHT/DARK are dithered; input via `gfx.getch`.
-
----
-
-## 2. Where We Are
-
-**Codebases**
-1. **Lua app (active):** `wasteland.lua`, 1,235 lines / 41,745 bytes, one file. Byte-identical to the copy the user has.
-2. **Python/pygame (parked):** `python_version/`, 15 files / 1,610 lines. Main menu (Continue if `savegame.json` exists) → character creator (12 attribute points over Str/Spd/Per/End, range 1–6; Project-Zomboid-style trait budget with 6 positive + 6 negative traits) → isometric hex overworld ⇄ inventory. JSON save/load. Entry point `main.py`.
-3. `hex_map.py` in the user's downloads is the obsolete first single-file prototype. Ignore it.
-
-**What has and hasn't been verified**
-4. **Explicitly confirmed on the device by the user: only "it works!"**, said after the float→integer fix + `pcall` wrapper. The inventory was still a text list then.
-5. **Inferred working** (the user kept requesting refinements to things they must have seen, but never said so): graphical inventory, item sprites, hex-shaped tile fills.
-6. **Never seen on hardware / no feedback yet:** the current build's terrain glyphs + legend (i.e. `gfx.sprite` on the *map* screen) and the polygon silhouette. `gfx.circle`/`fill_circle` are no longer used anywhere (only the old stick figure used them). The app now calls just: `begin end size clear color font text line rect fill_rect sprite refresh getch`.
-7. Everything else rests on a **fake `solaros` module I wrote** from the docs and the Snake sample (`tests/solaros.lua`). It checks argument types (integers, sprite byte counts) but not real rendering, dithering, fonts, or timing.
-
-**What the Lua app does today**
-8. **Map:** 61 tiles (hex radius 4), pointy-top axial coordinates, flat top-down, `HEX_SIZE 16`. Four terrains. Fog of war (sight 2): *visible* (filled + glyph), *remembered* (faded outline + faded glyph), *unseen* (blank).
-9. **Movement:** arrows/WASD → the neighbor best matching the direction. Cost = terrain cost in both MP and hours. 2 MP max, overdraft allowed while MP > 0. Space rests 4 h (only if MP is below cap).
-10. **Needs:** hunger/thirst/rest drain per awake hour and rest restores; each need at 0 reduces the MP you get back from resting by 1 (min 1); warnings go to the log. Three needs only (the Python UI shows seven bars, four of them static).
-11. **Map screen:** HUD, centered hex map, 2×2 terrain legend (swatch + name + cost, extra box on the terrain you stand on), 10×10 glyph per tile, player marker with white halo, 3-line log, key hints.
-12. **Inventory (`I`):** ground icon grid (6 cols), 10 equip slots (head, ears, eyes, neck, shirt, jacket, hands, wrists, pants, feet) in two columns flanking a polygon body silhouette, bag strip, conditions line (only real ones: Barefoot / Starving / Dehydrated / Exhausted). Cursor order: ground → equip → bag. Enter/Space selects, then moves; wrong-slot equips are rejected and reverted; equipping over an occupied slot bumps the old item to the bag.
-13. **Render pipeline:** ASCII art → `pack_bitmap` → `gfx.sprite` (9 item sprites 16×16, 4 terrain glyphs 10×10); silhouette polygons rasterized once at load into 81 blocks; hex fill via 2-px scanline bands; every computed coordinate goes through `rnd()`.
-14. **Structure:** one `Game` class; main loop wrapped in `pcall`, then `gfx["end"]()` always runs and the error is re-raised (the SolarOS documented convention).
-
-**Tooling**
-15. **Test suite** (`tests/run_tests.sh`, ~1 s): syntax, 6 unit tests, sprite round-trip, slot bounds, silhouette symmetry/collision, glyph+legend, a scripted main-loop run, a 400-random-key soak. All pass on the delivered file, verified from a clean copy.
-16. **Preview renderer** (`tests/render.sh`) replays the game's gfx calls into PNGs. It found six layout bugs the numeric tests missed (Evidence has the list). Previews are in `previews/`.
-
-**Known bugs and gaps (highest impact first)**
-17. **BUG, game-breaking:** the Lua UI cannot consume anything. `Game:try_consume` is never called from a key handler (`grep -c try_consume wasteland.lua` → 1, the definition). Needs drain and nothing restores them. The header comment falsely says Enter consumes, and my earlier tests passed only because they called the function directly.
-18. **BUG (both versions):** `try_consume` removes the *whole stack*. Eating one of "Water Bottle ×2" gives +50 thirst and deletes both.
-19. **BUG / waste:** the main loop calls `draw_*` + `gfx.refresh()` every `POLL_MS` (250 ms) even with no input: ~4 full redraws/s while idle, up to 1,041 gfx calls per frame on a fully revealed map. The `-- power-friendly` comment is wrong, and so was my earlier claim that it redraws only on input.
-20. **BUG:** bag capacity is 16 (`put_stack`) but only the first 9 are drawn/selectable, so stacks 10–16 are invisible. The ground grid has no row cap: more than 12 ground items would overlap the paper-doll.
-21. **GAP:** loot exists only on the spawn tile (`generate_world`). Only 5 of the 10 slots have any wearable defined (head, hands, shirt, pants, feet); `cap` and `gloves` exist in `ITEM_DB` but never spawn, and ears/eyes/neck/jacket/wrists can never be filled.
-22. **GAP:** the Lua app has no save/load, no main menu, no character creator/attributes/traits (sight 2 and MP 2 are constants); a new world every launch. The seed uses `os.time()` behind an `os and os.time and …` guard. Whether SolarOS's Lua includes `os` is unknown (if not, the seed is always 12345).
-23. **GAP (both):** no combat, encounters, crafting, or Run/Hide/Spy/Scavenge actions (Python has placeholder buttons; Lua has nothing). "Known recipes" is a placeholder.
-24. **Unverified assumptions:** mono-12 ≈ 7 px/char (taken from the Snake sample's `#msg * 7`); `gfx.KEY_LEFT/RIGHT/UP/DOWN` exist (used by the Snake sample, not listed in `lua.gfx.md`); Enter arrives as 13 or 10 (both handled); whether the physical keyboard has arrow keys is unknown (WASD works regardless).
-25. **Test weakness:** `bounds_test.lua` and `body_test.lua` duplicate layout constants instead of importing them, so changing a layout constant in the game leaves those tests checking stale numbers.
 
 ---
 
@@ -267,75 +314,3 @@ Python additionally has swamp (cost 3) and ruins (cost 2), sight = 2 + (Percepti
 **What has worked in the working relationship:** flag placeholders honestly (the user has never objected to stubs, only to breakage); verify with fakes *and* look at rendered output before shipping; when stuck, ask the user for a device photo or the fork's docs rather than guess. The user had no objection to being asked one focused question.
 
 **Not yet asked / unknown:** whether they want the Python version kept alive; how they deploy files to the board; whether the physical keyboard has arrow keys; whether they like the current silhouette and glyph art.
-
----
-
-## 7. Where We're Going
-
-**0. Ask the user (blocking unknowns; one message):** does the current `wasteland.lua` run without error (photo or pasted output)? How do you copy scripts onto the board, and what command launches one? Do arrow keys work or only WASD? Are the 10×10 terrain glyphs readable on the real panel? Should equip slots move next to their body parts? Keep the Python version alive?
-
-**1. Fix consumption (bugs 17, 18), first, since the game is unplayable without it.** Bind a key in the inventory screen (`e`: free, since `a/d/s/w/i/q`, space and Enter are taken) to eat/drink the item under the cursor. Consume **one unit**: decrement `qty`, remove the stack only at 0. Fix the same stack bug in `python_version/state_inventory.py`. Update the header comment and the on-screen hint (`"Up/Dn select  Enter act  I map"`). Turn the two repros into real tests.
-
-**2. Redraw only when something changed (bug 19).** Add a `dirty` flag set after any handled key, draw only when set, keep `gfx.getch` as the wait. Check `getch`'s blocking limits in `lua.input.md`/`lua.gfx.md`. Expected: idle redraws 4/s → 0. Fix the misleading `POLL_MS` comment.
-
-**3. Bag/ground display limits (bug 20).** Either show 16 bag cells (needs a second row and layout re-check) or cap the bag at 9. Cap or scroll the ground grid. Extend `bounds_test.lua` to cover the worst case.
-
-**4. Loot and scavenging (gap 21).** Per-terrain loot tables, a Scavenge action (costs MP/hours; pick an unused key, e.g. `f`), spawn `cap`/`gloves`, add items for ears/eyes/neck/jacket/wrists with sprites, merge identical stacks in `put_stack`.
-
-**5. Persistence (gap 22).** Read `doc/manual/lua.storage.md` first. Save on quit; add a start-up "Continue". Persist player (pos, mp, hours, needs, equipped, inventory), tiles, ground items, explored set, seed. Data is already plain tables. Settle the `os.time` question at the same time.
-
-**6. Main menu + character creator port (gap 22).** Port `traits.py`/`player.py` (attributes, trait budget, derived sight/MP formulas above) to a keyboard-driven 300×400 UI.
-
-**7. Equip-slot layout + empty-slot ghost icons**, per the user's answer in step 0.
-
-**8. Real gameplay systems (gap 23):** Run/Hide/Spy, encounters, combat with body-part injuries (→ real "conditions"), crafting + recipes screen, weight ("Unburdened"), temperature.
-
-**9. Python version:** decide keep/archive. If kept, test with real pygame headless (`SDL_VIDEODRIVER=dummy`, *untested by me*) instead of a hand-written fake.
-
-**10. Housekeeping:** `git init`; run `tests/run_tests.sh` in CI; make tests import layout constants from the game (gap 25); consider splitting `wasteland.lua` if SolarOS `require` can load sibling files.
-
----
-
-## 8. Quick Start
-
-```bash
-cd solaros_wasteland_handoff
-
-# deps (Debian/Ubuntu). Pillow is only needed for previews.
-sudo apt-get install -y lua5.4 python3 && pip install pillow
-
-bash tests/run_tests.sh           # whole suite, ~1 s, non-zero exit on failure
-bash tests/repro_known_bugs.sh    # confirm bugs 17-20 reproduce BEFORE fixing
-bash tests/render.sh              # writes previews/*.png; open them and LOOK
-
-# Python version (parked); needs a display
-cd python_version && pip install pygame && python3 main.py
-```
-
-**Layout of this bundle**
-```
-wasteland.lua            the app (edit this; nothing else is shipped)
-HANDOFF.md               this file
-previews/*.png           renders of the current screens (approximate; see caveat below)
-tests/run_tests.sh       full suite            tests/render.sh        PNG previews
-tests/make_lib.py        cuts wasteland.lua at the "-- Main loop" marker to make test-only copies
-tests/solaros.lua        FAKE on-device module (has the scripted key queue). NEVER ship it
-tests/render_stub/       FAKE that records gfx calls for the renderer. NEVER ship it
-tests/*_test.lua, soak.lua, repro_known_bugs.sh, render_scene.lua, replay.py
-python_version/          the pygame game (15 files)
-```
-
-**Deploying to the device:** unknown. The manual says the `lua` app can "execute .lua scripts from storage" (`man lua`, `help` on the device). I never learned how the user copies files or which path they use. Ask.
-
-**Docs, in the user's fork** (`https://github.com/gabecamp/solar_os`, under `doc/manual/`): `lua.md`, `lua.gfx.md`, `lua.input.md`, `lua.tui.md`, `lua.storage.md`, `script.conventions.md`, `playground.md`. Read `lua.storage.md` before step 5 and `lua.tui.md` for the documented key handling.
-
-**Debug loop that has worked:** change → `run_tests.sh` → `render.sh` → *view the PNGs* → give the user the updated `wasteland.lua` → they run it on the device and send a photo or pasted output. The board's built-in `agent` app can also explain runtime errors, and the user has used it.
-
-**Gotchas (each cost real time):**
-- Lua 5.4 `/` always returns a float; use `//` for integers. `math.floor/ceil` return integers. Every `gfx` coordinate must be an integer: wrap at the call site with `rnd()`.
-- A `local function` is invisible to code *above* it in the file (`draw_glyph` was defined above `rnd` once, which would have crashed at the first map draw).
-- Never write `function gfx["end"]() … end` (invalid syntax); call `gfx["end"]()`. Keep the `pcall` + always-`end` + re-raise pattern; don't call `gfx.begin()` twice.
-- Sprite data must be exactly `((w+7)//8)*h` bytes, ≤ 128.
-- Colors are the `gfx.*` constants only, never strings or ints.
-- `tests/lib_only.lua`, `lib_map.lua`, `wasteland_run.lua` are **generated**. Edit only `wasteland.lua`, and keep the `-- Main loop` marker (make_lib.py cuts there).
-- **Previews are approximations:** they replay the draw calls with a PC font and plain grays, and do not reproduce the RLCD's dithering, real font metrics, or refresh behavior. Trust the device over the PNGs.

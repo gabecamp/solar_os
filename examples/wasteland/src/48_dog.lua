@@ -1,5 +1,5 @@
 -- ---------------------------------------------------------------------
--- A dog companion (numbers in DOG, 05_data)
+-- A dog companion (numbers in DOG, 05_data_world)
 --
 -- A rare stray turns up on plains/forest while you have no dog. Offer it
 -- food to tame it (self.dog, saved). It warns you (better hiding and
