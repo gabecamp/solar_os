@@ -286,6 +286,14 @@ local TECH = {
     },
 }
 
+-- A base (src/51_base.lua): claim a ruin, then build on it. The barrel
+-- fills a bottle every barrel_hours (2 in rain) into the stash box.
+local BASE = {
+    order = {"box", "bedroll", "barrel", "barricade"},
+    names = {box = "Stash box", bedroll = "Bedroll", barrel = "Rain barrel", barricade = "Barricade"},
+    barrel_hours = 12, barrel_max = 6, bed_rest_bonus = 0.5,
+}
+
 local BACKPACK_CAP = 16      -- most bag cells any build can have (the layout's limit)
 local POCKET_CELLS = 4       -- bag cells with nothing worn on your back
 
@@ -503,6 +511,17 @@ local RECIPES = {
      out = {"snare", 1}, known = true},
     {id = "cook_fish", name = "Cooked Fish", inputs = {raw_fish = 1}, fire = true, hours = 1,
      out = {"cooked_fish", 1}, known = true},
+    -- base building (base = what it builds; see BASE and src/51_base.lua)
+    {id = "claim", name = "Claim this ruin", inputs = {rope = 2, scrap_metal = 3}, hours = 4,
+     base = "claim", known = true},
+    {id = "box", name = "Stash box", inputs = {scrap_metal = 2, rope = 1}, hours = 2,
+     base = "box", known = true},
+    {id = "bedroll", name = "Bedroll", inputs = {cloth_scrap = 3, stick = 2}, hours = 2,
+     base = "bedroll", known = true},
+    {id = "barrel", name = "Rain barrel", inputs = {scrap_metal = 2, empty_bottle = 1}, hours = 2,
+     base = "barrel", needs = "box", known = true},
+    {id = "barricade", name = "Barricade", inputs = {stick = 4, scrap_metal = 2}, hours = 3,
+     base = "barricade", known = true},
     {id = "filter", name = "Filter Water", inputs = {dirty_water = 1, cloth_scrap = 1}, hours = 1,
      out = {"water_bottle", 1}, known = true},
     {id = "splint", name = "Splint", inputs = {stick = 2, cloth_scrap = 1}, hours = 1,
@@ -2033,6 +2052,18 @@ local GLYPH_ART = {
         "..#.#.....",
         ".#####....",
     },
+    camp = {
+        "....##....",
+        "...####...",
+        "..######..",
+        ".########.",
+        "##########",
+        ".#......#.",
+        ".#.##...#.",
+        ".#.##.#.#.",
+        ".#....#.#.",
+        ".########.",
+    },
     campfire = {
         "....#.....",
         "...##.....",
@@ -2887,15 +2918,18 @@ function Game:rest()
         self:push_log("Already rested.")
         return
     end
-    local fire = self:fire_here()
+    local fire, bed = self:fire_here(), self:bed_here()
     p.hours = p.hours + REST_HOURS
     apply_rest_hours(p, REST_HOURS)
     if fire then   -- a campfire: warm, and better sleep
         p.needs.rest = clamp(p.needs.rest + REST_HOURS * (100 / 6) * WORLD.fire_rest_bonus)
     end
+    if bed then    -- your own bedroll at camp
+        p.needs.rest = clamp(p.needs.rest + REST_HOURS * (100 / 6) * BASE.bed_rest_bonus)
+    end
     p.mp = effective_max_mp(p)
     self:refresh_view()
-    self:push_log("Rested " .. REST_HOURS .. "h" .. (fire and " by the fire." or "."))
+    self:push_log("Rested " .. REST_HOURS .. "h" .. (bed and " in your bedroll." or fire and " by the fire." or "."))
     if self:weather() == "Rain" then self:rain_fill() end
     if p.injuries.bleeding then self:push_log("You're still bleeding. Bandage it (E on cloth).") end
     self:check_death("You bled out in your sleep.")
@@ -3200,6 +3234,10 @@ end
 -- nil if you can make it now, else the reason you can't.
 function Game:craft_blocker(r)
     if not (r.repair or self.known[r.id]) then return "You don't know how to make that." end
+    if r.base then
+        local why = self:base_blocker(r)
+        if why then return why end
+    end
     for _, iq in ipairs(Game.recipe_inputs(r)) do
         if self:count_item(iq[1]) < iq[2] then
             return "Need " .. iq[2] .. " " .. ITEM_DB[iq[1]].name .. "."
@@ -3220,6 +3258,7 @@ function Game:craft(r)
         return false
     end
     if r.repair then return self:repair(r) end
+    if r.base then return self:build_base(r) end
     local p = self.player
     for _, iq in ipairs(Game.recipe_inputs(r)) do self:take_items(iq[1], iq[2]) end
     p.hours = p.hours + r.hours
@@ -3513,7 +3552,7 @@ end
 
 function Game:is_cold(hours)
     hours = hours or self.player.hours
-    return not self:fire_at(hours) and self:warmth() < self:cold_need(hours)
+    return not self:fire_at(hours) and not self:bed_here() and self:warmth() < self:cold_need(hours)
 end
 
 -- A lit torch in either hand.
@@ -3555,6 +3594,7 @@ function Game:tick()
         self:survive_hour()
         self:emission_hour(hour)
         self:dog_hour(hour)
+        self:base_hour(hour)
     end
     self.ticked_hour = p.hours
     local cold = (p.cold_hours or 0) > 0
@@ -3591,7 +3631,8 @@ local SAVE = {version = 1, dir = "wasteland", file = "save.lua",
                         "known", "ground", "log", "enc_cooldown", "ticked_hour", "rad_known",
                         "trader", "sites_known", "stashes", "next_emission", "snares",
                         "karl_asked", "karl_next", "karl_gave", "muted",
-                        "difficulty", "dog", "radio", "karl_hint"}}
+                        "difficulty", "dog", "radio", "karl_hint",
+                        "base"}}
 
 -- Where the save lives: <preferred storage>/wasteland/save.lua
 function SAVE.path()
@@ -3940,6 +3981,7 @@ function Game:roll(pct)
 end
 
 function Game:maybe_encounter(terrain_id)
+    if self:at_base() and self:base_has("barricade") then return end   -- safe at camp
     if (self.enc_cooldown or 0) > 0 then
         self.enc_cooldown = self.enc_cooldown - 1
         return
@@ -5442,6 +5484,7 @@ function Game:draw_map(w, h)
     if goal_line then gfx.text(PANEL_X, 112, goal_line) end
     local site_at = {}
     for name, key in pairs(self.sites) do site_at[key] = name end
+    if self.base then site_at[self.base.key] = "camp" end   -- drawn like a site
 
     local reachable = {}
     for _, n in ipairs(neighbors(self.tiles, p.q, p.r)) do
@@ -5642,6 +5685,88 @@ end
 
 local INV_ROWS = {}  -- rebuilt each draw: {kind, key, label} - only selectable item rows
 local INV_POS = {}   -- rebuilt each draw: row_index -> {x, y, w, h} - where that row draws
+-- ---------------------------------------------------------------------
+-- A base: claim a ruin, then build on it (recipes with `base`, in RECIPES)
+--
+-- self.base = {key, built = {box, bedroll, barrel, barricade}} (saved).
+-- The base hex's ground is your Stash box; the Bedroll keeps you warm and
+-- rests you better there; the Rain Barrel fills water bottles into the box;
+-- the Barricade stops encounters starting on the hex. Numbers in BASE.
+-- ---------------------------------------------------------------------
+
+function Game:at_base()
+    return self.base ~= nil and self.base.key == hex_key(self.player.q, self.player.r)
+end
+
+function Game:base_has(part)
+    return self.base ~= nil and self.base.built[part] == true
+end
+
+-- Why a base recipe can't be built here (nil if it can).
+function Game:base_blocker(r)
+    if r.base == "claim" then
+        if self.tiles[hex_key(self.player.q, self.player.r)] ~= "ruins" then
+            return "Only a ruin will do for a camp."
+        end
+        if self:at_base() then return "This is already your camp." end
+        return nil
+    end
+    if not self:at_base() then return "Build it at your camp." end
+    if self:base_has(r.base) then return "Already built." end
+    if r.needs and not self:base_has(r.needs) then
+        return "Needs a " .. BASE.names[r.needs] .. " first."
+    end
+    return nil
+end
+
+-- Called by Game:craft for a base recipe (after craft_blocker passed).
+function Game:build_base(r)
+    local p = self.player
+    for _, iq in ipairs(Game.recipe_inputs(r)) do self:take_items(iq[1], iq[2]) end
+    p.hours = p.hours + r.hours
+    apply_awake_hours(p, r.hours)
+    self:sfx("chime")
+    if r.base == "claim" then
+        local moved = self.base ~= nil
+        self.base = {key = hex_key(p.q, p.r), built = {}, barrel_hour = p.hours}
+        self:push_log(moved and "You move your camp to this ruin." or "You make this ruin your camp.")
+    else
+        self.base.built[r.base] = true
+        self:push_log("Built: " .. BASE.names[r.base] .. ".")
+    end
+    return true
+end
+
+-- Your bedroll, here: warm, and better rest.
+function Game:bed_here()
+    return self:at_base() and self:base_has("bedroll")
+end
+
+-- One hour: the rain barrel fills a bottle every BASE.barrel_hours (two in
+-- rain) into the stash box, up to BASE.barrel_max.
+function Game:base_hour(hour)
+    local b = self.base
+    if not (b and b.built.barrel and b.built.box) then return end
+    if hour - (b.barrel_hour or hour) < BASE.barrel_hours then return end
+    b.barrel_hour = hour
+    local pile = self.ground[b.key] or {}
+    self.ground[b.key] = pile
+    local have = 0
+    for _, s in ipairs(pile) do if s.item == "water_bottle" then have = have + s.qty end end
+    local add = math.min(self:weather(hour) == "Rain" and 2 or 1, BASE.barrel_max - have)
+    if add > 0 then add_to_list(pile, {item = "water_bottle", qty = add}) end
+end
+
+-- What the journal says about it.
+function Game:base_text()
+    if not self.base then return nil end
+    local parts = {}
+    for _, part in ipairs(BASE.order) do
+        if self.base.built[part] then parts[#parts + 1] = BASE.names[part] end
+    end
+    local where = self:at_base() and "here" or self:bearing_to(self.base.key)
+    return "Camp: " .. where .. (#parts > 0 and (". " .. table.concat(parts, ", ") .. ".") or ".")
+end
 
 -- Equip slots sit ON the body part they dress, NEO Scavenger style: a box over
 -- the head, the face, the torso, the legs, a hand... sized to that part, with
@@ -6048,7 +6173,7 @@ function Game:cursor_description()
     if not row then return "" end
     local kind, key = row[1], row[2]
     local stack = self:get_stack(kind, key)
-    local where = kind == "ground" and "Ground" or kind == "inventory" and "Bag"
+    local where = kind == "ground" and ((self:at_base() and self:base_has("box")) and "Box" or "Ground") or kind == "inventory" and "Bag"
         or EQUIP_NAME[key]
     if not stack then return where .. ": empty" end
     local text = where .. ": " .. ITEM_DB[stack.item].name
@@ -6092,7 +6217,7 @@ function Game:draw_inventory(w, h)
     local total_rows = (n_ground + GROUND_GRID_COLS - 1) // GROUND_GRID_COLS
     off = math.max(0, math.min(off, (total_rows - GROUND_GRID_ROWS) * GROUND_GRID_COLS))
     self.ground_off = off
-    local label = "Ground"
+    local label = (self:at_base() and self:base_has("box")) and "Stash box" or "Ground"
     if #ground > per_page then
         label = label .. " " .. (off + 1) .. "-" .. math.min(#ground, off + per_page)
             .. "/" .. #ground
@@ -6807,7 +6932,10 @@ function Game:draw_craft(w, h)
         if icon and draw_sprite then
             draw_sprite(w - 26, y - 12, SPRITE_W, SPRITE_H, icon)
         end
-        gfx.text(x, y, r.out and ("Makes: " .. ITEM_DB[r.out[1]].name) or "Builds a campfire here")
+        gfx.text(x, y, r.out and ("Makes: " .. ITEM_DB[r.out[1]].name)
+            or (r.base == "claim" and "Makes this ruin your camp")
+            or (r.base and ("Builds at your camp"))
+            or "Builds a campfire here")
         y = y + 18
         gfx.text(x, y, "Uses:")
         for _, iq in ipairs(Game.recipe_inputs(r)) do
@@ -6981,6 +7109,7 @@ local HELP = {
     {"TIPS", "Shelter in ruins/hills from emissions."},
     {"", "3 artifacts or a permit get you out."},
     {"", "Karl fishes rivers. Strays like food."},
+    {"", "C in a ruin: claim it as your camp."},
 }
 
 function Game:open_help()
@@ -7078,6 +7207,8 @@ function Game:journal_lines()
         add("The way out: unknown. Find the trader, or read notes.")
     end
     if self.sites_known.trader then add("Trader: " .. self:site_bearing("trader") .. ".") end
+    local camp = self:base_text()
+    if camp then add(camp) end
     local permit = self:count_item("permit") > 0
     add(("Artifacts: %d of %d.%s"):format(self:artifact_count(), GOAL.bribe,
         permit and " You have a Zone Permit." or ""))

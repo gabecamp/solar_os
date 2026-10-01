@@ -377,3 +377,21 @@ g.player.hours = 61
 g:open_journal()
 g:draw_journal(400, 300)
 solaros.dump("ops_journal.txt")
+
+-- Scenes: your camp (map from next door, and the stash box in the bag)
+g = fresh()
+g:start_game()
+local ck
+for k, t in pairs(g.tiles) do if t == "ruins" and k ~= g.sites.trader then ck = k; break end end
+local cq, cr = ck:match("(-?%d+),(-?%d+)")
+g.base = {key = ck, built = {box = true, bedroll = true, barrel = true}, barrel_hour = 0}
+g.ground[ck] = {{item = "water_bottle", qty = 3}, {item = "canned_beans", qty = 2}, {item = "rope", qty = 1}}
+g.player.q, g.player.r = tonumber(cq) + 1, tonumber(cr)
+g:refresh_view()
+g:draw_map(400, 300)
+solaros.dump("ops_map_camp.txt")
+g.player.q, g.player.r = tonumber(cq), tonumber(cr)
+g:refresh_view()
+g.inv_cursor = 1
+g:draw_inventory(400, 300)
+solaros.dump("ops_inventory_camp.txt")

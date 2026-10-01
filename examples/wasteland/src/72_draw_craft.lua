@@ -57,7 +57,10 @@ function Game:draw_craft(w, h)
         if icon and draw_sprite then
             draw_sprite(w - 26, y - 12, SPRITE_W, SPRITE_H, icon)
         end
-        gfx.text(x, y, r.out and ("Makes: " .. ITEM_DB[r.out[1]].name) or "Builds a campfire here")
+        gfx.text(x, y, r.out and ("Makes: " .. ITEM_DB[r.out[1]].name)
+            or (r.base == "claim" and "Makes this ruin your camp")
+            or (r.base and ("Builds at your camp"))
+            or "Builds a campfire here")
         y = y + 18
         gfx.text(x, y, "Uses:")
         for _, iq in ipairs(Game.recipe_inputs(r)) do

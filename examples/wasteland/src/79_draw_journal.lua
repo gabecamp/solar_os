@@ -21,6 +21,8 @@ function Game:journal_lines()
         add("The way out: unknown. Find the trader, or read notes.")
     end
     if self.sites_known.trader then add("Trader: " .. self:site_bearing("trader") .. ".") end
+    local camp = self:base_text()
+    if camp then add(camp) end
     local permit = self:count_item("permit") > 0
     add(("Artifacts: %d of %d.%s"):format(self:artifact_count(), GOAL.bribe,
         permit and " You have a Zone Permit." or ""))

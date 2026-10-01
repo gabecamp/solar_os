@@ -404,7 +404,7 @@ function Game:cursor_description()
     if not row then return "" end
     local kind, key = row[1], row[2]
     local stack = self:get_stack(kind, key)
-    local where = kind == "ground" and "Ground" or kind == "inventory" and "Bag"
+    local where = kind == "ground" and ((self:at_base() and self:base_has("box")) and "Box" or "Ground") or kind == "inventory" and "Bag"
         or EQUIP_NAME[key]
     if not stack then return where .. ": empty" end
     local text = where .. ": " .. ITEM_DB[stack.item].name
@@ -448,7 +448,7 @@ function Game:draw_inventory(w, h)
     local total_rows = (n_ground + GROUND_GRID_COLS - 1) // GROUND_GRID_COLS
     off = math.max(0, math.min(off, (total_rows - GROUND_GRID_ROWS) * GROUND_GRID_COLS))
     self.ground_off = off
-    local label = "Ground"
+    local label = (self:at_base() and self:base_has("box")) and "Stash box" or "Ground"
     if #ground > per_page then
         label = label .. " " .. (off + 1) .. "-" .. math.min(#ground, off + per_page)
             .. "/" .. #ground

@@ -47,7 +47,7 @@ end
 
 function Game:is_cold(hours)
     hours = hours or self.player.hours
-    return not self:fire_at(hours) and self:warmth() < self:cold_need(hours)
+    return not self:fire_at(hours) and not self:bed_here() and self:warmth() < self:cold_need(hours)
 end
 
 -- A lit torch in either hand.
@@ -89,6 +89,7 @@ function Game:tick()
         self:survive_hour()
         self:emission_hour(hour)
         self:dog_hour(hour)
+        self:base_hour(hour)
     end
     self.ticked_hour = p.hours
     local cold = (p.cold_hours or 0) > 0

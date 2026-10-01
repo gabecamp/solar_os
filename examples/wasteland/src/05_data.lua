@@ -236,6 +236,14 @@ local TECH = {
     },
 }
 
+-- A base (src/51_base.lua): claim a ruin, then build on it. The barrel
+-- fills a bottle every barrel_hours (2 in rain) into the stash box.
+local BASE = {
+    order = {"box", "bedroll", "barrel", "barricade"},
+    names = {box = "Stash box", bedroll = "Bedroll", barrel = "Rain barrel", barricade = "Barricade"},
+    barrel_hours = 12, barrel_max = 6, bed_rest_bonus = 0.5,
+}
+
 local BACKPACK_CAP = 16      -- most bag cells any build can have (the layout's limit)
 local POCKET_CELLS = 4       -- bag cells with nothing worn on your back
 
@@ -453,6 +461,17 @@ local RECIPES = {
      out = {"snare", 1}, known = true},
     {id = "cook_fish", name = "Cooked Fish", inputs = {raw_fish = 1}, fire = true, hours = 1,
      out = {"cooked_fish", 1}, known = true},
+    -- base building (base = what it builds; see BASE and src/51_base.lua)
+    {id = "claim", name = "Claim this ruin", inputs = {rope = 2, scrap_metal = 3}, hours = 4,
+     base = "claim", known = true},
+    {id = "box", name = "Stash box", inputs = {scrap_metal = 2, rope = 1}, hours = 2,
+     base = "box", known = true},
+    {id = "bedroll", name = "Bedroll", inputs = {cloth_scrap = 3, stick = 2}, hours = 2,
+     base = "bedroll", known = true},
+    {id = "barrel", name = "Rain barrel", inputs = {scrap_metal = 2, empty_bottle = 1}, hours = 2,
+     base = "barrel", needs = "box", known = true},
+    {id = "barricade", name = "Barricade", inputs = {stick = 4, scrap_metal = 2}, hours = 3,
+     base = "barricade", known = true},
     {id = "filter", name = "Filter Water", inputs = {dirty_water = 1, cloth_scrap = 1}, hours = 1,
      out = {"water_bottle", 1}, known = true},
     {id = "splint", name = "Splint", inputs = {stick = 2, cloth_scrap = 1}, hours = 1,

@@ -64,6 +64,7 @@ function Game:draw_map(w, h)
     if goal_line then gfx.text(PANEL_X, 112, goal_line) end
     local site_at = {}
     for name, key in pairs(self.sites) do site_at[key] = name end
+    if self.base then site_at[self.base.key] = "camp" end   -- drawn like a site
 
     local reachable = {}
     for _, n in ipairs(neighbors(self.tiles, p.q, p.r)) do

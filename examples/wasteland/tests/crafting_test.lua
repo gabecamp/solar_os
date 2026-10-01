@@ -35,7 +35,7 @@ for _, r in ipairs(C.RECIPES) do
         assert(math.type(qty) == "integer" and qty > 0)
     end
     for _, t in ipairs(r.tools or {}) do assert(C.ITEM_DB[t], r.id .. ": unknown tool " .. t) end
-    assert(r.out or r.place, r.id .. " makes nothing")
+    assert(r.out or r.place or r.base, r.id .. " makes nothing")
     if r.out then
         assert(C.ITEM_DB[r.out[1]] and C.SPRITES[r.out[1]], r.id .. ": output has no item/icon")
     end

@@ -66,6 +66,10 @@ end
 -- nil if you can make it now, else the reason you can't.
 function Game:craft_blocker(r)
     if not (r.repair or self.known[r.id]) then return "You don't know how to make that." end
+    if r.base then
+        local why = self:base_blocker(r)
+        if why then return why end
+    end
     for _, iq in ipairs(Game.recipe_inputs(r)) do
         if self:count_item(iq[1]) < iq[2] then
             return "Need " .. iq[2] .. " " .. ITEM_DB[iq[1]].name .. "."
@@ -86,6 +90,7 @@ function Game:craft(r)
         return false
     end
     if r.repair then return self:repair(r) end
+    if r.base then return self:build_base(r) end
     local p = self.player
     for _, iq in ipairs(Game.recipe_inputs(r)) do self:take_items(iq[1], iq[2]) end
     p.hours = p.hours + r.hours

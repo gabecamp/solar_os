@@ -215,15 +215,18 @@ function Game:rest()
         self:push_log("Already rested.")
         return
     end
-    local fire = self:fire_here()
+    local fire, bed = self:fire_here(), self:bed_here()
     p.hours = p.hours + REST_HOURS
     apply_rest_hours(p, REST_HOURS)
     if fire then   -- a campfire: warm, and better sleep
         p.needs.rest = clamp(p.needs.rest + REST_HOURS * (100 / 6) * WORLD.fire_rest_bonus)
     end
+    if bed then    -- your own bedroll at camp
+        p.needs.rest = clamp(p.needs.rest + REST_HOURS * (100 / 6) * BASE.bed_rest_bonus)
+    end
     p.mp = effective_max_mp(p)
     self:refresh_view()
-    self:push_log("Rested " .. REST_HOURS .. "h" .. (fire and " by the fire." or "."))
+    self:push_log("Rested " .. REST_HOURS .. "h" .. (bed and " in your bedroll." or fire and " by the fire." or "."))
     if self:weather() == "Rain" then self:rain_fill() end
     if p.injuries.bleeding then self:push_log("You're still bleeding. Bandage it (E on cloth).") end
     self:check_death("You bled out in your sleep.")
