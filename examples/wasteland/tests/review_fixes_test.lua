@@ -53,11 +53,11 @@ local rects = 0
 local real_fill = fake.gfx.fill_rect
 g = fresh()
 fake.gfx.fill_rect = function(...) rects = rects + 1; return real_fill(...) end
-g:draw_inventory(400, 300)
+g:draw_silhouette()   -- (the doll the bag screen's tiles are cut from)
 local without = rects
 rects = 0
 g.player.equipped.belt = "leather_belt"
-g:draw_inventory(400, 300)
+g:draw_silhouette()
 fake.gfx.fill_rect = real_fill
 assert(rects > without, "belt adds paint")
 

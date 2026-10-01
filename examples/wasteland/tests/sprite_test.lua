@@ -67,8 +67,13 @@ for _, c in ipairs(SPRITE_CALLS) do
 end
 -- expected: ground 4 + bag 2 + equipped (tshirt,jeans,boots,backpack,cap,gloves)
 -- 6 x 5 (each worn icon is drawn 4x in white as a halo, then once in black)
-assert(#SPRITE_CALLS == 36, "expected 36 sprites, got " .. #SPRITE_CALLS)
-print("   count matches: 4 ground + 2 bag + 6 worn x 5 (halo) = 36, all on screen")
+-- (the doll itself is drawn as bitmap tiles: count the 16x16 icons apart)
+local icons = 0
+for _, c in ipairs(SPRITE_CALLS) do if c.w == 16 and c.h == 16 then icons = icons + 1 end end
+assert(icons == 36, "expected 36 icon sprites, got " .. icons)
+assert(#SPRITE_CALLS == 36 + #game:doll_tiles(), "the rest are the doll's tiles")
+print("   count matches: 4 ground + 2 bag + 6 worn x 5 (halo) = 36 icons, + " .. #game:doll_tiles()
+    .. " doll tiles, all on screen")
 
 -- 5. an item with no art must fall back to a letter, not crash
 ITEM_DB.mystery = {name = "Mystery", slot = nil, consumable = nil}

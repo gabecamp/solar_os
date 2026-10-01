@@ -479,12 +479,87 @@ end
 -- The doll's pixels on the 1px ring just outside a slot, as runs
 -- {color, x, y, w, h}: draw_silhouette is run once into a recorder (so it is
 -- exactly what a full redraw paints there) and cached until the clothes change.
-function Game:doll_ring(slot, pos)
+-- Cached drawings of the doll for what you wear now (reset when it changes).
+function Game:doll_cache()
     local worn = {}
     for _, s in ipairs(EQUIP_SLOTS) do worn[#worn + 1] = self.player.equipped[s] or "-" end
     worn = table.concat(worn, ",")
     if not (self.ring_cache and self.ring_cache.worn == worn) then self.ring_cache = {worn = worn} end
-    if self.ring_cache[slot] then return self.ring_cache[slot] end
+    return self.ring_cache
+end
+
+-- The whole doll as 1-bit bitmap tiles, one set per color: {color, x, y,
+-- w, h, data}. draw_silhouette's ~500-800 rects are replayed once into a
+-- pixel grid and cut into 32x32 tiles (128 bytes, gfx.bitmap's limit); the
+-- firmware dithers a bitmap exactly like a fill_rect of the same color, so
+-- ~60-80 calls draw the same picture.
+function Game:doll_tiles()
+    local cache = self:doll_cache()
+    if cache.tiles then return cache.tiles end
+    local x0, y0, x1, y1 = 1e9, BODY_TOP - 1, -1e9, BODY_BOTTOM + 1
+    for _, b in ipairs(BODY_BLOCKS) do
+        for _, sp in ipairs(b.spans) do
+            x0, x1 = math.min(x0, sp[1] - 1), math.max(x1, sp[2] + 1)
+        end
+    end
+    local bw = x1 - x0
+    local grid, colors = {}, {}
+    local real_color, real_fill, pen = gfx.color, gfx.fill_rect, gfx.WHITE
+    gfx.color = function(c) pen = c end
+    gfx.fill_rect = function(x, y, w, h)
+        colors[pen] = true
+        for yy = math.max(y, y0), math.min(y + h, y1) - 1 do
+            local row = (yy - y0) * bw - x0
+            for xx = math.max(x, x0), math.min(x + w, x1) - 1 do grid[row + xx] = pen end
+        end
+    end
+    local ok, err = pcall(self.draw_silhouette, self)
+    gfx.color, gfx.fill_rect = real_color, real_fill
+    if not ok then error(err) end
+    local tiles = {}
+    for _, c in ipairs({gfx.BLACK, gfx.DARK, gfx.LIGHT}) do
+        if colors[c] then
+            for ty = y0, y1 - 1, 32 do
+                for tx = x0, x1 - 1, 32 do
+                    local w, h = math.min(32, x1 - tx), math.min(32, y1 - ty)
+                    local bytes, any = {}, false
+                    for yy = ty, ty + h - 1 do
+                        local row = (yy - y0) * bw - x0
+                        for bx = 0, (w + 7) // 8 - 1 do
+                            local v = 0
+                            for bit = 0, 7 do
+                                local xx = tx + bx * 8 + bit
+                                if bx * 8 + bit < w and grid[row + xx] == c then v = v | (1 << bit) end
+                            end
+                            if v ~= 0 then any = true end
+                            bytes[#bytes + 1] = string.char(v)
+                        end
+                    end
+                    if any then tiles[#tiles + 1] = {c, tx, ty, w, h, table.concat(bytes)} end
+                end
+            end
+        end
+    end
+    cache.tiles = tiles
+    return tiles
+end
+
+-- The doll: bitmap tiles when the firmware has them, else the rects.
+function Game:draw_doll()
+    if not draw_sprite then return self:draw_silhouette() end
+    local pen
+    for _, t in ipairs(self:doll_tiles()) do
+        if t[1] ~= pen then
+            pen = t[1]
+            gfx.color(pen)
+        end
+        draw_sprite(t[2], t[3], t[4], t[5], t[6])
+    end
+end
+
+function Game:doll_ring(slot, pos)
+    local cache = self:doll_cache()
+    if cache[slot] then return cache[slot] end
     local x0, y0, x1, y1 = pos.x - 1, pos.y - 1, pos.x + pos.w, pos.y + pos.h
     -- the ring as four lines of pixels: {x, y, dx, dy, length}
     local lines = {{x0, y0, 1, 0, x1 - x0 + 1}, {x0, y1, 1, 0, x1 - x0 + 1},
@@ -520,7 +595,7 @@ function Game:doll_ring(slot, pos)
             end
         end
     end
-    self.ring_cache[slot] = runs
+    cache[slot] = runs
     return runs
 end
 
@@ -666,7 +741,7 @@ function Game:draw_inventory(w, h)
     gfx.text(4, CONDITIONS_Y, self:current_conditions())
 
     -- silhouette + equip slots
-    self:draw_silhouette()
+    self:draw_doll()
     for i, row in ipairs(INV_ROWS) do
         if row[1] == "equip" then
             local pos = INV_POS[i]

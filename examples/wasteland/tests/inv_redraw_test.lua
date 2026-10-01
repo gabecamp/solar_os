@@ -5,8 +5,6 @@ package.path = "./?.lua;" .. package.path
 local fake = require("solaros")
 local gfx = fake.gfx
 gfx.begin()
-local Game, H = dofile("lib_hunt.lua")
-local KEY = H.KEY
 
 local W, Hh = 400, 300
 local canvas, color = {}, "W"
@@ -47,6 +45,11 @@ gfx.sprite = function(x, y, w, h, data)
         end
     end
 end
+
+-- (loaded after the canvas is in place: the game keeps its own reference
+-- to gfx.sprite from load time)
+local Game, H = dofile("lib_hunt.lua")
+local KEY = H.KEY
 
 local function snapshot()
     local copy = {}
@@ -145,5 +148,37 @@ print("5. another screen in between forgets the patched state")
 g.inv_drawn = {sig = "x", cursor = 1}
 local main = io.open("../src/90_main.lua"):read("a")
 assert(main:find('if game.screen ~= "inventory" then game.inv_drawn = nil end', 1, true))
+
+print("6. the doll drawn as bitmap tiles is the rect doll, pixel for pixel")
+local outfits = {
+    {},
+    {head = "cap", jacket = "jacket", pants = "jeans", feet = "boots"},
+    {shirt = "tshirt", pants = "jeans", belt = "leather_belt", hands = "gloves", eyes = "sunglasses",
+     ears = "earmuffs", neck = "scarf", wrists = "bracers", back = "backpack"},
+}
+for n, outfit in ipairs(outfits) do
+    g = Game.new()
+    g:start_game()
+    g.player.equipped = {}
+    for slot, item in pairs(outfit) do g.player.equipped[slot] = item end
+    canvas = {}
+    g:draw_silhouette()
+    local rects = snapshot()
+    canvas = {}
+    calls = 0
+    g:draw_doll()
+    local tiled_calls = calls
+    local ok, at = same(rects, snapshot())
+    assert(ok, ("outfit %d differs at x %d y %d"):format(n, (at or 0) % W, (at or 0) // W))
+    for _, tile in ipairs(g:doll_tiles()) do
+        assert(#tile[6] == ((tile[4] + 7) // 8) * tile[5] and #tile[6] <= 128, "tile too big")
+    end
+    print(("   outfit %d: %d calls for the tiled doll"):format(n, tiled_calls))
+    assert(tiled_calls < 120, tostring(tiled_calls))
+end
+local first = g:doll_tiles()
+assert(g:doll_tiles() == first, "cached while the clothes stay the same")
+g.player.equipped.head = "cap"
+assert(g:doll_tiles() ~= first, "rebuilt when they change")
 
 print("INVENTORY REDRAW TESTS PASSED")
