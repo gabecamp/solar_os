@@ -336,3 +336,11 @@ g:start_game()
 g:start_karl()
 g:draw_encounter(400, 300)
 solaros.dump("ops_karl.txt")
+
+-- Scene: a stray dog
+g = fresh()
+g:start_game()
+g.player.inventory = {{item = "strange_meat", qty = 1}}
+g:start_encounter({kind = "dog", name = "Stray Dog", art = "stray", who = "dog", intro = "A thin mongrel watches you from the grass, ribs showing, one ear up. It doesn't run. It doesn't come closer either.", start = "near"})
+g:draw_encounter(400, 300)
+solaros.dump("ops_dog.txt")

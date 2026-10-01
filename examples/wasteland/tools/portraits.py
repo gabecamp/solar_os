@@ -540,6 +540,37 @@ def door():
     return c, (48, 30, 96)
 
 
+def stray():
+    """A thin stray mongrel, standing side-on, head turned to you, tail low."""
+    c = Canvas()
+    c.ground_shadow(100, 172, 70, 8)
+    fur = 0.55
+    leg(c, (132, 114), (136, 138), (132, 154), (134, 170), fur * 0.7, 70, w=(12, 9, 6))
+    leg(c, (82, 114), (78, 136), (82, 154), (78, 170), fur * 0.7, 71, w=(12, 9, 6))
+    body = poly([(66, 98), (86, 88), (122, 86), (148, 92), (156, 104), (150, 120),
+                 (126, 120), (100, 118), (82, 122), (68, 116)])
+    c.body(body, fur, soft=12, seed=72)
+    c.hatch(body, 165, 0.45, 3.0, 6, seed=172)
+    for i in range(4):                      # thin: ribs show
+        x = 96 + i * 8
+        c.darken(blur(stroke([(x, 96), (x + 3, 114)], 1.6), 1.2), 0.3)
+    c.body(tapered([(154, 104), (170, 118), (176, 134)], 7, 3), fur, soft=3, seed=73)  # tail, low
+    leg(c, (144, 114), (148, 138), (144, 154), (146, 170), fur, 74, w=(12, 9, 6))
+    leg(c, (92, 116), (88, 138), (92, 154), (90, 170), fur, 75, w=(12, 9, 6))
+    neck = tapered([(80, 98), (64, 82), (58, 72)], 24, 18)
+    c.body(neck, fur, soft=8, seed=76)
+    head = union(ellipse(56, 62, 18, 16), poly([(46, 62), (30, 70), (32, 80), (52, 78)]))
+    c.body(head, fur * 1.15, soft=6, seed=77)
+    c.body(poly([(60, 48), (70, 30), (72, 54)]), fur * 0.8, soft=3, seed=78)            # ear up
+    c.body(tapered([(46, 50), (38, 46), (34, 60)], 8, 6), fur * 0.7, soft=3, seed=79)     # ear flopped
+    c.flat(ellipse(31, 74, 4, 3.5), 0.05)                                                 # nose
+    c.darken(blur(stroke([(34, 80), (46, 82)], 1.4), 0.8), 0.6)                           # mouth
+    eye(c, 50, 60, 4, 3.4)
+    eye(c, 62, 58, 3.4, 3)
+    c.outline(0.9)
+    return c, (16, 30, 96)
+
+
 def karl():
     """Karl the fisherman: a PLACEHOLDER smiley face. Karl is a real person;
     the user will supply art/karl.jpg, which replaces this automatically."""
@@ -558,6 +589,6 @@ SUBJECTS = {
     "jawhound": jawhound, "boar": boar, "crows": crows, "stag": stag,
     "fused": fused, "mouthless": mouthless, "bloom": bloom,
     "bandits": bandits, "tollman": tollman, "medic": medic, "wanderer": wanderer,
-    "karl": karl,
+    "karl": karl, "stray": stray,
     "hollow": hollow, "bell": bell, "stars": stars, "stillness": stillness, "door": door,
 }

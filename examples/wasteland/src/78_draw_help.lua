@@ -9,10 +9,9 @@ Game.VERSION = "0.10 (2026-10-01)"
 
 local HELP = {
     {"MAP", "Arrows/WASD move    Space rest 4h"},
-    {"", "F search the hex   E water: fill/drink"},
-    {"", "T trade / Checkpoint   C craft   I bag"},
-    {"", "G hunt, or fish by water with a rod"},
-    {"", "M sound on/off"},
+    {"", "F search   E water: fill/drink   I bag"},
+    {"", "T trade/Checkpoint   C craft"},
+    {"", "G hunt, or fish by water   M sound"},
     {"BAG", "Arrows pick  Enter select, Enter move"},
     {"", "E use: eat, drink, wear, read, set snare"},
     {"CRAFT", "Up/Dn pick  Enter make  C/Q back"},
@@ -20,10 +19,9 @@ local HELP = {
     {"FIGHTS", "Up/Dn pick  Enter choose"},
     {"PUZZLE", "Arrows move  T+arrow throw  1-4 sigils"},
     {"", "Q backs away from a puzzle unharmed"},
-    {"TIPS", "Shelter in ruins/hills when the sky"},
-    {"", "bruises. Boil or filter river water."},
+    {"TIPS", "Shelter in ruins/hills from emissions."},
     {"", "3 artifacts or a permit get you out."},
-    {"", "Karl fishes the rivers. Mind his riddles."},
+    {"", "Karl fishes rivers. Strays like food."},
 }
 
 function Game:open_help()

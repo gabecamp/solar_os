@@ -234,6 +234,23 @@ local DIFFICULTY = {
     hard   = {name = "Zone-Hardened", short = "Hard", food = 0.85, encounter = 1.3, rad = 1.25, emission = 1.25, drain = 1.1},
 }
 
+-- A dog companion (src/48_dog.lua). chance: % per move on `terrain` while
+-- you have none. tame: % that food wins it over (+meat_bonus for meat).
+-- warn_bonus: + % to hide and flee. bite: dmg range, bite_chance % per
+-- enemy turn at close range. guard: % it takes a blow meant for you. It
+-- eats one item from `eats` every meal_hours; leave_after hungry meals and
+-- it goes.
+local DOG = {
+    chance = 2, terrain = {plains = true, forest = true},
+    tame = 60, meat_bonus = 25, hp = 30,
+    warn_bonus = 15, bite_chance = 50, bite = {3, 6}, guard = 20,
+    meal_hours = 24, leave_after = 3,
+    eats = {"rotten_meat", "strange_meat", "raw_fish", "cooked_meat", "cooked_fish", "jerky",
+            "canned_beans"},
+    intro = "A thin mongrel watches you from the grass, ribs showing, one ear up. "
+         .. "It doesn't run. It doesn't come closer either.",
+}
+
 local BACKPACK_CAP = 16      -- most bag cells any build can have (the layout's limit)
 local POCKET_CELLS = 4       -- bag cells with nothing worn on your back
 
@@ -3270,6 +3287,7 @@ function Game:tick()
         dose = dose + self:rad_hour()
         self:survive_hour()
         self:emission_hour(hour)
+        self:dog_hour(hour)
     end
     self.ticked_hour = p.hours
     local cold = (p.cold_hours or 0) > 0
@@ -3306,7 +3324,7 @@ local SAVE = {version = 1, dir = "wasteland", file = "save.lua",
                         "known", "ground", "log", "enc_cooldown", "ticked_hour", "rad_known",
                         "trader", "sites_known", "stashes", "next_emission", "snares",
                         "karl_asked", "karl_next", "karl_gave", "muted",
-                        "difficulty"}}
+                        "difficulty", "dog"}}
 
 -- Where the save lives: <preferred storage>/wasteland/save.lua
 function SAVE.path()
@@ -3608,7 +3626,7 @@ function Game:maybe_encounter(terrain_id)
         self.enc_cooldown = self.enc_cooldown - 1
         return
     end
-    if self:maybe_karl("move") then return end
+    if self:maybe_karl("move") or self:maybe_dog() then return end
     local chance = FIGHT.ENCOUNTER_CHANCE[terrain_id]
     if chance then chance = chance * self:diff("encounter") end
     if chance and self:is_night() then chance = chance * WORLD.night_encounters end
@@ -3683,6 +3701,12 @@ function Game:encounter_options()
     local kind = e.def.kind
     if kind == "helper" then return {{"Talk", "talk"}, {"Walk on", "leave_quietly"}} end
     if kind == "anomaly" then return {{"Investigate", "investigate"}, {"Walk away", "leave_quietly"}} end
+    if kind == "dog" then
+        local o = {}
+        if self:dog_food() then o[1] = {"Offer it food", "tame"} end
+        o[#o + 1] = {"Leave it", "leave_quietly"}
+        return o
+    end
     if kind == "riddle" then
         local o = {}
         for i, answer in ipairs(e.riddle.answers) do o[i] = {answer, "answer_" .. i} end
@@ -3749,6 +3773,7 @@ function Game:enemy_turn()
         e.outcome = "fled"
         return self:end_encounter("The " .. d.who .. " fled.")
     end
+    if self:dog_turn() then return end
     if e.range ~= "close" then
         if self:roll(FIGHT.ADVANCE_CHANCE + 10 * (d.speed - p.attrs.Speed)) then
             e.range = CLOSER[e.range]
@@ -3763,6 +3788,7 @@ function Game:enemy_turn()
         return
     end
     local dmg = d.dmg[1] + self:rand(d.dmg[2] - d.dmg[1] + 1)
+    if self:dog_guard(dmg) then return end
     p.health = clamp(p.health - dmg)
     self:sfx("hurt")
     local text = "The " .. d.who .. " hits you (-" .. dmg .. " HP)."
@@ -3819,6 +3845,7 @@ end
 function Game:encounter_action(action)
     local e, p = self.enc, self.player
     e.msg = {}
+    if action == "tame" then return self:dog_tame() end
     local answer = action:match("^answer_(%d)$")
     if answer then return self:karl_answer(tonumber(answer)) end
     if action == "investigate" then
@@ -3886,7 +3913,7 @@ function Game:encounter_action(action)
             self:enc_say("You can't make out much.")
         end
     elseif action == "hide" then
-        local chance = FIGHT.HIDE_CHANCE + 10 * (p.attrs.Perception - 3)
+        local chance = FIGHT.HIDE_CHANCE + 10 * (p.attrs.Perception - 3) + self:dog_bonus()
         if e.def.kind == "animal" then chance = chance - 10 end
         if self:roll(chance) then
             self:enc_say("You drop into cover and keep very still. It passes you by.")
@@ -3894,7 +3921,7 @@ function Game:encounter_action(action)
         end
         self:enc_say("It has seen where you went.")
     elseif action == "flee" then
-        if self:roll(FIGHT.FLEE_CHANCE[e.range] + 10 * (p.attrs.Speed - e.def.speed)) then
+        if self:roll(FIGHT.FLEE_CHANCE[e.range] + 10 * (p.attrs.Speed - e.def.speed) + self:dog_bonus()) then
             p.mp = p.mp - 1
             self:enc_say("You run until your lungs burn. It doesn't follow. (-1 MP)")
             return self:end_encounter("You ran from the " .. e.def.who .. ".")
@@ -4724,6 +4751,111 @@ function Game:toggle_mute()
     self:push_log(self.muted and "Sound off. (M)" or "Sound on. (M)")
 end
 -- ---------------------------------------------------------------------
+-- A dog companion (numbers in DOG, 05_data)
+--
+-- A rare stray turns up on plains/forest while you have no dog. Offer it
+-- food to tame it (self.dog, saved). It warns you (better hiding and
+-- running), bites in fights, sometimes takes a blow meant for you, and
+-- eats from your bag once a day - after DOG.leave_after hungry days it
+-- leaves. If it dies, it's gone.
+-- ---------------------------------------------------------------------
+
+function Game:maybe_dog()
+    local p = self.player
+    if self.dog or not DOG.terrain[self.tiles[hex_key(p.q, p.r)]] then return false end
+    if not self:roll(DOG.chance) then return false end
+    self:start_encounter({kind = "dog", name = "Stray Dog", art = "stray", who = "dog",
+                          intro = DOG.intro, start = "near"})
+    self:sfx("bark")
+    return true
+end
+
+-- The first food in the bag the dog would eat (DOG.eats, in order).
+function Game:dog_food()
+    for _, item in ipairs(DOG.eats) do
+        for i, s in ipairs(self.player.inventory) do
+            if s.item == item then return i, item end
+        end
+    end
+end
+
+function Game:dog_tame()
+    local i, item = self:dog_food()
+    if not i then return end
+    local s = self.player.inventory[i]
+    s.qty = s.qty - 1
+    if s.qty <= 0 then table.remove(self.player.inventory, i) end
+    local meat = item:find("meat") or item:find("fish") or item == "jerky"
+    if self:roll(DOG.tame + (meat and DOG.meat_bonus or 0)) then
+        self.dog = {hp = DOG.hp, fed_hour = self.player.hours, hungry_days = 0}
+        self:sfx("bark")
+        self:enc_say("It wolfs down the " .. ITEM_DB[item].name:lower()
+            .. ", then sits by your boot and looks up at you. You have a dog.")
+        self:end_encounter("A stray dog follows you now.")
+    else
+        self:enc_say("It snatches the " .. ITEM_DB[item].name:lower() .. " and bolts into the grass.")
+        self:end_encounter("The stray ran off with your food.")
+    end
+end
+
+-- Hide/flee bonus while the dog is with you.
+function Game:dog_bonus()
+    return self.dog and DOG.warn_bonus or 0
+end
+
+-- In a fight, the dog's turn: maybe a bite. Returns true if the fight ended.
+function Game:dog_turn()
+    local e = self.enc
+    if not self.dog or e.over or e.range ~= "close" then return false end
+    if self:roll(DOG.bite_chance) then
+        local dmg = DOG.bite[1] + self:rand(DOG.bite[2] - DOG.bite[1] + 1)
+        self:enc_hit(dmg, nil, "Your dog bites the " .. e.def.who)
+    end
+    return e.over
+end
+
+-- The dog jumps in front of a blow. Returns true if it took it.
+function Game:dog_guard(dmg)
+    if not self.dog or not self:roll(DOG.guard) then return false end
+    local dog = self.dog
+    dog.hp = dog.hp - dmg
+    if dog.hp <= 0 then
+        self.dog = nil
+        self:sfx("whine")
+        self:enc_say("Your dog throws itself in the way. It doesn't get up.")
+        self:push_log("Your dog died protecting you.")
+    else
+        self:enc_say(("Your dog takes the blow for you (-%d)."):format(dmg))
+    end
+    return true
+end
+
+-- One hour passing: a slow heal, and a meal once a day.
+function Game:dog_hour(hour)
+    local dog = self.dog
+    if not dog then return end
+    if hour % 6 == 0 and dog.hp < DOG.hp then dog.hp = dog.hp + 1 end
+    if hour - dog.fed_hour < DOG.meal_hours then return end
+    dog.fed_hour = hour
+    local i, item = self:dog_food()
+    if i then
+        local s = self.player.inventory[i]
+        s.qty = s.qty - 1
+        if s.qty <= 0 then table.remove(self.player.inventory, i) end
+        dog.hungry_days = 0
+        self:push_log("Your dog eats the " .. ITEM_DB[item].name:lower() .. ".")
+    else
+        dog.hungry_days = dog.hungry_days + 1
+        if dog.hungry_days >= DOG.leave_after then
+            self.dog = nil
+            self:sfx("whine")
+            self:push_log("Your dog is gone. Too long without food.")
+        else
+            self:push_log("Your dog is hungry. Nothing in the bag it can eat.")
+        end
+    end
+end
+-- ---------------------------------------------------------------------
 -- Rendering
 -- ---------------------------------------------------------------------
 
@@ -4890,6 +5022,13 @@ function Game:draw_map(w, h)
                 gfx.fill_rect(rnd(px) - 5, rnd(py) - 5, 10, 10)
                 gfx.color(gfx.BLACK)
                 gfx.fill_rect(rnd(px) - 3, rnd(py) - 3, 6, 6)
+                if self.dog then   -- your dog at your heel: a small block with an ear
+                    gfx.color(gfx.WHITE)
+                    gfx.fill_rect(rnd(px) + 4, rnd(py) + 1, 8, 6)
+                    gfx.color(gfx.BLACK)
+                    gfx.fill_rect(rnd(px) + 5, rnd(py) + 3, 6, 3)
+                    gfx.fill_rect(rnd(px) + 9, rnd(py) + 1, 2, 2)
+                end
             end
         end
       end
@@ -5667,6 +5806,17 @@ local PORTRAIT_DATA = {
             marks = {66, 41, 91, 64, 70, 67, 29, 40, 25, 67, 5, 67, 58, 73, 34, 32, 33, 75, 60, 33, 4, 29, 88, 75, 12, 77, 49, 77},
             data = "AAAAAAAAAEAAAADgAAAA/AAAAP4AAMBfAADgAwAA8AEAAPgAAAB+AAAAHwAAwAcAAOADAADwAQAA+AAAAHwAAAA8AAAAHgAAAA4AAAAHAACAAwAAwAMAAOABAADgAQAA4AAAAHAAAPB4AAD4fAAA/DgAAPwcAAD8HgAA/h8AAP/4//8P/////78AAP4XAADwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAwAMAAOAHAADgDwAA4A8AAPAPAADwHwAA8AAAAAABAAAADwAAAD8AAAD+AAAA/AEAAOADAADAHwAAAB4AAAB8AAAA+AAAAPABAADAAwAAwA8AAAAPAAAAHgAAADgAAAB4AAAA8AAAAPABAADgAQAAwAEAAIADAAAABwAAAA4PAAAfHwAAHj8AABw/AAA8fwAAPH8AADh/AAB4DgAA/g8AAP8PAAD+BwAA/wcAAP4HAAD8AwAA/AcAAPwDAAD4AwAA8AMAAAADAAAAAwAAAAEAAAADAAAAAwAAAAMAAAABAAAAAwAAAAMAAAADAAAAAwAAAAMAAAADAAAAAwAAAAcAAAADAAAABwAAAAcAAAAHAAAADgAAAA8AAAAPAAD4HwAA+A8AAPgfAADwDwAA8A8AAPAHAADgBwAA4AMAAMABAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH8AAHh/AABwfwAA4H8AAPB/AADgfwAAwD8AAOAfAADADwAAwAcAAMAAAACAAAAAwAAAAIAAAADAAAAAgAAAAMAAAACAAAAAwAAAAIAAAADAAAAAgAAAAMAAAADAAAAAwAAAAMAAAADAAAAA4AAAAOAAAADgAAAA8AAAAPAAAABwDgAAABwAAAE+AIADPADABzgAgA94AAAf8AAAPvAAAPzgAAD4wAEA8IADAICABwAAAA8AAAAfAAAAHgAAAHwAAAB4AAAA8AEAAOABAADABwAAgA8AAAAfAAAAPgAAAHwAAADgAAAAwAcAAIA/AAAA/wAAAPgAAADwAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAMAAOAfAAD8/wAA/v/////4//8/0P//BwD6LwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAwAA4H8FQP3//////P//HwAAADiAAQB8wAMAOPADADzwAwAe/AEAHn4AAA5/AAAPDwCABwcAwAcDAIADAQDAAQAA4AAAAPAAAAA4AAAAfAAAAD4AAAAfAACADwAAwAcAAOABAAD4AAAAOAAAAB8AAIAPAADwBwAA+AAAAH8AAAA/AAAABwAAAAAAAAAAAAAA"},
     },
+    stray = {
+        near = {w = 96, h = 96, tw = 3, th = 3,
+            marks = {50, 53, 69, 53, 38, 52, 59, 57, 83, 56, 64, 45, 31, 45, 40, 65, 75, 63, 87, 65, 15, 38, 42, 43, 65, 66, 35, 34},
+            data = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAcAAAAOoAAAPb3AAD6gQAA/1UAAO4AAABfVQAADogAAFfWAIAvAwAAU/EAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAABAAAAAQAAAACAAAABwAAAA4AAAANAAAADgAAAA8AAAAPAAAADwAAAAoAAAAfAAAACgAAABwAAAAeAAAAHwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIqAAARP0AAIL6AMDV/wDA6/8AwP//AID//wAAX1cAAACIAAAAVAAAAKgAAAB4AAAAqAAAAPAAAADgAAAAwAAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAfAAAAHwAAAA8AAAAHAAAADwAAAB0AAAAiAAAAdQAAAIgAAADVAQAAogMAAFUHVXWqrqqq1V1VVaq6qqr3f1VVq76qiP9/VVX+v6oq/n9VV/qvqqr03/39qqu6u3T///+oiv7v3N///7iv///w11X/wO4AAEDXAACg4wAA4PcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAoAAAB9AQAAogMAAFUHAACKCgAAVR0AAKo6AAD3fwAAqo4AAP3/AQC7/gIAf98FAL8OCwBfDxYAPw4sAH8HeAC7DiAAXQdgALoO4AB/D8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAARAAAAAAAAAARAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACg6wAA4HcAAKBjAADwdwAAoGsAAOB3AADgLwAAwH8AAMBqAADAXwAAgOIAAIDXAACA5gAAgNcAAIBjAACAcwAAgGMAAMBRAACAYwAA0XEREeAoAAD4fUSE8DwAAFEREREAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAALoOgAD+DcABug6AAf4dgAG6DAAA/h0AADwPAAA8BwAAmgYAAJ4HAACaAgAA3wcAAI4CAABNAwAAjgMAAI4DAACOAgAAjgMAAIoCAAAeBwAAjgIAAN8HAACPAwAAFREAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"},
+        far = {w = 48, h = 48, tw = 2, th = 2,
+            marks = {18, 26, 27, 27, 38, 25, 34, 28, 23, 24, 29, 22, 38, 33, 19, 33, 42, 29, 13, 20, 8, 18, 33, 39, 17, 13, 12, 11},
+            data = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAADAAACAgAA1wMAAI4DAABfBwAAowIAAFUHAACgAwAA/QMAgP8DAAD/BQAAoAgAAEAdRACAqqoAgH9VAAD+qgAAf10AAL6qAAD//wAAqv8AAPz9AAC4AAAA/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAB8AAAAqAAAAfQAAALoAAAD/AQAALwIAADcEAAA/CAAANwgAAAAAuAAAANwAAAD4AAAAeAAAAPgAAADQAAAAsAAAANAAAACIAAAAXEQAAO4AABB1VQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAALggAAH8QAAAuAAAANwAAADIAAAAXAAAAGwAAABMAAAASAAAAFwAAADsAAAAXAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},
+        close = {w = 96, h = 96, tw = 3, th = 3,
+            marks = {61, 52, 38, 53, 69, 57, 86, 57, 50, 55, 23, 49, 32, 44, 52, 42, 13, 46, 55, 65, 75, 66, 20, 39, 91, 66, 44, 37},
+            data = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADwAAAA2AEAAKwHAAB0HwAArPoAAFT9AACs+gAA9P8AAOz/AAD2/gAA6vwAAPf2AAD7AwAA/VUAAHsCAIB/dQCAPgAAwH8VAIB/gACAXxUAAAAAAABgAAAAIAAAAHAAAABwAAAAWAAAAGgAAAB8AAAAbAAAAHYAAADrAAAAdQAAgOsAAID1AADAegAAQP0A+P/6AF/V/wADoP8AV9X/AAMA/gBXVf0AAwD6AVVV9QEAAKgAVVXdAQqCqgF1wf0DDPDoAxzx/AMPAvoDH1X/AwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABPAAAARFUAAEAAAABAVQAAQAAAAHBVAAAcoAAAV9UAwAGoAPBX/QD4h/oA+Ff/APiv/gD4//8A8Pv/AMD//wAA//8AAP8FAAAAAAAAABEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAqP4HQNX/A6Cq/wNV//8DqOr/A93//wGq//8B////Af7/fwD//38A//8/AP///wD//68B//9XA///ogb/f1UNioiIGlhVVTUwIqJqcFVV1aCIiKhwVVVVoKqiqmBVVVXgqoiowFVVVYCqqqqAd1d1AKuqqgDeVdUArKqqAPh39wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAMAAAAGAAAADwAAABoAAAA9AOT/6v//qv9XV3WqioqK/VVVVbqroqr/V1dVAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAsKqqAODf/QDAqqoAgP//AACr6gAA/v8AALz/AAD8/wAA7P8AAPz/AACo/wAA2P8AAKj+AABY/QAAqPoAAHj3AACwqgAAWN0AALiqAABQdwAAsKoAAPD9AADgugAAgP8AAACuAAAA+AAAALAAAADwAAAAuAAAANgAAACoAAAA+O6viKj/X1VV/6+qqv9fV1f/r4qq/19VVf+vqqr/V1dX/4uqqv9XVVX/q6qq/3X///+qqqr/3d3/r6qqq/f///+qququ/dX//6qq+/9/1f//qqr+/n/V//+76v//f/X//67qn/1/9QEAv/IBAH/1AQC++gAAf/0BAD76AABf/QAA"},
+    },
     hollow = {
         near = {w = 96, h = 96, tw = 3, th = 3,
             marks = {52, 55, 32, 55, 76, 51, 66, 57, 15, 56, 42, 59, 80, 61, 27, 66, 70, 67, 57, 65, 10, 67, 85, 70, 88, 35, 18, 35},
@@ -6283,10 +6433,9 @@ Game.VERSION = "0.10 (2026-10-01)"
 
 local HELP = {
     {"MAP", "Arrows/WASD move    Space rest 4h"},
-    {"", "F search the hex   E water: fill/drink"},
-    {"", "T trade / Checkpoint   C craft   I bag"},
-    {"", "G hunt, or fish by water with a rod"},
-    {"", "M sound on/off"},
+    {"", "F search   E water: fill/drink   I bag"},
+    {"", "T trade/Checkpoint   C craft"},
+    {"", "G hunt, or fish by water   M sound"},
     {"BAG", "Arrows pick  Enter select, Enter move"},
     {"", "E use: eat, drink, wear, read, set snare"},
     {"CRAFT", "Up/Dn pick  Enter make  C/Q back"},
@@ -6294,10 +6443,9 @@ local HELP = {
     {"FIGHTS", "Up/Dn pick  Enter choose"},
     {"PUZZLE", "Arrows move  T+arrow throw  1-4 sigils"},
     {"", "Q backs away from a puzzle unharmed"},
-    {"TIPS", "Shelter in ruins/hills when the sky"},
-    {"", "bruises. Boil or filter river water."},
+    {"TIPS", "Shelter in ruins/hills from emissions."},
     {"", "3 artifacts or a permit get you out."},
-    {"", "Karl fishes the rivers. Mind his riddles."},
+    {"", "Karl fishes rivers. Strays like food."},
 }
 
 function Game:open_help()

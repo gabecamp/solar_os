@@ -165,6 +165,13 @@ function Game:draw_map(w, h)
                 gfx.fill_rect(rnd(px) - 5, rnd(py) - 5, 10, 10)
                 gfx.color(gfx.BLACK)
                 gfx.fill_rect(rnd(px) - 3, rnd(py) - 3, 6, 6)
+                if self.dog then   -- your dog at your heel: a small block with an ear
+                    gfx.color(gfx.WHITE)
+                    gfx.fill_rect(rnd(px) + 4, rnd(py) + 1, 8, 6)
+                    gfx.color(gfx.BLACK)
+                    gfx.fill_rect(rnd(px) + 5, rnd(py) + 3, 6, 3)
+                    gfx.fill_rect(rnd(px) + 9, rnd(py) + 1, 2, 2)
+                end
             end
         end
       end

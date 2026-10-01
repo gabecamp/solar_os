@@ -184,6 +184,23 @@ local DIFFICULTY = {
     hard   = {name = "Zone-Hardened", short = "Hard", food = 0.85, encounter = 1.3, rad = 1.25, emission = 1.25, drain = 1.1},
 }
 
+-- A dog companion (src/48_dog.lua). chance: % per move on `terrain` while
+-- you have none. tame: % that food wins it over (+meat_bonus for meat).
+-- warn_bonus: + % to hide and flee. bite: dmg range, bite_chance % per
+-- enemy turn at close range. guard: % it takes a blow meant for you. It
+-- eats one item from `eats` every meal_hours; leave_after hungry meals and
+-- it goes.
+local DOG = {
+    chance = 2, terrain = {plains = true, forest = true},
+    tame = 60, meat_bonus = 25, hp = 30,
+    warn_bonus = 15, bite_chance = 50, bite = {3, 6}, guard = 20,
+    meal_hours = 24, leave_after = 3,
+    eats = {"rotten_meat", "strange_meat", "raw_fish", "cooked_meat", "cooked_fish", "jerky",
+            "canned_beans"},
+    intro = "A thin mongrel watches you from the grass, ribs showing, one ear up. "
+         .. "It doesn't run. It doesn't come closer either.",
+}
+
 local BACKPACK_CAP = 16      -- most bag cells any build can have (the layout's limit)
 local POCKET_CELLS = 4       -- bag cells with nothing worn on your back
 

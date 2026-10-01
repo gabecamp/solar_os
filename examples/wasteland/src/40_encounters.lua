@@ -20,7 +20,7 @@ function Game:maybe_encounter(terrain_id)
         self.enc_cooldown = self.enc_cooldown - 1
         return
     end
-    if self:maybe_karl("move") then return end
+    if self:maybe_karl("move") or self:maybe_dog() then return end
     local chance = FIGHT.ENCOUNTER_CHANCE[terrain_id]
     if chance then chance = chance * self:diff("encounter") end
     if chance and self:is_night() then chance = chance * WORLD.night_encounters end
@@ -95,6 +95,12 @@ function Game:encounter_options()
     local kind = e.def.kind
     if kind == "helper" then return {{"Talk", "talk"}, {"Walk on", "leave_quietly"}} end
     if kind == "anomaly" then return {{"Investigate", "investigate"}, {"Walk away", "leave_quietly"}} end
+    if kind == "dog" then
+        local o = {}
+        if self:dog_food() then o[1] = {"Offer it food", "tame"} end
+        o[#o + 1] = {"Leave it", "leave_quietly"}
+        return o
+    end
     if kind == "riddle" then
         local o = {}
         for i, answer in ipairs(e.riddle.answers) do o[i] = {answer, "answer_" .. i} end
@@ -161,6 +167,7 @@ function Game:enemy_turn()
         e.outcome = "fled"
         return self:end_encounter("The " .. d.who .. " fled.")
     end
+    if self:dog_turn() then return end
     if e.range ~= "close" then
         if self:roll(FIGHT.ADVANCE_CHANCE + 10 * (d.speed - p.attrs.Speed)) then
             e.range = CLOSER[e.range]
@@ -175,6 +182,7 @@ function Game:enemy_turn()
         return
     end
     local dmg = d.dmg[1] + self:rand(d.dmg[2] - d.dmg[1] + 1)
+    if self:dog_guard(dmg) then return end
     p.health = clamp(p.health - dmg)
     self:sfx("hurt")
     local text = "The " .. d.who .. " hits you (-" .. dmg .. " HP)."
@@ -231,6 +239,7 @@ end
 function Game:encounter_action(action)
     local e, p = self.enc, self.player
     e.msg = {}
+    if action == "tame" then return self:dog_tame() end
     local answer = action:match("^answer_(%d)$")
     if answer then return self:karl_answer(tonumber(answer)) end
     if action == "investigate" then
@@ -298,7 +307,7 @@ function Game:encounter_action(action)
             self:enc_say("You can't make out much.")
         end
     elseif action == "hide" then
-        local chance = FIGHT.HIDE_CHANCE + 10 * (p.attrs.Perception - 3)
+        local chance = FIGHT.HIDE_CHANCE + 10 * (p.attrs.Perception - 3) + self:dog_bonus()
         if e.def.kind == "animal" then chance = chance - 10 end
         if self:roll(chance) then
             self:enc_say("You drop into cover and keep very still. It passes you by.")
@@ -306,7 +315,7 @@ function Game:encounter_action(action)
         end
         self:enc_say("It has seen where you went.")
     elseif action == "flee" then
-        if self:roll(FIGHT.FLEE_CHANCE[e.range] + 10 * (p.attrs.Speed - e.def.speed)) then
+        if self:roll(FIGHT.FLEE_CHANCE[e.range] + 10 * (p.attrs.Speed - e.def.speed) + self:dog_bonus()) then
             p.mp = p.mp - 1
             self:enc_say("You run until your lungs burn. It doesn't follow. (-1 MP)")
             return self:end_encounter("You ran from the " .. e.def.who .. ".")

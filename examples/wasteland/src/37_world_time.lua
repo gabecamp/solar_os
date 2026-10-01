@@ -83,6 +83,7 @@ function Game:tick()
         dose = dose + self:rad_hour()
         self:survive_hour()
         self:emission_hour(hour)
+        self:dog_hour(hour)
     end
     self.ticked_hour = p.hours
     local cold = (p.cold_hours or 0) > 0
