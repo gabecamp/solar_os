@@ -29,7 +29,7 @@ g.snares["1,0"] = {set = 0}
 g.rad_known["2,0"] = 3
 g.player.rads = 42
 g.dog = {hp = 20, fed_hour = 0, hungry_days = 1}
-g.player.inventory = {{item = "lora_radio", qty = 1}, {item = "permit", qty = 1},
+g.player.inventory = {{item = "lora_radio", qty = 1}, {item = "permit", qty = 1}, {item = "geiger", qty = 1},
                       {item = "weeping_stone", qty = 2}}
 g.radio = {charge = 4, next = {}}
 t = text_of(g)

@@ -119,9 +119,16 @@ local WORLD = {
 local RAD = {
     fields = 5, min_dist = 4, dose = {1, 4, 10}, decay = 1, max = 100,
     level_name = {[0] = "clean", "low", "high", "deadly"},
-    stages = {{at = 30, name = "Irradiated", hurt = 0, tire = 1},
-              {at = 60, name = "Rad sick", hurt = 1, tire = 2},
-              {at = 85, name = "Rad poisoned", hurt = 2, tire = 3}},
+    -- name: what a Geiger owner knows it is; feel/onset: all you know without one
+    stages = {{at = 30, name = "Irradiated", hurt = 0, tire = 1, feel = "Unwell",
+               onset = "You feel weak and washed out, and you don't know why."},
+              {at = 60, name = "Rad sick", hurt = 1, tire = 2, feel = "Nauseous",
+               onset = "Nausea, and your gums bleed. Something is making you sick."},
+              {at = 85, name = "Rad poisoned", hurt = 2, tire = 3, feel = "Wasting",
+               onset = "Your hair comes out in clumps. You're getting worse."}},
+    -- what a dose feels like, by level, when nothing tells you what it is
+    feel = {"You feel a little off here.", "Your skin prickles. A metal taste.",
+            "A wave of nausea. Something here is wrong."},
     artifact_find = 20,   -- % a search on a level 2+ hex also turns up an artifact
     bolts_bonus = 2,      -- extra throws in the bolts puzzle while you carry bolts
     world_items = {"geiger", "gasmask", "antirad", "antirad", "bolts"},   -- dropped once each
@@ -3446,7 +3453,9 @@ function Game:death_reason()
     local p = self.player
     if self.emission_caught then return "The emission took you." end
     if (p.cold_hours or 0) > WORLD.cold_grace then return "You froze to death." end
-    if self:rad_stage() >= 2 then return "Radiation sickness took you." end
+    if self:rad_stage() >= 2 then
+        return self:can_measure() and "Radiation sickness took you." or "A wasting sickness took you."
+    end
     if (p.sick_hours or 0) > 0 then return "The sickness took you." end
     if p.needs.thirst <= 0 then return "You died of thirst." end
     if p.needs.hunger <= 0 then return "You starved." end
@@ -3794,7 +3803,9 @@ function Game:rad_hour()
     if level > 0 then
         dose = RAD.dose[level] * self:rad_armor() * self:diff("rad")
         p.rads = math.min(RAD.max, (p.rads or 0) + dose)
-        self.rad_known[hex_key(p.q, p.r)] = level
+        -- only a counter puts it on the map; otherwise you just felt something
+        if self:can_measure() then self.rad_known[hex_key(p.q, p.r)] = level end
+        self.dose_level = math.max(self.dose_level or 0, level)
     elseif (p.rads or 0) > 0 then
         p.rads = math.max(0, p.rads - RAD.decay)
     end
@@ -3804,6 +3815,12 @@ function Game:rad_hour()
         p.needs.rest = clamp(p.needs.rest - st.tire)
     end
     return dose
+end
+
+-- A Geiger counter (or the Anomaly Detector) tells you what's going on.
+-- Without one, radiation only shows as symptoms.
+function Game:can_measure()
+    return self:carrying("geiger") or self:carrying("anomaly_detector")
 end
 
 -- The Geiger counter reads your hex and the ones next to it.
@@ -3820,31 +3837,47 @@ function Game:geiger_scan()
         return
     end
     if not self:carrying("geiger") then return end
-    self.rad_known[hex_key(p.q, p.r)] = self:rad_at(p.q, p.r)
+    local here = hex_key(p.q, p.r)
+    self.rad_known[here] = self:rad_at(p.q, p.r)
+    local near = 0
     for _, n in ipairs(neighbors(self.tiles, p.q, p.r)) do
-        self.rad_known[hex_key(n[1], n[2])] = self:rad_at(n[1], n[2])
+        local level = self:rad_at(n[1], n[2])
+        self.rad_known[hex_key(n[1], n[2])] = level
+        near = math.max(near, level)
+    end
+    -- clean here but hot next door: the counter ticks faster (once per hex)
+    if self.rad_known[here] == 0 and near > 0 and self.geiger_ticked ~= here then
+        self.geiger_ticked = here
+        self:sfx("geiger")
+        self:push_log("The Geiger ticks faster. Something hot nearby.")
     end
 end
 
 -- Log lines (and clicks) for the hours tick just applied.
 function Game:rad_news(dose, stage_before)
     local p = self.player
-    local geiger = self:carrying("geiger")
+    local measured = self:can_measure()
+    local level = self.dose_level or 0
+    self.dose_level = nil
     if dose > 0 then
-        if geiger then
+        if measured then
             self:push_log(("Geiger crackles: +%d rads (%d)."):format(math.floor(dose + 0.5),
                                                                    math.floor(p.rads)))
             self:sfx("geiger")
         else
-            self:push_log("Your skin prickles. A metal taste.")
+            self:push_log(RAD.feel[math.max(1, level)])   -- a feeling, not a reading
         end
     end
     local stage = self:rad_stage()
     if stage > stage_before then
         local st = RAD.stages[stage]
-        self:push_log(st.name .. (st.hurt > 0 and (": -" .. st.hurt .. " HP/h. Anti-Rad!") or ": you feel weak."))
+        if measured then
+            self:push_log(st.name .. (st.hurt > 0 and (": -" .. st.hurt .. " HP/h. Anti-Rad!") or ": you feel weak."))
+        else
+            self:push_log(st.onset)
+        end
     elseif stage < stage_before and stage == 0 then
-        self:push_log("The radiation sickness fades.")
+        self:push_log(measured and "The radiation sickness fades." or "You feel more like yourself.")
     end
 end
 
@@ -3856,7 +3889,8 @@ function Game:rad_text()
         return "Geiger " .. RAD.level_name[self:rad_at(p.q, p.r)] .. " Rad " .. rads
     end
     local st = RAD.stages[self:rad_stage()]
-    return st and st.name or nil
+    if not st then return nil end
+    return self:can_measure() and st.name or st.feel
 end
 
 -- A search on a hot hex can turn up an artifact.
@@ -5264,7 +5298,8 @@ function RADIO.signal(self)
     end
     p.explored[key] = true
     self:radio_say("Numbers, read by a voice that isn't a voice. You understand them: something "
-        .. "waits " .. self:bearing_to(key) .. ". Your teeth ache. (+" .. TECH.signal_rads .. " rads)")
+        .. "waits " .. self:bearing_to(key) .. ". Your teeth ache."
+        .. (self:can_measure() and (" (+" .. TECH.signal_rads .. " rads)") or ""))
     return true
 end
 
@@ -5656,7 +5691,7 @@ function Game:current_conditions()
     if self.player.health < 50 then table.insert(list, "Hurt") end
     if (self.player.sick_hours or 0) > 0 then table.insert(list, "Sick") end
     local rad_stage = RAD.stages[self:rad_stage()]
-    if rad_stage then table.insert(list, rad_stage.name) end
+    if rad_stage then table.insert(list, self:can_measure() and rad_stage.name or rad_stage.feel) end
     if #list == 0 then return "Conditions: none" end
     local text = table.concat(list, ", ")
     -- all four at once don't fit after the prefix (mono 12 is ~7px/char)
@@ -7045,7 +7080,11 @@ function Game:journal_lines()
             or self:bearing_to(nearest)))
     end
     -- you, and who's with you
-    if (p.rads or 0) > 0 then add(("Radiation: %d rads."):format(math.floor(p.rads))) end
+    if self:can_measure() and (p.rads or 0) > 0 then
+        add(("Radiation: %d rads."):format(math.floor(p.rads)))
+    elseif self:rad_stage() > 0 then
+        add("You feel " .. RAD.stages[self:rad_stage()].feel:lower() .. ". Something is making you sick.")
+    end
     local emit = self:emission_text()
     if emit then add("Emission: " .. emit .. ". Get to ruins or hills.") end
     if self.dog then

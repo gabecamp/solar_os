@@ -43,7 +43,11 @@ function Game:journal_lines()
             or self:bearing_to(nearest)))
     end
     -- you, and who's with you
-    if (p.rads or 0) > 0 then add(("Radiation: %d rads."):format(math.floor(p.rads))) end
+    if self:can_measure() and (p.rads or 0) > 0 then
+        add(("Radiation: %d rads."):format(math.floor(p.rads)))
+    elseif self:rad_stage() > 0 then
+        add("You feel " .. RAD.stages[self:rad_stage()].feel:lower() .. ". Something is making you sick.")
+    end
     local emit = self:emission_text()
     if emit then add("Emission: " .. emit .. ". Get to ruins or hills.") end
     if self.dog then

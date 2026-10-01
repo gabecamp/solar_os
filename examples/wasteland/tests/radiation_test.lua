@@ -61,13 +61,18 @@ local function has_log(g, pat)
     return false
 end
 
-print("2. dose per hour by level, felt without a Geiger counter")
+print("2. dose per hour by level: without a Geiger you only feel it")
+local function leaks(text)   -- does anything name radiation?
+    local t = text:lower()
+    return t:find("%f[%a]rads?%f[%A]") or t:find("radiation") or t:find("geiger") or t:find("irradiat")
+end
 for level = 1, 3 do
     local g = game_on(level)
     pass_hours(g, 2)
     assert(g.player.rads == 2 * RAD.dose[level], "level " .. level .. ": " .. g.player.rads)
-    assert(g.rad_known[key(g.player.q, g.player.r)] == level, "a dose marks the hex")
-    assert(has_log(g, "skin prickles"))
+    assert(not g.rad_known[key(g.player.q, g.player.r)], "no counter: nothing on the map")
+    assert(has_log(g, RAD.feel[level]:sub(1, 12)), "felt it")
+    for _, line in ipairs(g.log) do assert(not leaks(line), "log names it: " .. line) end
 end
 
 print("3. a gas mask halves it")
@@ -83,7 +88,7 @@ g.player.rads = 10
 pass_hours(g, 4)
 assert(g.player.rads == 10 - 4 * RAD.decay)
 
-print("5. sickness stages: HP and rest per hour, conditions, panel, log")
+print("5. sickness stages: HP and rest per hour; named only with a Geiger")
 g = game_on(1)
 g.player.q, g.player.r = 0, 0
 g.player.rads = RAD.stages[2].at + 5
@@ -92,12 +97,43 @@ local hp = g.player.health
 local st = RAD.stages[2]
 g:rad_hour()
 assert(g.player.health == hp - st.hurt and g.player.needs.rest == 80 - st.tire)
-assert(g:current_conditions():find(st.name, 1, true), g:current_conditions())
-assert(g:rad_text() == st.name, "no Geiger: the panel shows the stage")
+assert(g:current_conditions():find(st.feel, 1, true), g:current_conditions())
+assert(g:rad_text() == st.feel, "no Geiger: the panel only says how you feel")
+local journal = table.concat(g:journal_lines(), " ")
+assert(not leaks(journal), "journal names it: " .. journal)
+assert(g:death_reason() == "A wasting sickness took you.")
+g.player.inventory[#g.player.inventory + 1] = {item = "geiger", qty = 1}
+assert(g:current_conditions():find(st.name, 1, true) and g:rad_text():find("^Geiger"))
+assert(table.concat(g:journal_lines(), " "):find("Radiation: ", 1, true))
+assert(g:death_reason() == "Radiation sickness took you.")
 g = game_on(3)
 g.player.rads = RAD.stages[1].at - 1
 pass_hours(g, 1)
-assert(has_log(g, RAD.stages[1].name), "stage change is logged")
+assert(has_log(g, RAD.stages[1].onset:sub(1, 15)), "the onset is felt")
+g = game_on(3)
+g.player.inventory[#g.player.inventory + 1] = {item = "geiger", qty = 1}
+g.player.rads = RAD.stages[1].at - 1
+pass_hours(g, 1)
+assert(has_log(g, RAD.stages[1].name), "with a Geiger it's named")
+assert(g.rad_known[key(g.player.q, g.player.r)] == 3, "and measured")
+
+print("5b. with a Geiger: it ticks faster next to a hot hex")
+g = game_on(1)
+local clean
+for _, d in ipairs({{1, 0}, {1, -1}, {0, -1}, {-1, 0}, {-1, 1}, {0, 1}}) do
+    local q, r = g.player.q + d[1], g.player.r + d[2]
+    local k = key(q, r)
+    if g.tiles[k] and not g.rad[k] then clean = {q, r} end
+end
+if clean then
+    g.player.q, g.player.r = clean[1], clean[2]
+    g.player.inventory[#g.player.inventory + 1] = {item = "geiger", qty = 1}
+    g:geiger_scan()
+    assert(has_log(g, "ticks faster"))
+    local n = #g.log
+    g:geiger_scan()
+    assert(#g.log == n, "once per hex")
+end
 
 print("6. Anti-Rad and Vodka take rads off, never below 0")
 g = game_on(1)
@@ -163,7 +199,7 @@ g = game_on(3)
 g.player.rads = RAD.max
 g.player.health = 2
 pass_hours(g, 1)
-assert(g.screen == "dead" and g.death_cause:find("Radiation"), tostring(g.death_cause))
+assert(g.screen == "dead" and g.death_cause == "A wasting sickness took you.", tostring(g.death_cause))
 
 print("11. items: new ones have sprites and turn up in loot or the world")
 for _, id in ipairs({"geiger", "gasmask", "antirad", "vodka", "bolts"}) do

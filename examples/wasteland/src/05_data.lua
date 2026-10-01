@@ -69,9 +69,16 @@ local WORLD = {
 local RAD = {
     fields = 5, min_dist = 4, dose = {1, 4, 10}, decay = 1, max = 100,
     level_name = {[0] = "clean", "low", "high", "deadly"},
-    stages = {{at = 30, name = "Irradiated", hurt = 0, tire = 1},
-              {at = 60, name = "Rad sick", hurt = 1, tire = 2},
-              {at = 85, name = "Rad poisoned", hurt = 2, tire = 3}},
+    -- name: what a Geiger owner knows it is; feel/onset: all you know without one
+    stages = {{at = 30, name = "Irradiated", hurt = 0, tire = 1, feel = "Unwell",
+               onset = "You feel weak and washed out, and you don't know why."},
+              {at = 60, name = "Rad sick", hurt = 1, tire = 2, feel = "Nauseous",
+               onset = "Nausea, and your gums bleed. Something is making you sick."},
+              {at = 85, name = "Rad poisoned", hurt = 2, tire = 3, feel = "Wasting",
+               onset = "Your hair comes out in clumps. You're getting worse."}},
+    -- what a dose feels like, by level, when nothing tells you what it is
+    feel = {"You feel a little off here.", "Your skin prickles. A metal taste.",
+            "A wave of nausea. Something here is wrong."},
     artifact_find = 20,   -- % a search on a level 2+ hex also turns up an artifact
     bolts_bonus = 2,      -- extra throws in the bolts puzzle while you carry bolts
     world_items = {"geiger", "gasmask", "antirad", "antirad", "bolts"},   -- dropped once each

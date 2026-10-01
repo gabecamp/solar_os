@@ -51,7 +51,9 @@ function Game:rad_hour()
     if level > 0 then
         dose = RAD.dose[level] * self:rad_armor() * self:diff("rad")
         p.rads = math.min(RAD.max, (p.rads or 0) + dose)
-        self.rad_known[hex_key(p.q, p.r)] = level
+        -- only a counter puts it on the map; otherwise you just felt something
+        if self:can_measure() then self.rad_known[hex_key(p.q, p.r)] = level end
+        self.dose_level = math.max(self.dose_level or 0, level)
     elseif (p.rads or 0) > 0 then
         p.rads = math.max(0, p.rads - RAD.decay)
     end
@@ -61,6 +63,12 @@ function Game:rad_hour()
         p.needs.rest = clamp(p.needs.rest - st.tire)
     end
     return dose
+end
+
+-- A Geiger counter (or the Anomaly Detector) tells you what's going on.
+-- Without one, radiation only shows as symptoms.
+function Game:can_measure()
+    return self:carrying("geiger") or self:carrying("anomaly_detector")
 end
 
 -- The Geiger counter reads your hex and the ones next to it.
@@ -77,31 +85,47 @@ function Game:geiger_scan()
         return
     end
     if not self:carrying("geiger") then return end
-    self.rad_known[hex_key(p.q, p.r)] = self:rad_at(p.q, p.r)
+    local here = hex_key(p.q, p.r)
+    self.rad_known[here] = self:rad_at(p.q, p.r)
+    local near = 0
     for _, n in ipairs(neighbors(self.tiles, p.q, p.r)) do
-        self.rad_known[hex_key(n[1], n[2])] = self:rad_at(n[1], n[2])
+        local level = self:rad_at(n[1], n[2])
+        self.rad_known[hex_key(n[1], n[2])] = level
+        near = math.max(near, level)
+    end
+    -- clean here but hot next door: the counter ticks faster (once per hex)
+    if self.rad_known[here] == 0 and near > 0 and self.geiger_ticked ~= here then
+        self.geiger_ticked = here
+        self:sfx("geiger")
+        self:push_log("The Geiger ticks faster. Something hot nearby.")
     end
 end
 
 -- Log lines (and clicks) for the hours tick just applied.
 function Game:rad_news(dose, stage_before)
     local p = self.player
-    local geiger = self:carrying("geiger")
+    local measured = self:can_measure()
+    local level = self.dose_level or 0
+    self.dose_level = nil
     if dose > 0 then
-        if geiger then
+        if measured then
             self:push_log(("Geiger crackles: +%d rads (%d)."):format(math.floor(dose + 0.5),
                                                                    math.floor(p.rads)))
             self:sfx("geiger")
         else
-            self:push_log("Your skin prickles. A metal taste.")
+            self:push_log(RAD.feel[math.max(1, level)])   -- a feeling, not a reading
         end
     end
     local stage = self:rad_stage()
     if stage > stage_before then
         local st = RAD.stages[stage]
-        self:push_log(st.name .. (st.hurt > 0 and (": -" .. st.hurt .. " HP/h. Anti-Rad!") or ": you feel weak."))
+        if measured then
+            self:push_log(st.name .. (st.hurt > 0 and (": -" .. st.hurt .. " HP/h. Anti-Rad!") or ": you feel weak."))
+        else
+            self:push_log(st.onset)
+        end
     elseif stage < stage_before and stage == 0 then
-        self:push_log("The radiation sickness fades.")
+        self:push_log(measured and "The radiation sickness fades." or "You feel more like yourself.")
     end
 end
 
@@ -113,7 +137,8 @@ function Game:rad_text()
         return "Geiger " .. RAD.level_name[self:rad_at(p.q, p.r)] .. " Rad " .. rads
     end
     local st = RAD.stages[self:rad_stage()]
-    return st and st.name or nil
+    if not st then return nil end
+    return self:can_measure() and st.name or st.feel
 end
 
 -- A search on a hot hex can turn up an artifact.

@@ -139,7 +139,8 @@ function RADIO.signal(self)
     end
     p.explored[key] = true
     self:radio_say("Numbers, read by a voice that isn't a voice. You understand them: something "
-        .. "waits " .. self:bearing_to(key) .. ". Your teeth ache. (+" .. TECH.signal_rads .. " rads)")
+        .. "waits " .. self:bearing_to(key) .. ". Your teeth ache."
+        .. (self:can_measure() and (" (+" .. TECH.signal_rads .. " rads)") or ""))
     return true
 end
 

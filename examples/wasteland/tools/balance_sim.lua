@@ -50,7 +50,7 @@ local function step_toward(g, want, through_hot)
             local nk = key(q + d[1], r + d[2])
             -- like a person: once a hex is known to be hot, go around it
             if prev[nk] == nil and g.tiles[nk] and TERRAIN[g.tiles[nk]].passable
-                and (through_hot or (g.rad_known[nk] or 0) == 0 or want(nk)) then
+                and (through_hot or ((g.rad_known[nk] or 0) == 0 and not FELT[nk]) or want(nk)) then
                 prev[nk] = k
                 queue[#queue + 1] = nk
             end
@@ -250,7 +250,12 @@ local function trade(g)
     g.screen = "map"
 end
 
+-- Hexes where the bot felt sick (without a Geiger it can't see radiation;
+-- like a player, it remembers where it felt bad and keeps away).
+FELT = {}
+
 local function play(seed)
+    FELT = {}
     fake.time.uptime_ms = function() return seed end
     local g = Game.new()
     g:set_difficulty(LEVEL)
@@ -334,7 +339,9 @@ local function play(seed)
                     if p.hours == h and g.screen == "map" then p.hours = p.hours + 1 end   -- wait
                 end
             end
+            local rads_before = p.rads or 0
             if g.screen ~= "dead" then g:tick() end
+            if (p.rads or 0) > rads_before then FELT[key(p.q, p.r)] = true end
         end
         stats.max_rads = math.max(stats.max_rads, p.rads or 0)
     end
