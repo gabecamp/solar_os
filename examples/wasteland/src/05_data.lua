@@ -126,8 +126,12 @@ local TRADE = {
         shiv = 6, machete = 18, spiked_club = 12, pipe_spear = 15, splint = 5,
         fishing_rod = 8, snare = 4, raw_fish = 3, cooked_fish = 6,
         pilk = 7, lucky_lure = 12, karls_waders = 14, karls_hat = 10,
+        broken_radio = 15, lora_radio = 60, broken_detector = 12, anomaly_detector = 45,
+        broken_headlamp = 6, headlamp = 25, circuit_board = 10, copper_wire = 5,
+        battery_cell = 8, antenna = 6, multitool = 20,
     },
     stock = {{"antirad", 3}, {"water_bottle", 4}, {"canned_beans", 4}, {"bandage", 2},
+             {"multitool", 1}, {"battery_cell", 1},
              {"vodka", 2}, {"empty_bottle", 3}, {"geiger", 1}, {"gasmask", 1},
              {"knife", 1}, {"permit", 1}},
     restock = {"canned_beans", "water_bottle", "antirad", "bandage", "vodka", "empty_bottle"},
@@ -199,6 +203,30 @@ local DOG = {
             "canned_beans"},
     intro = "A thin mongrel watches you from the grass, ribs showing, one ear up. "
          .. "It doesn't run. It doesn't come closer either.",
+}
+
+-- Broken tech (src/49_tech.lua): very rare devices that scavenged parts and
+-- a Multitool can bring back. A repair takes repair_hours and succeeds with
+-- base % (+per_point per Perception over 3); a failure burns one part.
+-- The LoRa Radio (R on the map) calls helpful voices for a charge each.
+local TECH = {
+    repairs = {
+        {broken = "broken_radio", out = "lora_radio", base = 35,
+         parts = {circuit_board = 1, copper_wire = 1, battery_cell = 1, antenna = 1}},
+        {broken = "broken_detector", out = "anomaly_detector", base = 45,
+         parts = {circuit_board = 1, copper_wire = 1, battery_cell = 1}},
+        {broken = "broken_headlamp", out = "headlamp", base = 60,
+         parts = {copper_wire = 1, battery_cell = 1}},
+    },
+    repair_hours = 3, per_point = 8, tool = "multitool",
+    world_items = {"broken_radio", "multitool"},   -- dropped once each
+    radio_max = 5, radio_start = 3, detector_range = 3, signal_rads = 10,
+    channels = {
+        {id = "trader", name = "Trader's net", cooldown = 72},
+        {id = "anna",   name = "Anna, old medic", cooldown = 72},
+        {id = "karl",   name = "Karl, 433 MHz", cooldown = 48},
+        {id = "signal", name = "The Signal", cooldown = 24},
+    },
 }
 
 local BACKPACK_CAP = 16      -- most bag cells any build can have (the layout's limit)
@@ -321,6 +349,20 @@ local ITEM_DB = {
                     sick = 15, perish = {hours = 24, into = "rotten_meat"}, desc = "Too many eyes. Cook it"},
     cooked_fish  = {name = "Cooked Fish",  slot = nil, consumable = {hunger = 35},
                     perish = {hours = 48, into = "rotten_meat"}},
+    -- broken tech and its parts (TECH)
+    broken_radio     = {name = "Broken Radio", slot = nil, consumable = nil, desc = "Repair: C, with parts"},
+    lora_radio       = {name = "LoRa Radio",   slot = nil, consumable = nil, desc = "R: call for help"},
+    broken_detector  = {name = "Dead Detector", slot = nil, consumable = nil, desc = "Repair: C, with parts"},
+    anomaly_detector = {name = "Anomaly Detector", slot = nil, consumable = nil,
+                        desc = "Carried: reads rads 3 hexes out"},
+    broken_headlamp  = {name = "Broken Headlamp", slot = nil, consumable = nil, desc = "Repair: C, with parts"},
+    headlamp     = {name = "Headlamp",     slot = "head", consumable = nil, light = true,
+                    desc = "Worn: light at night", wear = {{"head", 118, 122, "BLACK"}}},
+    circuit_board = {name = "Circuit Board", slot = nil, consumable = nil, desc = "A repair part"},
+    copper_wire  = {name = "Copper Wire",  slot = nil, consumable = nil, desc = "A repair part"},
+    battery_cell = {name = "Battery Cell", slot = nil, consumable = nil, desc = "Part; E: charge radio"},
+    antenna      = {name = "Antenna",      slot = nil, consumable = nil, desc = "A repair part"},
+    multitool    = {name = "Multitool",    slot = nil, consumable = nil, desc = "Tool for repairs"},
     scrap_metal  = {name = "Scrap Metal",  slot = nil, consumable = nil, desc = "For crafting"},
     jerky        = {name = "Jerky",        slot = nil, consumable = {hunger = 25, thirst = -5}},
     -- crafting materials and crafted goods (see RECIPES)
@@ -359,19 +401,21 @@ local SCAVENGE_LOOT = {
               {"water_bottle", 2}, {"cap", 1}, {"sunglasses", 1}, {"gloves", 1},
               {"satchel", 1}, {"pipe", 1}, {"knife", 1}, {"stick", 2},
               {"scrawled_notes", 1}, {"bolts", 1}, {"vodka", 1}, {"empty_bottle", 2},
-              {"scrap_metal", 2}, {"jerky", 2}},
+              {"scrap_metal", 2}, {"jerky", 2}, {"copper_wire", 1}, {"battery_cell", 1}},
     forest = {{"nothing", 16}, {"berries", 9}, {"cloth_scrap", 1}, {"water_bottle", 1},
               {"scarf", 1}, {"earmuffs", 1}, {"gloves", 1}, {"spear", 1}, {"stick", 6}},
     -- ruins: what's left in houses and cars
-    ruins  = {{"nothing", 25}, {"canned_beans", 5}, {"water_bottle", 2}, {"cloth_scrap", 3},
+    ruins  = {{"nothing", 32}, {"canned_beans", 7}, {"water_bottle", 3}, {"cloth_scrap", 3},
               {"scrawled_notes", 2}, {"rope", 1}, {"knife", 1}, {"pipe", 1}, {"stick", 1},
               {"jacket", 1}, {"backpack", 1}, {"antirad", 1}, {"vodka", 1}, {"bolts", 2},
               {"geiger", 1}, {"gasmask", 1}, {"empty_bottle", 2}, {"scrap_metal", 3},
-              {"leather_belt", 1}, {"jerky", 3}},
+              {"leather_belt", 1}, {"jerky", 5}, {"broken_radio", 1}, {"broken_detector", 1},
+              {"broken_headlamp", 1}, {"circuit_board", 1}, {"copper_wire", 2}, {"battery_cell", 1},
+              {"antenna", 1}, {"multitool", 1}},
     ford   = {{"nothing", 18}, {"rock", 4}, {"stick", 2}, {"water_bottle", 1}, {"scrap_metal", 1}},
     hills  = {{"nothing", 20}, {"rock", 5}, {"water_bottle", 1}, {"canned_beans", 2},
               {"jacket", 1}, {"bracers", 1}, {"boots", 1}, {"knife", 1}, {"stick", 1},
-              {"scrawled_notes", 1}, {"antirad", 1}, {"scrap_metal", 1}},
+              {"scrawled_notes", 1}, {"antirad", 1}, {"scrap_metal", 1}, {"antenna", 1}},
 }
 
 -- Crafting, NEO Scavenger style: inputs come from your bag, your hands and

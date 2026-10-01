@@ -344,3 +344,21 @@ g.player.inventory = {{item = "strange_meat", qty = 1}}
 g:start_encounter({kind = "dog", name = "Stray Dog", art = "stray", who = "dog", intro = "A thin mongrel watches you from the grass, ribs showing, one ear up. It doesn't run. It doesn't come closer either.", start = "near"})
 g:draw_encounter(400, 300)
 solaros.dump("ops_dog.txt")
+
+-- Scenes: crafting with a repair on offer, and the LoRa radio
+g = fresh()
+g:start_game()
+for k in pairs(g.ground) do g.ground[k] = {} end
+g.player.inventory = {{item = "broken_radio", qty = 1}, {item = "multitool", qty = 1},
+                      {item = "circuit_board", qty = 1}, {item = "copper_wire", qty = 1},
+                      {item = "battery_cell", qty = 1}}
+g:open_crafting()
+g.craft_ui.cursor = #g:known_recipes()
+g:draw_craft(400, 300)
+solaros.dump("ops_craft_repair.txt")
+g.player.inventory = {{item = "lora_radio", qty = 1}}
+g.radio = {charge = 3, next = {anna = g.player.hours + 20}}
+g:open_radio()
+g:radio_call(1)
+g:draw_radio(400, 300)
+solaros.dump("ops_radio.txt")

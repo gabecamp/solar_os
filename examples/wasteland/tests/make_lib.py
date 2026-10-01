@@ -68,7 +68,7 @@ lib = src[:cut]
           "b64_decode = b64_decode, PORTRAIT_SIZE = PORTRAIT_SIZE}\n")
 (here / "lib_crafting.lua").write_text(
     lib + "\nreturn Game, {RECIPES = RECIPES, ITEM_DB = ITEM_DB, SPRITES = SPRITES, "
-          "SCAVENGE_LOOT = SCAVENGE_LOOT, KEY = KEY, KARL = KARL}\n")
+          "SCAVENGE_LOOT = SCAVENGE_LOOT, KEY = KEY, KARL = KARL, TECH = TECH}\n")
 (here / "lib_world.lua").write_text(
     lib + "\nreturn Game, {WORLD = WORLD, GRID_RADIUS = GRID_RADIUS, TERRAIN = TERRAIN, "
           "AXIAL_DIRS = AXIAL_DIRS, generate_world = generate_world, ITEM_DB = ITEM_DB, "
@@ -90,6 +90,7 @@ lib = src[:cut]
 (here / "lib_hunt.lua").write_text(
     lib + "\nreturn Game, {HUNT = HUNT, ITEM_DB = ITEM_DB, KEY = KEY, SPRITES = SPRITES, "
           "RECIPES = RECIPES, FIGHT = FIGHT, KARL = KARL, PORTRAIT_DATA = PORTRAIT_DATA, "
-          "DIFFICULTY = DIFFICULTY, RAD = RAD, SCAVENGE_LOOT = SCAVENGE_LOOT}\n")
+          "DIFFICULTY = DIFFICULTY, RAD = RAD, SCAVENGE_LOOT = SCAVENGE_LOOT, TECH = TECH, "
+          "MAX_HEALTH = MAX_HEALTH}\n")
 (here / "wasteland_run.lua").write_text(src)
 print("generated lib_*.lua, wasteland_run.lua")

@@ -53,7 +53,11 @@ end
 -- A lit torch in either hand.
 function Game:has_light()
     local eq = self.player.equipped
-    return eq.rhand == "torch" or eq.lhand == "torch"
+    if eq.rhand == "torch" or eq.lhand == "torch" then return true end
+    for slot, item in pairs(eq) do
+        if not HOLD_SLOTS[slot] and ITEM_DB[item].light then return true end   -- a headlamp
+    end
+    return false
 end
 
 -- Recompute what you can see: at night sight drops by one without light.

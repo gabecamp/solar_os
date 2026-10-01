@@ -176,8 +176,12 @@ local TRADE = {
         shiv = 6, machete = 18, spiked_club = 12, pipe_spear = 15, splint = 5,
         fishing_rod = 8, snare = 4, raw_fish = 3, cooked_fish = 6,
         pilk = 7, lucky_lure = 12, karls_waders = 14, karls_hat = 10,
+        broken_radio = 15, lora_radio = 60, broken_detector = 12, anomaly_detector = 45,
+        broken_headlamp = 6, headlamp = 25, circuit_board = 10, copper_wire = 5,
+        battery_cell = 8, antenna = 6, multitool = 20,
     },
     stock = {{"antirad", 3}, {"water_bottle", 4}, {"canned_beans", 4}, {"bandage", 2},
+             {"multitool", 1}, {"battery_cell", 1},
              {"vodka", 2}, {"empty_bottle", 3}, {"geiger", 1}, {"gasmask", 1},
              {"knife", 1}, {"permit", 1}},
     restock = {"canned_beans", "water_bottle", "antirad", "bandage", "vodka", "empty_bottle"},
@@ -249,6 +253,30 @@ local DOG = {
             "canned_beans"},
     intro = "A thin mongrel watches you from the grass, ribs showing, one ear up. "
          .. "It doesn't run. It doesn't come closer either.",
+}
+
+-- Broken tech (src/49_tech.lua): very rare devices that scavenged parts and
+-- a Multitool can bring back. A repair takes repair_hours and succeeds with
+-- base % (+per_point per Perception over 3); a failure burns one part.
+-- The LoRa Radio (R on the map) calls helpful voices for a charge each.
+local TECH = {
+    repairs = {
+        {broken = "broken_radio", out = "lora_radio", base = 35,
+         parts = {circuit_board = 1, copper_wire = 1, battery_cell = 1, antenna = 1}},
+        {broken = "broken_detector", out = "anomaly_detector", base = 45,
+         parts = {circuit_board = 1, copper_wire = 1, battery_cell = 1}},
+        {broken = "broken_headlamp", out = "headlamp", base = 60,
+         parts = {copper_wire = 1, battery_cell = 1}},
+    },
+    repair_hours = 3, per_point = 8, tool = "multitool",
+    world_items = {"broken_radio", "multitool"},   -- dropped once each
+    radio_max = 5, radio_start = 3, detector_range = 3, signal_rads = 10,
+    channels = {
+        {id = "trader", name = "Trader's net", cooldown = 72},
+        {id = "anna",   name = "Anna, old medic", cooldown = 72},
+        {id = "karl",   name = "Karl, 433 MHz", cooldown = 48},
+        {id = "signal", name = "The Signal", cooldown = 24},
+    },
 }
 
 local BACKPACK_CAP = 16      -- most bag cells any build can have (the layout's limit)
@@ -371,6 +399,20 @@ local ITEM_DB = {
                     sick = 15, perish = {hours = 24, into = "rotten_meat"}, desc = "Too many eyes. Cook it"},
     cooked_fish  = {name = "Cooked Fish",  slot = nil, consumable = {hunger = 35},
                     perish = {hours = 48, into = "rotten_meat"}},
+    -- broken tech and its parts (TECH)
+    broken_radio     = {name = "Broken Radio", slot = nil, consumable = nil, desc = "Repair: C, with parts"},
+    lora_radio       = {name = "LoRa Radio",   slot = nil, consumable = nil, desc = "R: call for help"},
+    broken_detector  = {name = "Dead Detector", slot = nil, consumable = nil, desc = "Repair: C, with parts"},
+    anomaly_detector = {name = "Anomaly Detector", slot = nil, consumable = nil,
+                        desc = "Carried: reads rads 3 hexes out"},
+    broken_headlamp  = {name = "Broken Headlamp", slot = nil, consumable = nil, desc = "Repair: C, with parts"},
+    headlamp     = {name = "Headlamp",     slot = "head", consumable = nil, light = true,
+                    desc = "Worn: light at night", wear = {{"head", 118, 122, "BLACK"}}},
+    circuit_board = {name = "Circuit Board", slot = nil, consumable = nil, desc = "A repair part"},
+    copper_wire  = {name = "Copper Wire",  slot = nil, consumable = nil, desc = "A repair part"},
+    battery_cell = {name = "Battery Cell", slot = nil, consumable = nil, desc = "Part; E: charge radio"},
+    antenna      = {name = "Antenna",      slot = nil, consumable = nil, desc = "A repair part"},
+    multitool    = {name = "Multitool",    slot = nil, consumable = nil, desc = "Tool for repairs"},
     scrap_metal  = {name = "Scrap Metal",  slot = nil, consumable = nil, desc = "For crafting"},
     jerky        = {name = "Jerky",        slot = nil, consumable = {hunger = 25, thirst = -5}},
     -- crafting materials and crafted goods (see RECIPES)
@@ -409,19 +451,21 @@ local SCAVENGE_LOOT = {
               {"water_bottle", 2}, {"cap", 1}, {"sunglasses", 1}, {"gloves", 1},
               {"satchel", 1}, {"pipe", 1}, {"knife", 1}, {"stick", 2},
               {"scrawled_notes", 1}, {"bolts", 1}, {"vodka", 1}, {"empty_bottle", 2},
-              {"scrap_metal", 2}, {"jerky", 2}},
+              {"scrap_metal", 2}, {"jerky", 2}, {"copper_wire", 1}, {"battery_cell", 1}},
     forest = {{"nothing", 16}, {"berries", 9}, {"cloth_scrap", 1}, {"water_bottle", 1},
               {"scarf", 1}, {"earmuffs", 1}, {"gloves", 1}, {"spear", 1}, {"stick", 6}},
     -- ruins: what's left in houses and cars
-    ruins  = {{"nothing", 25}, {"canned_beans", 5}, {"water_bottle", 2}, {"cloth_scrap", 3},
+    ruins  = {{"nothing", 32}, {"canned_beans", 7}, {"water_bottle", 3}, {"cloth_scrap", 3},
               {"scrawled_notes", 2}, {"rope", 1}, {"knife", 1}, {"pipe", 1}, {"stick", 1},
               {"jacket", 1}, {"backpack", 1}, {"antirad", 1}, {"vodka", 1}, {"bolts", 2},
               {"geiger", 1}, {"gasmask", 1}, {"empty_bottle", 2}, {"scrap_metal", 3},
-              {"leather_belt", 1}, {"jerky", 3}},
+              {"leather_belt", 1}, {"jerky", 5}, {"broken_radio", 1}, {"broken_detector", 1},
+              {"broken_headlamp", 1}, {"circuit_board", 1}, {"copper_wire", 2}, {"battery_cell", 1},
+              {"antenna", 1}, {"multitool", 1}},
     ford   = {{"nothing", 18}, {"rock", 4}, {"stick", 2}, {"water_bottle", 1}, {"scrap_metal", 1}},
     hills  = {{"nothing", 20}, {"rock", 5}, {"water_bottle", 1}, {"canned_beans", 2},
               {"jacket", 1}, {"bracers", 1}, {"boots", 1}, {"knife", 1}, {"stick", 1},
-              {"scrawled_notes", 1}, {"antirad", 1}, {"scrap_metal", 1}},
+              {"scrawled_notes", 1}, {"antirad", 1}, {"scrap_metal", 1}, {"antenna", 1}},
 }
 
 -- Crafting, NEO Scavenger style: inputs come from your bag, your hands and
@@ -628,6 +672,204 @@ end
 local SPRITE_W, SPRITE_H = 16, 16
 
 local SPRITE_ART = {
+    lora_radio = {
+        "..........#.....",
+        "..........#.....",
+        "..........#.....",
+        "..........#.....",
+        "....#######.....",
+        "....#.....#.....",
+        "....#.###.#.....",
+        "....#.#.#.#.....",
+        "....#.###.#.....",
+        "....#.....#.....",
+        "....#.#.#.#.....",
+        "....#.....#.....",
+        "....#.#.#.#.....",
+        "....#.....#.....",
+        "....#######.....",
+        "................",
+    },
+    anomaly_detector = {
+        "................",
+        "..############..",
+        "..#..........#..",
+        "..#..######..#..",
+        "..#.#......#.#..",
+        "..#.#...#..#.#..",
+        "..#.#..#...#.#..",
+        "..#.#.#....#.#..",
+        "..#..######..#..",
+        "..#..........#..",
+        "..#.##.##.##.#..",
+        "..#..........#..",
+        "..############..",
+        "......#..#......",
+        "......####......",
+        "................",
+    },
+    headlamp = {
+        "................",
+        "................",
+        "................",
+        "......####......",
+        ".....#....#.....",
+        ".###.#.##.#.###.",
+        "#...##.##.##...#",
+        "#....#....#....#",
+        "#.....####.....#",
+        ".#............#.",
+        "..##........##..",
+        "....########....",
+        "................",
+        "................",
+        "................",
+        "................",
+    },
+    circuit_board = {
+        "................",
+        ".##############.",
+        ".#............#.",
+        ".#.##..##.###.#.",
+        ".#.##..##.###.#.",
+        ".#..#...#...#.#.",
+        ".#..#####...#.#.",
+        ".#......#####.#.",
+        ".#.###........#.",
+        ".#.###..#.#.#.#.",
+        ".#......#.#.#.#.",
+        ".#............#.",
+        ".##############.",
+        "..#.#.#..#.#.#..",
+        "................",
+        "................",
+    },
+    copper_wire = {
+        "................",
+        "....######......",
+        "...#......#.....",
+        "..#.######.#....",
+        "..#.#....#.#....",
+        "..#.#.##.#.#....",
+        "..#.#.##.#.#....",
+        "..#.#....#.#....",
+        "..#.######.#....",
+        "...#......#.....",
+        "....######......",
+        "..........#.....",
+        "...........#....",
+        "............##..",
+        "..............#.",
+        "................",
+    },
+    battery_cell = {
+        "................",
+        "......####......",
+        "....########....",
+        "....#......#....",
+        "....#..##..#....",
+        "....#.####.#....",
+        "....#..##..#....",
+        "....#......#....",
+        "....########....",
+        "....#......#....",
+        "....#.####.#....",
+        "....#......#....",
+        "....#......#....",
+        "....########....",
+        "................",
+        "................",
+    },
+    antenna = {
+        "#.......#.......",
+        ".#.....#........",
+        "..#...#.........",
+        "...#.#..........",
+        "....#...........",
+        "....#...........",
+        "....#...........",
+        "....#...........",
+        "....#...........",
+        "....#...........",
+        "....#...........",
+        "....#...........",
+        "...###..........",
+        "..#####.........",
+        "................",
+        "................",
+    },
+    multitool = {
+        "................",
+        "..##............",
+        "..###...........",
+        "...###..........",
+        "....###.........",
+        ".....###........",
+        "......#####.....",
+        ".......#####....",
+        "......########..",
+        ".......######...",
+        "........######..",
+        ".........######.",
+        "..........#####.",
+        "...........###..",
+        "................",
+        "................",
+    },
+    broken_radio = {
+        "..........#.....",
+        "..........#.....",
+        "..........#.....",
+        "..........#.....",
+        "....#..####.....",
+        "....#.....#.....",
+        "....#...#.#.....",
+        "....#.#...#.....",
+        "....#.##..#.....",
+        "....#.....#.....",
+        "....#.#.#.......",
+        "....#...........",
+        "....#.#.#.#..#..",
+        "..#.#.....#.....",
+        "....#######.....",
+        "................",
+    },
+    broken_detector = {
+        "................",
+        "..############..",
+        "..#..........#..",
+        "..#...#####..#..",
+        "..#.#......#.#..",
+        "..#.#...#..#.#..",
+        "..#.#......#.#..",
+        "..#.#.#....#.#..",
+        "..#..###..#..#..",
+        "..#..........#..",
+        "..#.##.##..#.#..",
+        "..#..........#..",
+        "..#########..#..",
+        "..#...#..#......",
+        "....#.####......",
+        "................",
+    },
+    broken_headlamp = {
+        "................",
+        "................",
+        "................",
+        "......####......",
+        "..........#.....",
+        ".###.#..#.#.###.",
+        "#...##..#.##...#",
+        "#....#....#....#",
+        "#.....##.......#",
+        ".#............#.",
+        "..##........##..",
+        "....######......",
+        ".............#..",
+        "..#.............",
+        "....#...........",
+        "................",
+    },
     pilk = {
         "................",
         ".....######.....",
@@ -2199,6 +2441,7 @@ local function generate_world(seed)
         end
     end
     for _, item in ipairs(RAD.world_items) do drop(item, 1) end
+    for _, item in ipairs(TECH.world_items) do drop(item, 1) end
 
     -- anomaly fields: hot spots of radiation, an artifact at each center.
     -- rad[key] = level 1-3 (see RAD); not saved, rebuilt from the seed.
@@ -2826,6 +3069,11 @@ function Game:use_item(kind, k)
         self:push_log("You bandage yourself up. (+15 HP)")
         return
     end
+    if stack.item == "battery_cell" and self:charge_radio() then
+        stack.qty = stack.qty - 1
+        if stack.qty <= 0 then self:remove_stack(kind, k) end
+        return
+    end
     if stack.item == "snare" then
         if self:set_snare() then
             stack.qty = stack.qty - 1
@@ -2941,7 +3189,7 @@ end
 
 -- nil if you can make it now, else the reason you can't.
 function Game:craft_blocker(r)
-    if not self.known[r.id] then return "You don't know how to make that." end
+    if not (r.repair or self.known[r.id]) then return "You don't know how to make that." end
     for _, iq in ipairs(Game.recipe_inputs(r)) do
         if self:count_item(iq[1]) < iq[2] then
             return "Need " .. iq[2] .. " " .. ITEM_DB[iq[1]].name .. "."
@@ -2961,6 +3209,7 @@ function Game:craft(r)
         self:push_log(why)
         return false
     end
+    if r.repair then return self:repair(r) end
     local p = self.player
     for _, iq in ipairs(Game.recipe_inputs(r)) do self:take_items(iq[1], iq[2]) end
     p.hours = p.hours + r.hours
@@ -3011,6 +3260,7 @@ function Game:known_recipes()
     for _, r in ipairs(RECIPES) do
         if self.known[r.id] then list[#list + 1] = r end
     end
+    for _, r in ipairs(self:repair_recipes()) do list[#list + 1] = r end   -- broken tech you carry
     return list
 end
 
@@ -3257,7 +3507,11 @@ end
 -- A lit torch in either hand.
 function Game:has_light()
     local eq = self.player.equipped
-    return eq.rhand == "torch" or eq.lhand == "torch"
+    if eq.rhand == "torch" or eq.lhand == "torch" then return true end
+    for slot, item in pairs(eq) do
+        if not HOLD_SLOTS[slot] and ITEM_DB[item].light then return true end   -- a headlamp
+    end
+    return false
 end
 
 -- Recompute what you can see: at night sight drops by one without light.
@@ -3324,7 +3578,7 @@ local SAVE = {version = 1, dir = "wasteland", file = "save.lua",
                         "known", "ground", "log", "enc_cooldown", "ticked_hour", "rad_known",
                         "trader", "sites_known", "stashes", "next_emission", "snares",
                         "karl_asked", "karl_next", "karl_gave", "muted",
-                        "difficulty", "dog"}}
+                        "difficulty", "dog", "radio", "karl_hint"}}
 
 -- Where the save lives: <preferred storage>/wasteland/save.lua
 function SAVE.path()
@@ -3554,8 +3808,18 @@ end
 
 -- The Geiger counter reads your hex and the ones next to it.
 function Game:geiger_scan()
-    if not self:carrying("geiger") then return end
     local p = self.player
+    if self:carrying("anomaly_detector") then   -- reads further than a Geiger counter
+        local range = TECH.detector_range
+        for dq = -range, range do
+            for dr = math.max(-range, -dq - range), math.min(range, -dq + range) do
+                local key = hex_key(p.q + dq, p.r + dr)
+                if self.tiles[key] then self.rad_known[key] = self:rad_at(p.q + dq, p.r + dr) end
+            end
+        end
+        return
+    end
+    if not self:carrying("geiger") then return end
     self.rad_known[hex_key(p.q, p.r)] = self:rad_at(p.q, p.r)
     for _, n in ipairs(neighbors(self.tiles, p.q, p.r)) do
         self.rad_known[hex_key(n[1], n[2])] = self:rad_at(n[1], n[2])
@@ -3709,7 +3973,10 @@ function Game:encounter_options()
     end
     if kind == "riddle" then
         local o = {}
-        for i, answer in ipairs(e.riddle.answers) do o[i] = {answer, "answer_" .. i} end
+        for i, answer in ipairs(e.riddle.answers) do
+            local hint = self.karl_hint and i == e.riddle.right and "  (Karl winks)" or ""
+            o[i] = {answer .. hint, "answer_" .. i}
+        end
         o[#o + 1] = {"Walk away", "leave_quietly"}
         return o
     end
@@ -4399,6 +4666,7 @@ function Game:karl_reward()
 end
 
 function Game:karl_answer(n)
+    self.karl_hint = nil   -- a radio hint is good for one riddle
     local e = self.enc
     if n == e.riddle.right then
         local item = self:karl_reward()
@@ -4854,6 +5122,204 @@ function Game:dog_hour(hour)
             self:push_log("Your dog is hungry. Nothing in the bag it can eat.")
         end
     end
+end
+-- ---------------------------------------------------------------------
+-- Broken tech and the LoRa radio (numbers in TECH, 05_data)
+--
+-- Broken devices are very rare finds. While you carry one, the crafting
+-- screen lists "Repair <device>": its parts and the device itself are the
+-- inputs, a Multitool the tool. A repair takes hours and can fail - then a
+-- part burns out and the device stays broken.
+--   LoRa Radio: R on the map; each call costs a charge (Battery Cell: E to
+--     recharge) and each voice needs time before it answers again.
+--   Anomaly Detector: carried, it reads rads TECH.detector_range hexes out.
+--   Headlamp: worn, light at night (ITEM_DB[..].light; see has_light).
+-- self.radio = {charge, next = {channel id -> hour}} is saved.
+-- ---------------------------------------------------------------------
+
+-- Repair "recipes" for the broken devices you carry (crafting screen).
+function Game:repair_recipes()
+    local list = {}
+    for _, fix in ipairs(TECH.repairs) do
+        if self:count_item(fix.broken) > 0 then
+            local inputs = {[fix.broken] = 1}
+            for part, n in pairs(fix.parts) do inputs[part] = n end
+            list[#list + 1] = {id = "repair_" .. fix.broken, name = "Repair " .. ITEM_DB[fix.out].name,
+                               inputs = inputs, tools = {TECH.tool}, hours = TECH.repair_hours,
+                               out = {fix.out, 1}, repair = fix}
+        end
+    end
+    return list
+end
+
+function Game:repair_chance(fix)
+    return math.max(5, math.min(95, fix.base + TECH.per_point * (self.player.attrs.Perception - 3)))
+end
+
+-- Called by Game:craft for a repair recipe (after craft_blocker passed).
+function Game:repair(r)
+    local p, fix = self.player, r.repair
+    p.hours = p.hours + r.hours
+    apply_awake_hours(p, r.hours)
+    if self:roll(self:repair_chance(fix)) then
+        for _, iq in ipairs(Game.recipe_inputs(r)) do self:take_items(iq[1], iq[2]) end
+        local stack = {item = fix.out, qty = 1}
+        if not self:put_stack("inventory", nil, stack) then self:put_stack("ground", nil, stack) end
+        if fix.out == "lora_radio" and not self.radio then
+            self.radio = {charge = TECH.radio_start, next = {}}
+        end
+        self:sfx("gift")
+        self:push_log("It hums back to life: " .. ITEM_DB[fix.out].name .. "!")
+    else
+        local parts = {}
+        for part in pairs(fix.parts) do parts[#parts + 1] = part end
+        table.sort(parts)
+        local lost = parts[self:rand(#parts) + 1]
+        self:take_items(lost, 1)
+        self:sfx("miss")
+        self:push_log("It sparks and dies again. Lost a " .. ITEM_DB[lost].name .. ".")
+    end
+    return true
+end
+
+-- E on a Battery Cell while you have the radio.
+function Game:charge_radio()
+    if not (self:carrying("lora_radio") and self.radio) then return false end
+    self.radio.charge = TECH.radio_max
+    self:push_log("The radio's charge light goes green. (" .. TECH.radio_max .. " calls)")
+    return true
+end
+
+-- R on the map.
+function Game:open_radio()
+    if not self:carrying("lora_radio") then
+        self:push_log("You have no working radio.")
+        return
+    end
+    self.radio = self.radio or {charge = TECH.radio_start, next = {}}
+    self.radio_ui = {cursor = 1, msg = {"Static. Pick a frequency."}}
+    self.screen = "radio"
+end
+
+function Game:radio_say(text)
+    self.radio_ui.msg = wrap(text, 54)
+end
+
+-- The nearest pile with an artifact in it, as a tile key (or nil).
+function Game:nearest_artifact()
+    local p, best, best_d = self.player, nil, nil
+    for key, pile in pairs(self.ground) do
+        for _, s in ipairs(pile) do
+            if ITEM_DB[s.item].artifact then
+                local q, r = key:match("(-?%d+),(-?%d+)")
+                local d = axial_distance(p.q, p.r, tonumber(q), tonumber(r))
+                if d > 0 and (not best or d < best_d or (d == best_d and key < best)) then
+                    best, best_d = key, d
+                end
+            end
+        end
+    end
+    return best
+end
+
+-- Each voice. Returns true if the call went through (it costs a charge).
+local RADIO = {}
+function RADIO.trader(self)
+    self:learn_site("trader")
+    local told = self:hear_of_exit("Trader")
+    self:mark_stash()
+    self:radio_say("'Trader here. Left a parcel for you, friend. Bearing's in your notes."
+        .. (told and " And the way out's open, if you've got paper.'" or "'"))
+    return true
+end
+function RADIO.anna(self)
+    local p = self.player
+    if p.health >= MAX_HEALTH and not p.injuries.bleeding and p.injuries.wounded_hours == 0 then
+        self:radio_say("Anna: 'You sound fine, love. Call me when it hurts.'")
+        return false
+    end
+    p.health = clamp(p.health + 20)
+    p.injuries.bleeding = false
+    p.injuries.wounded_hours = math.max(0, p.injuries.wounded_hours - 12)
+    self:radio_say("Anna talks you through it, calm and slow: press here, tie that, breathe. "
+        .. "(+20 HP, bleeding stopped)")
+    return true
+end
+function RADIO.karl(self)
+    local hours = (self.next_emission or 0) - self.player.hours
+    local when = hours > 0 and ("Next blowout in about " .. hours .. "h.") or "Blowout's overdue."
+    self.karl_hint = true
+    self:radio_say("'Karl here. With a K. Fish bite at dusk, son. " .. when
+        .. " And next time we meet, I'll go easy on you.' (a hint on his next riddle)")
+    return true
+end
+function RADIO.signal(self)
+    local p = self.player
+    p.rads = math.min(RAD.max, (p.rads or 0) + TECH.signal_rads)
+    self:sfx("emission")
+    local key = self:nearest_artifact()
+    if not key then
+        self:radio_say("Numbers, read by a voice that isn't a voice. Then your own name. Nothing else.")
+        return true
+    end
+    p.explored[key] = true
+    self:radio_say("Numbers, read by a voice that isn't a voice. You understand them: something "
+        .. "waits " .. self:bearing_to(key) .. ". Your teeth ache. (+" .. TECH.signal_rads .. " rads)")
+    return true
+end
+
+function Game:radio_call(i)
+    local ch, r = TECH.channels[i], self.radio
+    if not ch then return end
+    local wait = (r.next[ch.id] or 0) - self.player.hours
+    if wait > 0 then
+        self:radio_say(ch.name .. ": no answer. Try again in " .. wait .. "h.")
+    elseif r.charge <= 0 then
+        self:radio_say("Dead air. The radio needs a Battery Cell (E on one).")
+    elseif RADIO[ch.id](self) then
+        r.charge = r.charge - 1
+        r.next[ch.id] = self.player.hours + ch.cooldown
+    end
+end
+
+function Game:radio_key(key)
+    local u = self.radio_ui
+    if key == KEY.Q or key == gfx.KEY_ESCAPE or key == KEY.R then
+        self.screen = "map"
+    elseif key == gfx.KEY_UP or key == KEY.W then
+        u.cursor = math.max(1, u.cursor - 1)
+    elseif key == gfx.KEY_DOWN or key == KEY.S then
+        u.cursor = math.min(#TECH.channels, u.cursor + 1)
+    elseif key == KEY.ENTER or key == KEY.LF or key == KEY.SPACE then
+        self:radio_call(u.cursor)
+    end
+end
+
+function Game:draw_radio(w, h)
+    local u, r = self.radio_ui, self.radio
+    gfx.clear(gfx.WHITE)
+    gfx.color(gfx.BLACK)
+    gfx.font(gfx.FONT_BOLD_14)
+    gfx.text(6, 16, "LoRa Radio")
+    gfx.font(gfx.FONT_MONO_12)
+    gfx.text(220, 16, ("Charge %d/%d"):format(r.charge, TECH.radio_max))
+    gfx.line(6, 22, w - 6, 22)
+    for i, ch in ipairs(TECH.channels) do
+        local y = 44 + (i - 1) * 18
+        local wait = (r.next[ch.id] or 0) - self.player.hours
+        local status = wait > 0 and (wait .. "h") or "ready"
+        if i == u.cursor then
+            gfx.fill_rect(4, y - 12, w - 8, 16)
+            gfx.color(gfx.WHITE)
+        end
+        gfx.text(10, y, ch.name)
+        gfx.text(300, y, status)
+        gfx.color(gfx.BLACK)
+    end
+    gfx.line(6, 126, w - 6, 126)
+    for i, line in ipairs(u.msg) do gfx.text(6, 132 + 14 * i, line) end
+    gfx.text(6, h - 8, "Up/Dn pick  Enter call  Q back")
+    gfx.refresh()
 end
 -- ---------------------------------------------------------------------
 -- Rendering
@@ -6249,9 +6715,13 @@ function Game:draw_craft(w, h)
     gfx.text(w - 6 - 7 * #fire, 16, fire)
     gfx.line(6, 22, w - 6, 22)
 
-    -- the list: a mark for what you can make right now
+    -- the list: a mark for what you can make right now. It scrolls: only
+    -- `rows` fit above the log, so the window follows the cursor.
+    local rows = (h - 64 - CRAFT_UI.list_y) // CRAFT_UI.row_h
+    local first = math.max(1, math.min(c.cursor - rows + 1, #list - rows + 1))
     for i, r in ipairs(list) do
-        local y = CRAFT_UI.list_y + (i - 1) * CRAFT_UI.row_h
+      if i >= first and i < first + rows then
+        local y = CRAFT_UI.list_y + (i - first) * CRAFT_UI.row_h
         local ready = self:craft_blocker(r) == nil
         if i == c.cursor then
             gfx.fill_rect(4, y - 11, CRAFT_UI.detail_x - 12, CRAFT_UI.row_h - 1)
@@ -6259,10 +6729,16 @@ function Game:draw_craft(w, h)
         end
         gfx.text(8, y, (ready and "+ " or "  ") .. r.name)
         gfx.color(gfx.BLACK)
+      end
     end
-    local unknown = #RECIPES - #list
-    local ly = CRAFT_UI.list_y + #list * CRAFT_UI.row_h + 8
-    if unknown > 0 then
+    if first > 1 then gfx.text(CRAFT_UI.detail_x - 20, CRAFT_UI.list_y, "^") end
+    if first + rows <= #list then
+        gfx.text(CRAFT_UI.detail_x - 20, CRAFT_UI.list_y + (rows - 1) * CRAFT_UI.row_h, "v")
+    end
+    local unknown = 0
+    for _, rr in ipairs(RECIPES) do if not self.known[rr.id] then unknown = unknown + 1 end end
+    local ly = CRAFT_UI.list_y + math.min(#list, rows) * CRAFT_UI.row_h + 8
+    if unknown > 0 and ly + 13 < h - 64 then
         gfx.text(8, ly, unknown .. " more unknown:")
         gfx.text(8, ly + 13, "read Scrawled Notes")
     end
@@ -6295,6 +6771,10 @@ function Game:draw_craft(w, h)
         end
         y = y + 18
         gfx.text(x, y, "Takes " .. r.hours .. "h")
+        if r.repair then   -- repairs can fail (and burn a part)
+            y = y + 14
+            gfx.text(x, y, "Chance " .. self:repair_chance(r.repair) .. "% (Perception)")
+        end
         y = y + 18
         local why = self:craft_blocker(r)
         for i, line in ipairs(wrap(why or "Ready: Enter to make it.", (w - x - 6) // 7)) do
@@ -6435,7 +6915,7 @@ local HELP = {
     {"MAP", "Arrows/WASD move    Space rest 4h"},
     {"", "F search   E water: fill/drink   I bag"},
     {"", "T trade/Checkpoint   C craft"},
-    {"", "G hunt, or fish by water   M sound"},
+    {"", "G hunt, or fish   R radio   M sound"},
     {"BAG", "Arrows pick  Enter select, Enter move"},
     {"", "E use: eat, drink, wear, read, set snare"},
     {"CRAFT", "Up/Dn pick  Enter make  C/Q back"},
@@ -6561,6 +7041,8 @@ local ok, err = pcall(function()
             game:gather()
         elseif key == KEY.M then
             game:toggle_mute()
+        elseif key == KEY.R then
+            game:open_radio()
         elseif key == KEY.C then
             game:open_crafting()
         elseif key == KEY.I then
@@ -6621,6 +7103,8 @@ local ok, err = pcall(function()
                 game:draw_ending(w, h)
             elseif game.screen == "help" then
                 game:draw_help(w, h)
+            elseif game.screen == "radio" then
+                game:draw_radio(w, h)
             elseif game.screen == "info" then
                 game:draw_info(w, h)
             elseif game.screen == "trade" then
@@ -6665,6 +7149,8 @@ local ok, err = pcall(function()
                 game:trade_key(key)
             elseif game.screen == "help" or game.screen == "info" then
                 game:help_key(key)
+            elseif game.screen == "radio" then
+                game:radio_key(key)
             elseif game.screen == "gate" then
                 game:gate_key(key)
             elseif game.screen == "dead" or game.screen == "ending" then

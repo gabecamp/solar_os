@@ -80,7 +80,9 @@ g.sites_known.checkpoint = true   -- otherwise some notes sketch the way out ins
 local n_before = #g:known_recipes()
 g.player.inventory = {{item = "scrawled_notes", qty = 2}}
 g:use_item("inventory", 1)
-assert(#g:known_recipes() == n_before + 1, "notes teach one recipe")
+-- a note teaches one recipe, or (1 in 4) marks a stash instead
+assert(#g:known_recipes() == n_before + 1 or (#g:known_recipes() == n_before and next(g.stashes)),
+       "notes teach one recipe")
 assert(bag_count(g, "scrawled_notes") == 1, "and are used up")
 for _ = 1, 40 do g:read_notes() end   -- some mark stashes instead
 assert(#g:known_recipes() == #C.RECIPES, "enough notes teach everything")

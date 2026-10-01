@@ -62,6 +62,7 @@ function Game:karl_reward()
 end
 
 function Game:karl_answer(n)
+    self.karl_hint = nil   -- a radio hint is good for one riddle
     local e = self.enc
     if n == e.riddle.right then
         local item = self:karl_reward()

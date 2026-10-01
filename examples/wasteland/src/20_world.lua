@@ -257,6 +257,7 @@ local function generate_world(seed)
         end
     end
     for _, item in ipairs(RAD.world_items) do drop(item, 1) end
+    for _, item in ipairs(TECH.world_items) do drop(item, 1) end
 
     -- anomaly fields: hot spots of radiation, an artifact at each center.
     -- rad[key] = level 1-3 (see RAD); not saved, rebuilt from the seed.

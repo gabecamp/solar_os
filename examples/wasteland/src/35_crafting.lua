@@ -65,7 +65,7 @@ end
 
 -- nil if you can make it now, else the reason you can't.
 function Game:craft_blocker(r)
-    if not self.known[r.id] then return "You don't know how to make that." end
+    if not (r.repair or self.known[r.id]) then return "You don't know how to make that." end
     for _, iq in ipairs(Game.recipe_inputs(r)) do
         if self:count_item(iq[1]) < iq[2] then
             return "Need " .. iq[2] .. " " .. ITEM_DB[iq[1]].name .. "."
@@ -85,6 +85,7 @@ function Game:craft(r)
         self:push_log(why)
         return false
     end
+    if r.repair then return self:repair(r) end
     local p = self.player
     for _, iq in ipairs(Game.recipe_inputs(r)) do self:take_items(iq[1], iq[2]) end
     p.hours = p.hours + r.hours
@@ -135,6 +136,7 @@ function Game:known_recipes()
     for _, r in ipairs(RECIPES) do
         if self.known[r.id] then list[#list + 1] = r end
     end
+    for _, r in ipairs(self:repair_recipes()) do list[#list + 1] = r end   -- broken tech you carry
     return list
 end
 

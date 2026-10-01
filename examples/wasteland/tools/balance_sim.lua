@@ -13,7 +13,7 @@ package.path = "./?.lua;" .. package.path
 local fake = require("solaros")
 fake.gfx.begin()
 
-local src = io.open("../wasteland.lua"):read("a")
+local src = io.open(os.getenv("WASTELAND_FILE") or "../wasteland.lua"):read("a")   -- (try variants)
 local lib = src:sub(1, src:find("-- Main loop", 1, true) - 1) .. [[
 return Game, {ITEM_DB = ITEM_DB, KEY = KEY, TERRAIN = TERRAIN, AXIAL_DIRS = AXIAL_DIRS,
               TRADE = TRADE, GOAL = GOAL, RECIPES = RECIPES, RAD = RAD, WORLD = WORLD}
@@ -95,6 +95,11 @@ local function worth(g, item)
     if item == "rock" then return count(g, "rock") == 0 end
     if item == "stick" then return count(g, "stick") < 3 end
     if def.slot then return count(g, item) == 0 and not g.player.equipped[def.slot] end
+    -- tech and its parts only while there's room to spare (food comes first)
+    if Game.item_value(item) >= 5 and not (def.consumable or def.artifact or def.weapon)
+        and #g.player.inventory > g:bag_capacity() - 4 then
+        return false
+    end
     return def.consumable or def.artifact or KEEP[item] or def.weapon or Game.item_value(item) >= 5
 end
 local function pile_worth(g, k)

@@ -103,7 +103,10 @@ function Game:encounter_options()
     end
     if kind == "riddle" then
         local o = {}
-        for i, answer in ipairs(e.riddle.answers) do o[i] = {answer, "answer_" .. i} end
+        for i, answer in ipairs(e.riddle.answers) do
+            local hint = self.karl_hint and i == e.riddle.right and "  (Karl winks)" or ""
+            o[i] = {answer .. hint, "answer_" .. i}
+        end
         o[#o + 1] = {"Walk away", "leave_quietly"}
         return o
     end

@@ -20,9 +20,13 @@ function Game:draw_craft(w, h)
     gfx.text(w - 6 - 7 * #fire, 16, fire)
     gfx.line(6, 22, w - 6, 22)
 
-    -- the list: a mark for what you can make right now
+    -- the list: a mark for what you can make right now. It scrolls: only
+    -- `rows` fit above the log, so the window follows the cursor.
+    local rows = (h - 64 - CRAFT_UI.list_y) // CRAFT_UI.row_h
+    local first = math.max(1, math.min(c.cursor - rows + 1, #list - rows + 1))
     for i, r in ipairs(list) do
-        local y = CRAFT_UI.list_y + (i - 1) * CRAFT_UI.row_h
+      if i >= first and i < first + rows then
+        local y = CRAFT_UI.list_y + (i - first) * CRAFT_UI.row_h
         local ready = self:craft_blocker(r) == nil
         if i == c.cursor then
             gfx.fill_rect(4, y - 11, CRAFT_UI.detail_x - 12, CRAFT_UI.row_h - 1)
@@ -30,10 +34,16 @@ function Game:draw_craft(w, h)
         end
         gfx.text(8, y, (ready and "+ " or "  ") .. r.name)
         gfx.color(gfx.BLACK)
+      end
     end
-    local unknown = #RECIPES - #list
-    local ly = CRAFT_UI.list_y + #list * CRAFT_UI.row_h + 8
-    if unknown > 0 then
+    if first > 1 then gfx.text(CRAFT_UI.detail_x - 20, CRAFT_UI.list_y, "^") end
+    if first + rows <= #list then
+        gfx.text(CRAFT_UI.detail_x - 20, CRAFT_UI.list_y + (rows - 1) * CRAFT_UI.row_h, "v")
+    end
+    local unknown = 0
+    for _, rr in ipairs(RECIPES) do if not self.known[rr.id] then unknown = unknown + 1 end end
+    local ly = CRAFT_UI.list_y + math.min(#list, rows) * CRAFT_UI.row_h + 8
+    if unknown > 0 and ly + 13 < h - 64 then
         gfx.text(8, ly, unknown .. " more unknown:")
         gfx.text(8, ly + 13, "read Scrawled Notes")
     end
@@ -66,6 +76,10 @@ function Game:draw_craft(w, h)
         end
         y = y + 18
         gfx.text(x, y, "Takes " .. r.hours .. "h")
+        if r.repair then   -- repairs can fail (and burn a part)
+            y = y + 14
+            gfx.text(x, y, "Chance " .. self:repair_chance(r.repair) .. "% (Perception)")
+        end
         y = y + 18
         local why = self:craft_blocker(r)
         for i, line in ipairs(wrap(why or "Ready: Enter to make it.", (w - x - 6) // 7)) do

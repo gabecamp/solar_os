@@ -65,8 +65,18 @@ end
 
 -- The Geiger counter reads your hex and the ones next to it.
 function Game:geiger_scan()
-    if not self:carrying("geiger") then return end
     local p = self.player
+    if self:carrying("anomaly_detector") then   -- reads further than a Geiger counter
+        local range = TECH.detector_range
+        for dq = -range, range do
+            for dr = math.max(-range, -dq - range), math.min(range, -dq + range) do
+                local key = hex_key(p.q + dq, p.r + dr)
+                if self.tiles[key] then self.rad_known[key] = self:rad_at(p.q + dq, p.r + dr) end
+            end
+        end
+        return
+    end
+    if not self:carrying("geiger") then return end
     self.rad_known[hex_key(p.q, p.r)] = self:rad_at(p.q, p.r)
     for _, n in ipairs(neighbors(self.tiles, p.q, p.r)) do
         self.rad_known[hex_key(n[1], n[2])] = self:rad_at(n[1], n[2])

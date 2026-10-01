@@ -39,6 +39,8 @@ local ok, err = pcall(function()
             game:gather()
         elseif key == KEY.M then
             game:toggle_mute()
+        elseif key == KEY.R then
+            game:open_radio()
         elseif key == KEY.C then
             game:open_crafting()
         elseif key == KEY.I then
@@ -99,6 +101,8 @@ local ok, err = pcall(function()
                 game:draw_ending(w, h)
             elseif game.screen == "help" then
                 game:draw_help(w, h)
+            elseif game.screen == "radio" then
+                game:draw_radio(w, h)
             elseif game.screen == "info" then
                 game:draw_info(w, h)
             elseif game.screen == "trade" then
@@ -143,6 +147,8 @@ local ok, err = pcall(function()
                 game:trade_key(key)
             elseif game.screen == "help" or game.screen == "info" then
                 game:help_key(key)
+            elseif game.screen == "radio" then
+                game:radio_key(key)
             elseif game.screen == "gate" then
                 game:gate_key(key)
             elseif game.screen == "dead" or game.screen == "ending" then

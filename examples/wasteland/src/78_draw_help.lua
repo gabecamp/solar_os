@@ -11,7 +11,7 @@ local HELP = {
     {"MAP", "Arrows/WASD move    Space rest 4h"},
     {"", "F search   E water: fill/drink   I bag"},
     {"", "T trade/Checkpoint   C craft"},
-    {"", "G hunt, or fish by water   M sound"},
+    {"", "G hunt, or fish   R radio   M sound"},
     {"BAG", "Arrows pick  Enter select, Enter move"},
     {"", "E use: eat, drink, wear, read, set snare"},
     {"CRAFT", "Up/Dn pick  Enter make  C/Q back"},

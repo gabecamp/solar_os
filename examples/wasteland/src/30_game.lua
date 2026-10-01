@@ -406,6 +406,11 @@ function Game:use_item(kind, k)
         self:push_log("You bandage yourself up. (+15 HP)")
         return
     end
+    if stack.item == "battery_cell" and self:charge_radio() then
+        stack.qty = stack.qty - 1
+        if stack.qty <= 0 then self:remove_stack(kind, k) end
+        return
+    end
     if stack.item == "snare" then
         if self:set_snare() then
             stack.qty = stack.qty - 1
