@@ -269,10 +269,22 @@ local function body_row(src_y)
     return BODY_Y0 + math.floor((src_y - BODY_SRC_Y0) * BODY_SCALE + 0.5)
 end
 
+-- fill_rect cut to clip = {x0, y0, x1, y1} (exclusive), or plain without one:
+-- the cursor-only redraw repaints just the doll under one slot.
+local function fill_clipped(clip, x, y, w, h)
+    if clip then
+        local x0, y0 = math.max(x, clip[1]), math.max(y, clip[2])
+        local x1, y1 = math.min(x + w, clip[3]), math.min(y + h, clip[4])
+        if x1 <= x0 or y1 <= y0 then return end
+        x, y, w, h = x0, y0, x1 - x0, y1 - y0
+    end
+    gfx.fill_rect(x, y, w, h)
+end
+
 -- Paint one body part between two authored rows (clothing on the doll).
 -- inner/outer (optional, authored units) keep only the pixels whose distance
 -- from the center line is in [inner, outer), on both sides.
-local function paint_part(part, src_y0, src_y1, color, inner, outer)
+local function paint_part(part, src_y0, src_y1, color, inner, outer, clip)
     local y0, y1 = body_row(src_y0), body_row(src_y1)
     local bands
     if outer then
@@ -288,10 +300,10 @@ local function paint_part(part, src_y0, src_y1, color, inner, outer)
                 if bands then
                     for _, band in ipairs(bands) do
                         local a, z = math.max(sp[1], band[1]), math.min(sp[2], band[2])
-                        if z > a then gfx.fill_rect(a, top, z - a, bottom - top) end
+                        if z > a then fill_clipped(clip, a, top, z - a, bottom - top) end
                     end
                 else
-                    gfx.fill_rect(sp[1], top, sp[2] - sp[1], bottom - top)
+                    fill_clipped(clip, sp[1], top, sp[2] - sp[1], bottom - top)
                 end
             end
         end
@@ -303,19 +315,24 @@ end
 local WEAR_ORDER = {"shirt", "pants", "belt", "jacket", "back", "feet", "hands", "head", "neck",
                     "wrists", "eyes", "ears"}
 
-function Game:draw_silhouette()
+-- clip (optional): only repaint inside {x0, y0, x1, y1}, on white.
+function Game:draw_silhouette(clip)
+    if clip then
+        gfx.color(gfx.WHITE)
+        gfx.fill_rect(clip[1], clip[2], clip[3] - clip[1], clip[4] - clip[2])
+    end
     -- pass 1: outline (every block grown by 1px, black)
     gfx.color(gfx.BLACK)
     for _, b in ipairs(BODY_BLOCKS) do
         for _, sp in ipairs(b.spans) do
-            gfx.fill_rect(sp[1] - 1, b.y - 1, sp[2] - sp[1] + 2, b.h + 2)
+            fill_clipped(clip, sp[1] - 1, b.y - 1, sp[2] - sp[1] + 2, b.h + 2)
         end
     end
     -- pass 2: body fill at true size
     gfx.color(gfx.LIGHT)
     for _, b in ipairs(BODY_BLOCKS) do
         for _, sp in ipairs(b.spans) do
-            gfx.fill_rect(sp[1], b.y, sp[2] - sp[1], b.h)
+            fill_clipped(clip, sp[1], b.y, sp[2] - sp[1], b.h)
         end
     end
     -- pass 3: worn clothes painted onto the body, inner layers first
@@ -324,24 +341,20 @@ function Game:draw_silhouette()
         local wear = item and ITEM_DB[item].wear
         if wear then
             for _, w in ipairs(wear) do
-                paint_part(w[1], w[2], w[3], gfx[w[4]], w[5], w[6])
+                paint_part(w[1], w[2], w[3], gfx[w[4]], w[5], w[6], clip)
             end
         end
     end
 end
 
--- Dashed outline: a slot's frame on the doll (the cursor gets a solid one).
+-- A slot's frame on the doll (the cursor gets a solid one): one rect in
+-- dark gray, which the 1-bit panel dithers into a broken line. (It was
+-- drawn as 2px dashes - ~30 line calls a slot, most of the bag screen's
+-- draw time on the device.)
 local function dashed_rect(x, y, w, h)
-    for dx = 0, w - 1, 4 do
-        local len = math.min(2, w - dx) - 1
-        gfx.line(x + dx, y, x + dx + len, y)
-        gfx.line(x + dx, y + h - 1, x + dx + len, y + h - 1)
-    end
-    for dy = 0, h - 1, 4 do
-        local len = math.min(2, h - dy) - 1
-        gfx.line(x, y + dy, x, y + dy + len)
-        gfx.line(x + w - 1, y + dy, x + w - 1, y + dy + len)
-    end
+    gfx.color(gfx.DARK)
+    gfx.rect(x, y, w, h)
+    gfx.color(gfx.BLACK)
 end
 
 local HALO = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}}
@@ -412,7 +425,162 @@ function Game:cursor_description()
     return text
 end
 
+-- Which ground stack starts the visible window: scrolled so the cursor is
+-- in view when it is on the ground grid.
+function Game:ground_scroll(n_ground)
+    local off = self.ground_off or 0
+    if self.inv_cursor <= n_ground then
+        local crow = (self.inv_cursor - 1) // GROUND_GRID_COLS
+        local first = off // GROUND_GRID_COLS
+        if crow < first then
+            off = crow * GROUND_GRID_COLS
+        elseif crow >= first + GROUND_GRID_ROWS then
+            off = (crow - GROUND_GRID_ROWS + 1) * GROUND_GRID_COLS
+        end
+    end
+    local total_rows = (n_ground + GROUND_GRID_COLS - 1) // GROUND_GRID_COLS
+    return math.max(0, math.min(off, (total_rows - GROUND_GRID_ROWS) * GROUND_GRID_COLS))
+end
+
+-- Everything the bag screen shows except where the cursor is: when only the
+-- cursor moved, the screen is patched instead of redrawn.
+function Game:inv_signature()
+    local p, out = self.player, {self:current_conditions(), self.ground_off or 0, self:bag_capacity(),
+                                 (self:at_base() and self:base_has("box")) and "box" or "ground"}
+    for _, list in ipairs({self:ground_list(), p.inventory}) do
+        for _, s in ipairs(list) do out[#out + 1] = s.item .. "x" .. s.qty end
+        out[#out + 1] = "|"
+    end
+    for _, slot in ipairs(EQUIP_SLOTS) do out[#out + 1] = p.equipped[slot] or "-" end
+    local sel = self.inv_selected
+    out[#out + 1] = sel and (sel[1] .. ":" .. sel[2]) or "-"
+    for _, line in ipairs(self.log) do out[#out + 1] = line end
+    return table.concat(out, "\n")
+end
+
+-- What the cursor is on and what it does, under the bag.
+function Game:draw_inv_desc(w, clear)
+    if clear then
+        gfx.color(gfx.WHITE)
+        gfx.fill_rect(INV_COL_X, CURSOR_DESC_Y - 11, w - INV_COL_X, 30)
+    end
+    gfx.color(gfx.BLACK)
+    gfx.font(gfx.FONT_MONO_12)
+    local desc = self:cursor_description()
+    local max_chars = (w - INV_COL_X - 2) // 7
+    if #desc > max_chars then desc = desc:sub(1, max_chars) end
+    gfx.text(INV_COL_X, CURSOR_DESC_Y, desc)
+    local row = INV_ROWS[self.inv_cursor]
+    local stack = row and self:get_stack(row[1], row[2])
+    local effect = stack and ITEM_DB[stack.item].desc
+    if effect then gfx.text(INV_COL_X, CURSOR_DESC_Y + 14, effect:sub(1, max_chars)) end
+end
+
+-- The doll's pixels on the 1px ring just outside a slot, as runs
+-- {color, x, y, w, h}: draw_silhouette is run once into a recorder (so it is
+-- exactly what a full redraw paints there) and cached until the clothes change.
+function Game:doll_ring(slot, pos)
+    local worn = {}
+    for _, s in ipairs(EQUIP_SLOTS) do worn[#worn + 1] = self.player.equipped[s] or "-" end
+    worn = table.concat(worn, ",")
+    if not (self.ring_cache and self.ring_cache.worn == worn) then self.ring_cache = {worn = worn} end
+    if self.ring_cache[slot] then return self.ring_cache[slot] end
+    local x0, y0, x1, y1 = pos.x - 1, pos.y - 1, pos.x + pos.w, pos.y + pos.h
+    -- the ring as four lines of pixels: {x, y, dx, dy, length}
+    local lines = {{x0, y0, 1, 0, x1 - x0 + 1}, {x0, y1, 1, 0, x1 - x0 + 1},
+                   {x0, y0 + 1, 0, 1, y1 - y0 - 1}, {x1, y0 + 1, 0, 1, y1 - y0 - 1}}
+    local px = {{}, {}, {}, {}}
+    local real_color, real_fill, pen = gfx.color, gfx.fill_rect, gfx.WHITE
+    gfx.color = function(c) pen = c end
+    gfx.fill_rect = function(x, y, w, h)
+        for i, l in ipairs(lines) do
+            local lx, ly = l[1], l[2]
+            if l[3] == 1 then      -- a row: the part of [x, x+w) on it
+                if ly >= y and ly < y + h then
+                    for xx = math.max(x, lx), math.min(x + w, lx + l[5]) - 1 do px[i][xx - lx + 1] = pen end
+                end
+            elseif lx >= x and lx < x + w then
+                for yy = math.max(y, ly), math.min(y + h, ly + l[5]) - 1 do px[i][yy - ly + 1] = pen end
+            end
+        end
+    end
+    local ok, err = pcall(self.draw_silhouette, self, {x0, y0, x1 + 1, y1 + 1})
+    gfx.color, gfx.fill_rect = real_color, real_fill
+    if not ok then error(err) end
+    -- run-length: one rect per stretch of one color
+    local runs = {}
+    for i, l in ipairs(lines) do
+        local start, color = 1, px[i][1]
+        for k = 2, l[5] + 1 do
+            if k > l[5] or px[i][k] ~= color then
+                local n = k - start
+                local x, y = l[1] + l[3] * (start - 1), l[2] + l[4] * (start - 1)
+                runs[#runs + 1] = {color, x, y, l[3] == 1 and n or 1, l[3] == 1 and 1 or n}
+                start, color = k, px[i][k]
+            end
+        end
+    end
+    self.ring_cache[slot] = runs
+    return runs
+end
+
+-- One cell or slot again (on top of what is there), with the cursor or not.
+function Game:redraw_inv_row(i, erase)
+    local row, pos = INV_ROWS[i], INV_POS[i]
+    if not (row and pos) then return end
+    local sel = self.inv_selected
+    sel = sel ~= nil and sel[1] == row[1] and sel[2] == row[2]
+    if row[1] == "equip" then
+        if erase then
+            -- the cursor's rect is the 1px ring just outside the slot (its
+            -- own frame is redrawn below): put the doll's pixels back there
+            for _, run in ipairs(self:doll_ring(row[2], pos)) do
+                gfx.color(run[1])
+                gfx.fill_rect(run[2], run[3], run[4], run[5])
+            end
+        end
+        self:draw_equip_slot(row[2], pos.x, pos.y, pos.w, pos.h, i == self.inv_cursor, sel)
+    else
+        if erase then
+            gfx.color(gfx.WHITE)
+            gfx.fill_rect(pos.x - 2, pos.y - 2, pos.w + 4, pos.h + 4)
+        end
+        self:draw_slot_box(pos.x, pos.y, pos.w, pos.h, self:get_stack(row[1], row[2]),
+                           i == self.inv_cursor, sel)
+    end
+end
+
+-- Only the cursor moved: redraw the cell it left, the one it's on, and the
+-- description (~50 draw calls instead of ~850 for the whole screen).
+function Game:move_inv_cursor_drawn(old, w)
+    self:redraw_inv_row(old, true)
+    self:redraw_inv_row(self.inv_cursor, true)
+    -- an erase can clip the selected cell's outline (it may be the cell just
+    -- left): draw it again on top, last
+    local sel = self.inv_selected
+    if sel then
+        for i, row in ipairs(INV_ROWS) do
+            if row[1] == sel[1] and row[2] == sel[2] then
+                self:redraw_inv_row(i, false)
+            end
+        end
+    end
+    self:draw_inv_desc(w, true)
+    self.inv_drawn.cursor = self.inv_cursor
+    gfx.refresh()
+end
+
 function Game:draw_inventory(w, h)
+    -- cursor-only change (the screen on the panel is this one, unchanged)
+    local drawn = self.inv_drawn
+    if drawn and INV_ROWS and #INV_ROWS > 0 then
+        self.inv_cursor = math.max(1, math.min(self.inv_cursor, #INV_ROWS))
+        if self:ground_scroll(#self:ground_list() + 1) == (self.ground_off or 0)
+            and self:inv_signature() == drawn.sig then
+            if drawn.cursor ~= self.inv_cursor then self:move_inv_cursor_drawn(drawn.cursor, w) end
+            return
+        end
+    end
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
     gfx.font(gfx.FONT_MONO_12)
@@ -435,18 +603,7 @@ function Game:draw_inventory(w, h)
     -- one extra, empty cell after the last stack: somewhere to drop things
     local n_ground = #ground + 1
     local per_page = GROUND_GRID_COLS * GROUND_GRID_ROWS
-    local off = self.ground_off or 0
-    if self.inv_cursor <= n_ground then
-        local crow = (self.inv_cursor - 1) // GROUND_GRID_COLS
-        local first = off // GROUND_GRID_COLS
-        if crow < first then
-            off = crow * GROUND_GRID_COLS
-        elseif crow >= first + GROUND_GRID_ROWS then
-            off = (crow - GROUND_GRID_ROWS + 1) * GROUND_GRID_COLS
-        end
-    end
-    local total_rows = (n_ground + GROUND_GRID_COLS - 1) // GROUND_GRID_COLS
-    off = math.max(0, math.min(off, (total_rows - GROUND_GRID_ROWS) * GROUND_GRID_COLS))
+    local off = self:ground_scroll(n_ground)
     self.ground_off = off
     local label = (self:at_base() and self:base_has("box")) and "Stash box" or "Ground"
     if #ground > per_page then
@@ -520,15 +677,7 @@ function Game:draw_inventory(w, h)
     end
 
     -- what the cursor is on, under the bag
-    gfx.color(gfx.BLACK)
-    local desc = self:cursor_description()
-    local max_chars = (w - INV_COL_X - 2) // 7
-    if #desc > max_chars then desc = desc:sub(1, max_chars) end
-    gfx.text(INV_COL_X, CURSOR_DESC_Y, desc)
-    local row = INV_ROWS[self.inv_cursor]
-    local stack = row and self:get_stack(row[1], row[2])
-    local effect = stack and ITEM_DB[stack.item].desc
-    if effect then gfx.text(INV_COL_X, CURSOR_DESC_Y + 14, effect:sub(1, max_chars)) end
+    self:draw_inv_desc(w, false)
 
     local back = self.player.equipped.back
     gfx.text(INV_COL_X, BAG_LABEL_Y, (back and ITEM_DB[back].name or "Pockets")
@@ -542,6 +691,7 @@ function Game:draw_inventory(w, h)
         ly = ly + 12
     end
 
+    self.inv_drawn = {sig = self:inv_signature(), cursor = self.inv_cursor}
     gfx.refresh()
 end
 

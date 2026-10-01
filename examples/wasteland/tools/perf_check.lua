@@ -58,6 +58,21 @@ frame("map (night)", function() g:draw_map(400, 300) end)
 for k in pairs(g.tiles) do g.player.explored[k] = true end
 frame("map (all explored)", function() g:draw_map(400, 300) end)
 frame("inventory", function() g:draw_inventory(400, 300) end)
+-- the bag patches itself when only the cursor moves: the worst single step
+do
+    local worst = 0
+    for i = 1, 40 do
+        g.inv_cursor = i
+        g.inv_drawn = nil
+        g:draw_inventory(400, 300)
+        calls = 0
+        g.inv_cursor = i + 1
+        g:draw_inventory(400, 300)
+        worst = math.max(worst, calls)
+    end
+    frames[#frames + 1] = {"inventory cursor move", worst}
+    g.inv_cursor, g.inv_drawn = 1, nil
+end
 g:open_crafting()
 frame("crafting", function() g:draw_craft(400, 300) end)
 g.screen = "map"

@@ -59,6 +59,19 @@ function Game:draw_help(w, h)
     gfx.refresh()
 end
 
+-- Every gfx call is an event the firmware drains 24 at a time, once per app
+-- tick (25 ms by default): ~960 calls a second, so a 900-call screen took
+-- most of a second to appear. solaros.tick_interval asks for faster ticks;
+-- the main loop turns them on only while a frame is being drawn, so the
+-- board idles as before. Firmware without it keeps the old speed.
+Game.DRAW_TICK_MS = 2
+
+function Game.draw_pump(on)
+    local set = solaros.tick_interval
+    if not set then return false end
+    return (pcall(set, on and Game.DRAW_TICK_MS or 0))
+end
+
 -- What the game sees of the device, one line each.
 function Game:device_lines()
     local st = solaros.storage
@@ -83,6 +96,8 @@ function Game:device_lines()
     end
     lines[#lines + 1] = ("World seed %d, hour %d, %s"):format(self.world_seed or 0, self.player.hours,
         DIFFICULTY[self.difficulty or "normal"].name)
+    lines[#lines + 1] = "Fast drawing: " .. (solaros.tick_interval
+        and ("yes (" .. Game.DRAW_TICK_MS .. " ms ticks while drawing)") or "no (older firmware)")
     lines[#lines + 1] = "Audio: " .. ((solaros.audio and solaros.audio.tone) and "tone ok" or "none")
     return lines
 end

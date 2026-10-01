@@ -14,7 +14,11 @@ gfx.FONT_BOLD_14, gfx.FONT_MONO_12 = "BOLD14", "MONO12"
 gfx.KEY_ESCAPE, gfx.KEY_UP, gfx.KEY_DOWN, gfx.KEY_LEFT, gfx.KEY_RIGHT = 0x1b, 0x80, 0x81, 0x82, 0x83
 
 function gfx.begin() end
-gfx["end"] = function() print("[gfx.end called]") end
+gfx["end"] = function()
+    -- the main loop asks for fast ticks only while drawing: never leave it on
+    assert((TICK_SET or 0) == 0, "tick interval left at " .. tostring(TICK_SET))
+    print("[gfx.end called]" .. (TICK_CALLS and (" fast-draw toggles: " .. TICK_CALLS) or ""))
+end
 function gfx.clear(c) end
 function gfx.color(c) end
 function gfx.font(f) end
@@ -91,6 +95,14 @@ function M.audio.tone(freq, ms, vol) end
 -- prints it) so a failure can be replayed: WASTELAND_SEED=1234 bash tests/run_tests.sh
 local SEED = tonumber(os.getenv("WASTELAND_SEED") or "") or os.time()
 M.time = {uptime_ms = function() return SEED end}
+
+-- solaros.tick_interval([ms]): the firmware's event-pump interval (0 = 25 ms)
+function M.tick_interval(ms)
+    if ms ~= nil then
+        TICK_SET, TICK_CALLS = ms, (TICK_CALLS or 0) + 1
+    end
+    return (TICK_SET or 0) ~= 0 and TICK_SET or 25
+end
 
 -- In-memory storage with the real API's shape (read_file raises on a missing
 -- file, like the device). write_file is the new call from firmware/; tests set

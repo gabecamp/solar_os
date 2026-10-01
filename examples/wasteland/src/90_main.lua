@@ -95,6 +95,10 @@ local ok, err = pcall(function()
     local dirty = true
     while not game.quit and not solaros.should_exit() do
         if dirty then
+            -- the bag screen patches itself when only its cursor moved; any
+            -- other screen in between means it has to be drawn whole again
+            if game.screen ~= "inventory" then game.inv_drawn = nil end
+            Game.draw_pump(true)
             if game.screen == "title" then
                 game:draw_title(w, h)
             elseif game.screen == "creator" then
@@ -130,6 +134,7 @@ local ok, err = pcall(function()
             else
                 game:draw_inventory(w, h)
             end
+            Game.draw_pump(false)
             dirty = false
         end
 

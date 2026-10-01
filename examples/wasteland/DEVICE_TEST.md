@@ -46,14 +46,17 @@ before and start it. For anything that goes wrong, a photo of the screen
     and a list of choices.
 
 ## Expected numbers (measured on a PC with the test fake)
-- Lua memory: about **755 KB** once loaded, **~850 KB** at most while
+- Lua memory: about **765 KB** once loaded, **~885 KB** at most while
   playing. The device info page (H, then V) shows the real figure. On the
   SolarTerm board Lua lives in the 8 MB PSRAM, so this should be fine;
   much higher than ~1 MB on the device would be worth reporting.
-- The script is ~400 KB; SolarOS streams it from storage, so size is not
+- The script is ~410 KB; SolarOS streams it from storage, so size is not
   a limit.
-- Redraws: the bag screen is the busiest (~1,300 draw calls), the map
-  ~400-850. If the bag screen feels slow after a key press, say so.
+- Redraws: the map is ~450-900 draw calls, the bag ~890 for a full redraw
+  and ~100 when only the cursor moves. The device info page (H, V) says
+  "Fast drawing: yes" when the firmware has `solaros.tick_interval`; then
+  moving the bag cursor should feel instant and other screens should appear
+  in well under half a second. If not, say which screen is slow.
 
 ## What to send back
 - The photo of the device info page (H then V).
