@@ -21,7 +21,7 @@ function Game:maybe_encounter(terrain_id)
         self.enc_cooldown = self.enc_cooldown - 1
         return
     end
-    if self:maybe_karl("move") or self:maybe_dog() then return end
+    if self:maybe_karl("move") or self:maybe_dog() or self:maybe_horror() then return end
     local chance = FIGHT.ENCOUNTER_CHANCE[terrain_id]
     if chance then chance = chance * self:diff("encounter") end
     if chance and self:is_night() then chance = chance * WORLD.night_encounters end
@@ -96,6 +96,7 @@ function Game:encounter_options()
     local kind = e.def.kind
     if kind == "helper" then return {{"Talk", "talk"}, {"Walk on", "leave_quietly"}} end
     if kind == "anomaly" then return {{"Investigate", "investigate"}, {"Walk away", "leave_quietly"}} end
+    if kind == "horror" then return self:horror_options(e) end
     if kind == "dog" then
         local o = {}
         if self:dog_food() then o[1] = {"Offer it food", "tame"} end
@@ -172,7 +173,7 @@ function Game:enemy_turn()
         e.outcome = "fled"
         return self:end_encounter("The " .. d.who .. " fled.")
     end
-    if self:dog_turn() then return end
+    if self:dog_turn() or self:dark_flees() then return end
     if e.range ~= "close" then
         if self:roll(FIGHT.ADVANCE_CHANCE + 10 * (d.speed - p.attrs.Speed)) then
             e.range = CLOSER[e.range]
@@ -245,6 +246,9 @@ function Game:encounter_action(action)
     local e, p = self.enc, self.player
     e.msg = {}
     if action == "tame" then return self:dog_tame() end
+    if action == "look_away" or action == "speak" or action == "cover" or action == "follow" then
+        return self:horror_action(action)
+    end
     local answer = action:match("^answer_(%d)$")
     if answer then return self:karl_answer(tonumber(answer)) end
     if action == "investigate" then
@@ -284,6 +288,7 @@ function Game:encounter_action(action)
         e.aim = 0
         if self:roll(hit) then
             local dmg = math.max(1, w.dmg - self:rand(w.dmg // 4 + 1) + 2 * (p.attrs.Strength - 3))
+            dmg = self:dark_damage(dmg)
             self:enc_hit(dmg, w.bleed, "You hit the " .. e.def.who .. " (" .. wname:lower() .. ")")
         else
             self:sfx("miss")

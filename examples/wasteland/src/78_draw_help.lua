@@ -22,7 +22,7 @@ local HELP = {
     {"TIPS", "Shelter in ruins/hills from emissions."},
     {"", "3 artifacts or a permit get you out."},
     {"", "Karl fishes rivers. Strays like food."},
-    {"", "C in a ruin: claim it as your camp."},
+    {"", "C in a ruin: claim it. Carry light at night."},
 }
 
 function Game:open_help()

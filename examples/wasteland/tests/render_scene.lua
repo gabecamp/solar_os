@@ -404,3 +404,13 @@ g.lore_page = 3
 g.screen = "lore"
 g:draw_lore(400, 300)
 solaros.dump("ops_lore.txt")
+
+-- Scene: a night horror (the Long Man)
+g = fresh()
+g:start_game()
+g.player.hours = 14
+g:start_encounter({kind = "horror", horror = "long_man", name = "The Long Man", art = "long_man",
+    who = "long man", start = "far", speed = 3,
+    intro = "Someone stands at the edge of your light. Too tall. Its arms hang past its knees. It doesn't move, and you can't tell which way it's facing."})
+g:draw_encounter(400, 300)
+solaros.dump("ops_horror.txt")

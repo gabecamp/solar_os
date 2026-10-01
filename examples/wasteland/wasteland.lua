@@ -241,7 +241,7 @@ local KARL = {
 local DIFFICULTY = {
     order = {"easy", "normal", "hard"},
     easy   = {name = "Easy", short = "Easy",          food = 1.5, encounter = 0.6, rad = 0.6, emission = 0.5, drain = 0.8},
-    normal = {name = "Normal", short = "Normal",        food = 1,   encounter = 1,   rad = 1,   emission = 1,   drain = 1},
+    normal = {name = "Normal", short = "Normal",        food = 1.15, encounter = 0.9, rad = 1, emission = 1, drain = 0.9},
     hard   = {name = "Zone-Hardened", short = "Hard", food = 0.85, encounter = 1.3, rad = 1.25, emission = 1.25, drain = 1.1},
 }
 
@@ -307,6 +307,28 @@ local QUESTS = {
               reward = {{"medkit", 1}, {"water_bottle", 2}}},
     dog = {offer = "Karl: 'Before you go - my old dog ran off. Find her by the water?'",
            journal = "find his dog by the river", near = 4, far = 8},
+}
+
+-- Night horrors (src/54_night.lua): chance % per move after dark, halved
+-- by light and again by a fire; never at a camp with a bedroll.
+local NIGHT = {
+    chance = 4, dread_rest = 10, madness_hurt = 15, whisper_rest = 15, follow_hurt = 20,
+    light_drives_off = 35,
+    horrors = {
+        {kind = "horror", horror = "long_man", name = "The Long Man", art = "long_man",
+         who = "long man", start = "far",
+         intro = "Someone stands at the edge of your light. Too tall. Its arms hang past its "
+              .. "knees. It doesn't move, and you can't tell which way it's facing.", speed = 3},
+        {kind = "beast", name = "The Crawler", art = "crawler", who = "crawler", dark = true,
+         intro = "Something low and wide moves in the grass, too many legs, too many eyes "
+              .. "catching your light. It clicks. It's coming.",
+         hp = 40, dmg = {6, 12}, hit = 55, speed = 4, bleed = 25, start = "near",
+         loot = {{"strange_meat", 2}, {"nothing", 1}}, loot_rolls = 1},
+        {kind = "horror", horror = "whisper", name = "The Whisperers", art = "whisper",
+         who = "whisperers", start = "far",
+         intro = "From the black water, voices. They say your name, then your mother's. "
+              .. "Pale faces turn just under the surface.", speed = 3},
+    },
 }
 
 local BACKPACK_CAP = 16      -- most bag cells any build can have (the layout's limit)
@@ -2794,6 +2816,8 @@ function Game.new()
     end
     self.craft_ui = {cursor = 1, back = "map"}   -- crafting screen state (not "craft": that is the method)
     self.player = new_player()
+    self.difficulty = "normal"
+    self.player.diff_drain = DIFFICULTY.normal.drain   -- (set_difficulty changes it)
     recompute_stats(self.player)
     self:refresh_view()
     self.screen = "creator"      -- "creator", then "map" or "inventory"
@@ -4062,7 +4086,7 @@ function Game:maybe_encounter(terrain_id)
         self.enc_cooldown = self.enc_cooldown - 1
         return
     end
-    if self:maybe_karl("move") or self:maybe_dog() then return end
+    if self:maybe_karl("move") or self:maybe_dog() or self:maybe_horror() then return end
     local chance = FIGHT.ENCOUNTER_CHANCE[terrain_id]
     if chance then chance = chance * self:diff("encounter") end
     if chance and self:is_night() then chance = chance * WORLD.night_encounters end
@@ -4137,6 +4161,7 @@ function Game:encounter_options()
     local kind = e.def.kind
     if kind == "helper" then return {{"Talk", "talk"}, {"Walk on", "leave_quietly"}} end
     if kind == "anomaly" then return {{"Investigate", "investigate"}, {"Walk away", "leave_quietly"}} end
+    if kind == "horror" then return self:horror_options(e) end
     if kind == "dog" then
         local o = {}
         if self:dog_food() then o[1] = {"Offer it food", "tame"} end
@@ -4213,7 +4238,7 @@ function Game:enemy_turn()
         e.outcome = "fled"
         return self:end_encounter("The " .. d.who .. " fled.")
     end
-    if self:dog_turn() then return end
+    if self:dog_turn() or self:dark_flees() then return end
     if e.range ~= "close" then
         if self:roll(FIGHT.ADVANCE_CHANCE + 10 * (d.speed - p.attrs.Speed)) then
             e.range = CLOSER[e.range]
@@ -4286,6 +4311,9 @@ function Game:encounter_action(action)
     local e, p = self.enc, self.player
     e.msg = {}
     if action == "tame" then return self:dog_tame() end
+    if action == "look_away" or action == "speak" or action == "cover" or action == "follow" then
+        return self:horror_action(action)
+    end
     local answer = action:match("^answer_(%d)$")
     if answer then return self:karl_answer(tonumber(answer)) end
     if action == "investigate" then
@@ -4325,6 +4353,7 @@ function Game:encounter_action(action)
         e.aim = 0
         if self:roll(hit) then
             local dmg = math.max(1, w.dmg - self:rand(w.dmg // 4 + 1) + 2 * (p.attrs.Strength - 3))
+            dmg = self:dark_damage(dmg)
             self:enc_hit(dmg, w.bleed, "You hit the " .. e.def.who .. " (" .. wname:lower() .. ")")
         else
             self:sfx("miss")
@@ -6177,6 +6206,98 @@ function Game:draw_lore(w, h)
     gfx.text(6, h - 8, "Up/Dn page  any other key: back")
     gfx.refresh()
 end
+-- ---------------------------------------------------------------------
+-- Night horrors (NIGHT in 05_data). Only after dark, never in the normal
+-- encounter pick: maybe_horror runs on each move at night with its own
+-- chance, halved by light in your hand or a fire on the hex, and never at a
+-- camp with a bedroll.
+--   The Long Man: look away (safe, costs rest), run, or speak to it.
+--   The Crawler: a fight; without light your blows only half land, and a
+--     torch at close range can drive it off.
+--   The Whisperers: cover your ears, or follow the voice.
+-- ---------------------------------------------------------------------
+
+function Game:horror_chance()
+    if not self:is_night() or self:bed_here() then return 0 end
+    local chance = NIGHT.chance
+    if self:has_light() then chance = chance / 2 end
+    if self:fire_here() then chance = chance / 2 end
+    return chance
+end
+
+function Game:maybe_horror()
+    if not self:roll(self:horror_chance()) then return false end
+    local def = NIGHT.horrors[self:rand(#NIGHT.horrors) + 1]
+    self:start_encounter(def)
+    self:sfx("emission")
+    return true
+end
+
+-- Options for the two that don't fight.
+function Game:horror_options(e)
+    if e.def.horror == "long_man" then
+        return {{"Look away", "look_away"}, {"Run", "flee"}, {"Speak to it", "speak"}}
+    end
+    return {{"Cover your ears", "cover"}, {"Follow the voice", "follow"}}
+end
+
+function Game:horror_action(action)
+    local p, e = self.player, self.enc
+    if action == "look_away" then
+        p.needs.rest = clamp(p.needs.rest - NIGHT.dread_rest)
+        self:enc_say("You stare at your boots until your eyes water. When you look up, the "
+            .. "edge of the light is empty. You don't sleep well after that.")
+        return self:end_encounter("It was gone when you looked up.")
+    elseif action == "speak" then
+        if self:roll(50) then
+            local item = ARTIFACTS[self:rand(#ARTIFACTS) + 1]
+            self:put_stack("ground", nil, {item = item, qty = 1})
+            self:enc_say("It bends down, and down, and puts something in the grass at your feet. "
+                .. "Then it isn't there.")
+            return self:end_encounter("It left you a " .. ITEM_DB[item].name .. ".")
+        end
+        p.health = clamp(p.health - NIGHT.madness_hurt)
+        self:enc_say("It answers. You don't remember what it said. Your nose is bleeding and "
+            .. "your hands won't stop shaking. (-" .. NIGHT.madness_hurt .. " HP)")
+        self:end_encounter("You spoke to it. You wish you hadn't.")
+        return self:check_death("Something answered you in the dark.")
+    elseif action == "cover" then
+        p.needs.rest = clamp(p.needs.rest - NIGHT.whisper_rest)
+        self:enc_say("You press your hands over your ears and hum until dawn. They know your "
+            .. "name. They'll know it tomorrow too.")
+        return self:end_encounter("You didn't listen to the river.")
+    elseif action == "follow" then
+        if self:roll(40 + 10 * (p.attrs.Perception - 3)) then
+            self:mark_stash()
+            self:enc_say("The voice leads you along the bank to a drowned man's pack. When you "
+                .. "turn, the water is just water.")
+            return self:end_encounter("The voices showed you something.")
+        end
+        p.health = clamp(p.health - NIGHT.follow_hurt)
+        self:enc_say("You're waist-deep before you wake. Cold hands let go of your ankles. "
+            .. "(-" .. NIGHT.follow_hurt .. " HP)")
+        self:end_encounter("You nearly walked into the river.")
+        return self:check_death("The river kept you.")
+    end
+end
+
+-- The Crawler: blows in the dark only half land.
+function Game:dark_damage(dmg)
+    local e = self.enc
+    if e and e.def.dark and not self:has_light() then return math.max(1, dmg // 2) end
+    return dmg
+end
+
+-- The Crawler hates light: a torch at close range may drive it off.
+function Game:dark_flees()
+    local e = self.enc
+    if not (e and e.def.dark and self:has_light() and e.range == "close") then return false end
+    if not self:roll(NIGHT.light_drives_off) then return false end
+    self:enc_say("You thrust the light at it. It shrieks and pours away into the dark.")
+    e.outcome = "fled"
+    self:end_encounter("The light drove it off.")
+    return true
+end
 
 -- Equip slots sit ON the body part they dress, NEO Scavenger style: a box over
 -- the head, the face, the torso, the legs, a hand... sized to that part, with
@@ -6873,6 +6994,39 @@ local PORTRAIT_DATA = {
             marks = {61, 52, 38, 53, 69, 57, 86, 57, 50, 55, 23, 49, 32, 44, 52, 42, 13, 46, 55, 65, 75, 66, 20, 39, 91, 66, 44, 37},
             data = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADwAAAA2AEAAKwHAAB0HwAArPoAAFT9AACs+gAA9P8AAOz/AAD2/gAA6vwAAPf2AAD7AwAA/VUAAHsCAIB/dQCAPgAAwH8VAIB/gACAXxUAAAAAAABgAAAAIAAAAHAAAABwAAAAWAAAAGgAAAB8AAAAbAAAAHYAAADrAAAAdQAAgOsAAID1AADAegAAQP0A+P/6AF/V/wADoP8AV9X/AAMA/gBXVf0AAwD6AVVV9QEAAKgAVVXdAQqCqgF1wf0DDPDoAxzx/AMPAvoDH1X/AwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABPAAAARFUAAEAAAABAVQAAQAAAAHBVAAAcoAAAV9UAwAGoAPBX/QD4h/oA+Ff/APiv/gD4//8A8Pv/AMD//wAA//8AAP8FAAAAAAAAABEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAqP4HQNX/A6Cq/wNV//8DqOr/A93//wGq//8B////Af7/fwD//38A//8/AP///wD//68B//9XA///ogb/f1UNioiIGlhVVTUwIqJqcFVV1aCIiKhwVVVVoKqiqmBVVVXgqoiowFVVVYCqqqqAd1d1AKuqqgDeVdUArKqqAPh39wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAMAAAAGAAAADwAAABoAAAA9AOT/6v//qv9XV3WqioqK/VVVVbqroqr/V1dVAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAsKqqAODf/QDAqqoAgP//AACr6gAA/v8AALz/AAD8/wAA7P8AAPz/AACo/wAA2P8AAKj+AABY/QAAqPoAAHj3AACwqgAAWN0AALiqAABQdwAAsKoAAPD9AADgugAAgP8AAACuAAAA+AAAALAAAADwAAAAuAAAANgAAACoAAAA+O6viKj/X1VV/6+qqv9fV1f/r4qq/19VVf+vqqr/V1dX/4uqqv9XVVX/q6qq/3X///+qqqr/3d3/r6qqq/f///+qququ/dX//6qq+/9/1f//qqr+/n/V//+76v//f/X//67qn/1/9QEAv/IBAH/1AQC++gAAf/0BAD76AABf/QAA"},
     },
+    long_man = {
+        near = {w = 96, h = 96, tw = 3, th = 3,
+            marks = {52, 53, 8, 53, 73, 52, 39, 52, 22, 53, 89, 51, 63, 58, 47, 45, 79, 62, 48, 62, 34, 61, 12, 42, 31, 45, 81, 43},
+            data = "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////7+7//////////////////////////////////////////////////////////////////////////////////////9/9//+/+///////////////////////////////////////////////////////////////////////7u7v7v////+////7///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////u/v//////////////////7u7u7v///////7u7/////+7u7qr/////u7u7u/////+uqqqq/////7u7qqr/////qqqqqv//392qqqqq////f6qqqqrd3d3dqqqqqv93d3eqqqqq3d1VVaqqqqp3d3d3qqqqqlVVVVWqqqqqd1dVVaqqqqpVVVVVqqqqqlVVVVXu7u/u/////7v7u7v/////quqrqv////+76r+6/////6rqr6r/////qvq/qv////+q+ruq3d3/3aruu6p3/3d3qu7rql3f/92q6+uqd/f3d6rrq6vV1ddVquurq9X1V1fq6quq9dVXV+rqq6511VdfuOiLjn3VV1266qu6XdVXfe7u7u7/////u7v////////q7u7u/////7u7u7v/////qqqq7v////+qqrq7/////6qqqqrd/f//qqqqqv////+qqqqq3d3d3aqqqqp3d/f/qqqqqlXV3d2qqqqqdXd3d6qqqqpVVVVVqqqqqlVVdXeqqqqqVVVVVaqqqqpVVVVVqoqIiFVVVVWqqqqqVVVVVYiIiIhVVVVVqqoiIlVVVVWIiIiIVVVVVSIiIiJVVVVViIiIiFVVVVUiIiIiVVVVVYiIiAhVVVVVIiIiIlVVVVWIiIiIVVVVVSIiIqJVVVXViIiIiFVVVVUiIiIiVVVVVYiIiIhVVVVVIiIiIlVVVVWMyIu4XdVXdS7iIyJd1Vd1jMiLqFXVV3Uu4iMiV9VXdY7Ii+hX1Vd1IuIj4lfVV3WCyIvIV9VX1SLiI+JX1VfVisiLiFfVV9Uj4iOiV9VX1YvIg4hV1VfVI+IjolXVV9WIyIOIVdVXVSLiIyJV1VdViMiDiFXVV1Ui4iMiVdVXVYiIqKpVVVVVqqqqqlVVVVWIiIiIVVVVVSKiqqpVVVVViIiIiFVVVVUiIiIiVVVVVYiIiIhVVVVVIiIiIlVVVVWIiIiIVVVVVSIiIiJVVVVViIiIiFVVVVUiIiIiVVVVVYiIiIhVVVVVIiIiIlVVVVWIiIiIVVVVVSIiIiJVVVVV"},
+        far = {w = 48, h = 48, tw = 2, th = 2,
+            marks = {35, 26, 20, 27, 43, 27, 28, 26, 3, 26, 7, 29, 13, 27, 10, 23, 25, 30, 24, 23, 40, 31, 37, 21, 16, 21, 33, 32},
+            data = "/////////////////////////////////////////////////////////////////////////////////////////+/////////7u//////u7uqr/////7u76q//////qqq6r//d/d2qqrq7/3f/f6qqqrvdVd11qqquq3dX13f//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAO7uAAD//wAAursAAP//AACqqgAA3f8AAKqqAAB3/wAAqqoAANXdAACqqgAAVXcAAKqqqutVVddVqqqqq1VV19WKiIqLVVXV1aoqq6tVVdXViIiIi1VV1dWqqqurVdXV1YiIiIlVVdVVqqqqq1VV1VUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAqqoAAFVVAACqqgAAVVUAAIioAABVVQAAqqoAAFVVAACIiAAAVVUAAKqqAABVVQAAiIgAAFVVAACqqgAAVVUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},
+        close = {w = 96, h = 96, tw = 3, th = 3,
+            marks = {9, 53, 51, 52, 65, 52, 79, 52, 23, 54, 38, 49, 91, 54, 31, 60, 19, 45, 17, 61, 73, 45, 57, 60, 4, 61, 57, 44},
+            data = "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////+8////FH///gA///8Qf///uP/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////+/u7u7/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////7v7/7v/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////u7u7u////////////////7u7u7v///////////////+7u7u7////////////////u7u7u/////7u7u7v/////7u7u7v////+7u7u7/////+7u7u7/////u7u7u/////+qqqqq/////7u7u7v/////qqqqqv////+7u7u7/////6qqqqr/////q6qqqv/////u/v/u////////v///////7v7/7v////+//7/7/////+7+/+7/////u/+/u//////u/r/u/////7v/v7v/////qv6/qv////+7/7+7/////6r+v6r/////u/+/u/////+q/r+q/////7v//7r/////qv7/qv////+q//+r/////+7u7u7////////////////u7u7u////////////////7u7u7v////+7u7u7/////+7u7u7/////u7u7u//////u7u7u/////7u7u7v/////qqqqqv////+7u7u7/////6qqqqr/////u7u7u/////+qqqqq/////6qqqqr/////"},
+    },
+    crawler = {
+        near = {w = 96, h = 96, tw = 3, th = 3,
+            marks = {30, 53, 86, 53, 56, 53, 69, 52, 3, 54, 14, 51, 42, 55, 22, 60, 36, 45, 76, 45, 23, 45, 61, 44, 34, 63, 4, 42},
+            data = "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////7+7/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////7u7u7v////+/v/v7///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////u/v//////////////////7u7u7v///////7u7/////+7u7qr/////u7u7u/////+uqqqq/////7u7qqr/////qqqqqv//392qqqqq////f6qqqqrd3d3dqqqqqv93d3eqqqqq3d1VVaqqqqp3d3d3qqqqqlVVVVWqqqqqd1fV9aqq6uhVVdXVqqrq61VV1ffu7u7u/////7u7u7v/////qqqqqv////+7qqq6/////6qqqqr/////qqqqqv////+qqqqq3d3d3aqqqqp3d3d3qqqqqt3d3d2qqqqqd3d3d6qqqqpVVVVVqqqqqlVVVVWqqqqqVVVVVaqqqqp1dXV96Oi4uvX1dXXr///6/////+7u7u7/////u7v////////q7u7u/////7u7u7v/////qqqq7v////+qqrq7/////6qqqqrd/f//qqqqqv////+qqqqq3d3d3aqqqqp3d/f/qqqqqlXV3d2qqqqqdXd3d6qqqqpVVVVVqqqqqlVVdXeqqqqqVVVVVaqqqqpVVVVVqoro7lVVVf+qqur+VVV1/4iIqP5VVXX/qqoi/lVVdf+IiKj+VVV1/SIiMvpVVXXViIi4GFVVVV0iIjo6VVVVXYiImIhVVV1dIiIiIlVVVVWIiIiIVVVVVSIiIiJVVVVViIiIiFVVVVUiIiIiVVVVVYiIiIhVVVVVIiIiIlVVVVX/////c57n+XOe5/n////////////////////////////////////////////////6//+v3f//VyqqLiJdXVdXiIwOgl1VVVciIiIiVVVVVYiIiIhVVVVVIiIiIlVVVVWIiIiIVVVVVSIiIiJVVVVViIiIiFVVVVUiIiIiVVVVVYqIqKpfVVVVv6qqqn9VVVX/iIiIf1VVVf+iqqp/VVVVv4iIiF9VVVUvIiIiV1VVVYiIiIhVVVVVIiIiIlVVVVWIiIiIVVVVVSIiIiJVVVVViIiIiFVVVVUiIiIiVVVVVYiIiIhVVVVVIiIiIlVVVVWIiIiIVVVVVSIiIiJVVVVV"},
+        far = {w = 48, h = 48, tw = 2, th = 2,
+            marks = {5, 26, 22, 27, 34, 27, 11, 28, 15, 25, 43, 24, 17, 30, 30, 23, 8, 22, 19, 22, 37, 22, 40, 29, 25, 31, 29, 34},
+            data = "/////////////////////////////////////////////////////////////////////////////////////////+7///////+7u//////u7qqq/////7u7qqr/////qqqqqv/d3d2qqqqq/3d3d6qqqqrd3d1Vqrrq7nf9/////wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAO7uAAD//wAAursAAP//AACqqgAA3f8AAKqqAAB3/wAAqqoAANXdAACqqgAAVXcAAKqqr+tV/f39qur//1X1//+K7P//VdX//6oq/r9Vd3d3iKqqqlVVVVWqqqqqVVVVVYiIiIhVVVVVqqqqqlVVVVUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAq6oAAFdVAACvqgAAX1UAAI+oAABVVQAAqqoAAFVVAACIiAAAVVUAAKqqAABVVQAAiIgAAFVVAACqqgAAVVUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},
+        close = {w = 96, h = 96, tw = 3, th = 3,
+            marks = {40, 53, 67, 52, 20, 51, 80, 51, 90, 55, 51, 50, 7, 56, 28, 57, 32, 47, 74, 59, 4, 45, 48, 61, 17, 62, 59, 64},
+            data = "qqqqqt3d3d2qqqqqd3d3d6qqqqrd3VVVqqqqqnd3d3eqqqqqVVVVVaqqqqp3d3dVqqqqqlVVVVWqqqqqV1VVVaqqqqpVVVVVqqqqqnVVX/X6qo/q/VVf9fqqvur1V3/1+ou+6P1Xf/W6r/v+/V/3/7iP//9d3//9ur7/8F3/f/Cqqqqq3d3d3aqqqqp3d3d3qqqqqlVVVVWqqqqqd3d3d6qqqqpVVVVVqqqqqlVVVVWqqqqqVVVVVaqqqqpVVVVVqqqqqlVVVVWqqqqqVX3VV4u+iI9XfdVfq/qqr1f91V+v//+///////////////////////HHH//ggw9+8ccff6qqqqrd3d3dqqqqqnd3d3eqqqqqVVXd3aqqqqp3d3d3qqqqqlVVVVWqqqqqVXd3d6qqqqpVVVVVqqqqqlVVVXWqqqqqVVVVVaqqqqp1VVVV+qqqqvVVVVX6q6qq9VdVVfiLiKj/V1VVv6+qqv9fVVX/v4iI/P9VVfj/q6r4/19ViPz/+F39//+q/v//Xf///4z+//9d////Lv7//1////+O/v//X/3//y76//9X9f//juj//1fV//8i4v7/V3X1/4LoiP5XdVX9I+Iirld1VV+LqIiOV3VVXyMiIi5XdVVXi7iIjlVVVVciIiIiVVVVVYiIiIhVVVVVIiIiIlVVVVX777/////////////////////////////////////////////////////////////////////////////////////////////6//+/1f9/VYgAOIjVVV1V4iI6otVVXdXoiIyIVVVd1SIiIiJVVVVViIiIiFVVVVUiIiIiVVVVVfj/j4j//39V//8/qv//f1X///+I////Vf///yL//39V////iP//f1X//z8i//9fVf//i4j//1VV/78iIv9fVVX/ioiIX1VVVSMiIiJXVVVVi4iIiFdVVVUjIiIiV1VVVYuIiIhVVVVVIiIiIlVVVVWIiIiIVVVVVSIiIiJVVVVViIiIiFVVVVUiIiIiVVVVVYiIiIhVVVVVIiIiIlVVVVWIiIiIVVVVVSIiIiJVVVVViIiIiFVVVVUiIiIiVVVVVYiIiIhVVVVV//////////////////////////////////////////////////////////////////////////+IiIiIVVVVVSIiIiJVVVVViIiIiFVVVVUiIiIiVVVVVYiIiIhVVVVVIiIiIlVVVVWIiIiIVVVVVSIiIiJVVVVViIiIiFVVVVX//////////////////////////////////////////////////////////////////////////4iIiIhVVVVVIiIiIlVVVVWIiIiIVVVVVSIiIiJVVVVViIiIiFVVVVUiIiIiVVVVVYiIiIhVVVVVIiIiIlVVVVWIiIiIVVVVVf//////////////////////////////////////////////////////////////////////////"},
+    },
+    whisper = {
+        near = {w = 96, h = 96, tw = 3, th = 3,
+            marks = {3, 54, 16, 53, 72, 51, 91, 53, 52, 53, 29, 54, 61, 48, 83, 58, 65, 57, 40, 49, 81, 45, 11, 45, 37, 60, 22, 60},
+            data = "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////7+7/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////7u7u7v////+/v/v7///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////u/v//////////////////7u7u7v///////7u7/////+7u7qr/////u7u7u/////+uqqqq/////7u7qqr/////qqqqqv//392qqqqq////f6qqqqrd3d3dqqqqqv93d3eqqqqq3d1VVaqqqqr///////////////////////////////////////+/+v//f/Xu7u7u/////7u7u7v/////qqqqqv////+7qqq6/////6qqqqr/////qqqqqv////+qqqqq3d3d3aqqqqp3d3d3qqqqqt3d3d2qqqqqd3d3d6qqqqpVVVVVqqqqqv//////v/7//1/9//8v+v//V/3//4vo//93/f//I/7//3f//+7u7u7/////u7v////////q7u7u/////7u7u7v/////qqqq7v////+qqrq7/////6qqqqrd/f//qqqqqv////+qqqqq3d3d3aqqqqp3d/f/qqqqqlXV3d2qqqqq//////////////////////////////////////////////////+P6P//X/X//y/q//93/f//6/z//9f9//+j+v//V////6//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////i/7//9f///+r////9////+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////9f////L/r//1f9//+L+v//Vf3//7v+//99////uP7//9X///+r/////////+v/////////////////////////////////////////////////////////////////////////////////////////////////////////"},
+        far = {w = 48, h = 48, tw = 2, th = 2,
+            marks = {17, 26, 31, 27, 40, 25, 3, 28, 11, 27, 23, 28, 38, 30, 27, 24, 14, 31, 36, 22, 12, 21, 7, 32, 5, 20, 42, 20},
+            data = "/////////////////////////////////////////////////////////////////////////////////////////+7///////+7u//////u7qqq/////7u7qqr/////qqqqqv/d3d2qqqqq//////////7//3/9//+//v/3X////wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAO7uAAD//wAAursAAP//AACqqgAA3f8AAKqqAAD//wAA//8AAP//AAD//wAA//8AAP+Ln/7//9///+v////3////+/////////////////////////////////////////////////////////////8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//8AAPf/AADr/wAA9/8AAPr/AAD9/wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},
+        close = {w = 96, h = 96, tw = 3, th = 3,
+            marks = {19, 53, 38, 52, 7, 52, 76, 52, 87, 54, 58, 53, 30, 57, 46, 47, 44, 59, 67, 57, 25, 46, 14, 44, 69, 45, 14, 61},
+            data = "qqqqqt3d3d2qqqqqd3d3d6qqqqrd3VVVqqqqqnd3d3eqqqqqVVVVVaqqqqp3d3d3qqqqqlVVVVWqqqqqVVVVVaqqqqr///////////////////////////////////////////////////+/////f////7////9f////P////1+qqqqq3d3d3aqqqqp3d3d3qqqqqlVVVVWqqqqqd3d3d6qqqqpVVVVVqqqqqnd3d3eqqqqqVVVVVaqqqqpVVVVVqqqqqv////////////f//7+I/v9fVf3/IyL6/1dV9f+IiOj/VVXV/yIiqv9VVfX/iIjq/1VV/f8iovr/dVX//6qqqqrd3d3dqqqqqnd3d3eqqqqq1d3d3aqqqqp3d3d3qqqqqlVVVdWqqqqqd3d3d6qqqqpVVVVVqqqqqlVVVVWqqqqq////////////////////////////////////////////////////////////////////////////////////j////1////8v////X////4////9f////L////1////+P////X////y////9f////j////1////+/////f////7/////////////////////////////////////////////////////////////////////////////////4iO///dX///qi///91f//+Kj//33V//8iqv//VfX//4io/v9V1f//Ir7//1X///+q////1f///6r/////////6v///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////3////+v////V////4v///9V////Iv//f1X//7+I//9fVf//vyr//19V//+PiP//X33//6/+//9Xff//j/7//1d9//+vvv//V33//6+q//9XVf//r6r//3d3////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////r6r//9/d//+vqv///////6/u////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////"},
+    },
     hollow = {
         near = {w = 96, h = 96, tw = 3, th = 3,
             marks = {52, 55, 32, 55, 76, 51, 66, 57, 15, 56, 42, 59, 80, 61, 27, 66, 70, 67, 57, 65, 10, 67, 85, 70, 88, 35, 18, 35},
@@ -7520,7 +7674,7 @@ local HELP = {
     {"TIPS", "Shelter in ruins/hills from emissions."},
     {"", "3 artifacts or a permit get you out."},
     {"", "Karl fishes rivers. Strays like food."},
-    {"", "C in a ruin: claim it as your camp."},
+    {"", "C in a ruin: claim it. Carry light at night."},
 }
 
 function Game:open_help()

@@ -91,6 +91,6 @@ lib = src[:cut]
     lib + "\nreturn Game, {HUNT = HUNT, ITEM_DB = ITEM_DB, KEY = KEY, SPRITES = SPRITES, "
           "RECIPES = RECIPES, FIGHT = FIGHT, KARL = KARL, PORTRAIT_DATA = PORTRAIT_DATA, "
           "DIFFICULTY = DIFFICULTY, RAD = RAD, SCAVENGE_LOOT = SCAVENGE_LOOT, TECH = TECH, "
-          "MAX_HEALTH = MAX_HEALTH, QUESTS = QUESTS, BASE = BASE}\n")
+          "MAX_HEALTH = MAX_HEALTH, QUESTS = QUESTS, BASE = BASE, NIGHT = NIGHT}\n")
 (here / "wasteland_run.lua").write_text(src)
 print("generated lib_*.lua, wasteland_run.lua")

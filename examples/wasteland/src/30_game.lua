@@ -37,6 +37,8 @@ function Game.new()
     end
     self.craft_ui = {cursor = 1, back = "map"}   -- crafting screen state (not "craft": that is the method)
     self.player = new_player()
+    self.difficulty = "normal"
+    self.player.diff_drain = DIFFICULTY.normal.drain   -- (set_difficulty changes it)
     recompute_stats(self.player)
     self:refresh_view()
     self.screen = "creator"      -- "creator", then "map" or "inventory"

@@ -8,14 +8,25 @@ local D = H.DIFFICULTY
 
 print("1. 1/2/3 on the creator pick the level; Normal is the default and all 1.0")
 local g = Game.new()
-assert(g:diff("food") == 1 and g:diff("encounter") == 1)
-for k, v in pairs(D.normal) do if k ~= "name" and k ~= "short" then assert(v == 1, k) end end
+assert(g:diff("food") == D.normal.food and g:diff("encounter") == D.normal.encounter)
+-- Normal sits between Easy and Hard on every dial (it's tuned, not all 1.0)
+for k, v in pairs(D.normal) do
+    if type(v) == "number" then
+        local lo, hi = math.min(D.easy[k], D.hard[k]), math.max(D.easy[k], D.hard[k])
+        assert(v >= lo and v <= hi, k)
+    end
+end
 g:creator_key(49)
 assert(g.difficulty == "easy")
 g:creator_key(51)
 assert(g.difficulty == "hard" and g:diff("rad") == D.hard.rad)
 g:creator_key(50)
 assert(g.difficulty == "normal")
+
+print("1b. a new game is Normal without pressing anything, drain included")
+local plain = Game.new()
+assert(plain.difficulty == "normal")
+assert(math.abs(plain.player.hunger_mult - D.normal.drain) < 1e-9)
 
 print("2. drain: hunger and thirst fall faster on hard")
 local easy, hard = Game.new(), Game.new()

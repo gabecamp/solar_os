@@ -571,6 +571,53 @@ def stray():
     return c, (16, 30, 96)
 
 
+def _night(c):
+    """Night: everything dark, a faint lighter haze low down."""
+    c.flat(poly([(0, 0), (192, 0), (192, 192), (0, 192)]), 0.12)
+    c.lighten(blur(ellipse(96, 190, 150, 100), 30), 0.5)
+
+
+def long_man():
+    """Someone at the edge of your light, far too tall and thin."""
+    c = Canvas()
+    _night(c)
+    c.flat(tapered([(96, 190), (96, 40)], 10, 6), 0.0)                      # body, a pole
+    c.flat(ellipse(96, 30, 9, 13), 0.0)                                     # head
+    c.flat(tapered([(96, 70), (70, 130), (64, 176)], 4, 2), 0.0)            # arms too long
+    c.flat(tapered([(96, 70), (122, 130), (128, 176)], 4, 2), 0.0)
+    c.flat(ellipse(92, 28, 1.6, 1.2), 0.95)                                 # two pale eyes
+    c.flat(ellipse(100, 28, 1.6, 1.2), 0.95)
+    return c, (60, 8, 72)
+
+
+def crawler():
+    """A low many-limbed shape on the ground, eyes catching the light."""
+    c = Canvas()
+    _night(c)
+    body = ellipse(96, 140, 46, 16)
+    c.flat(body, 0.03)
+    for i in range(6):
+        x = 58 + i * 15
+        c.flat(tapered([(x, 140), (x - 12, 120), (x - 18, 162)], 4, 2), 0.03)
+    for x in (70, 80, 92, 104, 116):
+        c.flat(ellipse(x, 132, 2.2, 1.6), 0.97)
+    return c, (40, 96, 112)
+
+
+def whisper():
+    """Pale faces under black water, mouths open."""
+    c = Canvas()
+    _night(c)
+    c.flat(poly([(0, 110), (192, 110), (192, 192), (0, 192)]), 0.02)       # the river
+    for x, y in ((50, 140), (96, 128), (142, 146)):
+        c.body(ellipse(x, y, 13, 16), 0.55, soft=5, seed=x)
+        c.flat(ellipse(x - 5, y - 3, 2, 2.5), 0.02)
+        c.flat(ellipse(x + 5, y - 3, 2, 2.5), 0.02)
+        c.flat(ellipse(x, y + 7, 3, 4), 0.02)
+    c.darken(blur(poly([(0, 150), (192, 150), (192, 192), (0, 192)]), 8), 0.6)
+    return c, (60, 96, 80)
+
+
 def karl():
     """Karl the fisherman: a PLACEHOLDER smiley face. Karl is a real person;
     the user will supply art/karl.jpg, which replaces this automatically."""
@@ -590,5 +637,6 @@ SUBJECTS = {
     "fused": fused, "mouthless": mouthless, "bloom": bloom,
     "bandits": bandits, "tollman": tollman, "medic": medic, "wanderer": wanderer,
     "karl": karl, "stray": stray,
+    "long_man": long_man, "crawler": crawler, "whisper": whisper,
     "hollow": hollow, "bell": bell, "stars": stars, "stillness": stillness, "door": door,
 }

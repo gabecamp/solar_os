@@ -323,12 +323,12 @@ assert(math.abs(got / tries - 0.25) < 0.03)
 print("19. artifacts work while held and stop when put away")
 g2 = fresh()
 local p2 = g2.player
-local mp0, sight0 = p2.max_mp, p2.sight
+local mp0, sight0, thirst0 = p2.max_mp, p2.sight, p2.thirst_mult   -- (thirst0 has difficulty in it)
 p2.inventory = {{item = "weeping_stone", qty = 1}, {item = "quiet_shell", qty = 1}}
 g2:try_transfer({"inventory", 1}, {"equip", "rhand"})
-assert(p2.max_mp == mp0 + 1 and p2.thirst_mult == 1.5)
+assert(p2.max_mp == mp0 + 1 and math.abs(p2.thirst_mult - 1.5 * thirst0) < 1e-9)
 g2:try_transfer({"equip", "rhand"}, {"inventory"})
-assert(p2.max_mp == mp0 and p2.thirst_mult == 1)
+assert(p2.max_mp == mp0 and p2.thirst_mult == thirst0)
 g2:try_transfer({"inventory", 1}, {"equip", "lhand"})   -- the shell (now first)
 assert(p2.encounter_mult == 0.5 and p2.sight == math.max(1, sight0 - 1))
 g2 = fresh(); p2 = g2.player

@@ -191,7 +191,7 @@ local KARL = {
 local DIFFICULTY = {
     order = {"easy", "normal", "hard"},
     easy   = {name = "Easy", short = "Easy",          food = 1.5, encounter = 0.6, rad = 0.6, emission = 0.5, drain = 0.8},
-    normal = {name = "Normal", short = "Normal",        food = 1,   encounter = 1,   rad = 1,   emission = 1,   drain = 1},
+    normal = {name = "Normal", short = "Normal",        food = 1.15, encounter = 0.9, rad = 1, emission = 1, drain = 0.9},
     hard   = {name = "Zone-Hardened", short = "Hard", food = 0.85, encounter = 1.3, rad = 1.25, emission = 1.25, drain = 1.1},
 }
 
@@ -257,6 +257,28 @@ local QUESTS = {
               reward = {{"medkit", 1}, {"water_bottle", 2}}},
     dog = {offer = "Karl: 'Before you go - my old dog ran off. Find her by the water?'",
            journal = "find his dog by the river", near = 4, far = 8},
+}
+
+-- Night horrors (src/54_night.lua): chance % per move after dark, halved
+-- by light and again by a fire; never at a camp with a bedroll.
+local NIGHT = {
+    chance = 4, dread_rest = 10, madness_hurt = 15, whisper_rest = 15, follow_hurt = 20,
+    light_drives_off = 35,
+    horrors = {
+        {kind = "horror", horror = "long_man", name = "The Long Man", art = "long_man",
+         who = "long man", start = "far",
+         intro = "Someone stands at the edge of your light. Too tall. Its arms hang past its "
+              .. "knees. It doesn't move, and you can't tell which way it's facing.", speed = 3},
+        {kind = "beast", name = "The Crawler", art = "crawler", who = "crawler", dark = true,
+         intro = "Something low and wide moves in the grass, too many legs, too many eyes "
+              .. "catching your light. It clicks. It's coming.",
+         hp = 40, dmg = {6, 12}, hit = 55, speed = 4, bleed = 25, start = "near",
+         loot = {{"strange_meat", 2}, {"nothing", 1}}, loot_rolls = 1},
+        {kind = "horror", horror = "whisper", name = "The Whisperers", art = "whisper",
+         who = "whisperers", start = "far",
+         intro = "From the black water, voices. They say your name, then your mother's. "
+              .. "Pale faces turn just under the surface.", speed = 3},
+    },
 }
 
 local BACKPACK_CAP = 16      -- most bag cells any build can have (the layout's limit)
