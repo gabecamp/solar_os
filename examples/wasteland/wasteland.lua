@@ -125,6 +125,17 @@ local RAD = {
     artifact_find = 20,   -- % a search on a level 2+ hex also turns up an artifact
     bolts_bonus = 2,      -- extra throws in the bolts puzzle while you carry bolts
     world_items = {"geiger", "gasmask", "antirad", "antirad", "bolts"},   -- dropped once each
+    -- Emissions (blowouts): the first comes `first` hours in, then every
+    -- every[1]-every[2] hours. `warn` hours before, the sky changes; for
+    -- `hours` it rages: off `shelter` terrain you lose `hurt` HP and gain
+    -- `rads` rads (spread over the hours). After it, every field center
+    -- without an artifact grows a new one.
+    emission = {first = 50, every = {60, 110}, warn = 6, hours = 2, hurt = 30, rads = 40,
+                shelter = {ruins = true}},
+    -- Stashes some scrawled notes point to: `items` picks from `loot`.
+    stash = {items = 3, near = 4, far = 9,
+             loot = {"antirad", "canned_beans", "water_bottle", "bandage", "jerky", "knife",
+                     "leather_belt", "scrap_metal", "vodka", "rope", "empty_bottle"}},
 }
 
 -- Water and the survival loop. Bottles are containers: drinking leaves an
@@ -161,7 +172,7 @@ local TRADE = {
         weeping_stone = 35, drowned_eye = 35, flesh_knot = 35, hollow_star = 35,
         quiet_shell = 35, permit = 120,
         leather_belt = 10, rope_belt = 4, scrap_metal = 3, jerky = 6,
-        shiv = 6, machete = 18, spiked_club = 12, pipe_spear = 15,
+        shiv = 6, machete = 18, spiked_club = 12, pipe_spear = 15, splint = 5,
     },
     stock = {{"antirad", 3}, {"water_bottle", 4}, {"canned_beans", 4}, {"bandage", 2},
              {"vodka", 2}, {"empty_bottle", 3}, {"geiger", 1}, {"gasmask", 1},
@@ -281,6 +292,8 @@ local ITEM_DB = {
                     desc = "Hold it: light in the dark"},
     bandage      = {name = "Bandage",      slot = nil, consumable = nil,
                     desc = "E: stop bleeding, +15 HP"},
+    splint       = {name = "Splint",       slot = nil, consumable = nil,
+                    desc = "E: a wound heals 12h sooner"},
     cooked_meat  = {name = "Cooked Meat",  slot = nil, consumable = {hunger = 45},
                     perish = {hours = 72, into = "rotten_meat"}},
     scrawled_notes = {name = "Scrawled Notes", slot = nil, consumable = nil,
@@ -343,6 +356,10 @@ local RECIPES = {
      out = {"rope_belt", 1}, known = true},
     {id = "shiv", name = "Shiv", inputs = {scrap_metal = 1, cloth_scrap = 1}, hours = 1,
      out = {"shiv", 1}, known = true},
+    {id = "filter", name = "Filter Water", inputs = {dirty_water = 1, cloth_scrap = 1}, hours = 1,
+     out = {"water_bottle", 1}, known = true},
+    {id = "splint", name = "Splint", inputs = {stick = 2, cloth_scrap = 1}, hours = 1,
+     out = {"splint", 1}, known = true},
     {id = "rope", name = "Rope", inputs = {cloth_scrap = 3}, hours = 1, out = {"rope", 1}},
     {id = "spear", name = "Spear", inputs = {stick = 1, rope = 1}, tools = {"knife"},
      hours = 2, out = {"spear", 1}},
@@ -514,6 +531,24 @@ end
 local SPRITE_W, SPRITE_H = 16, 16
 
 local SPRITE_ART = {
+    splint = {
+        "................",
+        "..##........##..",
+        "..##........##..",
+        "..##........##..",
+        "..############..",
+        "..##..####..##..",
+        "..##..####..##..",
+        "..############..",
+        "..##........##..",
+        "..##........##..",
+        "..############..",
+        "..##..####..##..",
+        "..##..####..##..",
+        "..############..",
+        "..##........##..",
+        "................",
+    },
     leather_belt = {
         "................",
         "................",
@@ -2164,6 +2199,8 @@ function Game.new()
         self.trader.stock[#self.trader.stock + 1] = {item = st[1], qty = st[2]}
     end
     self.sites_known = {}        -- site name -> true once you know where it is
+    self.stashes = {}            -- tile key -> true: a stash a note told you about
+    self.next_emission = RAD.emission.first
     self.rad_known = {}          -- tile key -> rad level you've measured or felt there
     self.seed = seed             -- RNG state for scavenging
     self.weather_seed = seed     -- fixed per world: weather is rolled from it (Game:weather)
@@ -2247,6 +2284,7 @@ function Game:try_move(q, r)
     if pile and #pile > 0 then self:push_log("Something is here. (I to look)") end
     if p.needs.hunger <= 0 then self:push_log("You are starving!") end
     if p.needs.thirst <= 0 then self:push_log("You are dehydrated!") end
+    self:find_stash()
     if not self:check_death("You bled out.") and not self:arrive_site() then
         self:maybe_encounter(terrain_id)
     end
@@ -2526,6 +2564,17 @@ function Game:use_item(kind, k)
         self:push_log("You bandage yourself up. (+15 HP)")
         return
     end
+    if stack.item == "splint" then
+        if p.injuries.wounded_hours <= 0 then
+            self:push_log("No wound to splint.")
+            return
+        end
+        p.injuries.wounded_hours = math.max(0, p.injuries.wounded_hours - 12)
+        stack.qty = stack.qty - 1
+        if stack.qty <= 0 then self:remove_stack(kind, k) end
+        self:push_log("You splint the wound. It'll mend sooner.")
+        return
+    end
     if stack.item == "scrawled_notes" then
         if self:read_notes() then
             stack.qty = stack.qty - 1
@@ -2672,6 +2721,10 @@ function Game:read_notes()
     -- some notes (and all of them once you know every recipe) sketch the way out
     if not self.sites_known.checkpoint and (#unknown == 0 or self:rand(3) == 0) then
         return self:hear_of_exit("A sketch in the notes")
+    end
+    -- others mark a stash (and once you know every recipe, all of them do)
+    if #unknown == 0 or self:rand(4) == 0 then
+        if self:mark_stash() then return true end
     end
     if #unknown == 0 then
         self:push_log("Nothing in these notes you don't already know.")
@@ -2862,6 +2915,7 @@ end
 -- What killed you, when it happened with time passing.
 function Game:death_reason()
     local p = self.player
+    if self.emission_caught then return "The emission took you." end
     if (p.cold_hours or 0) > WORLD.cold_grace then return "You froze to death." end
     if self:rad_stage() >= 2 then return "Radiation sickness took you." end
     if (p.sick_hours or 0) > 0 then return "The sickness took you." end
@@ -2953,6 +3007,7 @@ function Game:tick()
         end
         dose = dose + self:rad_hour()
         self:survive_hour()
+        self:emission_hour(hour)
     end
     self.ticked_hour = p.hours
     local cold = (p.cold_hours or 0) > 0
@@ -2963,6 +3018,7 @@ function Game:tick()
     end
     self:rad_news(dose, rad_before)
     self:survive_news()
+    self:emission_log()
     self:geiger_scan()
     self:refresh_view()
     self:check_death(self:death_reason())
@@ -2985,7 +3041,7 @@ end
 local SAVE = {version = 1, dir = "wasteland", file = "save.lua",
               fields = {"world_seed", "seed", "weather_seed", "scavenged", "camps",
                         "known", "ground", "log", "enc_cooldown", "ticked_hour", "rad_known",
-                        "trader", "sites_known"}}
+                        "trader", "sites_known", "stashes", "next_emission"}}
 
 -- Where the save lives: <preferred storage>/wasteland/save.lua
 function SAVE.path()
@@ -3769,6 +3825,114 @@ function Game:encounter_key(key)
 end
 
 -- ---------------------------------------------------------------------
+-- Emissions and stashes
+--
+-- An emission (blowout) comes every few days (RAD.emission). Game:tick calls
+-- emission_hour for every hour: a warning `warn` hours ahead, then `hours`
+-- of it - off shelter terrain (ruins) it costs HP and adds rads. After it,
+-- field centers without an artifact grow a new one. next_emission is saved.
+--
+-- Stashes: some scrawled notes mark a hidden pile of supplies a few hexes
+-- away (mark_stash). It's drawn on the map until you step on it.
+-- ---------------------------------------------------------------------
+
+function Game:emission_hour(hour)
+    local E, p = RAD.emission, self.player
+    local start = self.next_emission
+    if not start then return end
+    self.emission_news = self.emission_news or {}
+    if hour == start - E.warn then self.emission_news.warn = true end
+    if hour >= start and hour < start + E.hours then
+        if E.shelter[self.tiles[hex_key(p.q, p.r)]] then
+            self.emission_news.sheltered = true
+        else
+            p.health = clamp(p.health - E.hurt / E.hours)
+            p.rads = math.min(RAD.max, (p.rads or 0) + E.rads / E.hours * self:rad_armor())
+            self.emission_news.caught = true
+        end
+        if hour == start + E.hours - 1 then self:emission_ends() end
+    end
+end
+
+function Game:emission_ends()
+    local E = RAD.emission
+    for key, level in pairs(self.rad or {}) do
+        if level == 3 then
+            local pile = self.ground[key] or {}
+            local has = false
+            for _, s in ipairs(pile) do has = has or ITEM_DB[s.item].artifact ~= nil end
+            if not has then
+                self.ground[key] = pile
+                table.insert(pile, {item = ARTIFACTS[self:rand(#ARTIFACTS) + 1], qty = 1})
+            end
+        end
+    end
+    self.next_emission = self.next_emission + E.every[1] + self:rand(E.every[2] - E.every[1] + 1)
+    self.emission_news = self.emission_news or {}
+    self.emission_news.ended = true
+end
+
+function Game:emission_log()
+    local n = self.emission_news
+    self.emission_caught = n and n.caught
+    if not n then return end
+    if n.warn then
+        self:push_log(("The sky bruises purple. Emission in %dh: get to ruins!"):format(RAD.emission.warn))
+    end
+    if n.caught then
+        self:push_log("The EMISSION tears through you! Find ruins!")
+    elseif n.sheltered then
+        self:push_log("The emission howls over the ruins. You hold on.")
+    end
+    if n.ended then self:push_log("The emission passes. The fields glitter.") end
+    self.emission_news = nil
+end
+
+-- Panel text while one is coming or raging.
+function Game:emission_text()
+    local start, now = self.next_emission, self.player.hours
+    if not start then return nil end
+    if now >= start and now < start + RAD.emission.hours then return "EMISSION!" end
+    if start - now <= RAD.emission.warn and start > now then return "EMIT " .. (start - now) .. "h" end
+end
+
+-- A scrawled note marks a stash a few hexes away. Returns false if there's
+-- nowhere to put one.
+function Game:mark_stash()
+    local p, S = self.player, RAD.stash
+    local taken = {}
+    for _, key in pairs(self.sites) do taken[key] = true end
+    local spots = {}
+    for key, t in pairs(self.tiles) do
+        local q, r = key:match("(-?%d+),(-?%d+)")
+        local d = axial_distance(p.q, p.r, tonumber(q), tonumber(r))
+        if TERRAIN[t].passable and d >= S.near and d <= S.far and not self.stashes[key]
+            and not taken[key] then
+            spots[#spots + 1] = key
+        end
+    end
+    if #spots == 0 then return false end
+    table.sort(spots)
+    local key = spots[self:rand(#spots) + 1]
+    self.ground[key] = self.ground[key] or {}
+    for _ = 1, S.items do
+        add_to_list(self.ground[key], {item = S.loot[self:rand(#S.loot) + 1], qty = 1})
+    end
+    self.stashes[key] = true
+    p.explored[key] = true
+    self:push_log("The notes mark a stash: " .. self:bearing_to(key) .. ".")
+    return true
+end
+
+-- Stepping onto a stash you were told about.
+function Game:find_stash()
+    local key = hex_key(self.player.q, self.player.r)
+    if self.stashes[key] then
+        self.stashes[key] = nil
+        self:push_log("You dig up the stash. (I to look)")
+    end
+end
+-- ---------------------------------------------------------------------
 -- Traders and the way out
 --
 -- self.sites (from generate_world): trader = the town's center hex,
@@ -3797,8 +3961,12 @@ end
 
 -- "NE 9": compass direction (up = north) and hexes from you to a site.
 function Game:site_bearing(name)
+    return self:bearing_to(self.sites[name])
+end
+
+function Game:bearing_to(key)
     local p = self.player
-    local q, r = self.sites[name]:match("(-?%d+),(-?%d+)")
+    local q, r = key:match("(-?%d+),(-?%d+)")
     q, r = tonumber(q), tonumber(r)
     local d = axial_distance(p.q, p.r, q, r)
     if d == 0 then return "here" end
@@ -4073,7 +4241,8 @@ function Game:draw_map(w, h)
     gfx.font(gfx.FONT_MONO_12)
     local day, hour = self:clock()
     gfx.text(PANEL_X, 14, ("Day %d %02d:00%s"):format(day, hour, self:is_night() and " Night" or ""))
-    gfx.text(PANEL_X, 28, self:weather() .. (self:fire_here() and "  Fire" or ""))
+    -- an emission coming (or raging) matters more than the weather
+    gfx.text(PANEL_X, 28, self:emission_text() or (self:weather() .. (self:fire_here() and "  Fire" or "")))
     local scav = SCAVENGE_LOOT[self.tiles[hex_key(p.q, p.r)]]
         and (self:scavenge_left() .. "/" .. SCAVENGE_TRIES) or "-"
     gfx.text(PANEL_X, 42, "MP " .. math.max(p.mp, 0) .. "/" .. p.max_mp
@@ -4148,6 +4317,16 @@ function Game:draw_map(w, h)
                 gfx.color(gfx.BLACK)
                 gfx.rect(rnd(px) - 7, rnd(py) - 7, 14, 14)
                 draw_glyph(site, px, py, gfx.BLACK)
+            end
+            if self.stashes[key] and (p.visible[key] or p.explored[key]) then
+                -- a stash from the notes: an X in the lower right
+                local sx, sy = rnd(px) + 4, rnd(py) + 3
+                gfx.color(gfx.WHITE)
+                gfx.fill_rect(sx - 1, sy - 1, 9, 9)
+                gfx.color(gfx.BLACK)
+                gfx.rect(sx - 1, sy - 1, 9, 9)
+                gfx.line(sx + 1, sy + 1, sx + 5, sy + 5)
+                gfx.line(sx + 5, sy + 1, sx + 1, sy + 5)
             end
             local hot = self.rad_known[key]
             if hot and hot > 0 and (p.visible[key] or p.explored[key]) then

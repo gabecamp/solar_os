@@ -82,9 +82,9 @@ g.player.inventory = {{item = "scrawled_notes", qty = 2}}
 g:use_item("inventory", 1)
 assert(#g:known_recipes() == n_before + 1, "notes teach one recipe")
 assert(bag_count(g, "scrawled_notes") == 1, "and are used up")
-for _ = 1, 10 do g:read_notes() end
+for _ = 1, 40 do g:read_notes() end   -- some mark stashes instead
 assert(#g:known_recipes() == #C.RECIPES, "enough notes teach everything")
-assert(not g:read_notes(), "then there's nothing left to learn")
+assert(g:read_notes() and next(g.stashes), "then the notes mark stashes instead")
 print("   OK")
 
 print("5. campfire: built on the tile, cooking needs it, it burns out")

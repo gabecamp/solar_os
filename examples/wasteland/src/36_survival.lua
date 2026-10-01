@@ -150,6 +150,7 @@ end
 -- What killed you, when it happened with time passing.
 function Game:death_reason()
     local p = self.player
+    if self.emission_caught then return "The emission took you." end
     if (p.cold_hours or 0) > WORLD.cold_grace then return "You froze to death." end
     if self:rad_stage() >= 2 then return "Radiation sickness took you." end
     if (p.sick_hours or 0) > 0 then return "The sickness took you." end

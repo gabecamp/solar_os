@@ -115,6 +115,10 @@ function Game:read_notes()
     if not self.sites_known.checkpoint and (#unknown == 0 or self:rand(3) == 0) then
         return self:hear_of_exit("A sketch in the notes")
     end
+    -- others mark a stash (and once you know every recipe, all of them do)
+    if #unknown == 0 or self:rand(4) == 0 then
+        if self:mark_stash() then return true end
+    end
     if #unknown == 0 then
         self:push_log("Nothing in these notes you don't already know.")
         return false

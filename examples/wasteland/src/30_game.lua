@@ -23,6 +23,8 @@ function Game.new()
         self.trader.stock[#self.trader.stock + 1] = {item = st[1], qty = st[2]}
     end
     self.sites_known = {}        -- site name -> true once you know where it is
+    self.stashes = {}            -- tile key -> true: a stash a note told you about
+    self.next_emission = RAD.emission.first
     self.rad_known = {}          -- tile key -> rad level you've measured or felt there
     self.seed = seed             -- RNG state for scavenging
     self.weather_seed = seed     -- fixed per world: weather is rolled from it (Game:weather)
@@ -106,6 +108,7 @@ function Game:try_move(q, r)
     if pile and #pile > 0 then self:push_log("Something is here. (I to look)") end
     if p.needs.hunger <= 0 then self:push_log("You are starving!") end
     if p.needs.thirst <= 0 then self:push_log("You are dehydrated!") end
+    self:find_stash()
     if not self:check_death("You bled out.") and not self:arrive_site() then
         self:maybe_encounter(terrain_id)
     end
@@ -383,6 +386,17 @@ function Game:use_item(kind, k)
         stack.qty = stack.qty - 1
         if stack.qty <= 0 then self:remove_stack(kind, k) end
         self:push_log("You bandage yourself up. (+15 HP)")
+        return
+    end
+    if stack.item == "splint" then
+        if p.injuries.wounded_hours <= 0 then
+            self:push_log("No wound to splint.")
+            return
+        end
+        p.injuries.wounded_hours = math.max(0, p.injuries.wounded_hours - 12)
+        stack.qty = stack.qty - 1
+        if stack.qty <= 0 then self:remove_stack(kind, k) end
+        self:push_log("You splint the wound. It'll mend sooner.")
         return
     end
     if stack.item == "scrawled_notes" then

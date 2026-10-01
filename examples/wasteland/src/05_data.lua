@@ -75,6 +75,17 @@ local RAD = {
     artifact_find = 20,   -- % a search on a level 2+ hex also turns up an artifact
     bolts_bonus = 2,      -- extra throws in the bolts puzzle while you carry bolts
     world_items = {"geiger", "gasmask", "antirad", "antirad", "bolts"},   -- dropped once each
+    -- Emissions (blowouts): the first comes `first` hours in, then every
+    -- every[1]-every[2] hours. `warn` hours before, the sky changes; for
+    -- `hours` it rages: off `shelter` terrain you lose `hurt` HP and gain
+    -- `rads` rads (spread over the hours). After it, every field center
+    -- without an artifact grows a new one.
+    emission = {first = 50, every = {60, 110}, warn = 6, hours = 2, hurt = 30, rads = 40,
+                shelter = {ruins = true}},
+    -- Stashes some scrawled notes point to: `items` picks from `loot`.
+    stash = {items = 3, near = 4, far = 9,
+             loot = {"antirad", "canned_beans", "water_bottle", "bandage", "jerky", "knife",
+                     "leather_belt", "scrap_metal", "vodka", "rope", "empty_bottle"}},
 }
 
 -- Water and the survival loop. Bottles are containers: drinking leaves an
@@ -111,7 +122,7 @@ local TRADE = {
         weeping_stone = 35, drowned_eye = 35, flesh_knot = 35, hollow_star = 35,
         quiet_shell = 35, permit = 120,
         leather_belt = 10, rope_belt = 4, scrap_metal = 3, jerky = 6,
-        shiv = 6, machete = 18, spiked_club = 12, pipe_spear = 15,
+        shiv = 6, machete = 18, spiked_club = 12, pipe_spear = 15, splint = 5,
     },
     stock = {{"antirad", 3}, {"water_bottle", 4}, {"canned_beans", 4}, {"bandage", 2},
              {"vodka", 2}, {"empty_bottle", 3}, {"geiger", 1}, {"gasmask", 1},
@@ -231,6 +242,8 @@ local ITEM_DB = {
                     desc = "Hold it: light in the dark"},
     bandage      = {name = "Bandage",      slot = nil, consumable = nil,
                     desc = "E: stop bleeding, +15 HP"},
+    splint       = {name = "Splint",       slot = nil, consumable = nil,
+                    desc = "E: a wound heals 12h sooner"},
     cooked_meat  = {name = "Cooked Meat",  slot = nil, consumable = {hunger = 45},
                     perish = {hours = 72, into = "rotten_meat"}},
     scrawled_notes = {name = "Scrawled Notes", slot = nil, consumable = nil,
@@ -293,6 +306,10 @@ local RECIPES = {
      out = {"rope_belt", 1}, known = true},
     {id = "shiv", name = "Shiv", inputs = {scrap_metal = 1, cloth_scrap = 1}, hours = 1,
      out = {"shiv", 1}, known = true},
+    {id = "filter", name = "Filter Water", inputs = {dirty_water = 1, cloth_scrap = 1}, hours = 1,
+     out = {"water_bottle", 1}, known = true},
+    {id = "splint", name = "Splint", inputs = {stick = 2, cloth_scrap = 1}, hours = 1,
+     out = {"splint", 1}, known = true},
     {id = "rope", name = "Rope", inputs = {cloth_scrap = 3}, hours = 1, out = {"rope", 1}},
     {id = "spear", name = "Spear", inputs = {stick = 1, rope = 1}, tools = {"knife"},
      hours = 2, out = {"spear", 1}},

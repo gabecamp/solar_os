@@ -82,6 +82,7 @@ function Game:tick()
         end
         dose = dose + self:rad_hour()
         self:survive_hour()
+        self:emission_hour(hour)
     end
     self.ticked_hour = p.hours
     local cold = (p.cold_hours or 0) > 0
@@ -92,6 +93,7 @@ function Game:tick()
     end
     self:rad_news(dose, rad_before)
     self:survive_news()
+    self:emission_log()
     self:geiger_scan()
     self:refresh_view()
     self:check_death(self:death_reason())

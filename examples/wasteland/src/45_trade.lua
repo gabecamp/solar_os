@@ -27,8 +27,12 @@ end
 
 -- "NE 9": compass direction (up = north) and hexes from you to a site.
 function Game:site_bearing(name)
+    return self:bearing_to(self.sites[name])
+end
+
+function Game:bearing_to(key)
     local p = self.player
-    local q, r = self.sites[name]:match("(-?%d+),(-?%d+)")
+    local q, r = key:match("(-?%d+),(-?%d+)")
     q, r = tonumber(q), tonumber(r)
     local d = axial_distance(p.q, p.r, q, r)
     if d == 0 then return "here" end

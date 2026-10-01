@@ -42,7 +42,8 @@ function Game:draw_map(w, h)
     gfx.font(gfx.FONT_MONO_12)
     local day, hour = self:clock()
     gfx.text(PANEL_X, 14, ("Day %d %02d:00%s"):format(day, hour, self:is_night() and " Night" or ""))
-    gfx.text(PANEL_X, 28, self:weather() .. (self:fire_here() and "  Fire" or ""))
+    -- an emission coming (or raging) matters more than the weather
+    gfx.text(PANEL_X, 28, self:emission_text() or (self:weather() .. (self:fire_here() and "  Fire" or "")))
     local scav = SCAVENGE_LOOT[self.tiles[hex_key(p.q, p.r)]]
         and (self:scavenge_left() .. "/" .. SCAVENGE_TRIES) or "-"
     gfx.text(PANEL_X, 42, "MP " .. math.max(p.mp, 0) .. "/" .. p.max_mp
@@ -117,6 +118,16 @@ function Game:draw_map(w, h)
                 gfx.color(gfx.BLACK)
                 gfx.rect(rnd(px) - 7, rnd(py) - 7, 14, 14)
                 draw_glyph(site, px, py, gfx.BLACK)
+            end
+            if self.stashes[key] and (p.visible[key] or p.explored[key]) then
+                -- a stash from the notes: an X in the lower right
+                local sx, sy = rnd(px) + 4, rnd(py) + 3
+                gfx.color(gfx.WHITE)
+                gfx.fill_rect(sx - 1, sy - 1, 9, 9)
+                gfx.color(gfx.BLACK)
+                gfx.rect(sx - 1, sy - 1, 9, 9)
+                gfx.line(sx + 1, sy + 1, sx + 5, sy + 5)
+                gfx.line(sx + 5, sy + 1, sx + 1, sy + 5)
             end
             local hot = self.rad_known[key]
             if hot and hot > 0 and (p.visible[key] or p.explored[key]) then
