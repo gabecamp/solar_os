@@ -329,3 +329,10 @@ solaros.dump("ops_help.txt")
 g:help_key(118)
 g:draw_info(400, 300)
 solaros.dump("ops_info.txt")
+
+-- Scene: Karl asks a riddle
+g = fresh()
+g:start_game()
+g:start_karl()
+g:draw_encounter(400, 300)
+solaros.dump("ops_karl.txt")

@@ -540,9 +540,24 @@ def door():
     return c, (48, 30, 96)
 
 
+def karl():
+    """Karl the fisherman: a PLACEHOLDER smiley face. Karl is a real person;
+    the user will supply art/karl.jpg, which replaces this automatically."""
+    c = Canvas()
+    face = ellipse(96, 96, 72, 72)
+    c.flat(face, 0.97)
+    c.darken(stroke([(96 + 72 * np.cos(a), 96 + 72 * np.sin(a)) for a in np.linspace(0, 2 * np.pi, 64)], 5, False), 0.9)
+    c.flat(ellipse(70, 74, 9, 13), 0.05)                       # eyes
+    c.flat(ellipse(122, 74, 9, 13), 0.05)
+    smile = [(96 + 44 * np.cos(a), 104 + 36 * np.sin(a)) for a in np.linspace(0.2 * np.pi, 0.8 * np.pi, 24)]
+    c.darken(stroke(smile, 6), 0.95)                           # the smile
+    return c, (24, 24, 144)
+
+
 SUBJECTS = {
     "jawhound": jawhound, "boar": boar, "crows": crows, "stag": stag,
     "fused": fused, "mouthless": mouthless, "bloom": bloom,
     "bandits": bandits, "tollman": tollman, "medic": medic, "wanderer": wanderer,
+    "karl": karl,
     "hollow": hollow, "bell": bell, "stars": stars, "stillness": stillness, "door": door,
 }

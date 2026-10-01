@@ -20,6 +20,7 @@ function Game:maybe_encounter(terrain_id)
         self.enc_cooldown = self.enc_cooldown - 1
         return
     end
+    if self:maybe_karl("move") then return end
     local chance = FIGHT.ENCOUNTER_CHANCE[terrain_id]
     if chance and self:is_night() then chance = chance * WORLD.night_encounters end
     if chance and self:roll(chance * self.player.encounter_mult) then self:start_encounter(self:pick_encounter()) end
@@ -93,6 +94,12 @@ function Game:encounter_options()
     local kind = e.def.kind
     if kind == "helper" then return {{"Talk", "talk"}, {"Walk on", "leave_quietly"}} end
     if kind == "anomaly" then return {{"Investigate", "investigate"}, {"Walk away", "leave_quietly"}} end
+    if kind == "riddle" then
+        local o = {}
+        for i, answer in ipairs(e.riddle.answers) do o[i] = {answer, "answer_" .. i} end
+        o[#o + 1] = {"Walk away", "leave_quietly"}
+        return o
+    end
     if e.demanding then
         local o = {}
         if self:food_index() then o[#o + 1] = {"Give them some food", "give"} end
@@ -220,6 +227,8 @@ end
 function Game:encounter_action(action)
     local e, p = self.enc, self.player
     e.msg = {}
+    local answer = action:match("^answer_(%d)$")
+    if answer then return self:karl_answer(tonumber(answer)) end
     if action == "investigate" then
         return self:start_puzzle()
     elseif action == "leave" or action == "leave_quietly" then

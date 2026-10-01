@@ -34,13 +34,14 @@ end
 function Game:fish()
     local p = self.player
     self:spend_hours(HUNT.fish_hours)
-    if self:roll(HUNT.fish_chance + 5 * (p.attrs.Perception - 3)) then
+    if self:roll(HUNT.fish_chance + 5 * (p.attrs.Perception - 3) + self:fish_bonus()) then
         local fish = {item = "raw_fish", qty = 1}
         if not self:put_stack("inventory", nil, fish) then self:put_stack("ground", nil, fish) end
         self:push_log("A pale fish, too many eyes. Got it.")
     else
         self:push_log(("Fished %dh. Nothing bites."):format(HUNT.fish_hours))
     end
+    self:maybe_karl("fish")
 end
 
 function Game:hunt()

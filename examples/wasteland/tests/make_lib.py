@@ -18,7 +18,7 @@ Outputs (git-ignored, regenerated on every run):
   lib_rad.lua        -> radiation_test
   lib_survive.lua    -> survival_test
   lib_trade.lua      -> trade_test
-  lib_hunt.lua       -> hunting_test, help_test
+  lib_hunt.lua       -> hunting_test, help_test, karl_test
   wasteland_run.lua  -> full copy, run under the fake solaros by run_tests.sh / soak
 """
 import pathlib
@@ -68,7 +68,7 @@ lib = src[:cut]
           "b64_decode = b64_decode, PORTRAIT_SIZE = PORTRAIT_SIZE}\n")
 (here / "lib_crafting.lua").write_text(
     lib + "\nreturn Game, {RECIPES = RECIPES, ITEM_DB = ITEM_DB, SPRITES = SPRITES, "
-          "SCAVENGE_LOOT = SCAVENGE_LOOT, KEY = KEY}\n")
+          "SCAVENGE_LOOT = SCAVENGE_LOOT, KEY = KEY, KARL = KARL}\n")
 (here / "lib_world.lua").write_text(
     lib + "\nreturn Game, {WORLD = WORLD, GRID_RADIUS = GRID_RADIUS, TERRAIN = TERRAIN, "
           "AXIAL_DIRS = AXIAL_DIRS, generate_world = generate_world, ITEM_DB = ITEM_DB, "
@@ -89,6 +89,6 @@ lib = src[:cut]
           "RECIPE_IDS = (function() local t = {} for _, r in ipairs(RECIPES) do t[r.id] = true end return t end)()}\n")
 (here / "lib_hunt.lua").write_text(
     lib + "\nreturn Game, {HUNT = HUNT, ITEM_DB = ITEM_DB, KEY = KEY, SPRITES = SPRITES, "
-          "RECIPES = RECIPES, FIGHT = FIGHT}\n")
+          "RECIPES = RECIPES, FIGHT = FIGHT, KARL = KARL, PORTRAIT_DATA = PORTRAIT_DATA}\n")
 (here / "wasteland_run.lua").write_text(src)
 print("generated lib_*.lua, wasteland_run.lua")

@@ -125,6 +125,7 @@ local TRADE = {
         leather_belt = 10, rope_belt = 4, scrap_metal = 3, jerky = 6,
         shiv = 6, machete = 18, spiked_club = 12, pipe_spear = 15, splint = 5,
         fishing_rod = 8, snare = 4, raw_fish = 3, cooked_fish = 6,
+        pilk = 7, lucky_lure = 12, karls_waders = 14, karls_hat = 10,
     },
     stock = {{"antirad", 3}, {"water_bottle", 4}, {"canned_beans", 4}, {"bandage", 2},
              {"vodka", 2}, {"empty_bottle", 3}, {"geiger", 1}, {"gasmask", 1},
@@ -144,6 +145,32 @@ local HUNT = {
     fish_hours = 2, fish_chance = 40, hunt_hours = 2, hunt_chance = 45,
     snare_chance = {forest = 5, plains = 3, hills = 3},
     snare_catch = {"strange_meat", 2},
+}
+
+-- Karl (K-A-R-L), the riddling fisherman. Only by water (a ford, or next to
+-- the river): `chance` % per move onto such a hex, `fish_chance` % per
+-- fishing session, never again within `cooldown` hours. Answer his riddle
+-- right and he gives you one of `rewards` (worn gear only once).
+local KARL = {
+    chance = 3, fish_chance = 10, cooldown = 96,
+    intro = "A man in rubber waders stands knee-deep in the river, rod bent. "
+         .. "Stencilled on his tackle box: KARL. 'Name's Karl. With a K. "
+         .. "Answer me a riddle, friend.'",
+    riddles = {
+        {q = "What has a mouth but never eats, and a bed but never sleeps?",
+         a = {"A river", "A fish", "A grave"}},
+        {q = "The more you take, the more you leave behind. What am I?",
+         a = {"Footsteps", "Fish", "Bolts"}},
+        {q = "I have scales but weigh nothing. What am I?",
+         a = {"A map", "A fish", "A snake"}},
+        {q = "What gets wetter the more it dries?",
+         a = {"A towel", "Rain", "A sponge"}},
+        {q = "Forward I'm heavy, backward I'm not. What am I?",
+         a = {"A ton", "A rock", "A boat"}},
+        {q = "I have hooks but catch nothing. What am I?",
+         a = {"A coat rack", "A fisherman", "A bandit"}},
+    },   -- the first answer is the right one; they're shuffled when asked
+    rewards = {"pilk", "pilk", "fishing_rod", "lucky_lure", "karls_waders", "karls_hat"},
 }
 
 local BACKPACK_CAP = 16      -- most bag cells any build can have (the layout's limit)
@@ -247,6 +274,17 @@ local ITEM_DB = {
                     weapon = {dmg = 16, reach = "close", bleed = 10}, desc = "Weapon: 16 dmg"},
     pipe_spear   = {name = "Pipe Spear",   slot = nil, consumable = nil,
                     weapon = {dmg = 14, reach = "near", bleed = 20}, desc = "Weapon: 14 dmg, reach"},
+    -- Karl's gifts. fish_bonus: % added to fishing while worn (or carried, for the lure)
+    pilk         = {name = "Pilk",         slot = nil, consumable = {thirst = 40, hunger = 10, rest = 15},
+                    desc = "Pepsi and milk. Karl swears by it"},
+    lucky_lure   = {name = "Lucky Lure",   slot = nil, consumable = nil, fish_bonus = 15,
+                    desc = "Carried: +15% fishing"},
+    karls_waders = {name = "Karl's Waders", slot = "feet", consumable = nil, warmth = 2,
+                    fish_bonus = 10, desc = "Worn: +10% fishing",
+                    wear = {{"legs", 236, 290, "DARK"}}},
+    karls_hat    = {name = "Karl's Hat",   slot = "head", consumable = nil, warmth = 1,
+                    fish_bonus = 10, desc = "Worn: +10% fishing",
+                    wear = {{"head", 112, 125, "BLACK"}}},
     fishing_rod  = {name = "Fishing Rod",  slot = nil, consumable = nil,
                     desc = "G by water: fish"},
     snare        = {name = "Snare",        slot = nil, consumable = nil,

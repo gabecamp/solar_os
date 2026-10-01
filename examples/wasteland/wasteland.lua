@@ -175,6 +175,7 @@ local TRADE = {
         leather_belt = 10, rope_belt = 4, scrap_metal = 3, jerky = 6,
         shiv = 6, machete = 18, spiked_club = 12, pipe_spear = 15, splint = 5,
         fishing_rod = 8, snare = 4, raw_fish = 3, cooked_fish = 6,
+        pilk = 7, lucky_lure = 12, karls_waders = 14, karls_hat = 10,
     },
     stock = {{"antirad", 3}, {"water_bottle", 4}, {"canned_beans", 4}, {"bandage", 2},
              {"vodka", 2}, {"empty_bottle", 3}, {"geiger", 1}, {"gasmask", 1},
@@ -194,6 +195,32 @@ local HUNT = {
     fish_hours = 2, fish_chance = 40, hunt_hours = 2, hunt_chance = 45,
     snare_chance = {forest = 5, plains = 3, hills = 3},
     snare_catch = {"strange_meat", 2},
+}
+
+-- Karl (K-A-R-L), the riddling fisherman. Only by water (a ford, or next to
+-- the river): `chance` % per move onto such a hex, `fish_chance` % per
+-- fishing session, never again within `cooldown` hours. Answer his riddle
+-- right and he gives you one of `rewards` (worn gear only once).
+local KARL = {
+    chance = 3, fish_chance = 10, cooldown = 96,
+    intro = "A man in rubber waders stands knee-deep in the river, rod bent. "
+         .. "Stencilled on his tackle box: KARL. 'Name's Karl. With a K. "
+         .. "Answer me a riddle, friend.'",
+    riddles = {
+        {q = "What has a mouth but never eats, and a bed but never sleeps?",
+         a = {"A river", "A fish", "A grave"}},
+        {q = "The more you take, the more you leave behind. What am I?",
+         a = {"Footsteps", "Fish", "Bolts"}},
+        {q = "I have scales but weigh nothing. What am I?",
+         a = {"A map", "A fish", "A snake"}},
+        {q = "What gets wetter the more it dries?",
+         a = {"A towel", "Rain", "A sponge"}},
+        {q = "Forward I'm heavy, backward I'm not. What am I?",
+         a = {"A ton", "A rock", "A boat"}},
+        {q = "I have hooks but catch nothing. What am I?",
+         a = {"A coat rack", "A fisherman", "A bandit"}},
+    },   -- the first answer is the right one; they're shuffled when asked
+    rewards = {"pilk", "pilk", "fishing_rod", "lucky_lure", "karls_waders", "karls_hat"},
 }
 
 local BACKPACK_CAP = 16      -- most bag cells any build can have (the layout's limit)
@@ -297,6 +324,17 @@ local ITEM_DB = {
                     weapon = {dmg = 16, reach = "close", bleed = 10}, desc = "Weapon: 16 dmg"},
     pipe_spear   = {name = "Pipe Spear",   slot = nil, consumable = nil,
                     weapon = {dmg = 14, reach = "near", bleed = 20}, desc = "Weapon: 14 dmg, reach"},
+    -- Karl's gifts. fish_bonus: % added to fishing while worn (or carried, for the lure)
+    pilk         = {name = "Pilk",         slot = nil, consumable = {thirst = 40, hunger = 10, rest = 15},
+                    desc = "Pepsi and milk. Karl swears by it"},
+    lucky_lure   = {name = "Lucky Lure",   slot = nil, consumable = nil, fish_bonus = 15,
+                    desc = "Carried: +15% fishing"},
+    karls_waders = {name = "Karl's Waders", slot = "feet", consumable = nil, warmth = 2,
+                    fish_bonus = 10, desc = "Worn: +10% fishing",
+                    wear = {{"legs", 236, 290, "DARK"}}},
+    karls_hat    = {name = "Karl's Hat",   slot = "head", consumable = nil, warmth = 1,
+                    fish_bonus = 10, desc = "Worn: +10% fishing",
+                    wear = {{"head", 112, 125, "BLACK"}}},
     fishing_rod  = {name = "Fishing Rod",  slot = nil, consumable = nil,
                     desc = "G by water: fish"},
     snare        = {name = "Snare",        slot = nil, consumable = nil,
@@ -562,6 +600,78 @@ end
 local SPRITE_W, SPRITE_H = 16, 16
 
 local SPRITE_ART = {
+    pilk = {
+        "................",
+        ".....######.....",
+        ".....##.#.#.....",
+        ".....######.....",
+        "....#......#....",
+        "...#........#...",
+        "...##########...",
+        "...#.#.##.#.#...",
+        "...#.#.##.#.#...",
+        "...#.######.#...",
+        "...#........#...",
+        "...#.##.###.#...",
+        "...#.#..#...#...",
+        "...#.##.###.#...",
+        "...##########...",
+        "................",
+    },
+    lucky_lure = {
+        "................",
+        "......##........",
+        ".....#..#.......",
+        "......##........",
+        "......#.........",
+        "....######......",
+        "...#.#..#.#.....",
+        "...########.....",
+        "....######......",
+        ".....####.......",
+        "......##........",
+        "......#.........",
+        "....#.#.#.......",
+        "....#.#.#.......",
+        ".....###........",
+        "................",
+    },
+    karls_waders = {
+        "...##########...",
+        "...#........#...",
+        "...##########...",
+        "...###....###...",
+        "...###....###...",
+        "...###....###...",
+        "...###....###...",
+        "...###....###...",
+        "...###....###...",
+        "...###....###...",
+        "...###....###...",
+        "...###....###...",
+        "...###....###...",
+        "..####...####...",
+        ".#####..#####...",
+        "................",
+    },
+    karls_hat = {
+        "................",
+        "................",
+        "................",
+        ".....######.....",
+        "....#......#....",
+        "....#......#....",
+        "....#......#....",
+        "....########....",
+        "...#........#...",
+        "..############..",
+        ".#............#.",
+        ".##############.",
+        "................",
+        "................",
+        "................",
+        "................",
+    },
     fishing_rod = {
         "..............#.",
         ".............#.#",
@@ -3166,7 +3276,8 @@ end
 local SAVE = {version = 1, dir = "wasteland", file = "save.lua",
               fields = {"world_seed", "seed", "weather_seed", "scavenged", "camps",
                         "known", "ground", "log", "enc_cooldown", "ticked_hour", "rad_known",
-                        "trader", "sites_known", "stashes", "next_emission", "snares"}}
+                        "trader", "sites_known", "stashes", "next_emission", "snares",
+                        "karl_asked", "karl_next", "karl_gave"}}
 
 -- Where the save lives: <preferred storage>/wasteland/save.lua
 function SAVE.path()
@@ -3471,6 +3582,7 @@ function Game:maybe_encounter(terrain_id)
         self.enc_cooldown = self.enc_cooldown - 1
         return
     end
+    if self:maybe_karl("move") then return end
     local chance = FIGHT.ENCOUNTER_CHANCE[terrain_id]
     if chance and self:is_night() then chance = chance * WORLD.night_encounters end
     if chance and self:roll(chance * self.player.encounter_mult) then self:start_encounter(self:pick_encounter()) end
@@ -3544,6 +3656,12 @@ function Game:encounter_options()
     local kind = e.def.kind
     if kind == "helper" then return {{"Talk", "talk"}, {"Walk on", "leave_quietly"}} end
     if kind == "anomaly" then return {{"Investigate", "investigate"}, {"Walk away", "leave_quietly"}} end
+    if kind == "riddle" then
+        local o = {}
+        for i, answer in ipairs(e.riddle.answers) do o[i] = {answer, "answer_" .. i} end
+        o[#o + 1] = {"Walk away", "leave_quietly"}
+        return o
+    end
     if e.demanding then
         local o = {}
         if self:food_index() then o[#o + 1] = {"Give them some food", "give"} end
@@ -3671,6 +3789,8 @@ end
 function Game:encounter_action(action)
     local e, p = self.enc, self.player
     e.msg = {}
+    local answer = action:match("^answer_(%d)$")
+    if answer then return self:karl_answer(tonumber(answer)) end
     if action == "investigate" then
         return self:start_puzzle()
     elseif action == "leave" or action == "leave_quietly" then
@@ -4093,13 +4213,14 @@ end
 function Game:fish()
     local p = self.player
     self:spend_hours(HUNT.fish_hours)
-    if self:roll(HUNT.fish_chance + 5 * (p.attrs.Perception - 3)) then
+    if self:roll(HUNT.fish_chance + 5 * (p.attrs.Perception - 3) + self:fish_bonus()) then
         local fish = {item = "raw_fish", qty = 1}
         if not self:put_stack("inventory", nil, fish) then self:put_stack("ground", nil, fish) end
         self:push_log("A pale fish, too many eyes. Got it.")
     else
         self:push_log(("Fished %dh. Nothing bites."):format(HUNT.fish_hours))
     end
+    self:maybe_karl("fish")
 end
 
 function Game:hunt()
@@ -4149,6 +4270,94 @@ function Game:check_snare()
     else
         self:push_log("Your snare is empty.")
     end
+end
+-- ---------------------------------------------------------------------
+-- Karl (K-A-R-L), the riddling fisherman. Numbers and riddles in KARL.
+--
+-- Rare, and only by water: maybe_karl runs on moves (from maybe_encounter)
+-- and after fishing. He asks a riddle he hasn't asked yet (karl_asked);
+-- a right answer gets one of KARL.rewards, worn/lure gear only once
+-- (karl_gave). Either way he's gone for KARL.cooldown hours (karl_next).
+-- His portrait is a placeholder smiley until art/karl.jpg is supplied.
+-- ---------------------------------------------------------------------
+
+function Game:maybe_karl(how)
+    local p = self.player
+    if not self:near_water() or p.hours < (self.karl_next or 0) then return false end
+    if not self:roll(how == "fish" and KARL.fish_chance or KARL.chance) then return false end
+    self:start_karl()
+    return true
+end
+
+function Game:start_karl()
+    self.karl_next = self.player.hours + KARL.cooldown
+    self.karl_asked = self.karl_asked or {}
+    local fresh = {}
+    for i in ipairs(KARL.riddles) do
+        if not self.karl_asked[i] then fresh[#fresh + 1] = i end
+    end
+    if #fresh == 0 then   -- he's asked them all: start over
+        self.karl_asked = {}
+        for i in ipairs(KARL.riddles) do fresh[#fresh + 1] = i end
+    end
+    local i = fresh[self:rand(#fresh) + 1]
+    self.karl_asked[i] = true
+    local riddle = KARL.riddles[i]
+    -- shuffle the answers; remember where the right one (listed first) went
+    local order = {1, 2, 3}
+    for j = #order, 2, -1 do
+        local k = self:rand(j) + 1
+        order[j], order[k] = order[k], order[j]
+    end
+    local answers, right = {}, nil
+    for slot, idx in ipairs(order) do
+        answers[slot] = riddle.a[idx]
+        if idx == 1 then right = slot end
+    end
+    self:start_encounter({kind = "riddle", name = "Karl", art = "karl", who = "Karl",
+                          intro = KARL.intro, start = "near"})
+    self.enc.riddle = {answers = answers, right = right}
+    self:enc_say("Karl: '" .. riddle.q .. "'")
+end
+
+-- A reward Karl hasn't already given (gear only once; Pilk and rods repeat).
+function Game:karl_reward()
+    self.karl_gave = self.karl_gave or {}
+    local pool = {}
+    for _, item in ipairs(KARL.rewards) do
+        local once = ITEM_DB[item].slot or ITEM_DB[item].fish_bonus
+        if not (once and self.karl_gave[item]) then pool[#pool + 1] = item end
+    end
+    if #pool == 0 then pool = {"pilk"} end
+    local item = pool[self:rand(#pool) + 1]
+    self.karl_gave[item] = true
+    return item
+end
+
+function Game:karl_answer(n)
+    local e = self.enc
+    if n == e.riddle.right then
+        local item = self:karl_reward()
+        local stack = {item = item, qty = 1}
+        if not self:put_stack("inventory", nil, stack) then self:put_stack("ground", nil, stack) end
+        local name = ITEM_DB[item].name
+        self:enc_say("'Ha! Sharp one.' Karl hands you " .. (item == "pilk" and "a bottle of Pilk. "
+            .. "'Pepsi and milk. Trust me.'" or "his " .. name .. "."))
+        self:end_encounter("Karl gave you " .. name .. ".")
+    else
+        self:enc_say("Karl laughs. 'Wrong. The river keeps its secrets.' He wades off downstream.")
+        self:end_encounter("Karl waded off, laughing.")
+    end
+end
+
+-- Fishing bonus % from Karl's gear: worn items, and a carried lure.
+function Game:fish_bonus()
+    local p, bonus = self.player, 0
+    for slot, item in pairs(p.equipped) do
+        if not HOLD_SLOTS[slot] then bonus = bonus + (ITEM_DB[item].fish_bonus or 0) end
+    end
+    if self:carrying("lucky_lure") then bonus = bonus + ITEM_DB.lucky_lure.fish_bonus end
+    return bonus
 end
 -- ---------------------------------------------------------------------
 -- Traders and the way out
@@ -5362,6 +5571,17 @@ local PORTRAIT_DATA = {
             marks = {66, 51, 50, 53, 27, 51, 42, 59, 41, 46, 61, 61, 59, 42, 29, 62, 54, 67, 36, 37, 65, 73, 39, 71, 64, 33, 51, 30},
             data = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAMAAAADgAAAAoAAAAPAAAACwAAAAcAAAALAAAADQAAAAuAAA0H8AAP6qAMBf/QDguqoA8Pf/ALDq/gDg//8AwP//AAD//wAAwP8AAAD8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPpfAMD//QPwuroO/H93P6+qrur//939qqqqu3//9/+qqqrq3////6qru/v3////qqrq6v/d/f+6qrqr/////6qqqqr9/////7v7+//////////////////////////////////////r//+rAQABkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAADAAAABwAAAAcAAAAPAAAADwAAAB8AAAAPAAAADwAAAB8AAAD/BwAA7n4AAN/9BwC/6wcA//8PAP//DwD//wcA//8DAP9/AAD/CwAAXwAAAAAAAAAAAAAAAAAAgAAAAMAAAABAAAAAQAAAAEAAAABgAAAAIAAAADAAAAAAAAAAEAAAABwAAAAGAAAAAgAAAAIAAAADAAAAAQAAAAAAAAABAAAAAQAAAB8AAAAOAAAAHgAAALwAAAD4AAAAsAAAAHAAAACwAAAAcAAAAKAAAABgAAAAoAAAAOAAAACAAAAAQAAAAAAAAABRCAAAIPwFQH2oC6grAB18VQAACIhABEBVAAAAKFUXUV8AAgCqRANEU4ADgKMQERV1AACAqAAAVFUAAACiAABVVQAAAIAAAFVVqqqqqnd3d9+qqqqqXVXV3aqqqqp3d/f3qqqq6lXd3f2qqqr6d3/3/wEAAAADAAAAAgAAAAMAAAACAAAABwAAAAYAAAANAAAACAAAAA0AAAA6AAAAdQAAAGoAAABlAAAA6gAAAPcAAADqAAAA9QAAAPoAAAD3AAAA+gAAAH0AAAA6AAAAHwAAAA4AAAAPAAAADgAAAA8AAAAPAAAABwAAAA8AAAAHAAAAAAAAwAAAAEAAAADgAAAAQAAAAMAAAABAAAAAwAAAAMAAAACAAAAAwAAAAIAAAACAAAAAgAAAAIAAAACAAAAAAAAAAAAAAACAAAAAwAAAAHAAAAC+AACAVwAA4KoA/n1XAIuvqsBVXVXgoqqqcFdVVbCKiIDYVVVVqKoqoHxXV1Wqqqr61dX9/aqqqvtf9/f/iqqq+l3d1f+qqqr69199/6qqqu7dXd39qqqq/nffd/+qqqr+1d/9/6uquvv3d/f/q6rq//3////q6/////////7+7//9//9/6v//L9f//1eK/u8D1f//Var//yN3//9Vqv7/iFX9X1Wq4qsidVVVVQYAAAAHAAAABwAAAAcAAAACAAAABwAAAAMAAAADAAAAAwAAAAMAAAADAAAAAwAAAAEAAAADAAAAAQAAAAEAAAABAACAAQAAwAcAAGAdAABweAAAGNUBAFyiBwAmVb1/V6joyINVVVXVoioiolVVVfWICADoVVVV/SoiIrpVVVX/"},
     },
+    karl = {
+        near = {w = 96, h = 96, tw = 3, th = 3,
+            marks = {83, 52, 12, 57, 12, 44, 67, 62, 58, 41, 79, 65, 34, 42, 35, 65, 18, 67, 56, 69, 82, 39, 44, 70, 14, 33, 63, 33},
+            data = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAAAAOAAAAB4AAAAPgAAAB8AAIADAADAAQAA4AAAAHAAAAA4AAAAHAAAAAwAAAAOAAAABgAAAAcAAIADAADAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD1VwCA//8C/F/VXz4AAPoXAADwAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAgHwAAfAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAPAAAAHwAAADgAAABwAAAA4AAAAMAHAAAABwAAAB8AAAAMAAAAHAAAADgAAABwAAAA4AAAAMAAAACAAQAAwAEAAMAAAADAAYAA4ACAAHAAwABgAIAAcADAADAAgAAwAIAAOACAABgAAAA4AAAAGAAAABgAAAAcAAAAGAAAABgAAAAYAAAAHAAAABgAAAAYAAAAGAAAABgAAAA4AAAAMAAAADAAAABwAAAAIAAAAHAAAADgAAAA4ABgAOAA4ADAAfA/AAD8fwAA/H8AAP5/AAD//wAA/n8AAP9/AAD+fwAA/z8AAP5/AAD8PgAAeBQAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAwACAAwABAAcAAQADAAEABwADAA4AAQAOAAMADgABABwAAAAMAAAAHAAAABgAAAAcAAAAGAAAABwAAAA4AAAAGAAAABgAAAAYAAAAGAAAABgAAAAYAAAAHAAAAAgAAAAcAAAADAAAAAwAAAAOAAAABwAAAAYABgAHAA8AAwAHgAMAAIABgACAA4AAAAMAAAAHAAAADgAAABwAAAA4AAAAeAAAAOAAAADgAQAAwAMAAIAHAAAADgAAABwAAAA4AAAA8AAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADAADgHwAA8D4AAPr8AcA/4K/6D8D//wUA+j8AAEABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAADADwAA4H8AAP34K+I/0P//BwCoDgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOAAQABwAEAAOAAAABwAAAAYAAAAHAAAAA4AAAAHAAAAA4AAAAHAACAAwAA4AEAAOAAAAB8AAAADgAAAAcAAAADAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"},
+        far = {w = 48, h = 48, tw = 2, th = 2,
+            marks = {41, 26, 6, 29, 5, 22, 17, 21, 17, 32, 23, 34, 33, 31, 9, 34, 30, 21, 36, 36, 40, 17, 16, 40, 16, 15, 11, 11},
+            data = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAFAAC6PwAAB/AAwAAAAHAAAAAYAAAADAAAAAYAAAAGAAAAAwAAAAEHQIAAB+DAgA/wwIAP8ECAD/BAAAfgQAAHQCAAAABgAAAAIAAAAEAAAAAgAAAAQAAAAEAAAABAAAAAgAAAAIDBAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAIAAAAEAAAACAAAADAAAAAgAAAAQAAAAIAAAACAAQAAAAEAAAEBAAABAgAAAQMAAAACAAAABgAAAAIAAAAEAAAAAgAAAAQAAAACAAAABgAAAAIAAAADAAAAAwAAAwEAAICBA4AAAQ9wAAL4PwAG0AcACAAAABgAAAAgAAAAwAEAAIAD4AAA/H8AAIACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAMAAAABAAAAAYAAAADAAAAAcAAAADgAAAAcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},
+        close = {w = 96, h = 96, tw = 3, th = 3,
+            marks = {66, 41, 91, 64, 70, 67, 29, 40, 25, 67, 5, 67, 58, 73, 34, 32, 33, 75, 60, 33, 4, 29, 88, 75, 12, 77, 49, 77},
+            data = "AAAAAAAAAEAAAADgAAAA/AAAAP4AAMBfAADgAwAA8AEAAPgAAAB+AAAAHwAAwAcAAOADAADwAQAA+AAAAHwAAAA8AAAAHgAAAA4AAAAHAACAAwAAwAMAAOABAADgAQAA4AAAAHAAAPB4AAD4fAAA/DgAAPwcAAD8HgAA/h8AAP/4//8P/////78AAP4XAADwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAwAMAAOAHAADgDwAA4A8AAPAPAADwHwAA8AAAAAABAAAADwAAAD8AAAD+AAAA/AEAAOADAADAHwAAAB4AAAB8AAAA+AAAAPABAADAAwAAwA8AAAAPAAAAHgAAADgAAAB4AAAA8AAAAPABAADgAQAAwAEAAIADAAAABwAAAA4PAAAfHwAAHj8AABw/AAA8fwAAPH8AADh/AAB4DgAA/g8AAP8PAAD+BwAA/wcAAP4HAAD8AwAA/AcAAPwDAAD4AwAA8AMAAAADAAAAAwAAAAEAAAADAAAAAwAAAAMAAAABAAAAAwAAAAMAAAADAAAAAwAAAAMAAAADAAAAAwAAAAcAAAADAAAABwAAAAcAAAAHAAAADgAAAA8AAAAPAAD4HwAA+A8AAPgfAADwDwAA8A8AAPAHAADgBwAA4AMAAMABAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH8AAHh/AABwfwAA4H8AAPB/AADgfwAAwD8AAOAfAADADwAAwAcAAMAAAACAAAAAwAAAAIAAAADAAAAAgAAAAMAAAACAAAAAwAAAAIAAAADAAAAAgAAAAMAAAADAAAAAwAAAAMAAAADAAAAA4AAAAOAAAADgAAAA8AAAAPAAAABwDgAAABwAAAE+AIADPADABzgAgA94AAAf8AAAPvAAAPzgAAD4wAEA8IADAICABwAAAA8AAAAfAAAAHgAAAHwAAAB4AAAA8AEAAOABAADABwAAgA8AAAAfAAAAPgAAAHwAAADgAAAAwAcAAIA/AAAA/wAAAPgAAADwAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAMAAOAfAAD8/wAA/v/////4//8/0P//BwD6LwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAwAA4H8FQP3//////P//HwAAADiAAQB8wAMAOPADADzwAwAe/AEAHn4AAA5/AAAPDwCABwcAwAcDAIADAQDAAQAA4AAAAPAAAAA4AAAAfAAAAD4AAAAfAACADwAAwAcAAOABAAD4AAAAOAAAAB8AAIAPAADwBwAA+AAAAH8AAAA/AAAABwAAAAAAAAAAAAAA"},
+    },
     hollow = {
         near = {w = 96, h = 96, tw = 3, th = 3,
             marks = {52, 55, 32, 55, 76, 51, 66, 57, 15, 56, 42, 59, 80, 61, 27, 66, 70, 67, 57, 65, 10, 67, 85, 70, 88, 35, 18, 35},
@@ -5988,6 +6208,7 @@ local HELP = {
     {"TIPS", "Shelter in ruins/hills when the sky"},
     {"", "bruises. Boil or filter river water."},
     {"", "3 artifacts or a permit get you out."},
+    {"", "Karl fishes the rivers. Mind his riddles."},
 }
 
 function Game:open_help()

@@ -22,6 +22,7 @@ local HELP = {
     {"TIPS", "Shelter in ruins/hills when the sky"},
     {"", "bruises. Boil or filter river water."},
     {"", "3 artifacts or a permit get you out."},
+    {"", "Karl fishes the rivers. Mind his riddles."},
 }
 
 function Game:open_help()

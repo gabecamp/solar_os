@@ -20,6 +20,10 @@ seeds 1005 and 1015, both drew one), so he keeps his painted portrait for now.
 Wording to try next: "the skin of the lower face is stitched shut and healed
 into scar tissue", or an image editor to paint the mouth out.
 
+**karl.jpg** (Karl, the riddling fisherman) will be the user's own photo of a
+real person: no prompt, and never generated. Until it's added he shows a
+placeholder smiley face (`karl()` in `tools/portraits.py`).
+
 ## Shared style (paste after every prompt)
 
 The game's mood is three things at once, and every prompt should carry all of

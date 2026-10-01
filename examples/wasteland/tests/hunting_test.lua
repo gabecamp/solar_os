@@ -65,6 +65,7 @@ print("3. fishing with a rod by water")
 g = fresh()
 find(g, "plains", true)
 g.player.inventory = {{item = "fishing_rod", qty = 1}}
+g.karl_next = 1e9   -- Karl can turn up while you fish; not in this test
 saved = HUNT.fish_chance
 HUNT.fish_chance = 1000
 hours = g.player.hours

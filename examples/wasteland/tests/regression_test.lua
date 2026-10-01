@@ -151,6 +151,7 @@ end
 local _, CR = dofile("lib_crafting.lua")
 local crafted = {}   -- wearables you make (e.g. the Rope Belt) don't have to spawn
 for _, r in ipairs(CR.RECIPES) do if r.out then crafted[r.out[1]] = true end end
+for _, item in ipairs(CR.KARL.rewards) do crafted[item] = true end   -- Karl's gifts
 for seed_try = 1, 5 do
     g = Game2.new()
     local start = {}

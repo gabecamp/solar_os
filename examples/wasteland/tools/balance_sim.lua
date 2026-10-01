@@ -186,6 +186,7 @@ local function encounter(g, stats)
         if have.leave and e.over then act = "leave"
         elseif kind == "helper" then act = "talk"
         elseif kind == "anomaly" then act = "leave_quietly"
+        elseif kind == "riddle" then act = "answer_" .. (g:rand(3) + 1)   -- Karl: it guesses
         elseif have.give then act = "give"
         else
             local armed = g:weapon().dmg >= 12
