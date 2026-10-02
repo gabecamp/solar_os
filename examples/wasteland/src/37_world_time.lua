@@ -59,9 +59,12 @@ function Game:storm_hour(hour)
     if p.storm_hours > st.grace then p.health = clamp(p.health - st.hurt) end
 end
 
--- Map panel: "Win Storm" (season, weather).
-function Game:weather_text()
-    return self:season().short .. " " .. self:weather()
+-- Map panel: "Winter Storm" (season, weather), or "Win Storm" when the
+-- panel's 19 columns are short of room (`extra` is said after it).
+function Game:weather_text(extra)
+    local s, w = self:season(), self:weather()
+    local long = s.name .. " " .. w .. (extra or "")
+    return #long <= 19 and long or (s.short .. " " .. w .. (extra or ""))
 end
 
 -- -- clothes wear out (numbers in WORLD.wear) ---------------------------------

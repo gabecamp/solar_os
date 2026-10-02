@@ -143,4 +143,35 @@ assert(widest < PANEL_X - 2, "map reaches x=" .. widest .. " into the panel at "
 print(("6. legend text ends at x=%d (<=296); full map spans y=%d..%d (HUD ends ~54, legend starts %d)")
     :format(longest, highest, lowest, LEGEND_Y))
 
+print("6. weather over the map: a tile per kind (and phase) that fits gfx.bitmap; drawn only")
+print("   in its weather, inside the map, under the player figure")
+local Wt = GLYPHS.WEATHER
+for _, kind in ipairs({"Rain", "Storm", "Snow", "Fog"}) do
+    for phase = 0, 3 do
+        local t = GLYPHS.weather(kind, phase)
+        assert(t and #t == (Wt.w // 8) * Wt.h and #t <= 128, kind)
+    end
+end
+assert(GLYPHS.weather("Rain", 0) ~= GLYPHS.weather("Rain", 1), "the rain moves with the hour")
+assert(GLYPHS.weather("Clear", 0) == nil and GLYPHS.weather("Overcast", 0) == nil)
+local function weather_calls(kind)
+    local g = Game.new(); g:start_game()
+    g.weather = function() return kind end
+    SPRITE_CALLS = {}
+    g:draw_map(400, 300)
+    local n, last_weather, figure_at = 0, 0, 0
+    for i, c in ipairs(SPRITE_CALLS) do
+        if c.w == Wt.w and c.h == Wt.h then
+            n, last_weather = n + 1, i
+            assert(c.x >= 0 and c.x + c.w <= MAP_W and c.y >= MAP_TOP and c.y + c.h <= MAP_BOTTOM, "inside the map")
+        elseif c.w == 7 and c.h == 11 then figure_at = i end
+    end
+    return n, last_weather, figure_at
+end
+assert(weather_calls("Clear") == 0)
+local n, last, fig = weather_calls("Storm")
+assert(n == (MAP_W // Wt.w) * ((MAP_BOTTOM - MAP_TOP) // Wt.h), "tiles fill the map: " .. n)
+assert(fig > last, "the player is drawn over the weather")
+print("   OK")
+
 print("\nGLYPH/LEGEND TESTS PASSED")

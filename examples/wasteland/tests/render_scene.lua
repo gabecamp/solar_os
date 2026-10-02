@@ -478,6 +478,17 @@ g:refresh_view()
 g:draw_map(400, 300)
 solaros.dump("ops_map_fog_winter.txt")
 
+-- Scenes: the map in rain, a storm and snow (the weather drawn over it)
+for _, kind in ipairs({"Rain", "Storm", "Snow"}) do
+    g = Game.new()
+    g:start_game()
+    g.player.hours = (kind == "Snow" and 13 or 2) * 24 + 10
+    g.weather = function() return kind end
+    g:refresh_view()
+    g:draw_map(400, 300)
+    solaros.dump("ops_map_" .. kind:lower() .. ".txt")
+end
+
 -- Scenes: the Ferry Post on the map (with the Peddler passing), Mother Okun's stall
 g = Game.new()
 g:start_game()

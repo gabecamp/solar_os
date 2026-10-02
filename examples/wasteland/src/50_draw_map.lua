@@ -28,6 +28,52 @@ local PANEL_X = 262
 local LEGEND_Y = 130
 local LEGEND_ORDER = {"plains", "forest", "hills", "ruins", "ford", "water"}
 
+-- You, your Little Ones and your dog, at your hex's center.
+function Game:draw_player_mark(px, py)
+    -- you: a stick figure on a white halo, so it reads on dark tiles
+    if draw_sprite then
+        gfx.color(gfx.WHITE)
+        draw_sprite(rnd(px) - 4, rnd(py) - 6, 9, 13, GLYPHS.player_halo)
+        gfx.color(gfx.BLACK)
+        draw_sprite(rnd(px) - 3, rnd(py) - 5, 7, 11, GLYPHS.player)
+    else   -- no bitmaps on this board: a black block on a white halo
+        gfx.color(gfx.WHITE)
+        gfx.fill_rect(rnd(px) - 5, rnd(py) - 5, 10, 10)
+        gfx.color(gfx.BLACK)
+        gfx.fill_rect(rnd(px) - 3, rnd(py) - 3, 6, 6)
+    end
+    local n = self.little and self.little.n or 0
+    if n > 0 then   -- your Little Ones: small heads trailing behind you
+        for i = 1, n do
+            local lx, ly = rnd(px) - 12 + (i - 1) * 4, rnd(py) + 6 + (i % 2) * 2
+            gfx.color(gfx.WHITE)
+            gfx.fill_rect(lx - 1, ly - 1, 5, 5)
+            gfx.color(gfx.BLACK)
+            gfx.fill_rect(lx, ly, 3, 3)
+        end
+    end
+    if self.dog then   -- your dog at your heel: a small block with an ear
+        gfx.color(gfx.WHITE)
+        gfx.fill_rect(rnd(px) + 5, rnd(py) + 1, 8, 6)
+        gfx.color(gfx.BLACK)
+        gfx.fill_rect(rnd(px) + 6, rnd(py) + 3, 6, 3)
+        gfx.fill_rect(rnd(px) + 10, rnd(py) + 1, 2, 2)
+    end
+end
+
+-- Rain, storm, snow or fog over the map area (nothing on boards without
+-- bitmaps, or in clear weather).
+function Game:draw_weather()
+    local kind = self:weather()
+    local W = GLYPHS.WEATHER
+    if not (draw_sprite and W[kind]) then return end
+    gfx.color((W[kind].flake or W[kind].veil) and gfx.WHITE or gfx.BLACK)
+    local tile = GLYPHS.weather(kind, self.player.hours)
+    for y = MAP_TOP, MAP_BOTTOM - W.h, W.h do
+        for x = 0, MAP_W - W.w, W.w do draw_sprite(x, y, W.w, W.h, tile) end
+    end
+end
+
 function Game:draw_map(w, h)
     gfx.clear(gfx.WHITE)
 
@@ -43,7 +89,7 @@ function Game:draw_map(w, h)
     local day, hour = self:clock()
     gfx.text(PANEL_X, 14, ("Day %d %02d:00%s"):format(day, hour, self:is_night() and " Night" or ""))
     -- an emission coming (or raging) matters more than the weather
-    gfx.text(PANEL_X, 28, self:emission_text() or (self:weather_text() .. (self:fire_here() and "  Fire" or "")))
+    gfx.text(PANEL_X, 28, self:emission_text() or self:weather_text(self:fire_here() and "  Fire" or nil))
     local scav = SCAVENGE_LOOT[self.tiles[hex_key(p.q, p.r)]]
         and (self:scavenge_left() .. "/" .. SCAVENGE_TRIES) or "-"
     gfx.text(PANEL_X, 42, "MP " .. math.max(p.mp, 0) .. "/" .. p.max_mp
@@ -82,6 +128,7 @@ function Game:draw_map(w, h)
     -- the screen): walk the axial box around you instead of every tile
     local half_w = HEX_SIZE * SQRT3 / 2
     local span = math.floor(MAP_W / (2 * half_w)) + 2   -- an integer: keys are "q,r"
+    local mark_x, mark_y   -- (you're drawn last, over the weather)
     for dr = -span, span do
       for dq = -span - 1, span + 1 do
         local q, r = p.q + dq, p.r + dr
@@ -189,40 +236,12 @@ function Game:draw_map(w, h)
                 gfx.color(gfx.BLACK)
                 draw_sprite(fx, fy, GLYPH_W, GLYPH_H, GLYPHS.campfire)
             end
-            if is_player then
-                -- you: a stick figure on a white halo, so it reads on dark tiles
-                if draw_sprite then
-                    gfx.color(gfx.WHITE)
-                    draw_sprite(rnd(px) - 4, rnd(py) - 6, 9, 13, GLYPHS.player_halo)
-                    gfx.color(gfx.BLACK)
-                    draw_sprite(rnd(px) - 3, rnd(py) - 5, 7, 11, GLYPHS.player)
-                else   -- no bitmaps on this board: a black block on a white halo
-                    gfx.color(gfx.WHITE)
-                    gfx.fill_rect(rnd(px) - 5, rnd(py) - 5, 10, 10)
-                    gfx.color(gfx.BLACK)
-                    gfx.fill_rect(rnd(px) - 3, rnd(py) - 3, 6, 6)
-                end
-                local n = self.little and self.little.n or 0
-                if n > 0 then   -- your Little Ones: small heads trailing behind you
-                    for i = 1, n do
-                        local lx, ly = rnd(px) - 12 + (i - 1) * 4, rnd(py) + 6 + (i % 2) * 2
-                        gfx.color(gfx.WHITE)
-                        gfx.fill_rect(lx - 1, ly - 1, 5, 5)
-                        gfx.color(gfx.BLACK)
-                        gfx.fill_rect(lx, ly, 3, 3)
-                    end
-                end
-                if self.dog then   -- your dog at your heel: a small block with an ear
-                    gfx.color(gfx.WHITE)
-                    gfx.fill_rect(rnd(px) + 5, rnd(py) + 1, 8, 6)
-                    gfx.color(gfx.BLACK)
-                    gfx.fill_rect(rnd(px) + 6, rnd(py) + 3, 6, 3)
-                    gfx.fill_rect(rnd(px) + 10, rnd(py) + 1, 2, 2)
-                end
-            end
+            if is_player then mark_x, mark_y = px, py end
         end
       end
     end
+    self:draw_weather()
+    if mark_x then self:draw_player_mark(mark_x, mark_y) end
     gfx.color(gfx.BLACK)
     gfx.rect(0, MAP_TOP - 2, MAP_W, MAP_BOTTOM - MAP_TOP + 4)   -- the map's frame
 

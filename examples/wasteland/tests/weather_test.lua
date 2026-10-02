@@ -130,6 +130,6 @@ g.weather = function() return "Storm" end
 local found
 for _, l in ipairs(g:journal_lines()) do if l:find("^Winter, day 4 of 10%. Storm") then found = l end end
 assert(found, "journal season line")
-assert(g:weather_text() == "Win Storm")
+assert(g:weather_text() == "Winter Storm" and g:weather_text("  Fire XXXXXX") == "Win Storm  Fire XXXXXX")
 
 print("WEATHER TESTS PASSED")

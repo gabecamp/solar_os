@@ -1914,3 +1914,39 @@ local SIGIL_ART = {
 local SIGILS = {}
 for i, rows in ipairs(SIGIL_ART) do SIGILS[i] = pack_bitmap("sigil" .. i, rows, 16, 16) end
 
+-- Weather over the map (Game:draw_weather): one 32x29 tile per kind and
+-- phase (8 rows of 29 fill the map's 232 px), built the first time it's
+-- needed. Rain and storms: diagonal streaks; snow: 2x2 flakes; fog: a dot
+-- veil. The phase (the hour) moves the streaks and flakes along.
+GLYPHS.WEATHER = {Rain = {n = 6, len = 3}, Storm = {n = 14, len = 5}, Snow = {n = 9, flake = true},
+                  Fog = {veil = true}, w = 32, h = 29}
+function GLYPHS.weather(kind, phase)
+    local spec, W = GLYPHS.WEATHER[kind], GLYPHS.WEATHER
+    if not spec then return nil end
+    local key = kind .. (phase % 4)
+    if GLYPHS[key] then return GLYPHS[key] end
+    local grid = {}
+    for y = 1, W.h do grid[y] = {} for x = 1, W.w do grid[y][x] = "." end end
+    local function dot(x, y) grid[(y - 1) % W.h + 1][(x - 1) % W.w + 1] = "#" end
+    if spec.veil then
+        for y = 1 + phase % 4, W.h, 4 do
+            for x = 1 + (y // 4) % 2 * 2, W.w, 4 do dot(x, y) end
+        end
+    else
+        local seed = 977
+        for _ = 1, spec.n do
+            seed = (seed * 1103 + 12345) % 65536
+            local x, y = seed % W.w + 1, (seed // W.w) % W.h + 1 + (phase % 4) * 7
+            if spec.flake then
+                dot(x, y); dot(x + 1, y); dot(x, y + 1); dot(x + 1, y + 1)
+            else
+                for i = 0, spec.len - 1 do dot(x - i, y + i) end
+            end
+        end
+    end
+    local rows = {}
+    for y = 1, W.h do rows[y] = table.concat(grid[y]) end
+    GLYPHS[key] = pack_bitmap("weather:" .. key, rows, W.w, W.h)
+    return GLYPHS[key]
+end
+
