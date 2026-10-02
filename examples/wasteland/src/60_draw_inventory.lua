@@ -286,7 +286,7 @@ end
 -- Holes in a torn piece: 2x2 spots on a staggered grid (every 5 rows, 6
 -- columns, alternate rows shifted 3), fixed to the screen so the holes line
 -- up across body parts; in `hole_color` (the body shows through).
-local function punch_holes(clip, x, y, w, h, hole_color, color)
+function Game.punch_holes(clip, x, y, w, h, hole_color, color)
     gfx.color(hole_color)
     local row = (y + 4) // 5
     for yy = row * 5, y + h - 2, 5 do
@@ -319,12 +319,12 @@ local function paint_part(part, src_y0, src_y1, color, inner, outer, clip, torn)
                         local a, z = math.max(sp[1], band[1]), math.min(sp[2], band[2])
                         if z > a then
                             fill_clipped(clip, a, top, z - a, bottom - top)
-                            if torn then punch_holes(clip, a, top, z - a, bottom - top, hole, color) end
+                            if torn then Game.punch_holes(clip, a, top, z - a, bottom - top, hole, color) end
                         end
                     end
                 else
                     fill_clipped(clip, sp[1], top, sp[2] - sp[1], bottom - top)
-                    if torn then punch_holes(clip, sp[1], top, sp[2] - sp[1], bottom - top, hole, color) end
+                    if torn then Game.punch_holes(clip, sp[1], top, sp[2] - sp[1], bottom - top, hole, color) end
                 end
             end
         end

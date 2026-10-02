@@ -279,7 +279,7 @@ end
 local function trade(g)
     g:open_trade()
     local u = g.trade_ui
-    local permit_ask = math.ceil(Game.item_value("permit") * D.TRADE.markup)
+    local permit_ask = math.ceil(Game.item_value("permit") * D.TRADE.people.town.markup)
     local offer, give = 0, {}
     for _, s in ipairs(g.player.inventory) do
         if not KEEP[s.item] then
@@ -327,7 +327,7 @@ local function play(seed)
             if site == "checkpoint" and can_exit then
                 g:open_gate(); g:gate_key(KEY.ENTER)
             else
-                local permit_ask = math.ceil(Game.item_value("permit") * D.TRADE.markup)
+                local permit_ask = math.ceil(Game.item_value("permit") * D.TRADE.people.town.markup)
                 local can_buy = trader_has_permit(g) and offer_value(g) >= permit_ask
                 if site == "trader" and (not stats.traded or can_buy) then
                     trade(g); stats.traded = true

@@ -358,7 +358,7 @@ local LITTLE = {
     decay_hours = 48, act_every = 6,
     find = 40, find_trinket = 25, mischief = 20, keep_awake = 15, awake_rest = 8,
     back_chance = 60, back_hours = {6, 18},
-    keep = {permit = true, lora_radio = true, medkit = true, bandage = true, splint = true,   -- (never taken)
+    keep = {permit = true, institute_pass = true, lora_radio = true, medkit = true, bandage = true, splint = true,   -- (never taken)
             multitool = true, geiger = true, anomaly_detector = true, fishing_rod = true, snare = true},
     pebble = 40, pebble_dmg = {1, 3}, flee_bonus = 10, horror_run = 15,
     intro = "Small grey faces in the grass, too many teeth in their grins. Children, once. "

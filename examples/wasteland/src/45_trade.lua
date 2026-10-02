@@ -150,23 +150,47 @@ function Game:trade_rows(col)
 end
 
 -- What you offer, and what the trader asks for what you picked.
+-- The stacks of `item` in a list, most worn first (worn clothes are traded
+-- away before good ones).
+function Game.stacks_of(list, item)
+    local out = {}
+    for _, s in ipairs(list) do if s.item == item then out[#out + 1] = s end end
+    table.sort(out, function(a, b) return (a.cond or 100) < (b.cond or 100) end)
+    return out
+end
+
+-- What n units of item from a list are worth: worn clothes for less (a
+-- torn piece a quarter).
+function Game.units_value(list, item, n)
+    local total = 0
+    for _, s in ipairs(Game.stacks_of(list, item)) do
+        local k = math.min(n, s.qty)
+        total = total + k * math.floor(Game.item_value(item) * (25 + 0.75 * (s.cond or 100)) / 100)
+        n = n - k
+        if n <= 0 then break end
+    end
+    return total
+end
+
 function Game:trade_totals()
     local u = self.trade_ui
     local give, get = 0, 0
-    for item, n in pairs(u.give) do give = give + Game.item_value(item) * n end
-    for item, n in pairs(u.get) do get = get + Game.item_value(item) * n end
+    for item, n in pairs(u.give) do give = give + Game.units_value(self.player.inventory, item, n) end
+    -- (what you take costs at least 1 a unit: trinkets are worthless to sell)
+    for item, n in pairs(u.get) do get = get + math.max(1, Game.item_value(item)) * n end
     local _, cfg = self:trade_partner()
     return give, math.ceil(get * cfg.markup)
 end
 
--- Take n units of item out of a stack list.
+-- Take n units of item out of a stack list (across stacks, most worn first).
 local function take_units(list, item, n)
-    for i, s in ipairs(list) do
-        if s.item == item then
-            s.qty = s.qty - n
-            if s.qty <= 0 then table.remove(list, i) end
-            return
-        end
+    for _, s in ipairs(Game.stacks_of(list, item)) do
+        local k = math.min(n, s.qty)
+        s.qty, n = s.qty - k, n - k
+        if n <= 0 then break end
+    end
+    for i = #list, 1, -1 do
+        if list[i].qty <= 0 then table.remove(list, i) end
     end
 end
 
@@ -220,7 +244,9 @@ function Game:trade_key(key)
     elseif key == gfx.KEY_RIGHT or key == KEY.D then
         u.col = "theirs"
     elseif key == KEY.ENTER or key == KEY.LF or key == KEY.SPACE then
-        if row and (pick[row.item] or 0) < row.qty then pick[row.item] = (pick[row.item] or 0) + 1 end
+        local have = 0   -- (worn and new pieces of one item are separate rows)
+        for _, s in ipairs(row and rows or {}) do if s.item == row.item then have = have + s.qty end end
+        if row and (pick[row.item] or 0) < have then pick[row.item] = (pick[row.item] or 0) + 1 end
     elseif key == KEY.E then
         if row and pick[row.item] then
             pick[row.item] = pick[row.item] > 1 and pick[row.item] - 1 or nil

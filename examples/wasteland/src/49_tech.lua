@@ -123,6 +123,11 @@ function RADIO.trader(self)
 end
 function RADIO.anna(self)
     if self:story_anna() then return true end
+    local before = self.radio_ui.msg
+    local spent = RADIO.anna_help(self)
+    return self:story_anna_warning(before) or spent
+end
+function RADIO.anna_help(self)
     local work = self:anna_work()
     if work == "offered" then return false end   -- free: she only asked
     if work then return work end

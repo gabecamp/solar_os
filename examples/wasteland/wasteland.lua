@@ -383,7 +383,7 @@ local LITTLE = {
     decay_hours = 48, act_every = 6,
     find = 40, find_trinket = 25, mischief = 20, keep_awake = 15, awake_rest = 8,
     back_chance = 60, back_hours = {6, 18},
-    keep = {permit = true, lora_radio = true, medkit = true, bandage = true, splint = true,   -- (never taken)
+    keep = {permit = true, institute_pass = true, lora_radio = true, medkit = true, bandage = true, splint = true,   -- (never taken)
             multitool = true, geiger = true, anomaly_detector = true, fishing_rod = true, snare = true},
     pebble = 40, pebble_dmg = {1, 3}, flee_bonus = 10, horror_run = 15,
     intro = "Small grey faces in the grass, too many teeth in their grins. Children, once. "
@@ -3293,6 +3293,8 @@ function Game.new()
         seed = os.time() % 32768
     end
     self.world_seed = seed       -- the map is rebuilt from this when a save is loaded
+    -- this run, for the records (two runs can share a world seed)
+    self.run_id = seed .. "-" .. math.random(1, 1000000000)
     self.tiles, self.ground, seed, self.rad, self.sites = generate_world(seed)
     self.extras = Game.place_extras(self.tiles, self.sites, self.rad, self.world_seed)
     for _, d in ipairs(self.extras.drops) do
@@ -3641,7 +3643,7 @@ end
 
 local function copy_stacks(list)
     local out = {}
-    for i, s in ipairs(list) do out[i] = {item = s.item, qty = s.qty} end
+    for i, s in ipairs(list) do out[i] = {item = s.item, qty = s.qty, cond = s.cond} end
     return out
 end
 
@@ -3654,18 +3656,23 @@ function Game:try_transfer(source, dest)
     if s_kind == d_kind and s_key == d_key then return false end
     local p = self.player
     local saved_inv, saved_ground = copy_stacks(p.inventory), copy_stacks(self:ground_list())
-    local saved_eq = {}
+    local saved_eq, saved_wear = {}, {}
     for slot, item in pairs(p.equipped) do saved_eq[slot] = item end
+    for slot, c in pairs(p.wear or {}) do saved_wear[slot] = c end
+    local cap_before = self:bag_capacity()
 
     local stack = self:remove_stack(s_kind, s_key)
     if not stack then return false end
     local ok = self:put_stack(d_kind, d_key, stack)
-    if ok and #p.inventory > self:bag_capacity() then
+    -- too full only if this move made it so (more stacks, or a smaller bag):
+    -- a bag that shrank on its own (torn) can still be emptied
+    local cap = self:bag_capacity()
+    if ok and #p.inventory > cap and (#p.inventory > #saved_inv or cap < cap_before) then
         self:push_log("Bag too small - empty it first.")
         ok = false
     end
     if not ok then
-        p.inventory, p.equipped = saved_inv, saved_eq
+        p.inventory, p.equipped, p.wear = saved_inv, saved_eq, saved_wear
         self.ground[hex_key(p.q, p.r)] = saved_ground
         return false
     end
@@ -4321,6 +4328,7 @@ function Game:tick()
     self:apply_item_names()   -- before any log line this tick names an item
     self.ticked_hour = self.ticked_hour or p.hours
     local was_cold = (p.cold_hours or 0) > 0
+    local storm_before, cold_before = p.storm_hours or 0, p.cold_hours or 0
     local rad_before, dose = self:rad_stage(), 0
     for hour = self.ticked_hour, p.hours - 1 do
         if self:is_cold(hour) then
@@ -4347,13 +4355,15 @@ function Game:tick()
     local cold = (p.cold_hours or 0) > 0
     if cold and not was_cold then
         self:push_log("You're cold. Wear warmer clothes or build a fire.")
-    elseif cold and p.cold_hours == WORLD.cold_grace + 1 then
+    elseif (p.cold_hours or 0) > WORLD.cold_grace and cold_before <= WORLD.cold_grace then
         self:push_log("The cold is getting into you. (-" .. WORLD.cold_hurt .. " HP/h)")
     end
-    if (p.storm_hours or 0) == 1 then
-        self:push_log("The storm is on you. Get to cover: ruins, hills or trees.")
-    elseif (p.storm_hours or 0) == WORLD.storm.grace + 1 then
+    -- (on the change, not an exact count: a long rest jumps several hours)
+    local storm = p.storm_hours or 0
+    if storm > WORLD.storm.grace and storm_before <= WORLD.storm.grace then
         self:push_log("The storm is beating you down. (-" .. WORLD.storm.hurt .. " HP/h)")
+    elseif storm > 0 and storm_before == 0 then
+        self:push_log("The storm is on you. Get to cover: ruins, hills or trees.")
     end
     self:rad_news(dose, rad_before)
     self:survive_news()
@@ -4387,7 +4397,7 @@ local SAVE = {version = 1, dir = "wasteland", file = "save.lua",
                         "difficulty", "dog", "radio", "karl_hint",
                         "base", "quest", "quests_done",
                         "lore_read", "signal_page", "skills", "stats",
-                        "ferry_trader", "peddler", "little", "story"}}
+                        "ferry_trader", "peddler", "little", "story", "run_id"}}
 
 -- Where the save lives: <preferred storage>/wasteland/save.lua
 function SAVE.path()
@@ -5741,23 +5751,47 @@ function Game:trade_rows(col)
 end
 
 -- What you offer, and what the trader asks for what you picked.
+-- The stacks of `item` in a list, most worn first (worn clothes are traded
+-- away before good ones).
+function Game.stacks_of(list, item)
+    local out = {}
+    for _, s in ipairs(list) do if s.item == item then out[#out + 1] = s end end
+    table.sort(out, function(a, b) return (a.cond or 100) < (b.cond or 100) end)
+    return out
+end
+
+-- What n units of item from a list are worth: worn clothes for less (a
+-- torn piece a quarter).
+function Game.units_value(list, item, n)
+    local total = 0
+    for _, s in ipairs(Game.stacks_of(list, item)) do
+        local k = math.min(n, s.qty)
+        total = total + k * math.floor(Game.item_value(item) * (25 + 0.75 * (s.cond or 100)) / 100)
+        n = n - k
+        if n <= 0 then break end
+    end
+    return total
+end
+
 function Game:trade_totals()
     local u = self.trade_ui
     local give, get = 0, 0
-    for item, n in pairs(u.give) do give = give + Game.item_value(item) * n end
-    for item, n in pairs(u.get) do get = get + Game.item_value(item) * n end
+    for item, n in pairs(u.give) do give = give + Game.units_value(self.player.inventory, item, n) end
+    -- (what you take costs at least 1 a unit: trinkets are worthless to sell)
+    for item, n in pairs(u.get) do get = get + math.max(1, Game.item_value(item)) * n end
     local _, cfg = self:trade_partner()
     return give, math.ceil(get * cfg.markup)
 end
 
--- Take n units of item out of a stack list.
+-- Take n units of item out of a stack list (across stacks, most worn first).
 local function take_units(list, item, n)
-    for i, s in ipairs(list) do
-        if s.item == item then
-            s.qty = s.qty - n
-            if s.qty <= 0 then table.remove(list, i) end
-            return
-        end
+    for _, s in ipairs(Game.stacks_of(list, item)) do
+        local k = math.min(n, s.qty)
+        s.qty, n = s.qty - k, n - k
+        if n <= 0 then break end
+    end
+    for i = #list, 1, -1 do
+        if list[i].qty <= 0 then table.remove(list, i) end
     end
 end
 
@@ -5811,7 +5845,9 @@ function Game:trade_key(key)
     elseif key == gfx.KEY_RIGHT or key == KEY.D then
         u.col = "theirs"
     elseif key == KEY.ENTER or key == KEY.LF or key == KEY.SPACE then
-        if row and (pick[row.item] or 0) < row.qty then pick[row.item] = (pick[row.item] or 0) + 1 end
+        local have = 0   -- (worn and new pieces of one item are separate rows)
+        for _, s in ipairs(row and rows or {}) do if s.item == row.item then have = have + s.qty end end
+        if row and (pick[row.item] or 0) < have then pick[row.item] = (pick[row.item] or 0) + 1 end
     elseif key == KEY.E then
         if row and pick[row.item] then
             pick[row.item] = pick[row.item] > 1 and pick[row.item] - 1 or nil
@@ -6430,6 +6466,11 @@ function RADIO.trader(self)
 end
 function RADIO.anna(self)
     if self:story_anna() then return true end
+    local before = self.radio_ui.msg
+    local spent = RADIO.anna_help(self)
+    return self:story_anna_warning(before) or spent
+end
+function RADIO.anna_help(self)
     local work = self:anna_work()
     if work == "offered" then return false end   -- free: she only asked
     if work then return work end
@@ -7603,7 +7644,7 @@ function Game:record_run(how, cause)
     self.run_recorded = true
     local rec, p, best = Game.records(), self.player, {}
     -- a run is counted once, even if its save survives and is continued
-    local id = tostring(self.world_seed)
+    local id = self.run_id or tostring(self.world_seed)   -- (saves from before run ids)
     for _, seen in ipairs(rec.counted) do
         if seen == id then return end
     end
@@ -8067,21 +8108,31 @@ function Game:story_karl()
     return false
 end
 
--- Anna on the radio: a warning, then (if you helped her) the pass.
+-- Anna on the radio, if you helped her: the pass (that's the whole call).
 function Game:story_anna()
     local st = self.story
-    if not st or not st.step then return false end
-    if st.step == "gate" and st.anna and not st.pass then
+    if st and st.step == "gate" and st.anna and not st.pass then
         self:radio_say("Anna: 'You're going anyway. My brother's pass. A runner's bringing it. "
             .. "Come back out, love.'")
         return self:give_pass("Anna's runner")
     end
-    if not st.warned then
-        st.warned = true
-        self:radio_say("Anna: 'My brother worked at the Institute. Don't go.'")
-        return true
-    end
     return false
+end
+
+-- Her warning, once the story has begun: said after whatever else she said
+-- on this call (so it never costs you her help). True if she said it.
+function Game:story_anna_warning(said_before)
+    local st = self.story
+    if not st or not st.step or st.warned then return false end
+    st.warned = true
+    local text = "Anna: 'My brother worked at the Institute. Don't go.'"
+    local u = self.radio_ui
+    if said_before and u.msg ~= said_before then
+        for _, line in ipairs(wrap(text, 54)) do u.msg[#u.msg + 1] = line end
+    else
+        self:radio_say(text)
+    end
+    return true
 end
 
 -- T at the quarry.
@@ -8133,8 +8184,8 @@ function Game:institute_action(action)
     elseif action == "listen_institute" then
         self.lore_read = {}
         for i = 1, #LORE.pages do self.lore_read[i] = true end
-        self:enc_say("You listen. You understand all of it at once: the pages, the count, the eye. "
-            .. "And then you hear your own name, and it doesn't stop.")
+        self.death_note = "You listen. You understand all of it at once: the pages, the count, the eye. "
+            .. "And then you hear your own name, and it doesn't stop."
         p.health = 0
         self.enc = nil
         self:check_death("You joined the count.")
@@ -8438,7 +8489,7 @@ end
 -- Holes in a torn piece: 2x2 spots on a staggered grid (every 5 rows, 6
 -- columns, alternate rows shifted 3), fixed to the screen so the holes line
 -- up across body parts; in `hole_color` (the body shows through).
-local function punch_holes(clip, x, y, w, h, hole_color, color)
+function Game.punch_holes(clip, x, y, w, h, hole_color, color)
     gfx.color(hole_color)
     local row = (y + 4) // 5
     for yy = row * 5, y + h - 2, 5 do
@@ -8471,12 +8522,12 @@ local function paint_part(part, src_y0, src_y1, color, inner, outer, clip, torn)
                         local a, z = math.max(sp[1], band[1]), math.min(sp[2], band[2])
                         if z > a then
                             fill_clipped(clip, a, top, z - a, bottom - top)
-                            if torn then punch_holes(clip, a, top, z - a, bottom - top, hole, color) end
+                            if torn then Game.punch_holes(clip, a, top, z - a, bottom - top, hole, color) end
                         end
                     end
                 else
                     fill_clipped(clip, sp[1], top, sp[2] - sp[1], bottom - top)
-                    if torn then punch_holes(clip, sp[1], top, sp[2] - sp[1], bottom - top, hole, color) end
+                    if torn then Game.punch_holes(clip, sp[1], top, sp[2] - sp[1], bottom - top, hole, color) end
                 end
             end
         end
@@ -9562,6 +9613,13 @@ function Game:draw_dead(w, h)
     gfx.font(gfx.FONT_MONO_12)
     gfx.text(6, 70, self.death_cause or "")
     local y = 100
+    if self.death_note then   -- (a death with more to say: the Institute)
+        for _, line in ipairs(wrap(self.death_note, 54)) do
+            gfx.text(6, y - 8, line)
+            y = y + 14
+        end
+        y = y + 6
+    end
     for _, line in ipairs(self:run_summary()) do
         gfx.text(6, y, line)
         y = y + 16

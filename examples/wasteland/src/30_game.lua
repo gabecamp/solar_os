@@ -17,6 +17,8 @@ function Game.new()
         seed = os.time() % 32768
     end
     self.world_seed = seed       -- the map is rebuilt from this when a save is loaded
+    -- this run, for the records (two runs can share a world seed)
+    self.run_id = seed .. "-" .. math.random(1, 1000000000)
     self.tiles, self.ground, seed, self.rad, self.sites = generate_world(seed)
     self.extras = Game.place_extras(self.tiles, self.sites, self.rad, self.world_seed)
     for _, d in ipairs(self.extras.drops) do
@@ -365,7 +367,7 @@ end
 
 local function copy_stacks(list)
     local out = {}
-    for i, s in ipairs(list) do out[i] = {item = s.item, qty = s.qty} end
+    for i, s in ipairs(list) do out[i] = {item = s.item, qty = s.qty, cond = s.cond} end
     return out
 end
 
@@ -378,18 +380,23 @@ function Game:try_transfer(source, dest)
     if s_kind == d_kind and s_key == d_key then return false end
     local p = self.player
     local saved_inv, saved_ground = copy_stacks(p.inventory), copy_stacks(self:ground_list())
-    local saved_eq = {}
+    local saved_eq, saved_wear = {}, {}
     for slot, item in pairs(p.equipped) do saved_eq[slot] = item end
+    for slot, c in pairs(p.wear or {}) do saved_wear[slot] = c end
+    local cap_before = self:bag_capacity()
 
     local stack = self:remove_stack(s_kind, s_key)
     if not stack then return false end
     local ok = self:put_stack(d_kind, d_key, stack)
-    if ok and #p.inventory > self:bag_capacity() then
+    -- too full only if this move made it so (more stacks, or a smaller bag):
+    -- a bag that shrank on its own (torn) can still be emptied
+    local cap = self:bag_capacity()
+    if ok and #p.inventory > cap and (#p.inventory > #saved_inv or cap < cap_before) then
         self:push_log("Bag too small - empty it first.")
         ok = false
     end
     if not ok then
-        p.inventory, p.equipped = saved_inv, saved_eq
+        p.inventory, p.equipped, p.wear = saved_inv, saved_eq, saved_wear
         self.ground[hex_key(p.q, p.r)] = saved_ground
         return false
     end

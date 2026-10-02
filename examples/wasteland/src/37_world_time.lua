@@ -187,6 +187,7 @@ function Game:tick()
     self:apply_item_names()   -- before any log line this tick names an item
     self.ticked_hour = self.ticked_hour or p.hours
     local was_cold = (p.cold_hours or 0) > 0
+    local storm_before, cold_before = p.storm_hours or 0, p.cold_hours or 0
     local rad_before, dose = self:rad_stage(), 0
     for hour = self.ticked_hour, p.hours - 1 do
         if self:is_cold(hour) then
@@ -213,13 +214,15 @@ function Game:tick()
     local cold = (p.cold_hours or 0) > 0
     if cold and not was_cold then
         self:push_log("You're cold. Wear warmer clothes or build a fire.")
-    elseif cold and p.cold_hours == WORLD.cold_grace + 1 then
+    elseif (p.cold_hours or 0) > WORLD.cold_grace and cold_before <= WORLD.cold_grace then
         self:push_log("The cold is getting into you. (-" .. WORLD.cold_hurt .. " HP/h)")
     end
-    if (p.storm_hours or 0) == 1 then
-        self:push_log("The storm is on you. Get to cover: ruins, hills or trees.")
-    elseif (p.storm_hours or 0) == WORLD.storm.grace + 1 then
+    -- (on the change, not an exact count: a long rest jumps several hours)
+    local storm = p.storm_hours or 0
+    if storm > WORLD.storm.grace and storm_before <= WORLD.storm.grace then
         self:push_log("The storm is beating you down. (-" .. WORLD.storm.hurt .. " HP/h)")
+    elseif storm > 0 and storm_before == 0 then
+        self:push_log("The storm is on you. Get to cover: ruins, hills or trees.")
     end
     self:rad_news(dose, rad_before)
     self:survive_news()

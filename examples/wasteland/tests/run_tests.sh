@@ -18,7 +18,7 @@ echo "world seed: $WASTELAND_SEED  (replay: WASTELAND_SEED=$WASTELAND_SEED bash 
 
 echo "== syntax ==";           luac5.4 -p ../wasteland.lua && echo OK
 echo "== locals ==";           python3 ../tools/locals_headroom.py --min 10
-for t in unit_test sprite_test bounds_test body_test glyph_test regression_test scavenge_test creator_test encounter_test portrait_test crafting_test world_test save_test radiation_test survival_test trade_test gear_test events_test hunting_test help_test karl_test sound_test difficulty_test dog_test tech_test journal_test vague_test base_test quest_test review_fixes_test lore_test horror_test skills_test records_test inv_redraw_test review2_test weather_test towns_test little_test story_test ragged_test wear_test; do
+for t in unit_test sprite_test bounds_test body_test glyph_test regression_test scavenge_test creator_test encounter_test portrait_test crafting_test world_test save_test radiation_test survival_test trade_test gear_test events_test hunting_test help_test karl_test sound_test difficulty_test dog_test tech_test journal_test vague_test base_test quest_test review_fixes_test lore_test horror_test skills_test records_test inv_redraw_test review2_test weather_test towns_test little_test story_test ragged_test wear_test review3_test; do
   echo "== $t ==";             lua5.4 "$t.lua" | tail -n 2
 done
 echo "== main loop (scripted keys) =="; lua5.4 wasteland_run.lua

@@ -152,7 +152,7 @@ function Game:record_run(how, cause)
     self.run_recorded = true
     local rec, p, best = Game.records(), self.player, {}
     -- a run is counted once, even if its save survives and is continued
-    local id = tostring(self.world_seed)
+    local id = self.run_id or tostring(self.world_seed)   -- (saves from before run ids)
     for _, seen in ipairs(rec.counted) do
         if seen == id then return end
     end

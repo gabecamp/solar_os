@@ -72,21 +72,31 @@ function Game:story_karl()
     return false
 end
 
--- Anna on the radio: a warning, then (if you helped her) the pass.
+-- Anna on the radio, if you helped her: the pass (that's the whole call).
 function Game:story_anna()
     local st = self.story
-    if not st or not st.step then return false end
-    if st.step == "gate" and st.anna and not st.pass then
+    if st and st.step == "gate" and st.anna and not st.pass then
         self:radio_say("Anna: 'You're going anyway. My brother's pass. A runner's bringing it. "
             .. "Come back out, love.'")
         return self:give_pass("Anna's runner")
     end
-    if not st.warned then
-        st.warned = true
-        self:radio_say("Anna: 'My brother worked at the Institute. Don't go.'")
-        return true
-    end
     return false
+end
+
+-- Her warning, once the story has begun: said after whatever else she said
+-- on this call (so it never costs you her help). True if she said it.
+function Game:story_anna_warning(said_before)
+    local st = self.story
+    if not st or not st.step or st.warned then return false end
+    st.warned = true
+    local text = "Anna: 'My brother worked at the Institute. Don't go.'"
+    local u = self.radio_ui
+    if said_before and u.msg ~= said_before then
+        for _, line in ipairs(wrap(text, 54)) do u.msg[#u.msg + 1] = line end
+    else
+        self:radio_say(text)
+    end
+    return true
 end
 
 -- T at the quarry.
@@ -138,8 +148,8 @@ function Game:institute_action(action)
     elseif action == "listen_institute" then
         self.lore_read = {}
         for i = 1, #LORE.pages do self.lore_read[i] = true end
-        self:enc_say("You listen. You understand all of it at once: the pages, the count, the eye. "
-            .. "And then you hear your own name, and it doesn't stop.")
+        self.death_note = "You listen. You understand all of it at once: the pages, the count, the eye. "
+            .. "And then you hear your own name, and it doesn't stop."
         p.health = 0
         self.enc = nil
         self:check_death("You joined the count.")

@@ -227,6 +227,13 @@ function Game:draw_dead(w, h)
     gfx.font(gfx.FONT_MONO_12)
     gfx.text(6, 70, self.death_cause or "")
     local y = 100
+    if self.death_note then   -- (a death with more to say: the Institute)
+        for _, line in ipairs(wrap(self.death_note, 54)) do
+            gfx.text(6, y - 8, line)
+            y = y + 14
+        end
+        y = y + 6
+    end
     for _, line in ipairs(self:run_summary()) do
         gfx.text(6, y, line)
         y = y + 16

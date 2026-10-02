@@ -58,7 +58,7 @@ g = fresh()
 g.player.health = 0
 g:check_death("You starved.")
 local again = Game.new()
-again.world_seed = g.world_seed   -- (the same run, continued from a save that wasn't deleted)
+again.world_seed, again.run_id = g.world_seed, g.run_id   -- (the same run, continued from a save)
 again:start_game()
 again.player.health = 0
 again:check_death("You starved.")
