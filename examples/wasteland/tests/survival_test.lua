@@ -120,9 +120,10 @@ p.sick_hours = 1
 g:survive_hour()
 assert(p.sick_hours == 0 and has_log(g, "sickness passes"))
 local rolls, n = 0, 400
+local gg = fresh()   -- (one world; only the roll and the sickness are reset)
 for _ = 1, n do
-    local gg = fresh()
     gg.seed = rolls * 7 + _ * 131
+    gg.player.sick_hours = 0
     gg.player.inventory = {{item = "rotten_meat", qty = 1}}
     gg:use_item("inventory", 1)
     if (gg.player.sick_hours or 0) > 0 then rolls = rolls + 1 end

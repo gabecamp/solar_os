@@ -211,9 +211,32 @@ print("   OK")
 
 -- anomalies ------------------------------------------------------------
 local UP, DOWN, LEFT, RIGHT, ESC = gfx.KEY_UP, gfx.KEY_DOWN, gfx.KEY_LEFT, gfx.KEY_RIGHT, gfx.KEY_ESCAPE
+-- A game whose world is built once and reused: each call gives back a game
+-- as fresh() would (same world, the player and log as new) without paying
+-- for a new world (the puzzle and artifact loops below try hundreds).
+local reuse_base, reuse_player
+local function deep_copy(v)
+    if type(v) ~= "table" then return v end
+    local out = {}
+    for k, x in pairs(v) do out[k] = deep_copy(x) end
+    return out
+end
+local function reused()
+    if not reuse_base then
+        reuse_base = fresh()
+        reuse_player, reuse_base.saved_ground = deep_copy(reuse_base.player), deep_copy(reuse_base.ground)
+        reuse_base.saved_state = {seed = reuse_base.seed, screen = reuse_base.screen, log = deep_copy(reuse_base.log)}
+    end
+    local g2 = reuse_base
+    g2.player, g2.ground = deep_copy(reuse_player), deep_copy(g2.saved_ground)
+    g2.seed, g2.screen, g2.log = g2.saved_state.seed, g2.saved_state.screen, deep_copy(g2.saved_state.log)
+    g2.enc, g2.puz, g2.enc_cooldown = nil, nil, nil
+    return g2
+end
+
 local function puzzle(kind, seed)
     for s = seed or 1, (seed or 1) + 500 do
-        local g2 = fresh()
+        local g2 = reused()
         g2.seed = s
         g2:start_encounter(def_named("The Stillness"))
         act(g2, "investigate")
@@ -310,7 +333,7 @@ g2:puzzle_key(ESC)
 assert(g2.screen == "map" and not hurt(g2, hp, hours))
 local got, tries = 0, 2000
 for s = 1, tries do
-    g2 = fresh(); g2.seed = s
+    g2 = reused(); g2.seed = s
     g2:start_encounter(def_named("Wrong Stars"))
     g2.puz = {kind = "runes"}
     g2.screen = "puzzle"
