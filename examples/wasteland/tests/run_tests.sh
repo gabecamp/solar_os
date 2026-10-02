@@ -23,5 +23,6 @@ for t in unit_test sprite_test bounds_test body_test glyph_test regression_test 
 done
 echo "== main loop (scripted keys) =="; lua5.4 wasteland_run.lua
 echo "== soak (400 random keys) ==";    lua5.4 soak.lua | tail -n 1
+echo "== pygame host (python_version/) =="; python3 pygame_host_test.py | tail -n 1
 echo "== memory and draw calls ==";   lua5.4 ../tools/perf_check.lua 1300 2000   # heap KB: Lua lives in the 8 MB PSRAM
 echo; echo "ALL PASSED"

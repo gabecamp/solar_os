@@ -94,6 +94,16 @@ The sim is not byte-reproducible between processes (Lua 5.4 varies `pairs` order
 
 The dated notes below were written as each feature landed; part names in older notes predate the 2026-10-01 split of `05_data` (now `05_data_world`, `06_data_items`, `07_data_encounters`) and of the puzzles into `41_puzzles`.
 
+> **The pygame version (2026-10-02):** the user paused the Lua work and asked for the Python version (a Pi/PC target, a full match). `python_version/wasteland_pygame.py` is a host, not a port: lupa (Lua 5.4) runs `../wasteland.lua` unchanged, and `build_runtime` puts a `solaros` module in `package.preload` whose functions call `Host` methods. Details:
+> - **gfx:** a 400x300 canvas in four exact grays; text is DejaVu Sans Mono 11/Bold 13 with the baseline at y (7 px advance, as on the device); `sprite`/`bitmap` are LSB-first rows, cached per data+color; `refresh` scales it into the window.
+> - **Looks:** `gray`, `device` (the firmware's Bayer 4x4 thresholds, WHITE 16 / LIGHT 12 / DARK 5 / BLACK 0, via pygame masks) and `amber`/`green`.
+> - **Input:** `getch` pumps pygame events (arrows 0x80-0x83, Esc, Enter = 10, key repeat on).
+> - **Storage:** a per-user data folder, paths kept inside it.
+> - **Audio:** square waves from `array` through `pygame.mixer`, with a `tone_async` queue.
+> - **Errors:** a Lua error is shown on screen and printed.
+>
+> The old pygame prototype was removed (it's in git history). Test: `tests/pygame_host_test.py` (in run_tests.sh; it prints SKIPPED without pygame/lupa): every `gfx`/`storage`/`audio` call in the bundle exists in the host, bit order, the 7 px advance, the device dither, a scripted run, a save and Continue, and screenshots `previews/pygame_*.png`. **No Lua change needs Python work.**
+>
 > **Diagonal movement (2026-10-02, the user: "there is no diagonal movement"):** pointy-top hexes have six neighbors but the arrows reached four (Up/Down each picked one of the two upper/lower hexes). Now `Game:map_dir_key(key)` (30_game; `handle_map_key` calls it first): Up/W or Down/S only lean (`self.move_lean`), the next Left/Right steps that diagonal via `move_dir(dx, lean)`; Left/Right alone go west/east; any other key, or leaving the map, drops the lean. The hint line shows "Up: now Left or Right picks the side". Test: `move_test.lua` (all six neighbors).
 >
 > **Cleanup sweep (2026-10-02):** a script listed functions never referenced (none), only used by tests (`Game.reload_records`, a deliberate test hook), top-level locals used once (none) and comments naming missing functions (none stale). Nine copies of the "q,r" key parser became `Game.key_qr(key)` (30_game; `generate_world` keeps its own, as it runs before `Game` exists); headroom 12 -> 13. The balance sim's output (sorted: tied rows print in any order) is identical before and after on seeds 1 and 2000.
@@ -190,7 +200,7 @@ The dated notes below were written as each feature landed; part names in older n
 
 Sections 2 (Where We Are), 7 (Where We're Going) and 8 (Quick Start) were replaced by the sections at the top; the rest is kept as written. It describes the 300x400 portrait layout of the time; the game is 400x300 landscape now.
 
-*Written 2026-09-30 at the end of a long chat session. The active work is `wasteland.lua`, a single-file Lua app for a handheld running SolarOS. A parked Python/pygame version lives in `python_version/`. Read "Where We Are" bullets 17–20 before touching anything: an audit done while writing this found four real bugs, one of which makes the Lua game unplayable.*
+*Written 2026-09-30 at the end of a long chat session. The active work is `wasteland.lua`, a single-file Lua app for a handheld running SolarOS. `python_version/` is now a pygame host that runs this same Lua game on a PC or Pi (2026-10-02). Read "Where We Are" bullets 17–20 before touching anything: an audit done while writing this found four real bugs, one of which makes the Lua game unplayable.*
 
 > **Update 2026-09-30 (second session, now in `gabecamp/solar_os` at `examples/wasteland/`):**
 > bugs 17–20 are fixed and covered by `tests/regression_test.lua` (the old `repro_known_bugs.sh` is gone).
@@ -227,7 +237,7 @@ Sections 2 (Where We Are), 7 (Where We're Going) and 8 (Quick Start) were replac
 **What:** a clone/homage of *NEO Scavenger* (the Flash survival RPG: hex overworld, fog of war, hunger/thirst/rest, a paper-doll inventory with body slots, scavenging, turn-based combat, crafting). The user wanted it **not in Flash**.
 
 **Two targets, in the order they appeared:**
-1. **Raspberry Pi 3B+** in Python/pygame. Built, then parked (see `python_version/`).
+1. **Raspberry Pi 3B+** in Python/pygame. Built, then parked; replaced on 2026-10-02 by a pygame host for the Lua game (`python_version/`).
 2. **An ESP32-S3 handheld running SolarOS**, as a Lua app. This is now the active target. The user tests on the real device and reports back.
 
 **Why it matters to the user:** personal hobby project: a playable NEO Scavenger-like game on their own pocket hardware. Success looks like: launch the app on the device, explore a fogged hex map, watch needs drain, manage gear on a paper-doll inventory screen; later scavenging, encounters, combat, crafting.
