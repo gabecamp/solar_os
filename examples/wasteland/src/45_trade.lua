@@ -32,8 +32,7 @@ end
 
 function Game:bearing_to(key)
     local p = self.player
-    local q, r = key:match("(-?%d+),(-?%d+)")
-    q, r = tonumber(q), tonumber(r)
+    local q, r = Game.key_qr(key)
     local d = axial_distance(p.q, p.r, q, r)
     if d == 0 then return "here" end
     local x0, y0 = axial_to_pixel(p.q, p.r, 1)

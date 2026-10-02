@@ -3343,6 +3343,12 @@ end
 local Game = {}
 Game.__index = Game
 
+-- "q,r" (a tile key, hex_key) back to two numbers.
+function Game.key_qr(key)
+    local q, r = key:match("(-?%d+),(-?%d+)")
+    return tonumber(q), tonumber(r)
+end
+
 function Game.new()
     local self = setmetatable({}, Game)
     -- The SolarOS Lua runtime does not load the `os` library, so seed from
@@ -5049,8 +5055,8 @@ function Game:helper_talk()
         self:end_encounter("The medic patched you up.")
     else
         for key in pairs(self.tiles) do
-            local q, r = key:match("(-?%d+),(-?%d+)")
-            if axial_distance(p.q, p.r, tonumber(q), tonumber(r)) <= 3 then p.explored[key] = true end
+            local q, r = Game.key_qr(key)
+            if axial_distance(p.q, p.r, q, r) <= 3 then p.explored[key] = true end
         end
         self:put_stack("ground", nil, {item = "water_bottle", qty = 1})
         self:enc_say("He draws the land around you in the dirt and hands you a bottle of "
@@ -5444,8 +5450,8 @@ function Game:mark_stash()
     for _, key in pairs(self.sites) do taken[key] = true end
     local spots = {}
     for key, t in pairs(self.tiles) do
-        local q, r = key:match("(-?%d+),(-?%d+)")
-        local d = axial_distance(p.q, p.r, tonumber(q), tonumber(r))
+        local q, r = Game.key_qr(key)
+        local d = axial_distance(p.q, p.r, q, r)
         if TERRAIN[t].passable and d >= S.near and d <= S.far and not self.stashes[key]
             and not taken[key] then
             spots[#spots + 1] = key
@@ -5701,8 +5707,7 @@ end
 
 function Game:bearing_to(key)
     local p = self.player
-    local q, r = key:match("(-?%d+),(-?%d+)")
-    q, r = tonumber(q), tonumber(r)
+    local q, r = Game.key_qr(key)
     local d = axial_distance(p.q, p.r, q, r)
     if d == 0 then return "here" end
     local x0, y0 = axial_to_pixel(p.q, p.r, 1)
@@ -6027,11 +6032,6 @@ end
 -- Later features add their own pieces to `extras` the same way.
 -- ---------------------------------------------------------------------
 
-local function parse_key(key)
-    local q, r = key:match("(-?%d+),(-?%d+)")
-    return tonumber(q), tonumber(r)
-end
-
 function Game.place_extras(tiles, sites, rad, world_seed)
     local seed = (world_seed * 48271 + 12345) % 2147483647
     local function roll(n)
@@ -6047,7 +6047,7 @@ function Game.place_extras(tiles, sites, rad, world_seed)
     local extras = {}
 
     -- the Ferry Post: a dry, cool hex next to the water, far from the town
-    local tq, tr = parse_key(sites.trader)
+    local tq, tr = Game.key_qr(sites.trader)
     local F = TRADE.ferry
     local function by_water(q, r)
         for _, d in ipairs(AXIAL_DIRS) do
@@ -6058,7 +6058,7 @@ function Game.place_extras(tiles, sites, rad, world_seed)
     for _, min_town in ipairs({F.min_from_town, F.min_from_town - 3}) do
         local options = {}
         for _, key in ipairs(keys) do
-            local q, r = parse_key(key)
+            local q, r = Game.key_qr(key)
             if tiles[key] ~= "water" and not taken[key] and not rad[key]
                 and axial_distance(q, r, tq, tr) >= min_town
                 and axial_distance(0, 0, q, r) >= F.min_from_start and by_water(q, r) then
@@ -6069,7 +6069,7 @@ function Game.place_extras(tiles, sites, rad, world_seed)
             local key = options[roll(#options) + 1]
             sites.ferry, taken[key] = key, true
             tiles[key] = "ruins"
-            local q, r = parse_key(key)
+            local q, r = Game.key_qr(key)
             local placed = 0
             for _, d in ipairs(AXIAL_DIRS) do
                 local nk = hex_key(q + d[1], r + d[2])
@@ -6087,7 +6087,7 @@ function Game.place_extras(tiles, sites, rad, world_seed)
     for i = 0, TRADE.route_n - 1 do
         local options = {}
         for _, key in ipairs(keys) do
-            local q, r = parse_key(key)
+            local q, r = Game.key_qr(key)
             local d = axial_distance(0, 0, q, r)
             if TERRAIN[tiles[key]].passable and not taken[key] and d >= 3 and d < GRID_RADIUS then
                 local x, y = axial_to_pixel(q, r, 1)
@@ -6103,7 +6103,7 @@ function Game.place_extras(tiles, sites, rad, world_seed)
     local warrens, cairns = {}, {}
     local spots = {}
     for _, key in ipairs(keys) do
-        local q, r = parse_key(key)
+        local q, r = Game.key_qr(key)
         if (tiles[key] == "forest" or tiles[key] == "hills") and not taken[key]
             and axial_distance(0, 0, q, r) >= LITTLE.min_from_start then
             spots[#spots + 1] = key
@@ -6113,18 +6113,18 @@ function Game.place_extras(tiles, sites, rad, world_seed)
         if #warrens >= LITTLE.warrens or #spots == 0 then break end
         local key = spots[roll(#spots) + 1]
         local ok = not taken[key]
-        local kq, kr = parse_key(key)
+        local kq, kr = Game.key_qr(key)
         for _, w in ipairs(warrens) do
-            local wq, wr = parse_key(w)
+            local wq, wr = Game.key_qr(w)
             if axial_distance(wq, wr, kq, kr) < 5 then ok = false end   -- spread them out
         end
         if ok then warrens[#warrens + 1], taken[key] = key, true end
     end
     for i = 1, (#warrens > 0 and LITTLE.cairns or 0) do
-        local wq, wr = parse_key(warrens[(i - 1) % #warrens + 1])
+        local wq, wr = Game.key_qr(warrens[(i - 1) % #warrens + 1])
         local options = {}
         for _, key in ipairs(keys) do
-            local q, r = parse_key(key)
+            local q, r = Game.key_qr(key)
             local d = axial_distance(q, r, wq, wr)
             if TERRAIN[tiles[key]].passable and not taken[key] and d >= LITTLE.cairn_near and d <= LITTLE.cairn_far then
                 options[#options + 1] = key
@@ -6143,10 +6143,10 @@ function Game.place_extras(tiles, sites, rad, world_seed)
     for _, min_d in ipairs({QUESTS.story.min_from_towns, 5}) do
         local options = {}
         for _, key in ipairs(keys) do
-            local q, r = parse_key(key)
+            local q, r = Game.key_qr(key)
             local far = axial_distance(0, 0, q, r) >= 5
             for _, t in pairs(towns) do
-                local a, b = parse_key(t)
+                local a, b = Game.key_qr(t)
                 if axial_distance(q, r, a, b) < min_d then far = false end
             end
             if tiles[key] == "hills" and not taken[key] and not rad[key] and far then
@@ -6164,7 +6164,7 @@ function Game.place_extras(tiles, sites, rad, world_seed)
     -- game puts them on the ground: Game.new)
     local drops, options = {}, {}
     for _, key in ipairs(keys) do
-        local q, r = parse_key(key)
+        local q, r = Game.key_qr(key)
         local d = axial_distance(0, 0, q, r)
         if TERRAIN[tiles[key]].passable and not taken[key] and d >= 2 and d <= 6 then
             options[#options + 1] = key
@@ -6506,8 +6506,8 @@ function Game:nearest_artifact()
     for key, pile in pairs(self.ground) do
         for _, s in ipairs(pile) do
             if ITEM_DB[s.item].artifact then
-                local q, r = key:match("(-?%d+),(-?%d+)")
-                local d = axial_distance(p.q, p.r, tonumber(q), tonumber(r))
+                local q, r = Game.key_qr(key)
+                local d = axial_distance(p.q, p.r, q, r)
                 if d > 0 and (not best or d < best_d or (d == best_d and key < best)) then
                     best, best_d = key, d
                 end
@@ -7172,8 +7172,7 @@ function Game:quest_spot(near, far, by_water)
     for _, k in pairs(self.sites) do taken[k] = true end
     if self.base then taken[self.base.key] = true end
     for key, t in pairs(self.tiles) do
-        local q, r = key:match("(-?%d+),(-?%d+)")
-        q, r = tonumber(q), tonumber(r)
+        local q, r = Game.key_qr(key)
         local d = axial_distance(p.q, p.r, q, r)
         if TERRAIN[t].passable and d >= near and d <= far and not taken[key]
             and (self.rad[key] or 0) == 0 then
@@ -8115,8 +8114,8 @@ function Game:little_lines()
     local p, best, best_d = self.player, nil, nil
     for key in pairs(l.seen) do
         if self:little_spot(key) == "cairn" then
-            local q, r = key:match("(-?%d+),(-?%d+)")
-            local d = axial_distance(p.q, p.r, tonumber(q), tonumber(r))
+            local q, r = Game.key_qr(key)
+            local d = axial_distance(p.q, p.r, q, r)
             if not best_d or d < best_d then best, best_d = key, d end
         end
     end
@@ -10183,8 +10182,8 @@ function Game:journal_lines()
     for key, level in pairs(self.rad_known) do
         if level > 0 then
             hot = hot + 1
-            local q, r = key:match("(-?%d+),(-?%d+)")
-            local d = axial_distance(p.q, p.r, tonumber(q), tonumber(r))
+            local q, r = Game.key_qr(key)
+            local d = axial_distance(p.q, p.r, q, r)
             if not nearest or d < nearest_d then nearest, nearest_d = key, d end
         end
     end

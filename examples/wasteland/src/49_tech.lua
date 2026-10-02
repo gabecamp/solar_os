@@ -95,8 +95,8 @@ function Game:nearest_artifact()
     for key, pile in pairs(self.ground) do
         for _, s in ipairs(pile) do
             if ITEM_DB[s.item].artifact then
-                local q, r = key:match("(-?%d+),(-?%d+)")
-                local d = axial_distance(p.q, p.r, tonumber(q), tonumber(r))
+                local q, r = Game.key_qr(key)
+                local d = axial_distance(p.q, p.r, q, r)
                 if d > 0 and (not best or d < best_d or (d == best_d and key < best)) then
                     best, best_d = key, d
                 end

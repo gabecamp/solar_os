@@ -81,8 +81,8 @@ function Game:mark_stash()
     for _, key in pairs(self.sites) do taken[key] = true end
     local spots = {}
     for key, t in pairs(self.tiles) do
-        local q, r = key:match("(-?%d+),(-?%d+)")
-        local d = axial_distance(p.q, p.r, tonumber(q), tonumber(r))
+        local q, r = Game.key_qr(key)
+        local d = axial_distance(p.q, p.r, q, r)
         if TERRAIN[t].passable and d >= S.near and d <= S.far and not self.stashes[key]
             and not taken[key] then
             spots[#spots + 1] = key

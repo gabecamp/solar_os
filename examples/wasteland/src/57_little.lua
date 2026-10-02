@@ -271,8 +271,8 @@ function Game:little_lines()
     local p, best, best_d = self.player, nil, nil
     for key in pairs(l.seen) do
         if self:little_spot(key) == "cairn" then
-            local q, r = key:match("(-?%d+),(-?%d+)")
-            local d = axial_distance(p.q, p.r, tonumber(q), tonumber(r))
+            local q, r = Game.key_qr(key)
+            local d = axial_distance(p.q, p.r, q, r)
             if not best_d or d < best_d then best, best_d = key, d end
         end
     end

@@ -60,8 +60,8 @@ function Game:journal_lines()
     for key, level in pairs(self.rad_known) do
         if level > 0 then
             hot = hot + 1
-            local q, r = key:match("(-?%d+),(-?%d+)")
-            local d = axial_distance(p.q, p.r, tonumber(q), tonumber(r))
+            local q, r = Game.key_qr(key)
+            local d = axial_distance(p.q, p.r, q, r)
             if not nearest or d < nearest_d then nearest, nearest_d = key, d end
         end
     end

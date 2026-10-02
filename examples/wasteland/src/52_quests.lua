@@ -27,8 +27,7 @@ function Game:quest_spot(near, far, by_water)
     for _, k in pairs(self.sites) do taken[k] = true end
     if self.base then taken[self.base.key] = true end
     for key, t in pairs(self.tiles) do
-        local q, r = key:match("(-?%d+),(-?%d+)")
-        q, r = tonumber(q), tonumber(r)
+        local q, r = Game.key_qr(key)
         local d = axial_distance(p.q, p.r, q, r)
         if TERRAIN[t].passable and d >= near and d <= far and not taken[key]
             and (self.rad[key] or 0) == 0 then

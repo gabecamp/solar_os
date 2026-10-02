@@ -5,6 +5,12 @@
 local Game = {}
 Game.__index = Game
 
+-- "q,r" (a tile key, hex_key) back to two numbers.
+function Game.key_qr(key)
+    local q, r = key:match("(-?%d+),(-?%d+)")
+    return tonumber(q), tonumber(r)
+end
+
 function Game.new()
     local self = setmetatable({}, Game)
     -- The SolarOS Lua runtime does not load the `os` library, so seed from

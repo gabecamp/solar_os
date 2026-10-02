@@ -241,8 +241,8 @@ function Game:helper_talk()
         self:end_encounter("The medic patched you up.")
     else
         for key in pairs(self.tiles) do
-            local q, r = key:match("(-?%d+),(-?%d+)")
-            if axial_distance(p.q, p.r, tonumber(q), tonumber(r)) <= 3 then p.explored[key] = true end
+            local q, r = Game.key_qr(key)
+            if axial_distance(p.q, p.r, q, r) <= 3 then p.explored[key] = true end
         end
         self:put_stack("ground", nil, {item = "water_bottle", qty = 1})
         self:enc_say("He draws the land around you in the dirt and hands you a bottle of "
