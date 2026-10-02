@@ -20,17 +20,27 @@ do not maintain a separate device or website copy.
 
 ## Build
 
-SolarOS uses PlatformIO with ESP-IDF through the pioarduino Espressif32
-platform:
+SolarOS requires PlatformIO Core 6.2.0 or newer and uses ESP-IDF 5.5.5 through
+the pinned pioarduino Espressif32 platform release `55.03.312-1`.
+Upgrade Core in the Python environment that provides your `pio` command:
+
+```sh
+python -m pip install --upgrade 'platformio>=6.2.0'
+pio --version
+```
+
+Build a target:
 
 ```sh
 pio run -e solar_term
 pio run -e freenove_esp32_s3_display_4_0
+pio run -e qdtech_es3c28p
 pio run -e qdtech_es3n28p
 pio run -e cl_32
 pio run -e t_lora_pager
 pio run -e t_deck_plus
 pio run -e waveshare_esp32_s3_sim7670g_4g
+pio run -e waveshare_esp32_s3_epaper_3_97
 pio run -e elecrow_crowpanel_esp32_s3_4_2_epaper
 pio run -e elecrow_crowpanel_esp32_s3_5_79_epaper
 pio run -e odroid_go
@@ -38,11 +48,12 @@ pio run -e freenove_esp32_wrover_v3
 pio run -e esp32_devkitc_v4_wrover
 pio run -e ttgo_vga32_v14
 pio run -e esp32_s3_devkitc1_n16r8
+pio run -e goouuu_esp32_s3cam
 pio run -t upload
 pio device monitor -b 115200
 ```
 
-The default build uses the full firmware flavor, except the CrowPanel targets,
+The default build uses the full firmware flavor, except the e-paper HMI targets,
 which default to `writerdeck`, and the 4 MB VGA32 target, which defaults to
 `rover`. For a smaller image or an explicit override:
 
@@ -50,6 +61,7 @@ which default to `writerdeck`, and the 4 MB VGA32 target, which defaults to
 SOLAR_OS_FLAVOR=core pio run -e solar_term
 SOLAR_OS_FLAVOR=writerdeck pio run -e elecrow_crowpanel_esp32_s3_4_2_epaper
 SOLAR_OS_FLAVOR=writerdeck pio run -e elecrow_crowpanel_esp32_s3_5_79_epaper
+SOLAR_OS_FLAVOR=writerdeck pio run -e waveshare_esp32_s3_epaper_3_97
 SOLAR_OS_VGA_MODE=320x200 pio run -e ttgo_vga32_v14
 SOLAR_OS_VGA_MODE=320x240 pio run -e ttgo_vga32_v14
 ```
@@ -139,6 +151,7 @@ components remain applicable and must be preserved in redistributions.
 | [Lua 5.4.8](https://www.lua.org/ftp/lua-5.4.8.tar.gz) | Embedded Lua VM and selected standard libraries | MIT; copyright Lua.org, PUC-Rio. The upstream notice is retained in [`lua.h`](components/lua/lua/src/lua.h). |
 | [MicroPython `d901e98349`](https://github.com/micropython/micropython/commit/d901e98349) | Embedded Python runtime | MIT; Damien P. George and MicroPython contributors. Notices are retained in the vendored source files. |
 | [ESP-DSP 1.8.x](https://github.com/espressif/esp-dsp) | ESP32-S3 PIE-accelerated DSP kernels | Apache-2.0; Espressif Systems and contributors. The managed component includes the upstream `LICENSE` and notice metadata. |
+| [esp32-camera 2.1.7 (`202df95`)](https://github.com/espressif/esp32-camera/commit/202df95d7b1dc72e9303ad78f47b8dc9f339e6a1) | ESP32-S3 DVP/SCCB camera capture and OV2640 sensor support | Apache-2.0; Espressif Systems and contributors. The managed component includes the upstream `LICENSE` and notice metadata. |
 | [PicoTTS `bf1a8df`](https://github.com/DiUS/esp-picotts/commit/bf1a8df9d2be1e088a03a775d439ac66e18438dc) | Offline speech synthesis with [runtime-loaded voices](picotts_voices) | Apache-2.0; DiUS Computing, SVOX AG, and contributors. See the retained [`NOTICE`](components/picotts.NOTICE). |
 | [minimp3 `ca7c706`](https://github.com/lieff/minimp3/commit/ca7c706001331a5a8e3182ce3b3ce3b243589154) | MP3 decoding | CC0-1.0. The pinned header history credits lieff, Jörn Heusipp, Alibek Omarov, Chris Robinson, Darryl T. Agostinelli, David Reid, Martin Fiedler, and Matthijs van Duin. |
 | [stb_image 2.30 (`013ac3b`)](https://github.com/nothings/stb/commit/013ac3beddff3dbffafd5177e7972067cd2b5083) | PNG, JPEG, GIF, and other image decoding | MIT or public domain/Unlicense. The detailed upstream contributor and feature credits are retained in [`stb_image.h`](components/stb_image/include/stb_image.h). |

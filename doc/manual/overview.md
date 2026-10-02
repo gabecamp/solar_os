@@ -72,12 +72,16 @@ Built-in targets include:
   ESP32-S3-RLCD-4.2 board.
 - `freenove_esp32_s3_display_4_0`: integrated 480x320 capacitive-touch terminal
   with speaker, microphone, SD, and battery monitoring.
+- `qdtech_es3c28p`: capacitive-touch 320x240 color terminal with speaker,
+  microphone, SD, battery monitoring, and one RGB LED.
 - `qdtech_es3n28p`: non-touch 320x240 color terminal with speaker, microphone,
   SD, battery monitoring, and one RGB LED.
 - `elecrow_crowpanel_esp32_s3_4_2_epaper`: 400x300 e-paper HMI with rotary
   controls and microSD.
 - `elecrow_crowpanel_esp32_s3_5_79_epaper`: 792x272 dual-SSD1683 e-paper HMI
   with rotary controls and microSD.
+- `waveshare_esp32_s3_epaper_3_97`: SSD1677 e-paper HMI that defaults to 800x480
+  landscape, with rotary controls, microSD, RTC, environmental sensor, and duplex audio.
 - `cl_32`: compact 384x168 reflective terminal with an integrated keyboard,
   microSD, RTC, battery monitor, and PWM audio.
 - `t_lora_pager`: 480x222 pager with keyboard, rotary input, LoRa, GNSS, NFC,
@@ -89,6 +93,8 @@ Built-in targets include:
 - `ttgo_vga32_v14`: classic ESP32 desktop terminal with VGA, mono DAC audio,
   PS/2 keyboard, and microSD.
 - `esp32_s3_devkitc1_n16r8`: minimal headless ESP32-S3 target.
+- `goouuu_esp32_s3cam`: headless ESP32-S3 camera target with one-bit SDMMC,
+  native USB, UART, and reserved DVP/SCCB camera wiring.
 - `esp32_devkitc_v4_wrover`: minimal headless classic ESP32 target with PSRAM.
 
 See `man boards` for the complete board table, capability flags, pins, build

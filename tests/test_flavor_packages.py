@@ -87,6 +87,23 @@ class FlavorPackagesTest(unittest.TestCase):
         self.assertTrue(pruned_packages["app_sketch"])
         self.assertFalse(pruned_packages["app_view"])
 
+    def test_vplay_is_separate_from_the_image_viewer(self):
+        _, _, groups, packages = self.resolve("full")
+        self.assertTrue(groups["vplay"])
+        self.assertTrue(packages["app_vplay"])
+        self.assertNotIn("mplayer", groups)
+        self.assertNotIn("app_mplayer", packages)
+        self.assertIn("service_media_widgets", self.catalog.package_defs["app_vplay"].depends)
+        self.assertTrue(packages["service_mpeg"])
+        view = self.catalog.package_defs["app_view"]
+        self.assertNotIn("service_mpeg", view.depends)
+        self.assertNotIn("service_audio", view.depends)
+        self.assertEqual(view.sources, ("apps/solar_os_view.c",))
+        for caps, expected in (({"psram", "gfx"}, True), ({"psram"}, False), ({"gfx"}, False)):
+            _, pruned = generate_flavor_config.apply_board_capability_pruning(
+                self.catalog, groups, packages, caps)
+            self.assertEqual(pruned["app_vplay"], expected)
+
     def test_graffiti_is_available_for_runtime_attached_pointers(self):
         _, _, groups, packages = self.resolve("full")
         self.assertTrue(groups["handwriting_input"])
@@ -158,6 +175,18 @@ class FlavorPackagesTest(unittest.TestCase):
             self.assertTrue(pruned["driver_battery_adc"], target)
             self.assertTrue(pruned["expansion_sdmmc"], target)
 
+    def test_camera_expansion_is_available_without_fitted_camera_on_s3(self):
+        _, _, groups, packages = self.resolve("full")
+        _, pruned = generate_flavor_config.apply_board_capability_pruning(
+            self.catalog, groups, packages, {"psram", "expansion_gpio", "wifi"})
+        s3 = generate_flavor_config.apply_target_pruning(self.catalog, pruned, "esp32s3")
+        classic = generate_flavor_config.apply_target_pruning(self.catalog, pruned, "esp32")
+        for name in ("driver_camera_esp32", "service_camera", "job_cam_webd"):
+            self.assertTrue(s3[name], name)
+            self.assertFalse(classic[name], name)
+        self.assertTrue(s3["job_rtspd"])
+        self.assertTrue(classic["job_rtspd"])
+
     def test_full_exposes_reusable_t_lora_expansion_drivers(self):
         _, _, groups, packages = self.resolve("full")
         reusable = {
@@ -167,6 +196,7 @@ class FlavorPackagesTest(unittest.TestCase):
             "rotary_encoder": "rotary_encoder",
             "bq27220": "bq27220",
             "bq25896": "bq25896",
+            "qmi8658": "qmi8658",
         }
         for group, package in reusable.items():
             with self.subTest(group=group):
@@ -194,6 +224,7 @@ class FlavorPackagesTest(unittest.TestCase):
             "solar_os_rotary_encoder_expansion_driver",
             "solar_os_bq27220_expansion_driver",
             "solar_os_bq25896_expansion_driver",
+            "solar_os_qmi8658_expansion_driver",
         ):
             self.assertIn(symbol, drivers)
 
@@ -407,6 +438,44 @@ class FlavorPackagesTest(unittest.TestCase):
         self.assertEqual(
             self.catalog.package_defs["expansion_ssd1683"].capabilities,
             ("gfx", "expansion_gpio"),
+        )
+        self.assertEqual(
+            self.catalog.package_defs["expansion_ssd1677"].depends,
+            ("axp2101", "service_expansion", "service_spi"),
+        )
+        self.assertEqual(
+            self.catalog.package_defs["expansion_ssd1677"].capabilities,
+            ("gfx",),
+        )
+        self.assertEqual(
+            self.catalog.group_defs["axp2101"].members,
+            ("axp2101",),
+        )
+        self.assertEqual(
+            self.catalog.package_defs["axp2101"].depends,
+            (
+                "driver_axp2101", "service_battery", "service_charger",
+                "service_expansion", "service_i2c",
+            ),
+        )
+        self.assertEqual(
+            self.catalog.package_defs["driver_axp2101"].sources,
+            ("drivers/axp2101.c",),
+        )
+        self.assertEqual(
+            self.catalog.group_defs["qmi8658"].members,
+            ("qmi8658",),
+        )
+        self.assertEqual(
+            self.catalog.package_defs["qmi8658"].depends,
+            ("service_expansion", "service_i2c", "service_imu"),
+        )
+        self.assertEqual(
+            self.catalog.package_defs["qmi8658"].sources,
+            (
+                "drivers/qmi8658.c", "services/solar_os_qmi8658.c",
+                "services/solar_os_qmi8658_driver.c",
+            ),
         )
         self.assertEqual(
             self.catalog.package_defs["service_espnow"].depends,

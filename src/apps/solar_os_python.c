@@ -37,6 +37,10 @@
 #include "solar_os_contacts.h"
 #endif
 #include "solar_os_memory.h"
+#include "solar_os_script_media.h"
+#if SOLAR_OS_PACKAGE_SERVICE_CAMERA
+#include "solar_os_camera.h"
+#endif
 #if SOLAR_OS_PACKAGE_SERVICE_MESSAGING
 #include "solar_os_messaging.h"
 #endif
@@ -5079,6 +5083,7 @@ static bool python_expansion_key_known(const char *key)
         "spi", "cs", "ce", "i2c", "addr", "alt_addr", "uart", "ps2", "gpio", "irq", "reset",
         "rst", "data", "bck", "din", "rck", "mclk", "ws", "dout", "dc",
         "busy", "adc", "pwm", "backlight", "a", "b",
+        "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7", "siod", "sioc", "vsync", "href", "pclk", "xclk", "pwdn",
         "count", "keys", "x", "y", "min", "center", "max", "deadzone",
     };
     for (size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); i++) {
@@ -5305,6 +5310,21 @@ static mp_obj_t solaros_expansion_attach(mp_obj_t driver_obj,
         {"backlight", "backlight", SOLAR_OS_EXPANSION_BINDING_PWM},
         {"a", "a", SOLAR_OS_EXPANSION_BINDING_GPIO},
         {"b", "b", SOLAR_OS_EXPANSION_BINDING_GPIO},
+        {"d0", "d0", SOLAR_OS_EXPANSION_BINDING_GPIO},
+        {"d1", "d1", SOLAR_OS_EXPANSION_BINDING_GPIO},
+        {"d2", "d2", SOLAR_OS_EXPANSION_BINDING_GPIO},
+        {"d3", "d3", SOLAR_OS_EXPANSION_BINDING_GPIO},
+        {"d4", "d4", SOLAR_OS_EXPANSION_BINDING_GPIO},
+        {"d5", "d5", SOLAR_OS_EXPANSION_BINDING_GPIO},
+        {"d6", "d6", SOLAR_OS_EXPANSION_BINDING_GPIO},
+        {"d7", "d7", SOLAR_OS_EXPANSION_BINDING_GPIO},
+        {"siod", "siod", SOLAR_OS_EXPANSION_BINDING_GPIO},
+        {"sioc", "sioc", SOLAR_OS_EXPANSION_BINDING_GPIO},
+        {"vsync", "vsync", SOLAR_OS_EXPANSION_BINDING_GPIO},
+        {"href", "href", SOLAR_OS_EXPANSION_BINDING_GPIO},
+        {"pclk", "pclk", SOLAR_OS_EXPANSION_BINDING_GPIO},
+        {"xclk", "xclk", SOLAR_OS_EXPANSION_BINDING_GPIO},
+        {"pwdn", "pwdn", SOLAR_OS_EXPANSION_BINDING_GPIO},
     };
     if (python_get_dict_obj(config_obj, "reset", false) != MP_OBJ_NULL &&
         python_get_dict_obj(config_obj, "rst", false) != MP_OBJ_NULL) {
@@ -7164,6 +7184,10 @@ static mp_obj_t python_conversation_to_dict(
         "kind",
         solar_os_conversation_kind_name(conversation->kind));
     python_dict_store_cstr(dict, "title", conversation->title);
+    char label[SOLAR_OS_MESSAGING_TITLE_MAX];
+    solar_os_messaging_conversation_label(conversation, label, sizeof(label));
+    python_dict_store_cstr(dict, "label", label);
+    python_dict_store_bool(dict, "history_only", conversation->history_only);
     python_dict_store_uint(dict, "contact_id", conversation->contact_id);
     python_dict_store_uint(dict, "endpoint_id", conversation->endpoint_id);
     python_dict_store_uint(dict, "group_ref", conversation->group_ref);
@@ -8633,6 +8657,8 @@ MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(solaros_gfx_text_obj, 3, 3, solaros_gfx_text
 #include "solar_os_python_sftpsync.inc"
 #endif
 
+#include "solar_os_python_media.inc"
+
 static void python_module_store(mp_obj_t module, const char *name, mp_obj_t value)
 {
     mp_store_attr(module, qstr_from_str(name), value);
@@ -8972,6 +8998,7 @@ esp_err_t solar_os_python_run(const solar_os_script_run_request_t *request,
 #if SOLAR_OS_PACKAGE_SERVICE_NET
     python_net_destroy();
 #endif
+    python_media_destroy();
 #if SOLAR_OS_PACKAGE_SERVICE_HTTP_CLIENT
     python_http_stream_destroy();
     python_http_session_destroy();
@@ -9186,6 +9213,7 @@ static void python_task(void *arg)
 #if SOLAR_OS_PACKAGE_SERVICE_NET
         python_net_destroy();
 #endif
+        python_media_destroy();
 #if SOLAR_OS_PACKAGE_SERVICE_HTTP_CLIENT
         python_http_stream_destroy();
         python_http_session_destroy();
@@ -9634,11 +9662,21 @@ static void python_stop(solar_os_context_t *ctx)
                                            NULL,
                                            PYTHON_STOP_WAIT_MS,
                                            20U)) {
-            SOLAR_OS_LOGW(TAG, "force stopping unresponsive script");
-            solar_os_task_delete(python_app.task);
-            python_app.task = NULL;
-            python_app.task_done = true;
-            python_app.vm_active = false;
+            /* A live media session can be inside a driver capture/release or
+             * joining its RTSP worker. Never delete that owner task mid-call.
+             * Interpreter cancellation remains active while we wait. */
+            while (__atomic_load_n(&python_media_session, __ATOMIC_ACQUIRE) != NULL &&
+                   !python_task_stopped(NULL)) {
+                (void)solar_os_script_wait_for_stop(python_task_stopped, NULL,
+                    PYTHON_STOP_WAIT_MS, 20U);
+            }
+            if (!python_task_stopped(NULL)) {
+                SOLAR_OS_LOGW(TAG, "force stopping unresponsive script");
+                solar_os_task_delete(python_app.task);
+                python_app.task = NULL;
+                python_app.task_done = true;
+                python_app.vm_active = false;
+            }
         }
     }
 
@@ -9687,6 +9725,7 @@ static void python_stop(solar_os_context_t *ctx)
 #if SOLAR_OS_PACKAGE_SERVICE_NET
     python_net_destroy();
 #endif
+    python_media_destroy();
 #if SOLAR_OS_PACKAGE_SERVICE_HTTP_CLIENT
     python_http_stream_destroy();
     python_http_session_destroy();
@@ -9807,7 +9846,9 @@ static void python_apply_gfx_event(solar_os_context_t *ctx, const python_event_t
         solar_os_raster_image_t *image =
             (solar_os_raster_image_t *)event->object;
         if (gfx != NULL && image != NULL) {
-            const esp_err_t err = solar_os_raster_image_draw(image,
+            const esp_err_t err = event->attr == 1 ?
+                solar_os_raster_image_present(image, gfx, event->x0, event->y0, event->width, event->height) :
+                solar_os_raster_image_draw(image,
                                                               gfx,
                                                               (int)event->x0,
                                                               (int)event->y0,

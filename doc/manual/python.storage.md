@@ -101,6 +101,9 @@ if not solaros.storage.is_mounted():
     solaros.storage.mount()
 
 print(solaros.storage.usage("/"))
+solaros.storage.makedirs("/notes")
+solaros.storage.write_file("/notes/example.txt", "hello from Python\n")
+solaros.storage.write_file("/notes/example.txt", "another line\n", True)
 print(solaros.storage.read_file("/notes/example.txt", 512))
 for block in solaros.storage.blocks():
     print(block["name"], block["type"], block["mounted"], block["mount_point"])
@@ -118,6 +121,9 @@ while True:
 Directory cursors are numeric offsets into the current enumeration. If files
 are added or removed between calls, restart at `None` to obtain a coherent
 view.
+
+`read_file()` returns bytes and can truncate its result at `max_bytes`. Use
+`.decode("utf-8")` to load saved text, or `open()` to read larger files.
 
 ## Quick reference
 

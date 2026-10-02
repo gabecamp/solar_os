@@ -12,6 +12,45 @@
 #include "solar_os_ramfs.h"
 #include "solar_os_storage.h"
 
+static bool fail_write;
+static bool fail_sync;
+static bool fail_close;
+static size_t open_closes;
+
+size_t __real_fwrite(const void *data, size_t size, size_t count, FILE *file);
+int __real_fsync(int fd);
+int __real_fclose(FILE *file);
+
+size_t __wrap_fwrite(const void *data, size_t size, size_t count, FILE *file)
+{
+    if (fail_write) {
+        const size_t written = __real_fwrite(data, size, count / 2U, file);
+        errno = ENOSPC;
+        return written;
+    }
+    return __real_fwrite(data, size, count, file);
+}
+
+int __wrap_fsync(int fd)
+{
+    if (fail_sync) {
+        errno = EIO;
+        return -1;
+    }
+    return __real_fsync(fd);
+}
+
+int __wrap_fclose(FILE *file)
+{
+    open_closes++;
+    const int result = __real_fclose(file);
+    if (fail_close) {
+        errno = EBADF;
+        return EOF;
+    }
+    return result;
+}
+
 size_t strlcpy(char *dst, const char *src, size_t size)
 {
     const size_t len = strlen(src);
