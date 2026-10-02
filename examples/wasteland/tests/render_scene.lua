@@ -456,3 +456,23 @@ if g.sites.ferry then
     g:draw_trade(400, 300)
     solaros.dump("ops_trade_ferry.txt")
 end
+
+-- Scenes: the Little Ones (a warren and a cairn on the map, a troupe of 3 following; meeting them)
+g = Game.new()
+g:start_game()
+local w = g.extras.warrens[1]
+local q, r = w:match("(-?%d+),(-?%d+)")
+g.player.q, g.player.r = tonumber(q), tonumber(r) + 1
+if not g.tiles[g.player.q .. "," .. g.player.r] then g.player.r = tonumber(r) end
+g:refresh_view()
+g.little.seen[w] = true
+for _, c in ipairs(g.extras.cairns) do g.little.seen[c] = true end
+g.little.n, g.little.friend, g.little.mood = 3, 9, 8
+g:draw_map(400, 300)
+solaros.dump("ops_map_little.txt")
+g.little = Game.new_little()
+g.player.inventory = {{item = "crayons", qty = 1}}
+g.player.q, g.player.r = tonumber(q), tonumber(r)
+g:little_arrive()   -- strangers at their warren: they come out to look
+g:draw_encounter(400, 300)
+solaros.dump("ops_little.txt")

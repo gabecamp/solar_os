@@ -632,11 +632,40 @@ def karl():
     return c, (24, 24, 144)
 
 
+def little():
+    """The Little Ones: a small grey child-thing, huge head and eyes, a grin
+    of too many small teeth, ears like a bat's; two more peeking behind."""
+    c = Canvas()
+    c.ground_shadow(96, 178, 60, 8)
+    grey = 0.62
+    for x, y, s in ((40, 120, 0.55), (156, 116, 0.5)):          # two peeking behind
+        c.body(ellipse(x, y, 22 * s * 1.6, 20 * s * 1.6), grey * 0.8, soft=6, seed=int(x))
+        eye(c, x - 7 * s * 1.6, y - 2, 4, 3.4)
+        eye(c, x + 7 * s * 1.6, y - 2, 4, 3.4)
+    c.body(poly([(70, 120), (122, 120), (132, 176), (60, 176)]), grey, soft=8, seed=91)   # small body
+    c.body(tapered([(74, 128), (56, 150), (54, 168)], 10, 7), grey, soft=4, seed=92)       # arms
+    c.body(tapered([(118, 128), (136, 148), (140, 166)], 10, 7), grey, soft=4, seed=93)
+    c.body(poly([(46, 70), (14, 40), (40, 92)]), grey * 0.9, soft=4, seed=94)              # bat ears
+    c.body(poly([(146, 70), (178, 40), (152, 92)]), grey * 0.9, soft=4, seed=95)
+    head = ellipse(96, 84, 56, 50)
+    c.body(head, grey * 1.1, soft=10, seed=96)
+    eye(c, 74, 78, 13, 11)                                      # big wet eyes
+    eye(c, 118, 78, 13, 11)
+    grin = poly([(62, 104), (130, 104), (118, 122), (74, 122)])
+    c.flat(grin, 0.05)
+    for i in range(9):                                          # little teeth
+        x = 66 + i * 7.5
+        c.flat(poly([(x, 104), (x + 5, 104), (x + 2.5, 111)]), 0.98)
+        c.flat(poly([(x + 3, 122), (x + 8, 122), (x + 5.5, 116)]), 0.98)
+    c.outline(0.9)
+    return c, (30, 30, 132)
+
+
 SUBJECTS = {
     "jawhound": jawhound, "boar": boar, "crows": crows, "stag": stag,
     "fused": fused, "mouthless": mouthless, "bloom": bloom,
     "bandits": bandits, "tollman": tollman, "medic": medic, "wanderer": wanderer,
-    "karl": karl, "stray": stray,
+    "karl": karl, "stray": stray, "little": little,
     "long_man": long_man, "crawler": crawler, "whisper": whisper,
     "hollow": hollow, "bell": bell, "stars": stars, "stillness": stillness, "door": door,
 }

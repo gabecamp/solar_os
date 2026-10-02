@@ -69,6 +69,7 @@ function Game:spot_sites()
         self:push_log("A jetty and a few huts by the water: the Ferry Post, " .. self:site_bearing("ferry") .. ".")
     end
     self:spot_peddler()
+    self:spot_little()
 end
 
 function Game:learn_site_seen(name)
@@ -107,6 +108,8 @@ function Game:site_action()
         self:open_gate()
     elseif self:peddler_key() == hex_key(self.player.q, self.player.r) then
         self:open_trade("peddler")
+    elseif self:little_spot(hex_key(self.player.q, self.player.r)) == "cairn" then
+        self:offer_trinket()
     else
         self:push_log("Nobody here. (T trades at a trader)")
     end
@@ -115,6 +118,7 @@ end
 -- -- barter -------------------------------------------------------------
 
 function Game.item_value(item)
+    if ITEM_DB[item] and ITEM_DB[item].trinket then return 0 end   -- toys: no use to grown-ups
     return TRADE.value[item] or 1
 end
 

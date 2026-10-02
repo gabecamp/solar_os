@@ -66,6 +66,12 @@ function Game:draw_map(w, h)
     for name, key in pairs(self.sites) do site_at[key] = name end
     if self.base then site_at[self.base.key] = "camp" end   -- drawn like a site
     local peddler = self:peddler_key()
+    local little_at = {}   -- warrens and cairns you've found
+    for _, kind in ipairs({"warrens", "cairns"}) do
+        for _, k in ipairs((self.extras or {})[kind] or {}) do
+            if self.little.seen[k] then little_at[k] = kind == "warrens" and "warren" or "cairn" end
+        end
+    end
 
     local reachable = {}
     for _, n in ipairs(neighbors(self.tiles, p.q, p.r)) do
@@ -120,6 +126,12 @@ function Game:draw_map(w, h)
                 gfx.color(gfx.BLACK)
                 gfx.rect(rnd(px) - 7, rnd(py) - 7, 14, 14)
                 draw_glyph(site, px, py, gfx.BLACK)
+            end
+            local spot = little_at[key]
+            if spot and not is_player and (p.visible[key] or p.explored[key]) then
+                gfx.color(gfx.WHITE)
+                gfx.fill_rect(rnd(px) - 6, rnd(py) - 6, 12, 12)
+                draw_glyph(spot, px, py, gfx.BLACK)
             end
             if key == peddler and p.visible[key] and not is_player then
                 -- the Peddler and his cart, on a white patch
@@ -189,6 +201,16 @@ function Game:draw_map(w, h)
                     gfx.fill_rect(rnd(px) - 5, rnd(py) - 5, 10, 10)
                     gfx.color(gfx.BLACK)
                     gfx.fill_rect(rnd(px) - 3, rnd(py) - 3, 6, 6)
+                end
+                local n = self.little and self.little.n or 0
+                if n > 0 then   -- your Little Ones: small heads trailing behind you
+                    for i = 1, n do
+                        local lx, ly = rnd(px) - 12 + (i - 1) * 4, rnd(py) + 6 + (i % 2) * 2
+                        gfx.color(gfx.WHITE)
+                        gfx.fill_rect(lx - 1, ly - 1, 5, 5)
+                        gfx.color(gfx.BLACK)
+                        gfx.fill_rect(lx, ly, 3, 3)
+                    end
                 end
                 if self.dog then   -- your dog at your heel: a small block with an ear
                     gfx.color(gfx.WHITE)

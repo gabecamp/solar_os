@@ -201,6 +201,7 @@ local function encounter(g, stats)
         elseif kind == "riddle" then act = "answer_" .. (g:rand(3) + 1)   -- Karl: it guesses
         elseif kind == "dog" then act = have.tame and "tame" or "leave_quietly"
         elseif kind == "horror" then act = have.look_away and "look_away" or "cover"
+        elseif kind == "little" then act = have.offer_little and "offer_little" or "watch_little"
         elseif have.give then act = "give"
         else
             local armed = g:weapon().dmg >= 12
@@ -287,6 +288,8 @@ local function play(seed)
                 if site == "trader" and (not stats.traded or can_buy) then
                     trade(g); stats.traded = true
                 end
+                -- a cairn and a toy in the bag: leave it (the Little Ones)
+                if g:little_spot(here) == "cairn" and g:first_trinket() then g:offer_trinket() end
                 local target
                 local emit = g:emission_text()
                 -- a storm: get under cover (any terrain that isn't open), then wait it out

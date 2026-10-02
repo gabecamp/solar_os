@@ -46,11 +46,11 @@ before and start it. For anything that goes wrong, a photo of the screen
     and a list of choices.
 
 ## Expected numbers (measured on a PC with the test fake)
-- Lua memory: about **765 KB** once loaded, **~885 KB** at most while
+- Lua memory: about **845 KB** once loaded, **~1 MB** at most while
   playing. The device info page (H, then V) shows the real figure. On the
   SolarTerm board Lua lives in the 8 MB PSRAM, so this should be fine;
-  much higher than ~1 MB on the device would be worth reporting.
-- The script is ~410 KB; SolarOS streams it from storage, so size is not
+  much higher than ~1.3 MB on the device would be worth reporting.
+- The script is ~460 KB; SolarOS streams it from storage, so size is not
   a limit.
 - Redraws: the map is ~200-500 draw calls, the bag ~280 for a full redraw
   and ~100 when only the cursor moves. The device info page (H, V) says

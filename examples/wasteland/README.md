@@ -178,6 +178,33 @@ Two rare kind faces on the road (encounters, not radio voices).
   three hungry days. It has 30 HP and can die.
 - **Lore:** most dogs here *came back wrong*. This one didn't, or not yet.
 
+### The Little Ones
+- **Role:** small, grey, grinning creatures that live in burrows (warrens)
+  in the woods and hills. They're never hostile, only mischievous.
+  - **Befriending them:** you'll find little **cairns** of stones near
+    their warrens. Leave a **trinket** there (**E** on it, or **T** on the
+    cairn). Trinkets are toys and junk a toddler would play with: a plastic
+    earring, a toy car, crayons, a rubber duck, a doll's head, a marble, a
+    toy dinosaur, a hair clip, a button, a bottle cap, a tin whistle, a
+    jingle bell. They turn up in searches and the Peddler sells them, and
+    they're worth nothing to anyone else.
+  - **After three gifts**, visit a warren and a troupe follows you (one
+    more for every three further gifts, up to three). Walk up to a warren
+    as a stranger and they come out to look: watch them, offer a trinket
+    (worth two gifts), or shoo them away (they take something as they go).
+  - **Following you:** every few hours one of them brings you something it
+    found (sometimes a toy), or hides one of your odds and ends (often it
+    turns up again later; never food, water, medicine, tools or your way
+    out). In a fight they pelt the enemy with stones and help you run (more
+    so from the night horrors); at night they sometimes giggle half the
+    night away, and they go silent when something is out there.
+  - **Keep them happy:** without gifts they get bored (a little every two
+    days) and eventually wander home; one trinket wins them back.
+- **Lore:** when the town was evacuated, not every child made it to the
+  school. The ones who stayed in the cellars were small when the first
+  emission came, and they stayed small. They don't talk, or don't want
+  to. They remember toys.
+
 ### The Signal
 - **Role:** the fourth channel on the radio. The first call gives you a
   torn page. Every call marks where the nearest artifact lies, and every

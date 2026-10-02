@@ -83,6 +83,44 @@ function Game.place_extras(tiles, sites, rad, world_seed)
         if #options > 0 then route[#route + 1] = options[roll(#options) + 1] end
     end
     extras.route = route
+
+    -- the Little Ones: warrens in the woods and hills, cairns near them
+    local warrens, cairns = {}, {}
+    local spots = {}
+    for _, key in ipairs(keys) do
+        local q, r = parse_key(key)
+        if (tiles[key] == "forest" or tiles[key] == "hills") and not taken[key]
+            and axial_distance(0, 0, q, r) >= LITTLE.min_from_start then
+            spots[#spots + 1] = key
+        end
+    end
+    for _ = 1, 60 do
+        if #warrens >= LITTLE.warrens or #spots == 0 then break end
+        local key = spots[roll(#spots) + 1]
+        local ok = not taken[key]
+        local kq, kr = parse_key(key)
+        for _, w in ipairs(warrens) do
+            local wq, wr = parse_key(w)
+            if axial_distance(wq, wr, kq, kr) < 5 then ok = false end   -- spread them out
+        end
+        if ok then warrens[#warrens + 1], taken[key] = key, true end
+    end
+    for i = 1, (#warrens > 0 and LITTLE.cairns or 0) do
+        local wq, wr = parse_key(warrens[(i - 1) % #warrens + 1])
+        local options = {}
+        for _, key in ipairs(keys) do
+            local q, r = parse_key(key)
+            local d = axial_distance(q, r, wq, wr)
+            if TERRAIN[tiles[key]].passable and not taken[key] and d >= LITTLE.cairn_near and d <= LITTLE.cairn_far then
+                options[#options + 1] = key
+            end
+        end
+        if #options > 0 then
+            local key = options[roll(#options) + 1]
+            cairns[#cairns + 1], taken[key] = key, true
+        end
+    end
+    extras.warrens, extras.cairns = warrens, cairns
     return extras
 end
 

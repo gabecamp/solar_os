@@ -29,6 +29,7 @@ function Game:journal_lines()
     end
     if self.sites_known.trader then add("Trader: " .. self:site_bearing("trader") .. ".") end
     if self.sites_known.ferry then add("Ferry Post (Mother Okun): " .. self:site_bearing("ferry") .. ".") end
+    for _, l in ipairs(self:little_lines()) do add(l) end
     local pd = self.peddler
     if pd and pd.seen_key then
         add(("Peddler: last seen %s, day %d."):format(self:bearing_to(pd.seen_key), (self:clock(pd.seen_hour))))

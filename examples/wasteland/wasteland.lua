@@ -201,9 +201,9 @@ local TRADE = {
         peddler = {name = "The Peddler", markup = 1.4, restock_hours = 36, restock_n = 2,
                    hello = "'Everything rattles. Everything's for sale.'",
                    stock = {{"battery_cell", 1}, {"jerky", 2}, {"antenna", 1}, {"lore_page", 1},
-                            {"broken_headlamp", 1}, {"rope", 1}},
+                            {"broken_headlamp", 1}, {"rope", 1}, {"crayons", 1}, {"rubber_duck", 1}},
                    restock = {"jerky", "battery_cell", "copper_wire", "circuit_board", "lore_page",
-                              "bandage", "antenna"}},
+                              "bandage", "antenna", "toy_car", "marble", "jingle_bell"}},
     },
     -- the Ferry Post: a little cluster of ruins by the water, far from the town
     ferry = {ruins = 4, min_from_town = 9, min_from_start = 4},
@@ -349,6 +349,29 @@ local NIGHT = {
          intro = "From the black water, voices. They say your name, then your mother's. "
               .. "Pale faces turn just under the surface.", speed = 3},
     },
+}
+
+-- The Little Ones (src/57_little.lua): the Zone's children, grown small,
+-- grey and grinning. Never hostile. Trinkets left at their cairns befriend
+-- them: at join_at gifts a troupe follows you from a warren (1 more per
+-- per_extra gifts, up to max). Their mood falls 1 per decay_hours without
+-- a gift; at 0 they go home. Every act_every hours one of them does
+-- something: find (% a found item), mischief (% hides one of your things,
+-- back_chance % it turns up again later), keep_awake (% at night). In
+-- fights they pelt (pebble %, 1-3 dmg each) and help you run.
+local LITTLE = {
+    trinkets = {"earring", "toy_car", "crayons", "rubber_duck", "doll_head", "marble", "toy_dino",
+                "hair_clip", "button", "bottle_cap", "tin_whistle", "jingle_bell"},
+    warrens = 3, cairns = 7, cairn_near = 2, cairn_far = 5, min_from_start = 4,
+    join_at = 3, per_extra = 3, max = 3, mood_start = 6, mood_max = 10, mood_per_gift = 2,
+    decay_hours = 48, act_every = 6,
+    find = 40, find_trinket = 25, mischief = 20, keep_awake = 15, awake_rest = 8,
+    back_chance = 60, back_hours = {6, 18},
+    keep = {permit = true, lora_radio = true, medkit = true, bandage = true, splint = true,   -- (never taken)
+            multitool = true, geiger = true, anomaly_detector = true, fishing_rod = true, snare = true},
+    pebble = 40, pebble_dmg = {1, 3}, flee_bonus = 10, horror_run = 15,
+    intro = "Small grey faces in the grass, too many teeth in their grins. Children, once. "
+         .. "They giggle and edge closer, eyes on your bag.",
 }
 
 -- Skills that grow with use (src/55_skills.lua). levels = XP needed for
@@ -509,6 +532,19 @@ local ITEM_DB = {
     antenna      = {name = "Antenna",      slot = nil, consumable = nil, desc = "A repair part"},
     multitool    = {name = "Multitool",    slot = nil, consumable = nil, desc = "Tool for repairs"},
     lore_page    = {name = "Torn Page",    slot = nil, consumable = nil, desc = "E: read it"},
+    -- trinkets: no use but one (leave them at the Little Ones' cairns)
+    earring      = {name = "Plastic Earring", trinket = true, desc = "A toy. Someone small would love it."},
+    toy_car      = {name = "Toy Car", trinket = true, desc = "A toy. Someone small would love it."},
+    crayons      = {name = "Crayons", trinket = true, desc = "A toy. Someone small would love it."},
+    rubber_duck  = {name = "Rubber Duck", trinket = true, desc = "A toy. Someone small would love it."},
+    doll_head    = {name = "Doll's Head", trinket = true, desc = "A toy. Someone small would love it."},
+    marble       = {name = "Glass Marble", trinket = true, desc = "A toy. Someone small would love it."},
+    toy_dino     = {name = "Toy Dinosaur", trinket = true, desc = "A toy. Someone small would love it."},
+    hair_clip    = {name = "Hair Clip", trinket = true, desc = "A toy. Someone small would love it."},
+    button       = {name = "Big Button", trinket = true, desc = "A toy. Someone small would love it."},
+    bottle_cap   = {name = "Bottle Cap", trinket = true, desc = "A toy. Someone small would love it."},
+    tin_whistle  = {name = "Tin Whistle", trinket = true, desc = "A toy. Someone small would love it."},
+    jingle_bell  = {name = "Jingle Bell", trinket = true, desc = "A toy. Someone small would love it."},
     scrap_metal  = {name = "Scrap Metal",  slot = nil, consumable = nil, desc = "For crafting"},
     jerky        = {name = "Jerky",        slot = nil, consumable = {hunger = 25, thirst = -5}},
     -- crafting materials and crafted goods (see RECIPES)
@@ -545,21 +581,26 @@ local ARTIFACTS = {"weeping_stone", "drowned_eye", "flesh_knot", "hollow_star", 
 -- dud roll. Plains are old roadside junk, forest is food and cold-weather
 -- gear, hills are rock and whatever hikers left behind.
 local SCAVENGE_LOOT = {
-    plains = {{"nothing", 22}, {"rock", 3}, {"cloth_scrap", 3}, {"canned_beans", 3},
+    -- (nothing: 22 on plains and 34 in ruins before the trinkets; less now so
+    -- that useful finds are as likely as ever)
+    plains = {{"nothing", 17}, {"rock", 3}, {"cloth_scrap", 3}, {"canned_beans", 3},
               {"water_bottle", 2}, {"cap", 1}, {"sunglasses", 1}, {"gloves", 1},
               {"satchel", 1}, {"pipe", 1}, {"knife", 1}, {"stick", 2},
               {"scrawled_notes", 1}, {"bolts", 1}, {"vodka", 1}, {"empty_bottle", 2},
-              {"scrap_metal", 2}, {"jerky", 2}, {"copper_wire", 1}, {"battery_cell", 1}},
+              {"scrap_metal", 2}, {"jerky", 2}, {"copper_wire", 1}, {"battery_cell", 1},
+              {"button", 1}, {"marble", 1}, {"toy_dino", 1}, {"tin_whistle", 1}, {"jingle_bell", 1}},
     forest = {{"nothing", 16}, {"berries", 9}, {"cloth_scrap", 1}, {"water_bottle", 1},
               {"scarf", 1}, {"earmuffs", 1}, {"gloves", 1}, {"spear", 1}, {"stick", 6}},
     -- ruins: what's left in houses and cars
-    ruins  = {{"nothing", 34}, {"canned_beans", 7}, {"water_bottle", 3}, {"cloth_scrap", 3},
+    ruins  = {{"nothing", 26}, {"canned_beans", 7}, {"water_bottle", 3}, {"cloth_scrap", 3},
               {"scrawled_notes", 2}, {"rope", 1}, {"knife", 1}, {"pipe", 1}, {"stick", 1},
               {"jacket", 1}, {"backpack", 1}, {"antirad", 1}, {"vodka", 1}, {"bolts", 2},
               {"geiger", 1}, {"gasmask", 1}, {"empty_bottle", 2}, {"scrap_metal", 3},
               {"leather_belt", 1}, {"jerky", 5}, {"broken_radio", 1}, {"broken_detector", 1},
               {"broken_headlamp", 1}, {"circuit_board", 1}, {"copper_wire", 2}, {"battery_cell", 1},
-              {"antenna", 1}, {"multitool", 1}, {"lore_page", 2}},
+              {"antenna", 1}, {"multitool", 1}, {"lore_page", 2},
+              {"earring", 1}, {"toy_car", 1}, {"crayons", 1}, {"rubber_duck", 1}, {"doll_head", 1},
+              {"marble", 1}, {"hair_clip", 1}, {"bottle_cap", 1}},
     ford   = {{"nothing", 18}, {"rock", 4}, {"stick", 2}, {"water_bottle", 1}, {"scrap_metal", 1}},
     hills  = {{"nothing", 20}, {"rock", 5}, {"water_bottle", 1}, {"canned_beans", 2},
               {"jacket", 1}, {"bracers", 1}, {"boots", 1}, {"knife", 1}, {"stick", 1},
@@ -781,6 +822,223 @@ end
 local SPRITE_W, SPRITE_H = 16, 16
 
 local SPRITE_ART = {
+    -- trinkets (the Little Ones love them; src/57_little.lua)
+    earring = {
+        "................",
+        "......###.......",
+        ".....#...#......",
+        ".....#...#......",
+        "......#.#.......",
+        ".......#........",
+        ".......#........",
+        "......###.......",
+        ".....#####......",
+        "....##.#.##.....",
+        "....#..#..#.....",
+        "....##.#.##.....",
+        ".....#####......",
+        "......###.......",
+        "................",
+        "................",
+    },
+    toy_car = {
+        "................",
+        "................",
+        "................",
+        "....######......",
+        "...#..#...#.....",
+        "..#...#....#....",
+        ".##############.",
+        "#..............#",
+        "#..##......##..#",
+        "################",
+        ".#..#......#..#.",
+        "..##........##..",
+        "................",
+        "................",
+        "................",
+        "................",
+    },
+    crayons = {
+        "................",
+        "..#...#...#.....",
+        ".###.###.###....",
+        ".#.#.#.#.#.#....",
+        ".###.###.###....",
+        ".#.#.#.#.#.#....",
+        ".#.#.#.#.#.#....",
+        ".###.###.###....",
+        ".#.#.#.#.#.#....",
+        ".#.#.#.#.#.#....",
+        ".#.#.#.#.#.#....",
+        ".###.###.###....",
+        "................",
+        "...########.....",
+        "...########.....",
+        "................",
+    },
+    rubber_duck = {
+        "................",
+        "......####......",
+        ".....#....#.....",
+        ".....#.#..#.....",
+        "...###....#.....",
+        "..#..#....#.....",
+        "...###...#......",
+        "........#.......",
+        ".#######...#....",
+        "#..........#....",
+        "#...........#...",
+        "#...........#...",
+        ".#.........#....",
+        "..#########.....",
+        "................",
+        "................",
+    },
+    doll_head = {
+        "................",
+        "....########....",
+        "...#.#.#.#.#.#..",
+        "..##########.#..",
+        "..#........#....",
+        "..#.##..##.#....",
+        "..#.##..##.#....",
+        "..#........#....",
+        "..#...##...#....",
+        "..#..#..#..#....",
+        "...#......#.....",
+        "....######......",
+        ".....#..#.......",
+        ".....####.......",
+        "................",
+        "................",
+    },
+    marble = {
+        "................",
+        "................",
+        "......####......",
+        "....##....##....",
+        "...#.##.....#...",
+        "...#.##.....#...",
+        "..#.........#...",
+        "..#....##...#...",
+        "..#...##....#...",
+        "...#........#...",
+        "...#.......#....",
+        "....##....##....",
+        "......####......",
+        "................",
+        "................",
+        "................",
+    },
+    toy_dino = {
+        "................",
+        "..........###...",
+        ".........#.#.#..",
+        ".........#...#..",
+        "....#....#.##...",
+        "...###..##.#....",
+        "..#####.#...#...",
+        ".#######.....#..",
+        "#............#..",
+        "#.##.........#..",
+        ".#..##########..",
+        "..#.#..#..#.#...",
+        "..#.#..#..#.#...",
+        "..###..####.###.",
+        "................",
+        "................",
+    },
+    hair_clip = {
+        "................",
+        "................",
+        "................",
+        "...#.......#....",
+        "..###.....###...",
+        ".#####...#####..",
+        ".#######.######.",
+        ".##############.",
+        ".#######.######.",
+        ".#####...#####..",
+        "..###.....###...",
+        "...#.......#....",
+        "................",
+        "................",
+        "................",
+        "................",
+    },
+    button = {
+        "................",
+        "................",
+        ".....######.....",
+        "....#......#....",
+        "...#........#...",
+        "..#..##..##..#..",
+        "..#..##..##..#..",
+        "..#..........#..",
+        "..#..........#..",
+        "..#..##..##..#..",
+        "..#..##..##..#..",
+        "...#........#...",
+        "....#......#....",
+        ".....######.....",
+        "................",
+        "................",
+    },
+    bottle_cap = {
+        "................",
+        "................",
+        "....#.#.#.#.....",
+        "...##########...",
+        "..#..........#..",
+        "..#..######..#..",
+        "..#.#......#.#..",
+        "..#.#..##..#.#..",
+        "..#.#..##..#.#..",
+        "..#.#......#.#..",
+        "..#..######..#..",
+        "..#..........#..",
+        "...##########...",
+        "....#.#.#.#.....",
+        "................",
+        "................",
+    },
+    tin_whistle = {
+        "................",
+        "................",
+        "................",
+        "................",
+        "..##############",
+        "..#..##.##.##..#",
+        "..##############",
+        "##..............",
+        "##..............",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+    },
+    jingle_bell = {
+        "................",
+        ".......##.......",
+        "......#..#......",
+        ".......##.......",
+        "......####......",
+        ".....#....#.....",
+        "....#......#....",
+        "....#......#....",
+        "...#........#...",
+        "...#........#...",
+        "..##############",
+        "..#.....##.....#",
+        "...######..####.",
+        "........##......",
+        "................",
+        "................",
+    },
     lore_page = {
         "................",
         "...#########....",
@@ -2169,6 +2427,30 @@ local GLYPH_ART = {
         "..#.#.....",
         ".#####....",
     },
+    warren = {  -- a burrow mouth under a mound
+        "..........",
+        "...####...",
+        "..#....#..",
+        ".#......#.",
+        "#...##...#",
+        "#..####..#",
+        "#.######.#",
+        "##########",
+        "..........",
+        "..........",
+    },
+    cairn = {   -- little stones, a shell on top
+        "....##....",
+        "...#..#...",
+        "....##....",
+        "...####...",
+        "..#....#..",
+        "..######..",
+        ".#..#...#.",
+        ".########.",
+        "#...#..#.#",
+        "##########",
+    },
     ferry = {   -- a little boat on the water
         "....#.....",
         "....##....",
@@ -2893,6 +3175,7 @@ function Game.new()
     self.extras = Game.place_extras(self.tiles, self.sites, self.rad, self.world_seed)
     self.ferry_trader = Game.starting_stock("ferry")
     self.peddler = Game.starting_stock("peddler")
+    self.little = Game.new_little()
     self.trader = {stock = {}, restocked = 0}   -- what the trader has now (it changes as you trade)
     for _, st in ipairs(TRADE.stock) do
         self.trader.stock[#self.trader.stock + 1] = {item = st[1], qty = st[2]}
@@ -3003,7 +3286,8 @@ function Game:try_move(q, r)
     if p.needs.thirst <= 0 then self:push_log("You are dehydrated!") end
     self:find_stash()
     self:check_snare()
-    if not self:check_death("You bled out.") and not self:arrive_site() and not self:quest_arrive() then
+    if not self:check_death("You bled out.") and not self:arrive_site() and not self:quest_arrive()
+        and not self:little_arrive() then
         self:maybe_encounter(terrain_id)
     end
 end
@@ -3284,6 +3568,14 @@ function Game:use_item(kind, k)
     local p = self.player
     if stack.item == "lore_page" then
         if self:read_lore() then self:use_one(kind, k, stack) end
+        return
+    end
+    if def.trinket then
+        if self:little_spot(hex_key(p.q, p.r)) == "cairn" then
+            if kind == "inventory" then self:offer_trinket(stack.item) end
+        else
+            self:push_log("It's a toy. Someone small would love it. (Leave it at a cairn.)")
+        end
         return
     end
     if stack.item == "medkit" then
@@ -3817,6 +4109,7 @@ function Game:tick()
         dose = dose + self:rad_hour()
         self:survive_hour()
         self:storm_hour(hour)
+        self:little_hour(hour)
         local heat = self:season(hour).thirst
         if heat > 0 then p.needs.thirst = clamp(p.needs.thirst - heat) end
         self:emission_hour(hour)
@@ -3866,7 +4159,7 @@ local SAVE = {version = 1, dir = "wasteland", file = "save.lua",
                         "difficulty", "dog", "radio", "karl_hint",
                         "base", "quest", "quests_done",
                         "lore_read", "signal_page", "skills", "stats",
-                        "ferry_trader", "peddler"}}
+                        "ferry_trader", "peddler", "little"}}
 
 -- Where the save lives: <preferred storage>/wasteland/save.lua
 function SAVE.path()
@@ -4313,6 +4606,7 @@ function Game:encounter_options()
     if kind == "helper" then return {{"Talk", "talk"}, {"Walk on", "leave_quietly"}} end
     if kind == "anomaly" then return {{"Investigate", "investigate"}, {"Walk away", "leave_quietly"}} end
     if kind == "horror" then return self:horror_options(e) end
+    if kind == "little" then return self:little_options() end
     if kind == "dog" then
         local o = {}
         if self:dog_food() then o[1] = {"Offer it food", "tame"} end
@@ -4391,7 +4685,7 @@ function Game:enemy_turn()
         e.outcome = "fled"
         return self:end_encounter("The " .. d.who .. " fled.")
     end
-    if self:dog_turn() or self:dark_flees() then return end
+    if self:little_turn() or self:dog_turn() or self:dark_flees() then return end
     if e.range ~= "close" then
         if self:roll(FIGHT.ADVANCE_CHANCE + 10 * (d.speed - p.attrs.Speed)) then
             e.range = CLOSER[e.range]
@@ -4464,6 +4758,7 @@ function Game:encounter_action(action)
     local e, p = self.enc, self.player
     e.msg = {}
     if action == "tame" then return self:dog_tame() end
+    if action:find("_little$") then return self:little_action(action) end
     if action == "look_away" or action == "speak" or action == "cover" or action == "follow" then
         return self:horror_action(action)
     end
@@ -4546,7 +4841,8 @@ function Game:encounter_action(action)
         end
         self:enc_say("It has seen where you went.")
     elseif action == "flee" then
-        if self:roll(FIGHT.FLEE_CHANCE[e.range] + 10 * (p.attrs.Speed - e.def.speed) + self:dog_bonus()) then
+        if self:roll(FIGHT.FLEE_CHANCE[e.range] + 10 * (p.attrs.Speed - e.def.speed) + self:dog_bonus()
+                     + self:little_flee_bonus()) then
             p.mp = p.mp - 1
             self:enc_say("You run until your lungs burn. It doesn't follow. (-1 MP)")
             return self:end_encounter("You ran from the " .. e.def.who .. ".")
@@ -5132,6 +5428,7 @@ function Game:spot_sites()
         self:push_log("A jetty and a few huts by the water: the Ferry Post, " .. self:site_bearing("ferry") .. ".")
     end
     self:spot_peddler()
+    self:spot_little()
 end
 
 function Game:learn_site_seen(name)
@@ -5170,6 +5467,8 @@ function Game:site_action()
         self:open_gate()
     elseif self:peddler_key() == hex_key(self.player.q, self.player.r) then
         self:open_trade("peddler")
+    elseif self:little_spot(hex_key(self.player.q, self.player.r)) == "cairn" then
+        self:offer_trinket()
     else
         self:push_log("Nobody here. (T trades at a trader)")
     end
@@ -5178,6 +5477,7 @@ end
 -- -- barter -------------------------------------------------------------
 
 function Game.item_value(item)
+    if ITEM_DB[item] and ITEM_DB[item].trinket then return 0 end   -- toys: no use to grown-ups
     return TRADE.value[item] or 1
 end
 
@@ -5452,6 +5752,44 @@ function Game.place_extras(tiles, sites, rad, world_seed)
         if #options > 0 then route[#route + 1] = options[roll(#options) + 1] end
     end
     extras.route = route
+
+    -- the Little Ones: warrens in the woods and hills, cairns near them
+    local warrens, cairns = {}, {}
+    local spots = {}
+    for _, key in ipairs(keys) do
+        local q, r = parse_key(key)
+        if (tiles[key] == "forest" or tiles[key] == "hills") and not taken[key]
+            and axial_distance(0, 0, q, r) >= LITTLE.min_from_start then
+            spots[#spots + 1] = key
+        end
+    end
+    for _ = 1, 60 do
+        if #warrens >= LITTLE.warrens or #spots == 0 then break end
+        local key = spots[roll(#spots) + 1]
+        local ok = not taken[key]
+        local kq, kr = parse_key(key)
+        for _, w in ipairs(warrens) do
+            local wq, wr = parse_key(w)
+            if axial_distance(wq, wr, kq, kr) < 5 then ok = false end   -- spread them out
+        end
+        if ok then warrens[#warrens + 1], taken[key] = key, true end
+    end
+    for i = 1, (#warrens > 0 and LITTLE.cairns or 0) do
+        local wq, wr = parse_key(warrens[(i - 1) % #warrens + 1])
+        local options = {}
+        for _, key in ipairs(keys) do
+            local q, r = parse_key(key)
+            local d = axial_distance(q, r, wq, wr)
+            if TERRAIN[tiles[key]].passable and not taken[key] and d >= LITTLE.cairn_near and d <= LITTLE.cairn_far then
+                options[#options + 1] = key
+            end
+        end
+        if #options > 0 then
+            local key = options[roll(#options) + 1]
+            cairns[#cairns + 1], taken[key] = key, true
+        end
+    end
+    extras.warrens, extras.cairns = warrens, cairns
     return extras
 end
 
@@ -5978,6 +6316,12 @@ function Game:draw_map(w, h)
     for name, key in pairs(self.sites) do site_at[key] = name end
     if self.base then site_at[self.base.key] = "camp" end   -- drawn like a site
     local peddler = self:peddler_key()
+    local little_at = {}   -- warrens and cairns you've found
+    for _, kind in ipairs({"warrens", "cairns"}) do
+        for _, k in ipairs((self.extras or {})[kind] or {}) do
+            if self.little.seen[k] then little_at[k] = kind == "warrens" and "warren" or "cairn" end
+        end
+    end
 
     local reachable = {}
     for _, n in ipairs(neighbors(self.tiles, p.q, p.r)) do
@@ -6032,6 +6376,12 @@ function Game:draw_map(w, h)
                 gfx.color(gfx.BLACK)
                 gfx.rect(rnd(px) - 7, rnd(py) - 7, 14, 14)
                 draw_glyph(site, px, py, gfx.BLACK)
+            end
+            local spot = little_at[key]
+            if spot and not is_player and (p.visible[key] or p.explored[key]) then
+                gfx.color(gfx.WHITE)
+                gfx.fill_rect(rnd(px) - 6, rnd(py) - 6, 12, 12)
+                draw_glyph(spot, px, py, gfx.BLACK)
             end
             if key == peddler and p.visible[key] and not is_player then
                 -- the Peddler and his cart, on a white patch
@@ -6101,6 +6451,16 @@ function Game:draw_map(w, h)
                     gfx.fill_rect(rnd(px) - 5, rnd(py) - 5, 10, 10)
                     gfx.color(gfx.BLACK)
                     gfx.fill_rect(rnd(px) - 3, rnd(py) - 3, 6, 6)
+                end
+                local n = self.little and self.little.n or 0
+                if n > 0 then   -- your Little Ones: small heads trailing behind you
+                    for i = 1, n do
+                        local lx, ly = rnd(px) - 12 + (i - 1) * 4, rnd(py) + 6 + (i % 2) * 2
+                        gfx.color(gfx.WHITE)
+                        gfx.fill_rect(lx - 1, ly - 1, 5, 5)
+                        gfx.color(gfx.BLACK)
+                        gfx.fill_rect(lx, ly, 3, 3)
+                    end
                 end
                 if self.dog then   -- your dog at your heel: a small block with an ear
                     gfx.color(gfx.WHITE)
@@ -6684,6 +7044,9 @@ function Game:maybe_horror()
     local def = NIGHT.horrors[self:rand(#NIGHT.horrors) + 1]
     self:start_encounter(def)
     self:sfx("emission")
+    if self.little and self.little.n > 0 then
+        self:enc_say("Your Little Ones go silent and stare into the dark.")
+    end
     return true
 end
 
@@ -7064,6 +7427,285 @@ function Game:draw_records(w, h)
     if not SAVE.can_write() then gfx.text(6, h - 22, "(not saved: this SolarOS can't write files)") end
     gfx.text(6, h - 8, "Any key: back")
     gfx.refresh()
+end
+-- ---------------------------------------------------------------------
+-- The Little Ones (numbers in LITTLE, 05_data_world)
+--
+-- The Zone's children, grown small and grey and grinning. They live in
+-- warrens in the woods and hills and are never hostile, only mischievous.
+-- Trinkets (toys, crayons, buttons: worth nothing to anyone else) left at
+-- their cairns befriend them; with enough gifts a troupe follows you from
+-- a warren. self.little = {friend, n, mood, mood_hour, hidden, seen}
+-- (saved). Warrens and cairns come from Game.place_extras (extras.warrens,
+-- extras.cairns).
+-- ---------------------------------------------------------------------
+
+LITTLE.def = {kind = "little", name = "The Little Ones", art = "little",
+              who = "little ones", intro = LITTLE.intro, start = "near", speed = 6}
+
+function Game.new_little()
+    return {friend = 0, n = 0, mood = 0, mood_hour = 0, seen = {}}
+end
+
+-- "warren", "cairn" or nil for a hex.
+function Game:little_spot(key)
+    local x = self.extras or {}
+    for _, k in ipairs(x.warrens or {}) do if k == key then return "warren" end end
+    for _, k in ipairs(x.cairns or {}) do if k == key then return "cairn" end end
+    return nil
+end
+
+function Game:first_trinket()
+    for _, s in ipairs(self.player.inventory) do
+        if ITEM_DB[s.item].trinket then return s.item end
+    end
+    return nil
+end
+
+-- How many follow for this many gifts (0 before join_at).
+function Game.troupe_size(friend)
+    if friend < LITTLE.join_at then return 0 end
+    return math.min(LITTLE.max, 1 + (friend - LITTLE.join_at) // LITTLE.per_extra)
+end
+
+-- One unit out of your bag (not the ground or your hands, unlike take_items).
+function Game:take_from_bag(item)
+    local inv = self.player.inventory
+    for i, s in ipairs(inv) do
+        if s.item == item then
+            s.qty = s.qty - 1
+            if s.qty <= 0 then table.remove(inv, i) end
+            return true
+        end
+    end
+    return false
+end
+
+-- A trinket given (at a cairn, or to them at a warren).
+function Game:gift_little(item, points)
+    local l = self.little
+    self:take_from_bag(item)
+    l.friend = l.friend + (points or 1)
+    if l.n > 0 then
+        l.mood = math.min(LITTLE.mood_max, l.mood + LITTLE.mood_per_gift)
+        l.mood_hour = self.player.hours
+        local more = Game.troupe_size(l.friend)
+        if more > l.n then
+            l.n = more
+            self:push_log("Another Little One falls in behind you, grinning.")
+        end
+    end
+end
+
+-- E (or T) at a cairn: leave a trinket on the stones.
+function Game:offer_trinket(item)
+    item = item or self:first_trinket()
+    if not item then
+        self:push_log("Nothing to leave. They like toys.")
+        return false
+    end
+    local name = ITEM_DB[item].name:lower()
+    self:gift_little(item)
+    self:push_log(("You set the %s on the stones. Something giggles in the grass."):format(name))
+    self:sfx("chime")
+    return true
+end
+
+function Game:little_join()
+    local l = self.little
+    l.n = Game.troupe_size(l.friend)
+    l.mood, l.mood_hour = LITTLE.mood_start, self.player.hours
+    self:sfx("gift")
+    self:push_log(l.n == 1 and "A Little One creeps out of the burrow and follows you, giggling."
+        or ("%d Little Ones tumble out of the burrow and follow you."):format(l.n))
+end
+
+-- Warrens and cairns in sight are remembered (from spot_sites).
+function Game:spot_little()
+    local l, vis = self.little, self.player.visible
+    for _, kind in ipairs({"warrens", "cairns"}) do
+        for _, k in ipairs((self.extras or {})[kind] or {}) do
+            if vis[k] and not l.seen[k] then
+                l.seen[k] = true
+                self:push_log(kind == "warrens" and ("A burrow under a mound, " .. self:bearing_to(k) .. ". Giggling.")
+                    or ("A little cairn of stones, " .. self:bearing_to(k) .. "."))
+            end
+        end
+    end
+end
+
+-- After a move (from try_move). True if it started an encounter.
+function Game:little_arrive()
+    local key = hex_key(self.player.q, self.player.r)
+    local spot = self:little_spot(key)
+    if not spot then return false end
+    local l = self.little
+    l.seen[key] = true
+    if spot == "cairn" then
+        self:push_log("A little cairn of stones, a shell on top. Toys left here are gone.")
+        return false
+    end
+    if l.n > 0 then
+        self:push_log("Your Little Ones dive into the burrow and tumble out again.")
+        return false
+    end
+    if Game.troupe_size(l.friend) > 0 then
+        self:little_join()
+        return false
+    end
+    self:start_encounter(LITTLE.def)
+    return true
+end
+
+-- -- what a following troupe gets up to ----------------------------------------
+
+function Game:little_find(hour)
+    local p = self.player
+    local item
+    if self:roll(LITTLE.find_trinket) then
+        item = LITTLE.trinkets[self:rand(#LITTLE.trinkets) + 1]
+    else
+        local loot = SCAVENGE_LOOT[self.tiles[hex_key(p.q, p.r)]] or SCAVENGE_LOOT.plains
+        local table_ = {}
+        for _, e in ipairs(loot) do
+            if e[1] ~= "nothing" then table_[#table_ + 1] = e end
+        end
+        self.seed, item = weighted_pick(self.seed, table_)
+    end
+    self:put_stack("ground", nil, {item = item, qty = 1})
+    self:push_log("A Little One drops " .. ITEM_DB[item].name:lower() .. " at your feet and runs off giggling.")
+end
+
+-- Hide one small thing: only odds and ends - never what you eat or drink,
+-- wear, heal with, work with, or what gets you out of the Zone.
+function Game:little_mischief(hour)
+    local p, l = self.player, self.little
+    local options = {}
+    for _, s in ipairs(p.inventory) do
+        local def = ITEM_DB[s.item]
+        if not def.artifact and not def.consumable and not def.slot and not LITTLE.keep[s.item] then
+            options[#options + 1] = s.item
+        end
+    end
+    if #options == 0 or l.hidden then return end
+    local item = options[self:rand(#options) + 1]
+    self:take_from_bag(item)
+    if self:roll(LITTLE.back_chance) then
+        local b = LITTLE.back_hours
+        l.hidden = {item = item, back = hour + b[1] + self:rand(b[2] - b[1] + 1)}
+    end
+    self:push_log("Your " .. ITEM_DB[item].name:lower() .. " is gone. Giggling, somewhere close.")
+end
+
+-- One hour with the troupe (from tick).
+function Game:little_hour(hour)
+    local l, p = self.little, self.player
+    if not l then return end
+    if l.hidden and hour >= l.hidden.back then
+        self:put_stack("ground", nil, {item = l.hidden.item, qty = 1})
+        self:push_log("Your " .. ITEM_DB[l.hidden.item].name:lower() .. " is back, on the ground at your feet.")
+        l.hidden = nil
+    end
+    if l.n <= 0 then return end
+    if hour - l.mood_hour >= LITTLE.decay_hours then
+        l.mood, l.mood_hour = l.mood - 1, hour
+        if l.mood <= 0 then
+            l.n, l.friend = 0, LITTLE.join_at - 1   -- one more gift wins them back
+            self:push_log("Your Little Ones get bored of you and wander home.")
+            return
+        end
+    end
+    if hour % LITTLE.act_every ~= 0 then return end
+    if self:roll(LITTLE.find) then
+        self:little_find(hour)
+    elseif self:roll(LITTLE.mischief) then
+        self:little_mischief(hour)
+    elseif self:is_night(hour) and self:roll(LITTLE.keep_awake) then
+        p.needs.rest = clamp(p.needs.rest - LITTLE.awake_rest)
+        self:push_log("The Little Ones giggle half the night away.")
+    end
+end
+
+-- In a fight: they pelt it with stones (true if that killed it).
+function Game:little_turn()
+    local l, e = self.little, self.enc
+    if not l or l.n <= 0 or e.over or e.def.kind == "horror" then return false end
+    if not self:roll(LITTLE.pebble) then return false end
+    local d, dmg = LITTLE.pebble_dmg, 0
+    for _ = 1, l.n do dmg = dmg + d[1] + self:rand(d[2] - d[1] + 1) end
+    e.hp = e.hp - dmg
+    self:enc_say(("The Little Ones pelt the %s with stones (-%d)."):format(e.def.who, dmg))
+    if e.hp <= 0 then
+        self:enemy_dies()
+        return true
+    end
+    return false
+end
+
+-- % added to running away: they make a racket; horrors they flee from with you.
+function Game:little_flee_bonus()
+    local l, e = self.little, self.enc
+    if not l or l.n <= 0 then return 0 end
+    return (e and e.def.kind == "horror") and LITTLE.horror_run or LITTLE.flee_bonus
+end
+
+-- -- meeting them at a warren (kind "little") --------------------------------
+
+function Game:little_options()
+    local o = {{"Watch them", "watch_little"}}
+    if self:first_trinket() then o[#o + 1] = {"Offer a trinket", "offer_little"} end
+    o[#o + 1] = {"Shoo them away", "shoo_little"}
+    return o
+end
+
+function Game:little_action(action)
+    local l = self.little
+    if action == "watch_little" then
+        self:enc_say("They watch you back. One waves. Another picks its teeth with a bird bone. "
+            .. "Then they're gone.")
+        return self:end_encounter("The Little Ones went back underground.")
+    elseif action == "offer_little" then
+        local item = self:first_trinket()
+        self:gift_little(item, 2)
+        self:enc_say("A small grey hand snatches the " .. ITEM_DB[item].name:lower()
+            .. ". Delighted shrieking under the ground.")
+        if l.n == 0 and Game.troupe_size(l.friend) > 0 then
+            self:end_encounter()
+            self:little_join()
+            return
+        end
+        return self:end_encounter("The Little Ones liked that.")
+    else   -- shoo: they take something and vanish
+        local before = #self.player.inventory
+        self:little_mischief(self.player.hours)
+        self:enc_say(#self.player.inventory ~= before and "They scatter, and something of yours goes with them."
+            or "They scatter, giggling.")
+        return self:end_encounter("The Little Ones scattered.")
+    end
+end
+
+-- Journal lines.
+function Game:little_lines()
+    local l, out = self.little, {}
+    if not l then return out end
+    local moods = {"sulky", "sulky", "restless", "restless", "content", "content", "happy",
+                   "happy", "delighted", "delighted"}
+    if l.n > 0 then
+        out[1] = ("Little Ones: %d following, %s."):format(l.n, moods[math.max(1, math.min(10, l.mood))])
+    elseif l.friend > 0 then
+        out[1] = ("Little Ones: %d trinket%s given (%d befriends them)."):format(
+            l.friend, l.friend == 1 and "" or "s", LITTLE.join_at)
+    end
+    local p, best, best_d = self.player, nil, nil
+    for key in pairs(l.seen) do
+        if self:little_spot(key) == "cairn" then
+            local q, r = key:match("(-?%d+),(-?%d+)")
+            local d = axial_distance(p.q, p.r, tonumber(q), tonumber(r))
+            if not best_d or d < best_d then best, best_d = key, d end
+        end
+    end
+    if best then out[#out + 1] = "Nearest cairn: " .. self:bearing_to(best) .. "." end
+    return out
 end
 
 -- Equip slots sit ON the body part they dress, NEO Scavenger style: a box over
@@ -7992,6 +8634,17 @@ local PORTRAIT_DATA = {
             marks = {61, 52, 38, 53, 69, 57, 86, 57, 50, 55, 23, 49, 32, 44, 52, 42, 13, 46, 55, 65, 75, 66, 20, 39, 91, 66, 44, 37},
             data = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADwAAAA2AEAAKwHAAB0HwAArPoAAFT9AACs+gAA9P8AAOz/AAD2/gAA6vwAAPf2AAD7AwAA/VUAAHsCAIB/dQCAPgAAwH8VAIB/gACAXxUAAAAAAABgAAAAIAAAAHAAAABwAAAAWAAAAGgAAAB8AAAAbAAAAHYAAADrAAAAdQAAgOsAAID1AADAegAAQP0A+P/6AF/V/wADoP8AV9X/AAMA/gBXVf0AAwD6AVVV9QEAAKgAVVXdAQqCqgF1wf0DDPDoAxzx/AMPAvoDH1X/AwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABPAAAARFUAAEAAAABAVQAAQAAAAHBVAAAcoAAAV9UAwAGoAPBX/QD4h/oA+Ff/APiv/gD4//8A8Pv/AMD//wAA//8AAP8FAAAAAAAAABEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAqP4HQNX/A6Cq/wNV//8DqOr/A93//wGq//8B////Af7/fwD//38A//8/AP///wD//68B//9XA///ogb/f1UNioiIGlhVVTUwIqJqcFVV1aCIiKhwVVVVoKqiqmBVVVXgqoiowFVVVYCqqqqAd1d1AKuqqgDeVdUArKqqAPh39wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAMAAAAGAAAADwAAABoAAAA9AOT/6v//qv9XV3WqioqK/VVVVbqroqr/V1dVAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAsKqqAODf/QDAqqoAgP//AACr6gAA/v8AALz/AAD8/wAA7P8AAPz/AACo/wAA2P8AAKj+AABY/QAAqPoAAHj3AACwqgAAWN0AALiqAABQdwAAsKoAAPD9AADgugAAgP8AAACuAAAA+AAAALAAAADwAAAAuAAAANgAAACoAAAA+O6viKj/X1VV/6+qqv9fV1f/r4qq/19VVf+vqqr/V1dX/4uqqv9XVVX/q6qq/3X///+qqqr/3d3/r6qqq/f///+qququ/dX//6qq+/9/1f//qqr+/n/V//+76v//f/X//67qn/1/9QEAv/IBAH/1AQC++gAAf/0BAD76AABf/QAA"},
     },
+    little = {
+        near = {w = 96, h = 96, tw = 3, th = 3,
+            marks = {47, 53, 70, 54, 28, 53, 15, 52, 85, 57, 39, 58, 61, 50, 56, 60, 22, 61, 76, 44, 41, 46, 11, 63, 75, 63, 24, 43},
+            data = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAADAIAABwBwAAoAAAAcAFwAKAAAAFwAVgCIAAIAUAFFACCCAABwRVUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABUXQCAAqACcFUVHQgAACBFRETEAAAAAFVVVVUAAAAARERERAAAAABVVVVVAAAAAERUVUUAAAAAVVVVVQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAECAIAABwBgAAgAYAAUAHgAIAAoAFUAFgCAABoA1cEdAKLBDgBVcQcAACAIAABAfUQAgDoAAMBdVQCACgAAAF0EAAAKAAAAXxUAAA4AAABcBAAACAAAAFxVAAAIAAAAUEQAACAAAABQVQAAIAAAAEBUAAAgIAAAfVUAgKqIAEBVVQCgqioAUFVVAIiIqgBcVVcAKIKuABTT/QAICP4AVNXfAKjqPwD4/x8AAAAIRFVVQQAAIgB4UBUe/AAAP/RBhX3+IYB//lGFf/4AgD/8UAU/OAACDgBQFQAAAAAARVVVVSAiIiJVVVVVAAAAgFVVVVUiIiKiVVVVVYGIiESZ3c1MupnN7v/////+/////f///+q/u7t3dzObIiISmXd31927/////P//f6iCBgDV3wcAqqIDAFTXAQCo6gEA1PcBAKjqAADwfwAAqH4AANR/AACoPwAA9R8AAKgeAAD9HwAAqg8AAP0HAADqBwAA/QcAAPq7AgD/VwcA/IsIAPxVFQD+qjoA/3V9AP8IegB/XXsAuyB4AH31fwCA6j8Awf8/AID/PwAA/x8AAPj+DwDw/w8A4P8DAMD/AQAAPIAAAABAAAAAIAAAAPAAAACIAAAAxAAAAOIAAAB0AAAAMAAAADQAAAAwAAAAFAAAALgAAACUAAAAmgAAAN4AAACeAAAA3AAAAIAAAADRAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAADo//8v9v//RzrqP6pdVVVdDACAKl9VVX0HIKK6V1VV/wGAiOpVVVV9AiKi+lVVVf8AiIjqVVVV/QAioupVVVX/gKqq6lXd3f+gqqr79f///+r////9////+v////////+IiIiIRERERAAAAAARERERAAAAAAAAAAAAAAAAAAAAAAD+BwAA/AEAAAAAAAEAAAACAAAABQAAAAoAAAAdAAAAOwAAAHcAAAAqAAAAdAAAACgAAAB5AAAAaAAAAFkAAADJAAAA0QAAAPMAAADxAAAAYwAAAAMAAAADAAAAFwAAAAIAAAAAAAAAAAAAABEAAAAAAAAAAAAAAAAAAAAAAAAA"},
+        far = {w = 48, h = 48, tw = 2, th = 2,
+            marks = {15, 26, 37, 26, 24, 25, 30, 27, 8, 27, 12, 30, 42, 29, 33, 23, 23, 32, 29, 20, 10, 21, 17, 33, 17, 20, 6, 32},
+            data = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABUFQAAAqAQQFVVIAAAAEBAVVWAAAAAQFFVVYAKgIiAVURFAAMOcgAXX3EAAo5wAFZEBQAAIAIAVFVVAAiAgABUVVWAqqCqQFX//6Cq/v9A9V3VoPorqsB///8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEIAAACBAAABQQAAAoCAABdAwAAqAEAAN0BAAC6AAAA/AAAAOgAAAB8AAAAOgAAAD8AAAA+AAAA3wEAAL4CAABfBwAALwwAANcHAADoBwAA8AcAAMA//j+AH9f1AIIi6gBAV/UAgIDoAMBV9QBgoqoAYFX1ACCo6gBw/f8AoP7/AJD//wAAiAgAQEREAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA4AAAAAEAAAAAAAAABwAAAAYAAAAEAAAABgAAAAUAAAAIAAAADQAAAAEAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},
+        close = {w = 96, h = 96, tw = 3, th = 3,
+            marks = {75, 53, 6, 53, 32, 51, 60, 51, 91, 52, 46, 49, 54, 58, 18, 55, 40, 58, 81, 46, 68, 45, 68, 59, 10, 43, 28, 60},
+            data = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAoAAAAHAAAAAMAAAARwAAgAEAAEBVAAAgAAAAWEQAAAwAAABXVQAAAwAAgEVEAIAAAANAVVUCIAAADXBERBoQAAA1WFVVKAgAANVERESiBgAg1VdVFYoAgADVRVTAqwAg4PdVFfAAAAAAAAAAAAAAAABA/X8B4AqgCl9ERXwDAACAVVVVVQAAAABEREREAAAAAFVVVVUAAAAARERERAAAAABVVVVVAAAAAEREREQAAAAAVVVVVQAAAABEVFVVAAAAAFVVVVUAAAAARVVVVQIiIiBQVVUVgACAAAVVVcAPKCLgH1QV8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAfAAAAKAAAAMQAAACAAwAAVQcAAAAMAABEHQAAACAAAFV1AAAAgAAARNUBAAAgAwBVVQeAAIAGwFVVDXAAogo4VVUdXACIGoZVVTXXAqKqo1BV9/WAiKrgBVV99Q+oqvofVP/96gAAiPRFBNzsAAD8fFUV/OgAAPhwRAT48AAA+HBVFfDgAACAQEREAMAAAADAVVUVgAAAAABFRFUAAAAgAFVVVQACAAAARFVVAAIAIABUVVWgBgAA/FdVVSsiosNVVVXHiIiI5lVVVeWqqqruVVVV/YioqvpV1VX1qKCq6lgxd5cfAACIH1AV3D8gAvw/UBX8PwAA+B9QFfgPIAL4B1QV8AIAAIAAVVUAACIiAFBVVRUAAAAAVVVVVSIiIiJVVVVVAAAAAFVVVVUiIiICVVVVVQAAAABVVVVUEIIwhhnHMcY4zjjOfe99z7nve+//////////////////////9733fR+oqvgfUP19P6iqPj9Q/z8/qOoeH9T9Hw+oug8HdP8PAqjqDwDV/wcAqvoDUPX/A4Co/gFV1f8AoKr/AFX1/wCAqv8AVf1/AKK6fwBV/39/qOq/ilX9f1Ug+L+qcfxfVTn+j4h5/19Ve/6vqv//V1X//wsJ///Fwf//ioj/fRUUjryvikzd3x+g4v8Kdf/fX6rqn+vd/x/+qv8PuP//D/D+/w+I//8H3P//A+b//wH3/z8A4fwfgPWgAIA4AABgfQAAIB4AAFBfAACILwAA1FcAAMIDAAD1VQCA4AIAgHVWAIA4AgAAPVYAADkCAAA9VwCAGAEAAB1VAAAZAQCAHVXnPOc45xzHOUIYwhBXXfd/7u7+///////7//////////////////9/o///q1X1X9UAAACoVVVV1QAAAKpVVVX1AACAqFVVVdUAIiKqVVVV9QCIiKhVVVXVACIiqlVVVdUAiIioVVVV1QAiIqpVVVVVgIiIqFVVVdWiqqqqVXd39++5qKrHmdX9goqr+vcD////AOr/fwD8/z8A+P8fAPD/GADg/3UAQP9iAAAA1wEAAIoBAABfBwAALgYAAH8FAACuCAAA/xUAALoqAAD/dQAALusAAH/XAQB67gAAf/wBAGqoAAD/2AEA+qgDAP/QAQDqgAMA/9ADAPqgAwD/cQMA"},
+    },
     long_man = {
         near = {w = 96, h = 96, tw = 3, th = 3,
             marks = {52, 53, 8, 53, 73, 52, 39, 52, 22, 53, 89, 51, 63, 58, 47, 45, 79, 62, 48, 62, 34, 61, 12, 42, 31, 45, 81, 43},
@@ -8684,6 +9337,7 @@ local HELP = {
     {"", "Skills grow with use (J). R on the title: records."},
     {"", "Storms: shelter in ruins, hills or trees."},
     {"", "Mother Okun trades by the river; a Peddler roams."},
+    {"", "Leave toys at little cairns (E or T)."},
 }
 
 function Game:open_help()
@@ -8807,6 +9461,7 @@ function Game:journal_lines()
     end
     if self.sites_known.trader then add("Trader: " .. self:site_bearing("trader") .. ".") end
     if self.sites_known.ferry then add("Ferry Post (Mother Okun): " .. self:site_bearing("ferry") .. ".") end
+    for _, l in ipairs(self:little_lines()) do add(l) end
     local pd = self.peddler
     if pd and pd.seen_key then
         add(("Peddler: last seen %s, day %d."):format(self:bearing_to(pd.seen_key), (self:clock(pd.seen_hour))))

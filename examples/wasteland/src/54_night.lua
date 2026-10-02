@@ -22,6 +22,9 @@ function Game:maybe_horror()
     local def = NIGHT.horrors[self:rand(#NIGHT.horrors) + 1]
     self:start_encounter(def)
     self:sfx("emission")
+    if self.little and self.little.n > 0 then
+        self:enc_say("Your Little Ones go silent and stare into the dark.")
+    end
     return true
 end
 

@@ -176,9 +176,9 @@ local TRADE = {
         peddler = {name = "The Peddler", markup = 1.4, restock_hours = 36, restock_n = 2,
                    hello = "'Everything rattles. Everything's for sale.'",
                    stock = {{"battery_cell", 1}, {"jerky", 2}, {"antenna", 1}, {"lore_page", 1},
-                            {"broken_headlamp", 1}, {"rope", 1}},
+                            {"broken_headlamp", 1}, {"rope", 1}, {"crayons", 1}, {"rubber_duck", 1}},
                    restock = {"jerky", "battery_cell", "copper_wire", "circuit_board", "lore_page",
-                              "bandage", "antenna"}},
+                              "bandage", "antenna", "toy_car", "marble", "jingle_bell"}},
     },
     -- the Ferry Post: a little cluster of ruins by the water, far from the town
     ferry = {ruins = 4, min_from_town = 9, min_from_start = 4},
@@ -324,6 +324,29 @@ local NIGHT = {
          intro = "From the black water, voices. They say your name, then your mother's. "
               .. "Pale faces turn just under the surface.", speed = 3},
     },
+}
+
+-- The Little Ones (src/57_little.lua): the Zone's children, grown small,
+-- grey and grinning. Never hostile. Trinkets left at their cairns befriend
+-- them: at join_at gifts a troupe follows you from a warren (1 more per
+-- per_extra gifts, up to max). Their mood falls 1 per decay_hours without
+-- a gift; at 0 they go home. Every act_every hours one of them does
+-- something: find (% a found item), mischief (% hides one of your things,
+-- back_chance % it turns up again later), keep_awake (% at night). In
+-- fights they pelt (pebble %, 1-3 dmg each) and help you run.
+local LITTLE = {
+    trinkets = {"earring", "toy_car", "crayons", "rubber_duck", "doll_head", "marble", "toy_dino",
+                "hair_clip", "button", "bottle_cap", "tin_whistle", "jingle_bell"},
+    warrens = 3, cairns = 7, cairn_near = 2, cairn_far = 5, min_from_start = 4,
+    join_at = 3, per_extra = 3, max = 3, mood_start = 6, mood_max = 10, mood_per_gift = 2,
+    decay_hours = 48, act_every = 6,
+    find = 40, find_trinket = 25, mischief = 20, keep_awake = 15, awake_rest = 8,
+    back_chance = 60, back_hours = {6, 18},
+    keep = {permit = true, lora_radio = true, medkit = true, bandage = true, splint = true,   -- (never taken)
+            multitool = true, geiger = true, anomaly_detector = true, fishing_rod = true, snare = true},
+    pebble = 40, pebble_dmg = {1, 3}, flee_bonus = 10, horror_run = 15,
+    intro = "Small grey faces in the grass, too many teeth in their grins. Children, once. "
+         .. "They giggle and edge closer, eyes on your bag.",
 }
 
 -- Skills that grow with use (src/55_skills.lua). levels = XP needed for

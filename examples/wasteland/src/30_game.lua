@@ -21,6 +21,7 @@ function Game.new()
     self.extras = Game.place_extras(self.tiles, self.sites, self.rad, self.world_seed)
     self.ferry_trader = Game.starting_stock("ferry")
     self.peddler = Game.starting_stock("peddler")
+    self.little = Game.new_little()
     self.trader = {stock = {}, restocked = 0}   -- what the trader has now (it changes as you trade)
     for _, st in ipairs(TRADE.stock) do
         self.trader.stock[#self.trader.stock + 1] = {item = st[1], qty = st[2]}
@@ -131,7 +132,8 @@ function Game:try_move(q, r)
     if p.needs.thirst <= 0 then self:push_log("You are dehydrated!") end
     self:find_stash()
     self:check_snare()
-    if not self:check_death("You bled out.") and not self:arrive_site() and not self:quest_arrive() then
+    if not self:check_death("You bled out.") and not self:arrive_site() and not self:quest_arrive()
+        and not self:little_arrive() then
         self:maybe_encounter(terrain_id)
     end
 end
@@ -412,6 +414,14 @@ function Game:use_item(kind, k)
     local p = self.player
     if stack.item == "lore_page" then
         if self:read_lore() then self:use_one(kind, k, stack) end
+        return
+    end
+    if def.trinket then
+        if self:little_spot(hex_key(p.q, p.r)) == "cairn" then
+            if kind == "inventory" then self:offer_trinket(stack.item) end
+        else
+            self:push_log("It's a toy. Someone small would love it. (Leave it at a cairn.)")
+        end
         return
     end
     if stack.item == "medkit" then

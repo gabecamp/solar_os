@@ -104,6 +104,7 @@ function Game:encounter_options()
     if kind == "helper" then return {{"Talk", "talk"}, {"Walk on", "leave_quietly"}} end
     if kind == "anomaly" then return {{"Investigate", "investigate"}, {"Walk away", "leave_quietly"}} end
     if kind == "horror" then return self:horror_options(e) end
+    if kind == "little" then return self:little_options() end
     if kind == "dog" then
         local o = {}
         if self:dog_food() then o[1] = {"Offer it food", "tame"} end
@@ -182,7 +183,7 @@ function Game:enemy_turn()
         e.outcome = "fled"
         return self:end_encounter("The " .. d.who .. " fled.")
     end
-    if self:dog_turn() or self:dark_flees() then return end
+    if self:little_turn() or self:dog_turn() or self:dark_flees() then return end
     if e.range ~= "close" then
         if self:roll(FIGHT.ADVANCE_CHANCE + 10 * (d.speed - p.attrs.Speed)) then
             e.range = CLOSER[e.range]
@@ -255,6 +256,7 @@ function Game:encounter_action(action)
     local e, p = self.enc, self.player
     e.msg = {}
     if action == "tame" then return self:dog_tame() end
+    if action:find("_little$") then return self:little_action(action) end
     if action == "look_away" or action == "speak" or action == "cover" or action == "follow" then
         return self:horror_action(action)
     end
@@ -337,7 +339,8 @@ function Game:encounter_action(action)
         end
         self:enc_say("It has seen where you went.")
     elseif action == "flee" then
-        if self:roll(FIGHT.FLEE_CHANCE[e.range] + 10 * (p.attrs.Speed - e.def.speed) + self:dog_bonus()) then
+        if self:roll(FIGHT.FLEE_CHANCE[e.range] + 10 * (p.attrs.Speed - e.def.speed) + self:dog_bonus()
+                     + self:little_flee_bonus()) then
             p.mp = p.mp - 1
             self:enc_say("You run until your lungs burn. It doesn't follow. (-1 MP)")
             return self:end_encounter("You ran from the " .. e.def.who .. ".")

@@ -26,6 +26,7 @@ local HELP = {
     {"", "Skills grow with use (J). R on the title: records."},
     {"", "Storms: shelter in ruins, hills or trees."},
     {"", "Mother Okun trades by the river; a Peddler roams."},
+    {"", "Leave toys at little cairns (E or T)."},
 }
 
 function Game:open_help()

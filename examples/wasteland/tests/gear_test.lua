@@ -60,7 +60,8 @@ for terrain, table_ in pairs(C.SCAVENGE_LOOT) do
     local total, dud = 0, 0
     for _, e in ipairs(table_) do
         total = total + e[2]
-        if e[1] == "nothing" then dud = e[2] end
+        -- (a trinket is no use to you: it counts with the duds)
+        if e[1] == "nothing" or (C.ITEM_DB[e[1]] and C.ITEM_DB[e[1]].trinket) then dud = dud + e[2] end
         assert(e[1] == "nothing" or C.ITEM_DB[e[1]], terrain .. ": " .. e[1])
     end
     assert(dud / total >= 0.4, terrain .. " duds " .. dud .. "/" .. total)

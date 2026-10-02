@@ -127,6 +127,7 @@ function Game:tick()
         dose = dose + self:rad_hour()
         self:survive_hour()
         self:storm_hour(hour)
+        self:little_hour(hour)
         local heat = self:season(hour).thirst
         if heat > 0 then p.needs.thirst = clamp(p.needs.thirst - heat) end
         self:emission_hour(hour)
