@@ -46,8 +46,8 @@ local function drew(texts, needle)
 end
 
 print("[17] E on the inventory screen eats/drinks the item under the cursor")
--- spawn ground: rock, cloth_scrap, canned_beans, water_bottle -> cursor 4 is water
-local _, _, texts = run_loop({105, 115, 115, 115, 101}, 5)
+-- spawn ground: rock, stick, cloth_scrap, canned_beans, water_bottle -> cursor 5 is water
+local _, _, texts = run_loop({105, 115, 115, 115, 115, 101}, 6)
 assert(drew(texts, "Consumed Water Bottle."), "E did not consume the water bottle")
 assert(drew(texts, "Up/Dn Enter:move E:use C:craft I:map"), "inventory hint should mention E")
 local _, _, texts2 = run_loop({105, 101}, 2)   -- cursor 1 = rock: E puts it in a hand
@@ -198,7 +198,11 @@ print("    OK")
 
 print("[+] the worn bag sets the bag size; a bag can't be taken off while too full")
 g = fresh()
-assert(g.player.equipped.back == "backpack" and g:bag_capacity() == C.ITEM_DB.backpack.bag_cells)
+assert(next(g.player.equipped) == nil and g:bag_capacity() == C.POCKET_CELLS, "naked: your arms")
+g.player.equipped.pants = "jeans"
+assert(g:bag_capacity() == C.POCKET_CELLS + C.ITEM_DB.jeans.pocket_cells, "pockets add up")
+g.player.equipped = {back = "backpack"}
+assert(g:bag_capacity() == C.ITEM_DB.backpack.bag_cells)
 g.player.inventory = {}
 for k = 1, C.POCKET_CELLS + 1 do g.player.inventory[k] = {item = "r" .. k, qty = 1} end
 local saved = #g:ground_list()

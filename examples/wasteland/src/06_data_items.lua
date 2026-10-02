@@ -4,7 +4,7 @@
 -- ---------------------------------------------------------------------
 
 local BACKPACK_CAP = 16      -- most bag cells any build can have (the layout's limit)
-local POCKET_CELLS = 4       -- bag cells with nothing worn on your back
+local POCKET_CELLS = 2       -- what you can carry in your arms, with no bag and no pockets
 
 -- Also the cursor order on the paperdoll: top of the body to the bottom.
 local EQUIP_SLOTS = {
@@ -21,8 +21,8 @@ local ITEM_DB = {
     -- coordinates (see BODY_POLYGONS). Drawn in order, later entries on top.
     tshirt       = {name = "T-Shirt",      slot = "shirt", consumable = nil, warmth = 1,
                     wear = {{"torso", 146, 227, "DARK"}, {"arms", 150, 184, "DARK"}}},
-    jeans        = {name = "Jeans",        slot = "pants", consumable = nil, warmth = 1,
-                    wear = {{"torso", 214, 227, "DARK"}, {"legs", 224, 279, "DARK"}}},
+    jeans        = {name = "Jeans",        slot = "pants", consumable = nil, warmth = 1, pocket_cells = 2,
+                    desc = "Worn: +2 bag cells (pockets)", wear = {{"torso", 214, 227, "DARK"}, {"legs", 224, 279, "DARK"}}},
     boots        = {name = "Boots",        slot = "feet",  consumable = nil, warmth = 1,
                     wear = {{"legs", 272, 290, "BLACK"}}},
     cap          = {name = "Cap",          slot = "head",  consumable = nil, warmth = 1,
@@ -39,13 +39,13 @@ local ITEM_DB = {
                     wear = {{"head", 127, 131, "BLACK", 1, 9}}},
     scarf        = {name = "Scarf",        slot = "neck",  consumable = nil, warmth = 1,
                     wear = {{"torso", 139, 150, "BLACK", 0, 12}}},
-    jacket       = {name = "Leather Jacket", slot = "jacket", consumable = nil, warmth = 3,
-                    wear = {{"torso", 146, 222, "BLACK", 5, 40},
+    jacket       = {name = "Leather Jacket", slot = "jacket", consumable = nil, warmth = 3, pocket_cells = 2,
+                    desc = "Worn: warmth 3, +2 bag cells", wear = {{"torso", 146, 222, "BLACK", 5, 40},
                             {"arms", 150, 232, "BLACK"}}},
     bracers      = {name = "Bracers",      slot = "wrists", consumable = nil,
                     wear = {{"arms", 222, 233, "BLACK"}}},
     -- bags: bag_cells is how many bag cells you get while wearing it
-    backpack     = {name = "Backpack",     slot = "back", consumable = nil, bag_cells = 12,
+    backpack     = {name = "Backpack",     slot = "back", consumable = nil, bag_cells = 10,
                     wear = {{"torso", 147, 196, "BLACK", 9, 13}}},
     -- rad_armor multiplies the radiation you take while it's worn
     gasmask      = {name = "Gas Mask",     slot = "eyes",  consumable = nil, warmth = 1,
@@ -54,10 +54,41 @@ local ITEM_DB = {
     -- belts: belt_cells more bag cells (pouches), on top of the bag
     leather_belt = {name = "Leather Belt", slot = "belt", consumable = nil, belt_cells = 2,
                     desc = "Worn: +2 bag cells", wear = {{"torso", 209, 214, "BLACK"}}},
-    rope_belt    = {name = "Rope Belt",    slot = "belt", consumable = nil, belt_cells = 1,
+    rope_belt    = {name = "Rope Belt",    slot = "belt", consumable = nil, belt_cells = 1, ragged_of = "leather_belt",
                     desc = "Worn: +1 bag cell", wear = {{"torso", 210, 213, "BLACK"}}},
-    satchel      = {name = "Satchel",      slot = "back", consumable = nil, bag_cells = 8,
+    satchel      = {name = "Satchel",      slot = "back", consumable = nil, bag_cells = 6,
                     wear = {{"torso", 147, 210, "BLACK", 12, 15}}},
+    -- crafted from scraps: a makeshift version of each piece of clothing,
+    -- as warm as the real thing but with less room (or less use). ragged_of: whose
+    -- sprite and look it borrows (10_sprites punches holes in the sprite)
+    rag_shirt    = {name = "Rag Shirt",    slot = "shirt", warmth = 1, ragged_of = "tshirt",
+                    wear = {{"torso", 146, 227, "LIGHT"}, {"arms", 150, 178, "LIGHT"}}},
+    rag_trousers = {name = "Rag Trousers", slot = "pants", warmth = 1, pocket_cells = 1, ragged_of = "jeans",
+                    desc = "Worn: +1 bag cell", wear = {{"torso", 214, 227, "LIGHT"}, {"legs", 224, 270, "LIGHT"}}},
+    foot_wraps   = {name = "Foot Wraps",   slot = "feet", warmth = 1, ragged_of = "boots",
+                    desc = "Better than bare feet", wear = {{"legs", 276, 290, "DARK"}}},
+    rag_hood     = {name = "Rag Hood",     slot = "head", warmth = 1, ragged_of = "cap",
+                    wear = {{"head", 116, 124, "DARK"}}},
+    hand_wraps   = {name = "Hand Wraps",   slot = "hands", warmth = 1, ragged_of = "gloves",
+                    wear = {{"arms", 236, 250, "DARK"}}},
+    ear_wraps    = {name = "Ear Wraps",    slot = "ears", warmth = 1, ragged_of = "earmuffs",
+                    wear = {{"head", 118, 122, "DARK", 0, 12}}},
+    slit_goggles = {name = "Slit Goggles", slot = "eyes", ragged_of = "sunglasses",
+                    wear = {{"head", 128, 130, "BLACK", 1, 9}}},
+    rag_scarf    = {name = "Rag Scarf",    slot = "neck", warmth = 1, ragged_of = "scarf",
+                    wear = {{"torso", 140, 148, "DARK", 0, 12}}},
+    patch_coat   = {name = "Patchwork Coat", slot = "jacket", warmth = 3, pocket_cells = 1, ragged_of = "jacket",
+                    desc = "Warmth 3, +1 bag cell",
+                    wear = {{"torso", 146, 222, "DARK", 5, 40}, {"arms", 150, 228, "DARK"}}},
+    scrap_bracers = {name = "Scrap Bracers", slot = "wrists", ragged_of = "bracers",
+                     wear = {{"arms", 224, 232, "DARK"}}},
+    bindle       = {name = "Bindle",       slot = "back", bag_cells = 5, ragged_of = "satchel",
+                    desc = "Worn: 5 bag cells", wear = {{"torso", 147, 200, "DARK", 12, 15}}},
+    sack_pack    = {name = "Sack Pack",    slot = "back", bag_cells = 8, ragged_of = "backpack",
+                    desc = "Worn: 8 bag cells", wear = {{"torso", 147, 196, "DARK", 9, 13}}},
+    rag_mask     = {name = "Rag Mask",     slot = "eyes", warmth = 1, rad_armor = 0.75, ragged_of = "gasmask",
+                    desc = "Worn: some radiation", vague_desc = "Worn: filters a little",
+                    wear = {{"head", 131, 139, "LIGHT", 0, 10}}},
     canned_beans = {name = "Canned Beans", slot = nil, consumable = {hunger = 40}},
     -- empty: what is left in your hands after drinking (see SURVIVE)
     water_bottle = {name = "Water Bottle", slot = nil, consumable = {thirst = 50},
@@ -192,19 +223,20 @@ local ARTIFACTS = {"weeping_stone", "drowned_eye", "flesh_knot", "hollow_star", 
 -- gear, hills are rock and whatever hikers left behind.
 local SCAVENGE_LOOT = {
     -- (nothing: 22 on plains and 34 in ruins before the trinkets; less now so
-    -- that useful finds are as likely as ever)
-    plains = {{"nothing", 17}, {"rock", 3}, {"cloth_scrap", 3}, {"canned_beans", 3},
+    -- that useful finds are as likely as ever. Cloth is commoner since you
+    -- start with nothing and make your clothes from it.)
+    plains = {{"nothing", 15}, {"rock", 3}, {"cloth_scrap", 5}, {"canned_beans", 3},
               {"water_bottle", 2}, {"cap", 1}, {"sunglasses", 1}, {"gloves", 1},
               {"satchel", 1}, {"pipe", 1}, {"knife", 1}, {"stick", 2},
               {"scrawled_notes", 1}, {"bolts", 1}, {"vodka", 1}, {"empty_bottle", 2},
               {"scrap_metal", 2}, {"jerky", 2}, {"copper_wire", 1}, {"battery_cell", 1},
               {"button", 1}, {"marble", 1}, {"toy_dino", 1}, {"tin_whistle", 1}, {"jingle_bell", 1}},
-    forest = {{"nothing", 16}, {"berries", 9}, {"cloth_scrap", 1}, {"water_bottle", 1},
+    forest = {{"nothing", 15}, {"berries", 9}, {"cloth_scrap", 2}, {"water_bottle", 1},
               {"scarf", 1}, {"earmuffs", 1}, {"gloves", 1}, {"spear", 1}, {"stick", 6}},
     -- ruins: what's left in houses and cars
-    ruins  = {{"nothing", 26}, {"canned_beans", 7}, {"water_bottle", 3}, {"cloth_scrap", 3},
+    ruins  = {{"nothing", 23}, {"canned_beans", 7}, {"water_bottle", 3}, {"cloth_scrap", 6},
               {"scrawled_notes", 2}, {"rope", 1}, {"knife", 1}, {"pipe", 1}, {"stick", 1},
-              {"jacket", 1}, {"backpack", 1}, {"antirad", 1}, {"vodka", 1}, {"bolts", 2},
+              {"jacket", 1}, {"backpack", 1}, {"tshirt", 1}, {"jeans", 1}, {"antirad", 1}, {"vodka", 1}, {"bolts", 2},
               {"geiger", 1}, {"gasmask", 1}, {"empty_bottle", 2}, {"scrap_metal", 3},
               {"leather_belt", 1}, {"jerky", 5}, {"broken_radio", 1}, {"broken_detector", 1},
               {"broken_headlamp", 1}, {"circuit_board", 1}, {"copper_wire", 2}, {"battery_cell", 1},
@@ -213,7 +245,7 @@ local SCAVENGE_LOOT = {
               {"marble", 1}, {"hair_clip", 1}, {"bottle_cap", 1}},
     ford   = {{"nothing", 18}, {"rock", 4}, {"stick", 2}, {"water_bottle", 1}, {"scrap_metal", 1}},
     hills  = {{"nothing", 20}, {"rock", 5}, {"water_bottle", 1}, {"canned_beans", 2},
-              {"jacket", 1}, {"bracers", 1}, {"boots", 1}, {"knife", 1}, {"stick", 1},
+              {"jacket", 1}, {"bracers", 1}, {"boots", 1}, {"tshirt", 1}, {"knife", 1}, {"stick", 1},
               {"scrawled_notes", 1}, {"antirad", 1}, {"scrap_metal", 1}, {"antenna", 1}},
 }
 
@@ -229,6 +261,27 @@ local RECIPES = {
      out = {"bandage", 1}, known = true},
     {id = "campfire", name = "Campfire", inputs = {stick = 3, rock = 1}, hours = 1,
      place = "campfire", known = true},
+    -- makeshift clothes: all known from the start (you start with nothing,
+    -- so they come near the top of the list)
+    {id = "rag_shirt", name = "Rag Shirt", inputs = {cloth_scrap = 2}, hours = 1, out = {"rag_shirt", 1}, known = true},
+    {id = "rag_trousers", name = "Rag Trousers", inputs = {cloth_scrap = 2}, hours = 1,
+     out = {"rag_trousers", 1}, known = true},
+    {id = "foot_wraps", name = "Foot Wraps", inputs = {cloth_scrap = 1}, hours = 1, out = {"foot_wraps", 1}, known = true},
+    {id = "rag_hood", name = "Rag Hood", inputs = {cloth_scrap = 2}, hours = 1, out = {"rag_hood", 1}, known = true},
+    {id = "hand_wraps", name = "Hand Wraps", inputs = {cloth_scrap = 1}, hours = 1, out = {"hand_wraps", 1}, known = true},
+    {id = "ear_wraps", name = "Ear Wraps", inputs = {cloth_scrap = 1}, hours = 1, out = {"ear_wraps", 1}, known = true},
+    {id = "slit_goggles", name = "Slit Goggles", inputs = {stick = 1}, tools = {"knife"}, hours = 1,
+     out = {"slit_goggles", 1}, known = true},
+    {id = "rag_scarf", name = "Rag Scarf", inputs = {cloth_scrap = 2}, hours = 1, out = {"rag_scarf", 1}, known = true},
+    {id = "patch_coat", name = "Patchwork Coat", inputs = {cloth_scrap = 4}, hours = 2,
+     out = {"patch_coat", 1}, known = true},
+    {id = "scrap_bracers", name = "Scrap Bracers", inputs = {scrap_metal = 2, cloth_scrap = 1}, hours = 1,
+     out = {"scrap_bracers", 1}, known = true},
+    {id = "bindle", name = "Bindle", inputs = {stick = 1, cloth_scrap = 3}, hours = 1, out = {"bindle", 1}, known = true},
+    {id = "sack_pack", name = "Sack Pack", inputs = {cloth_scrap = 4, rope = 1}, hours = 2,
+     out = {"sack_pack", 1}, known = true},
+    {id = "rag_mask", name = "Rag Mask", inputs = {cloth_scrap = 2, water_bottle = 1}, hours = 1,
+     out = {"rag_mask", 1}, known = true},
     {id = "cook", name = "Cooked Meat", inputs = {strange_meat = 1}, fire = true, hours = 1,
      out = {"cooked_meat", 1}, known = true},
     {id = "boil", name = "Boil Water", inputs = {dirty_water = 1}, fire = true, hours = 1,
@@ -272,7 +325,9 @@ local RECIPES = {
 }
 RECIPES.campfire_hours = 12   -- a fire burns this long after it's built
 
--- Worn gear that is scattered around the map (the starting clothes aren't).
+-- Worn gear that is scattered around the map. The old starting clothes are
+-- placed separately (START_FINDS, Game.place_extras), near the start.
+START_FINDS = {"tshirt", "jeans", "boots", "backpack"}
 local WORLD_WEARABLES = {"cap", "gloves", "earmuffs", "sunglasses", "scarf",
                          "jacket", "bracers", "satchel", "leather_belt"}
 

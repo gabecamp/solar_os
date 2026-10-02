@@ -53,7 +53,7 @@ assert(p:byte(1) == 1 and p:byte(2) == 128, "bit order wrong")
 print("3. bit order confirmed: pixel 0 -> 0x01, pixel 15 -> 0x80 (matches XBM LSB-first)")
 
 -- 4. drawing: sprites land inside their slot boxes with valid args
-local game = Game.new()
+local game = dofile("kit.lua")(Game.new())   -- dressed as the old start
 game.player.q, game.player.r = 0, 0
 game.player.equipped.head = "cap"
 game.player.equipped.hands = "gloves"
@@ -65,14 +65,14 @@ for _, c in ipairs(SPRITE_CALLS) do
     assert(c.x >= 0 and c.y >= 0 and c.x + c.w <= 400 and c.y + c.h <= 300,
         ("sprite off screen at %d,%d"):format(c.x, c.y))
 end
--- expected: ground 4 + bag 2 + equipped (tshirt,jeans,boots,backpack,cap,gloves)
+-- expected: ground 5 (rock, sticks, cloth, beans, water) + bag 2 + equipped (tshirt,jeans,boots,backpack,cap,gloves)
 -- 6 x 5 (each worn icon is drawn 4x in white as a halo, then once in black)
 -- (the doll itself is drawn as bitmap tiles: count the 16x16 icons apart)
 local icons = 0
 for _, c in ipairs(SPRITE_CALLS) do if c.w == 16 and c.h == 16 then icons = icons + 1 end end
-assert(icons == 36, "expected 36 icon sprites, got " .. icons)
-assert(#SPRITE_CALLS == 36 + #game:doll_tiles(), "the rest are the doll's tiles")
-print("   count matches: 4 ground + 2 bag + 6 worn x 5 (halo) = 36 icons, + " .. #game:doll_tiles()
+assert(icons == 37, "expected 37 icon sprites, got " .. icons)
+assert(#SPRITE_CALLS == 37 + #game:doll_tiles(), "the rest are the doll's tiles")
+print("   count matches: 5 ground + 2 bag + 6 worn x 5 (halo) = 37 icons, + " .. #game:doll_tiles()
     .. " doll tiles, all on screen")
 
 -- 5. an item with no art must fall back to a letter, not crash

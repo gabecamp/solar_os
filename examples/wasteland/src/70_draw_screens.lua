@@ -80,10 +80,10 @@ function Game:draw_creator(w, h)
     local desc = row <= #ATTRIBUTES and ATTR_DESC[ATTRIBUTES[row]]
         or TRAITS[row - #ATTRIBUTES].desc
     gfx.text(6, y + 4, desc)
-    local bag = ITEM_DB.backpack.bag_cells + p.bag_bonus
+    local bag = POCKET_CELLS + p.bag_bonus   -- (you start with nothing: no bag, no pockets)
     gfx.text(6, y + 20, "MP " .. p.max_mp .. " Sight " .. p.sight .. " Finds " .. p.scav_rolls
         .. " Duds " .. dud_percent(p.attrs.Perception) .. "%")
-    gfx.text(6, y + 34, "Bag " .. math.max(2, math.min(BACKPACK_CAP, bag)) .. " cells (backpack)")
+    gfx.text(6, y + 34, "Carry " .. math.max(2, math.min(BACKPACK_CAP, bag)) .. " (no bag, no clothes)")
     if self.creator_msg then
         gfx.text(6, y + 50, self.creator_msg)
     elseif tleft < 0 then

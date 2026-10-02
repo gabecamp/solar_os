@@ -147,9 +147,11 @@ end
 assert(rest_gain(true) > rest_gain(false))
 print("   OK")
 
-print("8. clothes have warmth; the start outfit is enough for a clear night, not a cold snap")
+print("8. clothes have warmth; you start naked, and the old start outfit (lying near the start)")
+print("   is enough for a clear night, not a cold snap")
+assert(next(fresh().player.equipped) == nil, "you start with nothing on")
 local start = 0
-for _, item in pairs(fresh().player.equipped) do start = start + (W.ITEM_DB[item].warmth or 0) end
+for _, item in ipairs({"tshirt", "jeans", "boots", "backpack"}) do start = start + (W.ITEM_DB[item].warmth or 0) end
 assert(start >= W.WORLD.need.Clear + W.WORLD.night_need)
 assert(start < W.WORLD.need["Cold snap"] + W.WORLD.night_need)
 print("   OK")

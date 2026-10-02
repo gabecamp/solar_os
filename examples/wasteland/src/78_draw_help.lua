@@ -5,7 +5,7 @@
 -- info page is for testing on a new board: what the game sees of SolarOS.
 -- ---------------------------------------------------------------------
 
-Game.VERSION = "0.10 (2026-10-01)"
+Game.VERSION = "0.11 (2026-10-02)"
 
 local HELP = {
     {"MAP", "Arrows/WASD move    Space rest 4h"},
@@ -19,12 +19,12 @@ local HELP = {
     {"FIGHTS", "Up/Dn pick  Enter choose"},
     {"PUZZLE", "Arrows move  T+arrow throw  1-4 sigils"},
     {"", "Q backs away from a puzzle unharmed"},
-    {"TIPS", "Shelter in ruins/hills from emissions."},
+    {"TIPS", "You start with nothing: C makes rags."},
+    {"", "Emissions, storms: shelter in ruins/hills."},
     {"", "3 artifacts or a permit get you out."},
     {"", "Karl fishes rivers. Strays like food."},
     {"", "C in a ruin: claim it. Carry light at night."},
     {"", "Skills grow with use (J). R on the title: records."},
-    {"", "Storms: shelter in ruins, hills or trees."},
     {"", "Mother Okun trades by the river; a Peddler roams."},
     {"", "Leave toys at little cairns (E or T)."},
 }

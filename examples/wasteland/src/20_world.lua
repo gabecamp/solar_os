@@ -218,9 +218,12 @@ local function generate_world(seed)
     end
 
     local ground = {}
+    -- (you wake with nothing: enough here for a rag shirt, a bindle and
+    -- foot wraps, and a fire for the first night)
     ground[hex_key(0, 0)] = {
         {item = "rock", qty = 1},
-        {item = "cloth_scrap", qty = 2},
+        {item = "stick", qty = 4},
+        {item = "cloth_scrap", qty = 6},
         {item = "canned_beans", qty = 1},
         {item = "water_bottle", qty = 2},
     }
@@ -388,11 +391,8 @@ local function new_player()
         needs = {hunger = 100, thirst = 100, rest = 100},
         health = MAX_HEALTH,
         injuries = {bleeding = false, wounded_hours = 0},
-        equipped = {shirt = "tshirt", pants = "jeans", feet = "boots", back = "backpack"},
-        inventory = {
-            {item = "water_bottle", qty = 1},
-            {item = "canned_beans", qty = 1},
-        },
+        equipped = {},    -- you wake up with nothing: no clothes, no shoes, no bag
+        inventory = {},
         explored = {},
         visible = {},
         attrs = default_attrs(),

@@ -1567,6 +1567,23 @@ local function pack_bitmap(name, rows, w, h)
     return packed
 end
 
+-- Makeshift clothes borrow the real thing's sprite, full of holes.
+for item_id, def in pairs(ITEM_DB) do
+    local base = def.ragged_of and SPRITE_ART[def.ragged_of]
+    if base and not SPRITE_ART[item_id] then
+        local rows = {}
+        for y, row in ipairs(base) do
+            local out = {}
+            for x = 1, #row do
+                local c = row:sub(x, x)
+                out[x] = (c == "#" and (x + 2 * y) % 5 == 0) and "." or c
+            end
+            rows[y] = table.concat(out)
+        end
+        SPRITE_ART[item_id] = rows
+    end
+end
+
 local SPRITES = {}
 for item_id, rows in pairs(SPRITE_ART) do
     SPRITES[item_id] = pack_bitmap(item_id, rows, SPRITE_W, SPRITE_H)

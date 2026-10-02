@@ -173,6 +173,8 @@ local TRADE = {
         antirad = 15, vodka = 8, geiger = 30, gasmask = 25, bolts = 1,
         jacket = 20, backpack = 25, satchel = 12, boots = 8, gloves = 5, cap = 3,
         earmuffs = 4, sunglasses = 4, scarf = 4, bracers = 5, tshirt = 2, jeans = 3,
+        rag_shirt = 1, rag_trousers = 1, foot_wraps = 1, rag_hood = 1, hand_wraps = 1, ear_wraps = 1,
+        slit_goggles = 1, rag_scarf = 1, patch_coat = 4, scrap_bracers = 2, bindle = 3, sack_pack = 5, rag_mask = 2,
         weeping_stone = 35, drowned_eye = 35, flesh_knot = 35, hollow_star = 35,
         quiet_shell = 35, permit = 80,
         leather_belt = 10, rope_belt = 4, scrap_metal = 3, jerky = 6,
@@ -257,9 +259,9 @@ local KARL = {
 -- hunger and thirst fall.
 local DIFFICULTY = {
     order = {"easy", "normal", "hard"},
-    easy   = {name = "Easy", short = "Easy",          food = 1.5, encounter = 0.6, rad = 0.6, emission = 0.5, drain = 0.8},
-    normal = {name = "Normal", short = "Normal",        food = 1.15, encounter = 0.9, rad = 1, emission = 1, drain = 0.9},
-    hard   = {name = "Zone-Hardened", short = "Hard", food = 0.85, encounter = 1.3, rad = 1.25, emission = 1.25, drain = 1.1},
+    easy   = {name = "Easy", short = "Easy",          food = 2.0, encounter = 0.5, rad = 0.5, emission = 0.5, drain = 0.65},
+    normal = {name = "Normal", short = "Normal",        food = 1.4, encounter = 0.85, rad = 1, emission = 1, drain = 0.85},
+    hard   = {name = "Zone-Hardened", short = "Hard", food = 1.0, encounter = 1.2, rad = 1.25, emission = 1.25, drain = 1.05},
 }
 
 -- A dog companion (src/48_dog.lua). chance: % per move on `terrain` while
@@ -405,7 +407,7 @@ local SKILLS = {
 -- ---------------------------------------------------------------------
 
 local BACKPACK_CAP = 16      -- most bag cells any build can have (the layout's limit)
-local POCKET_CELLS = 4       -- bag cells with nothing worn on your back
+local POCKET_CELLS = 2       -- what you can carry in your arms, with no bag and no pockets
 
 -- Also the cursor order on the paperdoll: top of the body to the bottom.
 local EQUIP_SLOTS = {
@@ -422,8 +424,8 @@ local ITEM_DB = {
     -- coordinates (see BODY_POLYGONS). Drawn in order, later entries on top.
     tshirt       = {name = "T-Shirt",      slot = "shirt", consumable = nil, warmth = 1,
                     wear = {{"torso", 146, 227, "DARK"}, {"arms", 150, 184, "DARK"}}},
-    jeans        = {name = "Jeans",        slot = "pants", consumable = nil, warmth = 1,
-                    wear = {{"torso", 214, 227, "DARK"}, {"legs", 224, 279, "DARK"}}},
+    jeans        = {name = "Jeans",        slot = "pants", consumable = nil, warmth = 1, pocket_cells = 2,
+                    desc = "Worn: +2 bag cells (pockets)", wear = {{"torso", 214, 227, "DARK"}, {"legs", 224, 279, "DARK"}}},
     boots        = {name = "Boots",        slot = "feet",  consumable = nil, warmth = 1,
                     wear = {{"legs", 272, 290, "BLACK"}}},
     cap          = {name = "Cap",          slot = "head",  consumable = nil, warmth = 1,
@@ -440,13 +442,13 @@ local ITEM_DB = {
                     wear = {{"head", 127, 131, "BLACK", 1, 9}}},
     scarf        = {name = "Scarf",        slot = "neck",  consumable = nil, warmth = 1,
                     wear = {{"torso", 139, 150, "BLACK", 0, 12}}},
-    jacket       = {name = "Leather Jacket", slot = "jacket", consumable = nil, warmth = 3,
-                    wear = {{"torso", 146, 222, "BLACK", 5, 40},
+    jacket       = {name = "Leather Jacket", slot = "jacket", consumable = nil, warmth = 3, pocket_cells = 2,
+                    desc = "Worn: warmth 3, +2 bag cells", wear = {{"torso", 146, 222, "BLACK", 5, 40},
                             {"arms", 150, 232, "BLACK"}}},
     bracers      = {name = "Bracers",      slot = "wrists", consumable = nil,
                     wear = {{"arms", 222, 233, "BLACK"}}},
     -- bags: bag_cells is how many bag cells you get while wearing it
-    backpack     = {name = "Backpack",     slot = "back", consumable = nil, bag_cells = 12,
+    backpack     = {name = "Backpack",     slot = "back", consumable = nil, bag_cells = 10,
                     wear = {{"torso", 147, 196, "BLACK", 9, 13}}},
     -- rad_armor multiplies the radiation you take while it's worn
     gasmask      = {name = "Gas Mask",     slot = "eyes",  consumable = nil, warmth = 1,
@@ -455,10 +457,41 @@ local ITEM_DB = {
     -- belts: belt_cells more bag cells (pouches), on top of the bag
     leather_belt = {name = "Leather Belt", slot = "belt", consumable = nil, belt_cells = 2,
                     desc = "Worn: +2 bag cells", wear = {{"torso", 209, 214, "BLACK"}}},
-    rope_belt    = {name = "Rope Belt",    slot = "belt", consumable = nil, belt_cells = 1,
+    rope_belt    = {name = "Rope Belt",    slot = "belt", consumable = nil, belt_cells = 1, ragged_of = "leather_belt",
                     desc = "Worn: +1 bag cell", wear = {{"torso", 210, 213, "BLACK"}}},
-    satchel      = {name = "Satchel",      slot = "back", consumable = nil, bag_cells = 8,
+    satchel      = {name = "Satchel",      slot = "back", consumable = nil, bag_cells = 6,
                     wear = {{"torso", 147, 210, "BLACK", 12, 15}}},
+    -- crafted from scraps: a makeshift version of each piece of clothing,
+    -- as warm as the real thing but with less room (or less use). ragged_of: whose
+    -- sprite and look it borrows (10_sprites punches holes in the sprite)
+    rag_shirt    = {name = "Rag Shirt",    slot = "shirt", warmth = 1, ragged_of = "tshirt",
+                    wear = {{"torso", 146, 227, "LIGHT"}, {"arms", 150, 178, "LIGHT"}}},
+    rag_trousers = {name = "Rag Trousers", slot = "pants", warmth = 1, pocket_cells = 1, ragged_of = "jeans",
+                    desc = "Worn: +1 bag cell", wear = {{"torso", 214, 227, "LIGHT"}, {"legs", 224, 270, "LIGHT"}}},
+    foot_wraps   = {name = "Foot Wraps",   slot = "feet", warmth = 1, ragged_of = "boots",
+                    desc = "Better than bare feet", wear = {{"legs", 276, 290, "DARK"}}},
+    rag_hood     = {name = "Rag Hood",     slot = "head", warmth = 1, ragged_of = "cap",
+                    wear = {{"head", 116, 124, "DARK"}}},
+    hand_wraps   = {name = "Hand Wraps",   slot = "hands", warmth = 1, ragged_of = "gloves",
+                    wear = {{"arms", 236, 250, "DARK"}}},
+    ear_wraps    = {name = "Ear Wraps",    slot = "ears", warmth = 1, ragged_of = "earmuffs",
+                    wear = {{"head", 118, 122, "DARK", 0, 12}}},
+    slit_goggles = {name = "Slit Goggles", slot = "eyes", ragged_of = "sunglasses",
+                    wear = {{"head", 128, 130, "BLACK", 1, 9}}},
+    rag_scarf    = {name = "Rag Scarf",    slot = "neck", warmth = 1, ragged_of = "scarf",
+                    wear = {{"torso", 140, 148, "DARK", 0, 12}}},
+    patch_coat   = {name = "Patchwork Coat", slot = "jacket", warmth = 3, pocket_cells = 1, ragged_of = "jacket",
+                    desc = "Warmth 3, +1 bag cell",
+                    wear = {{"torso", 146, 222, "DARK", 5, 40}, {"arms", 150, 228, "DARK"}}},
+    scrap_bracers = {name = "Scrap Bracers", slot = "wrists", ragged_of = "bracers",
+                     wear = {{"arms", 224, 232, "DARK"}}},
+    bindle       = {name = "Bindle",       slot = "back", bag_cells = 5, ragged_of = "satchel",
+                    desc = "Worn: 5 bag cells", wear = {{"torso", 147, 200, "DARK", 12, 15}}},
+    sack_pack    = {name = "Sack Pack",    slot = "back", bag_cells = 8, ragged_of = "backpack",
+                    desc = "Worn: 8 bag cells", wear = {{"torso", 147, 196, "DARK", 9, 13}}},
+    rag_mask     = {name = "Rag Mask",     slot = "eyes", warmth = 1, rad_armor = 0.75, ragged_of = "gasmask",
+                    desc = "Worn: some radiation", vague_desc = "Worn: filters a little",
+                    wear = {{"head", 131, 139, "LIGHT", 0, 10}}},
     canned_beans = {name = "Canned Beans", slot = nil, consumable = {hunger = 40}},
     -- empty: what is left in your hands after drinking (see SURVIVE)
     water_bottle = {name = "Water Bottle", slot = nil, consumable = {thirst = 50},
@@ -593,19 +626,20 @@ local ARTIFACTS = {"weeping_stone", "drowned_eye", "flesh_knot", "hollow_star", 
 -- gear, hills are rock and whatever hikers left behind.
 local SCAVENGE_LOOT = {
     -- (nothing: 22 on plains and 34 in ruins before the trinkets; less now so
-    -- that useful finds are as likely as ever)
-    plains = {{"nothing", 17}, {"rock", 3}, {"cloth_scrap", 3}, {"canned_beans", 3},
+    -- that useful finds are as likely as ever. Cloth is commoner since you
+    -- start with nothing and make your clothes from it.)
+    plains = {{"nothing", 15}, {"rock", 3}, {"cloth_scrap", 5}, {"canned_beans", 3},
               {"water_bottle", 2}, {"cap", 1}, {"sunglasses", 1}, {"gloves", 1},
               {"satchel", 1}, {"pipe", 1}, {"knife", 1}, {"stick", 2},
               {"scrawled_notes", 1}, {"bolts", 1}, {"vodka", 1}, {"empty_bottle", 2},
               {"scrap_metal", 2}, {"jerky", 2}, {"copper_wire", 1}, {"battery_cell", 1},
               {"button", 1}, {"marble", 1}, {"toy_dino", 1}, {"tin_whistle", 1}, {"jingle_bell", 1}},
-    forest = {{"nothing", 16}, {"berries", 9}, {"cloth_scrap", 1}, {"water_bottle", 1},
+    forest = {{"nothing", 15}, {"berries", 9}, {"cloth_scrap", 2}, {"water_bottle", 1},
               {"scarf", 1}, {"earmuffs", 1}, {"gloves", 1}, {"spear", 1}, {"stick", 6}},
     -- ruins: what's left in houses and cars
-    ruins  = {{"nothing", 26}, {"canned_beans", 7}, {"water_bottle", 3}, {"cloth_scrap", 3},
+    ruins  = {{"nothing", 23}, {"canned_beans", 7}, {"water_bottle", 3}, {"cloth_scrap", 6},
               {"scrawled_notes", 2}, {"rope", 1}, {"knife", 1}, {"pipe", 1}, {"stick", 1},
-              {"jacket", 1}, {"backpack", 1}, {"antirad", 1}, {"vodka", 1}, {"bolts", 2},
+              {"jacket", 1}, {"backpack", 1}, {"tshirt", 1}, {"jeans", 1}, {"antirad", 1}, {"vodka", 1}, {"bolts", 2},
               {"geiger", 1}, {"gasmask", 1}, {"empty_bottle", 2}, {"scrap_metal", 3},
               {"leather_belt", 1}, {"jerky", 5}, {"broken_radio", 1}, {"broken_detector", 1},
               {"broken_headlamp", 1}, {"circuit_board", 1}, {"copper_wire", 2}, {"battery_cell", 1},
@@ -614,7 +648,7 @@ local SCAVENGE_LOOT = {
               {"marble", 1}, {"hair_clip", 1}, {"bottle_cap", 1}},
     ford   = {{"nothing", 18}, {"rock", 4}, {"stick", 2}, {"water_bottle", 1}, {"scrap_metal", 1}},
     hills  = {{"nothing", 20}, {"rock", 5}, {"water_bottle", 1}, {"canned_beans", 2},
-              {"jacket", 1}, {"bracers", 1}, {"boots", 1}, {"knife", 1}, {"stick", 1},
+              {"jacket", 1}, {"bracers", 1}, {"boots", 1}, {"tshirt", 1}, {"knife", 1}, {"stick", 1},
               {"scrawled_notes", 1}, {"antirad", 1}, {"scrap_metal", 1}, {"antenna", 1}},
 }
 
@@ -630,6 +664,27 @@ local RECIPES = {
      out = {"bandage", 1}, known = true},
     {id = "campfire", name = "Campfire", inputs = {stick = 3, rock = 1}, hours = 1,
      place = "campfire", known = true},
+    -- makeshift clothes: all known from the start (you start with nothing,
+    -- so they come near the top of the list)
+    {id = "rag_shirt", name = "Rag Shirt", inputs = {cloth_scrap = 2}, hours = 1, out = {"rag_shirt", 1}, known = true},
+    {id = "rag_trousers", name = "Rag Trousers", inputs = {cloth_scrap = 2}, hours = 1,
+     out = {"rag_trousers", 1}, known = true},
+    {id = "foot_wraps", name = "Foot Wraps", inputs = {cloth_scrap = 1}, hours = 1, out = {"foot_wraps", 1}, known = true},
+    {id = "rag_hood", name = "Rag Hood", inputs = {cloth_scrap = 2}, hours = 1, out = {"rag_hood", 1}, known = true},
+    {id = "hand_wraps", name = "Hand Wraps", inputs = {cloth_scrap = 1}, hours = 1, out = {"hand_wraps", 1}, known = true},
+    {id = "ear_wraps", name = "Ear Wraps", inputs = {cloth_scrap = 1}, hours = 1, out = {"ear_wraps", 1}, known = true},
+    {id = "slit_goggles", name = "Slit Goggles", inputs = {stick = 1}, tools = {"knife"}, hours = 1,
+     out = {"slit_goggles", 1}, known = true},
+    {id = "rag_scarf", name = "Rag Scarf", inputs = {cloth_scrap = 2}, hours = 1, out = {"rag_scarf", 1}, known = true},
+    {id = "patch_coat", name = "Patchwork Coat", inputs = {cloth_scrap = 4}, hours = 2,
+     out = {"patch_coat", 1}, known = true},
+    {id = "scrap_bracers", name = "Scrap Bracers", inputs = {scrap_metal = 2, cloth_scrap = 1}, hours = 1,
+     out = {"scrap_bracers", 1}, known = true},
+    {id = "bindle", name = "Bindle", inputs = {stick = 1, cloth_scrap = 3}, hours = 1, out = {"bindle", 1}, known = true},
+    {id = "sack_pack", name = "Sack Pack", inputs = {cloth_scrap = 4, rope = 1}, hours = 2,
+     out = {"sack_pack", 1}, known = true},
+    {id = "rag_mask", name = "Rag Mask", inputs = {cloth_scrap = 2, water_bottle = 1}, hours = 1,
+     out = {"rag_mask", 1}, known = true},
     {id = "cook", name = "Cooked Meat", inputs = {strange_meat = 1}, fire = true, hours = 1,
      out = {"cooked_meat", 1}, known = true},
     {id = "boil", name = "Boil Water", inputs = {dirty_water = 1}, fire = true, hours = 1,
@@ -673,7 +728,9 @@ local RECIPES = {
 }
 RECIPES.campfire_hours = 12   -- a fire burns this long after it's built
 
--- Worn gear that is scattered around the map (the starting clothes aren't).
+-- Worn gear that is scattered around the map. The old starting clothes are
+-- placed separately (START_FINDS, Game.place_extras), near the start.
+START_FINDS = {"tshirt", "jeans", "boots", "backpack"}
 local WORLD_WEARABLES = {"cap", "gloves", "earmuffs", "sunglasses", "scarf",
                          "jacket", "bracers", "satchel", "leather_belt"}
 
@@ -2390,6 +2447,23 @@ local function pack_bitmap(name, rows, w, h)
     return packed
 end
 
+-- Makeshift clothes borrow the real thing's sprite, full of holes.
+for item_id, def in pairs(ITEM_DB) do
+    local base = def.ragged_of and SPRITE_ART[def.ragged_of]
+    if base and not SPRITE_ART[item_id] then
+        local rows = {}
+        for y, row in ipairs(base) do
+            local out = {}
+            for x = 1, #row do
+                local c = row:sub(x, x)
+                out[x] = (c == "#" and (x + 2 * y) % 5 == 0) and "." or c
+            end
+            rows[y] = table.concat(out)
+        end
+        SPRITE_ART[item_id] = rows
+    end
+end
+
 local SPRITES = {}
 for item_id, rows in pairs(SPRITE_ART) do
     SPRITES[item_id] = pack_bitmap(item_id, rows, SPRITE_W, SPRITE_H)
@@ -2940,9 +3014,12 @@ local function generate_world(seed)
     end
 
     local ground = {}
+    -- (you wake with nothing: enough here for a rag shirt, a bindle and
+    -- foot wraps, and a fire for the first night)
     ground[hex_key(0, 0)] = {
         {item = "rock", qty = 1},
-        {item = "cloth_scrap", qty = 2},
+        {item = "stick", qty = 4},
+        {item = "cloth_scrap", qty = 6},
         {item = "canned_beans", qty = 1},
         {item = "water_bottle", qty = 2},
     }
@@ -3110,11 +3187,8 @@ local function new_player()
         needs = {hunger = 100, thirst = 100, rest = 100},
         health = MAX_HEALTH,
         injuries = {bleeding = false, wounded_hours = 0},
-        equipped = {shirt = "tshirt", pants = "jeans", feet = "boots", back = "backpack"},
-        inventory = {
-            {item = "water_bottle", qty = 1},
-            {item = "canned_beans", qty = 1},
-        },
+        equipped = {},    -- you wake up with nothing: no clothes, no shoes, no bag
+        inventory = {},
         explored = {},
         visible = {},
         attrs = default_attrs(),
@@ -3214,6 +3288,10 @@ function Game.new()
     self.world_seed = seed       -- the map is rebuilt from this when a save is loaded
     self.tiles, self.ground, seed, self.rad, self.sites = generate_world(seed)
     self.extras = Game.place_extras(self.tiles, self.sites, self.rad, self.world_seed)
+    for _, d in ipairs(self.extras.drops) do
+        self.ground[d.key] = self.ground[d.key] or {}
+        table.insert(self.ground[d.key], {item = d.item, qty = 1})
+    end
     self.ferry_trader = Game.starting_stock("ferry")
     self.peddler = Game.starting_stock("peddler")
     self.little = Game.new_little()
@@ -3246,7 +3324,7 @@ function Game.new()
     self.screen = "creator"      -- "creator", then "map" or "inventory"
     self.creator_cursor = 1      -- rows: attributes, then traits
     self.creator_msg = nil
-    self.log = {"You wake up in the wasteland."}
+    self.log = {"You wake with nothing. Not even shoes."}
     self.inv_cursor = 1
     self.inv_selected = nil      -- {"ground"|"inventory"|"equip", key}
     self.quit = false
@@ -3493,8 +3571,13 @@ end
 -- Pack Mule, within what the screen can show.
 function Game:bag_capacity()
     local p = self.player
+    -- a bag on your back (else what you can carry in your arms), plus the
+    -- pockets in what you wear and the pouches on your belt
     local bag = p.equipped.back and ITEM_DB[p.equipped.back].bag_cells or POCKET_CELLS
-    if p.equipped.belt then bag = bag + (ITEM_DB[p.equipped.belt].belt_cells or 0) end
+    for _, item in pairs(p.equipped) do
+        local def = ITEM_DB[item]
+        bag = bag + (def.pocket_cells or 0) + (def.belt_cells or 0)
+    end
     return math.max(2, math.min(BACKPACK_CAP, bag + (p.bag_bonus or 0)))
 end
 
@@ -5729,6 +5812,8 @@ end
 -- world made before them (an old save) keeps every tile and site it had:
 --   the Ferry Post (sites.ferry): a few ruins by the water, far from the
 --     town; Mother Okun trades there (self.ferry_trader, saved).
+--   the old starting clothes (extras.drops): lying a few hexes from the
+--     start, since you start with nothing.
 --   the Peddler's round (extras.route): TRADE.route_n stops around the map;
 --     he stays TRADE.stay hours at each, so where he is comes from the
 --     clock (nothing to save but his stock, self.peddler).
@@ -5867,6 +5952,23 @@ function Game.place_extras(tiles, sites, rad, world_seed)
             break
         end
     end
+
+    -- the clothes you used to start in, left lying around instead (a new
+    -- game puts them on the ground: Game.new)
+    local drops, options = {}, {}
+    for _, key in ipairs(keys) do
+        local q, r = parse_key(key)
+        local d = axial_distance(0, 0, q, r)
+        if TERRAIN[tiles[key]].passable and not taken[key] and d >= 2 and d <= 6 then
+            options[#options + 1] = key
+        end
+    end
+    for _, item in ipairs(START_FINDS) do
+        if #options == 0 then break end
+        local key = table.remove(options, roll(#options) + 1)
+        drops[#drops + 1], taken[key] = {key = key, item = item}, true
+    end
+    extras.drops = drops
     return extras
 end
 
@@ -9186,10 +9288,10 @@ function Game:draw_creator(w, h)
     local desc = row <= #ATTRIBUTES and ATTR_DESC[ATTRIBUTES[row]]
         or TRAITS[row - #ATTRIBUTES].desc
     gfx.text(6, y + 4, desc)
-    local bag = ITEM_DB.backpack.bag_cells + p.bag_bonus
+    local bag = POCKET_CELLS + p.bag_bonus   -- (you start with nothing: no bag, no pockets)
     gfx.text(6, y + 20, "MP " .. p.max_mp .. " Sight " .. p.sight .. " Finds " .. p.scav_rolls
         .. " Duds " .. dud_percent(p.attrs.Perception) .. "%")
-    gfx.text(6, y + 34, "Bag " .. math.max(2, math.min(BACKPACK_CAP, bag)) .. " cells (backpack)")
+    gfx.text(6, y + 34, "Carry " .. math.max(2, math.min(BACKPACK_CAP, bag)) .. " (no bag, no clothes)")
     if self.creator_msg then
         gfx.text(6, y + 50, self.creator_msg)
     elseif tleft < 0 then
@@ -9569,7 +9671,7 @@ end
 -- info page is for testing on a new board: what the game sees of SolarOS.
 -- ---------------------------------------------------------------------
 
-Game.VERSION = "0.10 (2026-10-01)"
+Game.VERSION = "0.11 (2026-10-02)"
 
 local HELP = {
     {"MAP", "Arrows/WASD move    Space rest 4h"},
@@ -9583,12 +9685,12 @@ local HELP = {
     {"FIGHTS", "Up/Dn pick  Enter choose"},
     {"PUZZLE", "Arrows move  T+arrow throw  1-4 sigils"},
     {"", "Q backs away from a puzzle unharmed"},
-    {"TIPS", "Shelter in ruins/hills from emissions."},
+    {"TIPS", "You start with nothing: C makes rags."},
+    {"", "Emissions, storms: shelter in ruins/hills."},
     {"", "3 artifacts or a permit get you out."},
     {"", "Karl fishes rivers. Strays like food."},
     {"", "C in a ruin: claim it. Carry light at night."},
     {"", "Skills grow with use (J). R on the title: records."},
-    {"", "Storms: shelter in ruins, hills or trees."},
     {"", "Mother Okun trades by the river; a Peddler roams."},
     {"", "Leave toys at little cairns (E or T)."},
 }

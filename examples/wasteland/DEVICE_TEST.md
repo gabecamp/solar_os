@@ -25,10 +25,14 @@ before and start it. For anything that goes wrong, a photo of the screen
 ## 3. Inventory and crafting (2 min)
 7. I opens the bag. Arrows move the cursor over the ground, the body slots
    and the bag. Enter picks something up, Enter again drops it somewhere.
-   **Expect:** icons are drawn (not blank boxes); the doll shows worn clothes.
-8. E on the water bottle. **Expect:** thirst goes up and an Empty Bottle
-   appears.
+   **Expect:** you start with nothing: a bare doll and 2 bag cells (your
+   arms). The ground holds a rock, 4 sticks, 6 cloth scraps, beans and 2 waters, with
+   icons drawn (not blank boxes).
+8. Pick up a water bottle and press E on it. **Expect:** thirst goes up and
+   an Empty Bottle appears.
 9. C opens crafting. **Expect:** a list of recipes with what each needs.
+   Make **Foot Wraps** from the scraps on the ground, then E on them in the bag:
+   **Expect:** holed boot icon on the doll's feet.
 
 ## 4. Things that make sound or use storage (2 min)
 10. If you find a Geiger Counter, step onto a hot hex. **Expect:** a click
@@ -46,6 +50,9 @@ before and start it. For anything that goes wrong, a photo of the screen
     and a list of choices.
 
 ## 6. New things to try (2026-10-02)
+- **Starting with nothing:** walk 2 to 6 hexes out and search the piles:
+  your old T-shirt, jeans, boots and backpack are out there. The rags you
+  craft show as holed versions of the real icons.
 - **Seasons and weather:** the panel's second line reads like "Aut Overcast"
   (season, weather). Wait or walk a few days: fog (sight 1), storms (find
   ruins, hills or trees), snow in winter (from day 11).

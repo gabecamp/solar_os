@@ -19,6 +19,10 @@ function Game.new()
     self.world_seed = seed       -- the map is rebuilt from this when a save is loaded
     self.tiles, self.ground, seed, self.rad, self.sites = generate_world(seed)
     self.extras = Game.place_extras(self.tiles, self.sites, self.rad, self.world_seed)
+    for _, d in ipairs(self.extras.drops) do
+        self.ground[d.key] = self.ground[d.key] or {}
+        table.insert(self.ground[d.key], {item = d.item, qty = 1})
+    end
     self.ferry_trader = Game.starting_stock("ferry")
     self.peddler = Game.starting_stock("peddler")
     self.little = Game.new_little()
@@ -51,7 +55,7 @@ function Game.new()
     self.screen = "creator"      -- "creator", then "map" or "inventory"
     self.creator_cursor = 1      -- rows: attributes, then traits
     self.creator_msg = nil
-    self.log = {"You wake up in the wasteland."}
+    self.log = {"You wake with nothing. Not even shoes."}
     self.inv_cursor = 1
     self.inv_selected = nil      -- {"ground"|"inventory"|"equip", key}
     self.quit = false
@@ -298,8 +302,13 @@ end
 -- Pack Mule, within what the screen can show.
 function Game:bag_capacity()
     local p = self.player
+    -- a bag on your back (else what you can carry in your arms), plus the
+    -- pockets in what you wear and the pouches on your belt
     local bag = p.equipped.back and ITEM_DB[p.equipped.back].bag_cells or POCKET_CELLS
-    if p.equipped.belt then bag = bag + (ITEM_DB[p.equipped.belt].belt_cells or 0) end
+    for _, item in pairs(p.equipped) do
+        local def = ITEM_DB[item]
+        bag = bag + (def.pocket_cells or 0) + (def.belt_cells or 0)
+    end
     return math.max(2, math.min(BACKPACK_CAP, bag + (p.bag_bonus or 0)))
 end
 

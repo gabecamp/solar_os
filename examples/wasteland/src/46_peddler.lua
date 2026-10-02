@@ -6,6 +6,8 @@
 -- world made before them (an old save) keeps every tile and site it had:
 --   the Ferry Post (sites.ferry): a few ruins by the water, far from the
 --     town; Mother Okun trades there (self.ferry_trader, saved).
+--   the old starting clothes (extras.drops): lying a few hexes from the
+--     start, since you start with nothing.
 --   the Peddler's round (extras.route): TRADE.route_n stops around the map;
 --     he stays TRADE.stay hours at each, so where he is comes from the
 --     clock (nothing to save but his stock, self.peddler).
@@ -144,6 +146,23 @@ function Game.place_extras(tiles, sites, rad, world_seed)
             break
         end
     end
+
+    -- the clothes you used to start in, left lying around instead (a new
+    -- game puts them on the ground: Game.new)
+    local drops, options = {}, {}
+    for _, key in ipairs(keys) do
+        local q, r = parse_key(key)
+        local d = axial_distance(0, 0, q, r)
+        if TERRAIN[tiles[key]].passable and not taken[key] and d >= 2 and d <= 6 then
+            options[#options + 1] = key
+        end
+    end
+    for _, item in ipairs(START_FINDS) do
+        if #options == 0 then break end
+        local key = table.remove(options, roll(#options) + 1)
+        drops[#drops + 1], taken[key] = {key = key, item = item}, true
+    end
+    extras.drops = drops
     return extras
 end
 

@@ -94,13 +94,32 @@ local KEEP = {water_bottle = true, dirty_water = true, empty_bottle = true, cann
               jerky = true, cooked_meat = true, berries = true, strange_meat = true,
               bandage = true, cloth_scrap = true, antirad = true, splint = true, permit = true,
               stick = true, rock = true, geiger = true}
+-- How good a piece of clothing is (warmth and room): the real thing beats
+-- its makeshift version.
+local function wear_score(item)
+    local def = item and ITEM_DB[item]
+    if not def then return -1 end
+    return (def.warmth or 0) + (def.bag_cells or 0) + (def.pocket_cells or 0) + (def.belt_cells or 0)
+        + (def.ragged_of and 0 or 0.5)
+end
+local function better_than_worn(g, item)
+    local slot = ITEM_DB[item].slot
+    if not slot or slot == "lhand" or slot == "rhand" then return false end
+    return wear_score(item) > wear_score(g.player.equipped[slot])
+end
+-- You start with nothing: makeshift clothes for the empty slots, a shirt and
+-- a bag first; the rest only with this much cloth (2 left for bandages).
+local RAGS = {{"shirt", "rag_shirt"}, {"back", "sack_pack"}, {"back", "bindle"},
+              {"pants", "rag_trousers", 2}, {"jacket", "patch_coat", 4}, {"feet", "foot_wraps", 3},
+              {"head", "rag_hood", 4}, {"neck", "rag_scarf", 4}}
+
 -- Worth picking up (the bot ignores junk).
 local function worth(g, item)
     local def = ITEM_DB[item]
     if item == "rotten_meat" then return false end
     if item == "rock" then return count(g, "rock") == 0 end
     if item == "stick" then return count(g, "stick") < 3 end
-    if def.slot then return count(g, item) == 0 and not g.player.equipped[def.slot] end
+    if def.slot then return count(g, item) == 0 and better_than_worn(g, item) end
     -- tech and its parts only while there's room to spare (food comes first)
     if Game.item_value(item) >= 5 and not (def.consumable or def.artifact or def.weapon)
         and #g.player.inventory > g:bag_capacity() - 4 then
@@ -155,6 +174,19 @@ local function upkeep(g, stats)
         end
         if worst then g:try_transfer({"inventory", worst}, {"ground"}) end
     end
+    -- dress: makeshift clothes for empty slots, then put on anything better
+    -- lying here, straight from the ground
+    for _, rag in ipairs(RAGS) do
+        if not p.equipped[rag[1]] and count(g, "cloth_scrap") >= (rag[3] or 0) then
+            try_craft(g, rag[2])
+        end
+    end
+    for i = #g:ground_list(), 1, -1 do
+        local s = g:ground_list()[i]
+        if s and better_than_worn(g, s.item) then
+            g:try_transfer({"ground", i}, {"equip", ITEM_DB[s.item].slot})
+        end
+    end
     -- pick up everything that fits (useful things first)
     local ground = g:ground_list()
     for i = #ground, 1, -1 do
@@ -168,7 +200,16 @@ local function upkeep(g, stats)
     for i = #p.inventory, 1, -1 do
         local s = p.inventory[i]
         local slot = s and ITEM_DB[s.item].slot
-        if slot and not p.equipped[slot] then g:try_transfer({"inventory", i}, {"equip", slot}) end
+        if slot and better_than_worn(g, s.item) then g:try_transfer({"inventory", i}, {"equip", slot}) end
+    end
+    -- leave behind clothes you've outgrown (rags swapped for the real thing)
+    for i = #p.inventory, 1, -1 do
+        local s = p.inventory[i]
+        local slot = ITEM_DB[s.item].slot
+        if slot and slot ~= "lhand" and slot ~= "rhand" and not ITEM_DB[s.item].weapon
+            and not better_than_worn(g, s.item) then
+            g:try_transfer({"inventory", i}, {"ground"})
+        end
     end
     local best, best_i = g:weapon().dmg, nil
     for i, s in ipairs(p.inventory) do

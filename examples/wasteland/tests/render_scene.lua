@@ -8,8 +8,33 @@ local function fresh()
     return g
 end
 
--- Scene 1: inventory, spawn tile with loot, dressed + a full-ish bag, cursor on a ground item
+-- Scene 0: a new game - nothing worn, nothing carried, the pile at your feet
 local g = fresh()
+g.inv_cursor = 2
+g.log = {"You wake with nothing. Not even shoes."}
+g:draw_inventory(400, 300)
+solaros.dump("ops_inventory_start.txt")
+
+-- Scene 0b: dressed in rags (all crafted), cursor on the rag shirt
+g = fresh()
+local rags = {head = "rag_hood", ears = "ear_wraps", eyes = "slit_goggles", neck = "rag_scarf",
+              jacket = "patch_coat", shirt = "rag_shirt", hands = "hand_wraps", wrists = "scrap_bracers",
+              pants = "rag_trousers", feet = "foot_wraps", back = "sack_pack", belt = "rope_belt"}
+for slot, item in pairs(rags) do g.player.equipped[slot] = item end
+g.inv_cursor = #g:ground_list() + 7
+g.log = {"Made Sack Pack.", "Moved Patchwork Coat."}
+g:draw_inventory(400, 300)
+solaros.dump("ops_inventory_rags.txt")
+
+-- Scene 0c: crafting at the start, cursor on the first makeshift clothes
+g = fresh()
+g.screen = "craft"
+for i, r in ipairs(g:known_recipes()) do if r.id == "rag_shirt" and not g.craft_ui.set then g.craft_ui.cursor, g.craft_ui.set = i, true end end
+g:draw_craft(400, 300)
+solaros.dump("ops_craft_rags.txt")
+
+-- Scene 1: inventory, spawn tile with loot, dressed + a full-ish bag, cursor on a ground item
+g = dofile("kit.lua")(fresh())   -- the old starting clothes
 g.player.equipped.head = "cap"
 g.player.equipped.hands = "gloves"
 table.insert(g.player.inventory, {item = "rock", qty = 3})

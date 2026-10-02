@@ -12,6 +12,15 @@ the Checkpoint alive.
 - **Keys:** arrows/WASD move, Space rests, F searches, I opens the bag,
   C crafts, E uses, G hunts or fishes, T trades, J opens the journal,
   R calls on the radio, M mutes, Q quits. **H** in game lists every key.
+- **You start with nothing:** no clothes, no shoes, no bag. Your arms hold
+  two things. The crafting screen (C) knows a makeshift version of every
+  piece of clothing, made from cloth scraps, sticks, rope and scrap (the
+  pile you wake next to has enough for a first outfit or a fire): foot
+  wraps, a rag shirt, rag trousers, a patchwork coat, a bindle (5 cells) or
+  a sack pack (8), and so on. Each is as warm as the real thing but holds
+  less: fewer pockets, a smaller bag. The T-shirt, jeans, boots and backpack you used
+  to start in are lying somewhere 2 to 6 hexes away. A backpack holds 10,
+  a satchel 6, jeans and a jacket 2 pockets each, a belt 1 or 2.
 - **More:** `DEVICE_TEST.md` is a 10-minute check on the board;
   `HANDOFF.md` is the developer guide (code map, tests, tools).
 

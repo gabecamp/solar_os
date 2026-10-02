@@ -148,6 +148,8 @@ local TRADE = {
         antirad = 15, vodka = 8, geiger = 30, gasmask = 25, bolts = 1,
         jacket = 20, backpack = 25, satchel = 12, boots = 8, gloves = 5, cap = 3,
         earmuffs = 4, sunglasses = 4, scarf = 4, bracers = 5, tshirt = 2, jeans = 3,
+        rag_shirt = 1, rag_trousers = 1, foot_wraps = 1, rag_hood = 1, hand_wraps = 1, ear_wraps = 1,
+        slit_goggles = 1, rag_scarf = 1, patch_coat = 4, scrap_bracers = 2, bindle = 3, sack_pack = 5, rag_mask = 2,
         weeping_stone = 35, drowned_eye = 35, flesh_knot = 35, hollow_star = 35,
         quiet_shell = 35, permit = 80,
         leather_belt = 10, rope_belt = 4, scrap_metal = 3, jerky = 6,
@@ -232,9 +234,9 @@ local KARL = {
 -- hunger and thirst fall.
 local DIFFICULTY = {
     order = {"easy", "normal", "hard"},
-    easy   = {name = "Easy", short = "Easy",          food = 1.5, encounter = 0.6, rad = 0.6, emission = 0.5, drain = 0.8},
-    normal = {name = "Normal", short = "Normal",        food = 1.15, encounter = 0.9, rad = 1, emission = 1, drain = 0.9},
-    hard   = {name = "Zone-Hardened", short = "Hard", food = 0.85, encounter = 1.3, rad = 1.25, emission = 1.25, drain = 1.1},
+    easy   = {name = "Easy", short = "Easy",          food = 2.0, encounter = 0.5, rad = 0.5, emission = 0.5, drain = 0.65},
+    normal = {name = "Normal", short = "Normal",        food = 1.4, encounter = 0.85, rad = 1, emission = 1, drain = 0.85},
+    hard   = {name = "Zone-Hardened", short = "Hard", food = 1.0, encounter = 1.2, rad = 1.25, emission = 1.25, drain = 1.05},
 }
 
 -- A dog companion (src/48_dog.lua). chance: % per move on `terrain` while

@@ -5,7 +5,7 @@ gfx.begin()
 
 local Game, ITEM_DB, EQUIP_SLOTS, TERRAIN = dofile("lib_only.lua")
 
-local game = Game.new()
+local game = dofile("kit.lua")(Game.new())   -- dressed as the old start
 game.player.q, game.player.r = 0, 0  -- ensure we're at the loot pile
 
 print("=== ground at spawn ===")
@@ -22,7 +22,9 @@ local function bottles()
     return 0
 end
 local before, before_stacks = bottles(), #game.player.inventory
-game:try_transfer({"ground", 4}, {"inventory", nil})  -- index target irrelevant, put_stack merges/appends
+local water_i
+for i, s in ipairs(game:ground_list()) do if s.item == "water_bottle" then water_i = i end end
+game:try_transfer({"ground", water_i}, {"inventory", nil})  -- index target irrelevant, put_stack merges/appends
 print("bottles in bag before/after:", before, bottles())
 assert(bottles() == before + 2, "FAIL: bottles were not added to inventory")
 assert(#game.player.inventory == before_stacks, "FAIL: same item should merge, not add a stack")
