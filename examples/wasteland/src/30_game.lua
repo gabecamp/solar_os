@@ -152,6 +152,28 @@ function Game:try_move(q, r)
     end
 end
 
+-- The map's movement keys. Hexes have six neighbors and there are four
+-- arrows, so Up/Down only lean (self.move_lean = -1 up, 1 down) and the next
+-- Left/Right steps that way: Up then Left = up-left, Down then Right =
+-- down-right; Left/Right alone go west/east. True if the key was used; any
+-- other key drops the lean (the caller handles it).
+function Game:map_dir_key(key)
+    if key == gfx.KEY_UP or key == KEY.W then
+        self.move_lean = -1
+        return true
+    elseif key == gfx.KEY_DOWN or key == KEY.S then
+        self.move_lean = 1
+        return true
+    end
+    local dx = (key == gfx.KEY_LEFT or key == KEY.A) and -1
+        or (key == gfx.KEY_RIGHT or key == KEY.D) and 1 or nil
+    local lean = self.move_lean
+    self.move_lean = nil
+    if not dx then return false end
+    self:move_dir(dx, lean or 0)
+    return true
+end
+
 function Game:move_dir(dq, dr)
     local p = self.player
     -- pick the neighbor whose pixel-space direction best matches (dq,dr)

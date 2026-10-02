@@ -255,7 +255,9 @@ function Game:draw_map(w, h)
         gfx.text(6, ly, line)
         ly = ly + 14
     end
-    gfx.text(6, h - 8, "Arrows Spc:rest F:search E:water I:bag H:help")
+    gfx.text(6, h - 8, self.move_lean
+        and ((self.move_lean < 0 and "Up" or "Down") .. ": now Left or Right picks the side")
+        or "Arrows Spc:rest F:search E:water I:bag H:help")
 
     gfx.refresh()
 end

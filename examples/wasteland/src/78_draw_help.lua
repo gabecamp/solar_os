@@ -8,7 +8,8 @@
 Game.VERSION = "0.11 (2026-10-02)"
 
 local HELP = {
-    {"MAP", "Arrows/WASD move    Space rest 4h"},
+    {"MAP", "Lt/Rt step; Up/Dn then Lt/Rt: diagonal"},
+    {"", "(WASD too)   Space rest 4h"},
     {"", "F search   E water: fill/drink   I bag"},
     {"", "T trade/Checkpoint   C craft   J journal"},
     {"", "G hunt, or fish   R radio   M sound"},

@@ -3490,6 +3490,28 @@ function Game:try_move(q, r)
     end
 end
 
+-- The map's movement keys. Hexes have six neighbors and there are four
+-- arrows, so Up/Down only lean (self.move_lean = -1 up, 1 down) and the next
+-- Left/Right steps that way: Up then Left = up-left, Down then Right =
+-- down-right; Left/Right alone go west/east. True if the key was used; any
+-- other key drops the lean (the caller handles it).
+function Game:map_dir_key(key)
+    if key == gfx.KEY_UP or key == KEY.W then
+        self.move_lean = -1
+        return true
+    elseif key == gfx.KEY_DOWN or key == KEY.S then
+        self.move_lean = 1
+        return true
+    end
+    local dx = (key == gfx.KEY_LEFT or key == KEY.A) and -1
+        or (key == gfx.KEY_RIGHT or key == KEY.D) and 1 or nil
+    local lean = self.move_lean
+    self.move_lean = nil
+    if not dx then return false end
+    self:move_dir(dx, lean or 0)
+    return true
+end
+
 function Game:move_dir(dq, dr)
     local p = self.player
     -- pick the neighbor whose pixel-space direction best matches (dq,dr)
@@ -6898,7 +6920,9 @@ function Game:draw_map(w, h)
         gfx.text(6, ly, line)
         ly = ly + 14
     end
-    gfx.text(6, h - 8, "Arrows Spc:rest F:search E:water I:bag H:help")
+    gfx.text(6, h - 8, self.move_lean
+        and ((self.move_lean < 0 and "Up" or "Down") .. ": now Left or Right picks the side")
+        or "Arrows Spc:rest F:search E:water I:bag H:help")
 
     gfx.refresh()
 end
@@ -10008,7 +10032,8 @@ end
 Game.VERSION = "0.11 (2026-10-02)"
 
 local HELP = {
-    {"MAP", "Arrows/WASD move    Space rest 4h"},
+    {"MAP", "Lt/Rt step; Up/Dn then Lt/Rt: diagonal"},
+    {"", "(WASD too)   Space rest 4h"},
     {"", "F search   E water: fill/drink   I bag"},
     {"", "T trade/Checkpoint   C craft   J journal"},
     {"", "G hunt, or fish   R radio   M sound"},
@@ -10249,16 +10274,10 @@ local ok, err = pcall(function()
     end
 
     local function handle_map_key(key)
-        if key == gfx.KEY_ESCAPE or key == KEY.Q then
+        if game:map_dir_key(key) then
+            return   -- (a step, or Up/Down leaning for the next one)
+        elseif key == gfx.KEY_ESCAPE or key == KEY.Q then
             game.quit = true
-        elseif key == gfx.KEY_LEFT or key == KEY.A then
-            game:move_dir(-1, 0)
-        elseif key == gfx.KEY_RIGHT or key == KEY.D then
-            game:move_dir(1, 0)
-        elseif key == gfx.KEY_UP or key == KEY.W then
-            game:move_dir(0, -1)
-        elseif key == gfx.KEY_DOWN or key == KEY.S then
-            game:move_dir(0, 1)
         elseif key == KEY.SPACE then
             game:rest()
         elseif key == KEY.F then
@@ -10333,6 +10352,7 @@ local ok, err = pcall(function()
             -- the bag screen patches itself when only its cursor moved; any
             -- other screen in between means it has to be drawn whole again
             if game.screen ~= "inventory" then game.inv_drawn = nil end
+            if game.screen ~= "map" then game.move_lean = nil end   -- (no stale Up/Down)
             Game.draw_pump(true)
             if game.screen == "title" then
                 game:draw_title(w, h)

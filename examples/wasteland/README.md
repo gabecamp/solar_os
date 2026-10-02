@@ -9,7 +9,9 @@ the Checkpoint alive.
   app. Saving needs the `write_file` firmware patch (`firmware/`, and the
   request to the SolarOS author in `firmware/UPSTREAM_REQUEST.md`); without
   it the game runs but can't save.
-- **Keys:** arrows/WASD move, Space rests, F searches, I opens the bag,
+- **Keys:** Left/Right step west/east; Up or Down then Left/Right takes
+  a diagonal (Up, Right = up-right; the hexes have six sides); WASD works
+  the same. Space rests, F searches, I opens the bag,
   C crafts, E uses, G hunts or fishes, T trades, J opens the journal,
   R calls on the radio, M mutes, Q quits. **H** in game lists every key.
 - **You start with nothing:** no clothes, no shoes, no bag. Your arms hold

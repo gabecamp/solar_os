@@ -16,8 +16,10 @@ before and start it. For anything that goes wrong, a photo of the screen
    whether saving works.
 
 ## 2. Moving and the clock (2 min)
-4. Move a few hexes with the arrows (and WASD). **Expect:** the map scrolls
-   to keep you centered; MP drops; the hour goes up.
+4. Move a few hexes: Left/Right step sideways; Up then Left (or Right) steps
+   up-left (up-right), Down then Left/Right down-left/right (WASD too).
+   **Expect:** after Up the bottom line says "Up: now Left or Right picks the
+   side"; the map scrolls to keep you centered; MP drops; the hour goes up.
 5. Space to rest. **Expect:** +4 hours, MP back.
 6. F to search. **Expect:** "Found: ..." or "Found nothing", and the
    "Scav n/3" count drops.
