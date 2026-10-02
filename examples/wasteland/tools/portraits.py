@@ -661,11 +661,31 @@ def little():
     return c, (30, 30, 132)
 
 
+def institute():
+    """The Institute: a stair going down into the dark, a doorway full of
+    light at the bottom, the hum drawn as rings in the air."""
+    c = Canvas()
+    c.flat(poly([(0, 0), (192, 0), (192, 192), (0, 192)]), 0.1)
+    for i in range(7):                                         # steps, nearest lowest
+        y = 186 - i * 14
+        w = 92 - i * 9
+        c.flat(poly([(96 - w, y), (96 + w, y), (96 + w - 6, y - 8), (96 - w + 6, y - 8)]), 0.22 + i * 0.03)
+    c.lighten(blur(ellipse(96, 66, 46, 50), 14), 0.6)          # the glow spilling out
+    c.flat(poly([(72, 26), (120, 26), (120, 94), (72, 94)]), 0.96)   # the doorway
+    c.flat(poly([(78, 32), (114, 32), (114, 94), (78, 94)]), 1.0)
+    for r in (58, 72, 86):                                      # the hum, rings in the air
+        ring = [(96 + r * np.cos(a), 60 + r * 0.8 * np.sin(a)) for a in np.linspace(0, 2 * np.pi, 72)]
+        c.lighten(stroke(ring, 1.2, False), 0.35)
+    c.darken(poly([(92, 70), (100, 70), (102, 94), (90, 94)]), 0.8)   # someone standing in it
+    c.darken(ellipse(96, 64, 5, 6), 0.8)
+    return c, (24, 16, 144)
+
+
 SUBJECTS = {
     "jawhound": jawhound, "boar": boar, "crows": crows, "stag": stag,
     "fused": fused, "mouthless": mouthless, "bloom": bloom,
     "bandits": bandits, "tollman": tollman, "medic": medic, "wanderer": wanderer,
-    "karl": karl, "stray": stray, "little": little,
+    "karl": karl, "stray": stray, "little": little, "institute": institute,
     "long_man": long_man, "crawler": crawler, "whisper": whisper,
     "hollow": hollow, "bell": bell, "stars": stars, "stillness": stillness, "door": door,
 }

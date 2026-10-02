@@ -121,6 +121,29 @@ function Game.place_extras(tiles, sites, rad, world_seed)
         end
     end
     extras.warrens, extras.cairns = warrens, cairns
+
+    -- the old quarry and the Institute's gate (the storyline): hills, far
+    -- from both towns
+    local towns = {sites.trader, sites.ferry}
+    for _, min_d in ipairs({QUESTS.story.min_from_towns, 5}) do
+        local options = {}
+        for _, key in ipairs(keys) do
+            local q, r = parse_key(key)
+            local far = axial_distance(0, 0, q, r) >= 5
+            for _, t in pairs(towns) do
+                local a, b = parse_key(t)
+                if axial_distance(q, r, a, b) < min_d then far = false end
+            end
+            if tiles[key] == "hills" and not taken[key] and not rad[key] and far then
+                options[#options + 1] = key
+            end
+        end
+        if #options > 0 then
+            local key = options[roll(#options) + 1]
+            sites.quarry, taken[key] = key, true
+            break
+        end
+    end
     return extras
 end
 

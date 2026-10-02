@@ -37,6 +37,8 @@ function Game:journal_lines()
     if self:lore_count() > 0 then
         add(("Pages read: %d/%d. L to reread them."):format(self:lore_count(), #LORE.pages))
     end
+    local story = self:story_text()
+    if story then add(story) end
     local quest = self:quest_text()
     if quest then add("Quest - " .. quest) end
     local camp = self:base_text()

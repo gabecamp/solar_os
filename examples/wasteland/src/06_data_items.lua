@@ -140,6 +140,8 @@ local ITEM_DB = {
     antenna      = {name = "Antenna",      slot = nil, consumable = nil, desc = "A repair part"},
     multitool    = {name = "Multitool",    slot = nil, consumable = nil, desc = "Tool for repairs"},
     lore_page    = {name = "Torn Page",    slot = nil, consumable = nil, desc = "E: read it"},
+    institute_pass = {name = "Institute Pass", slot = nil, consumable = nil,
+                      desc = "Opens the gate at the quarry"},
     -- trinkets: no use but one (leave them at the Little Ones' cairns)
     earring      = {name = "Plastic Earring", trinket = true, desc = "A toy. Someone small would love it."},
     toy_car      = {name = "Toy Car", trinket = true, desc = "A toy. Someone small would love it."},

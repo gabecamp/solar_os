@@ -73,6 +73,7 @@ function Game:karl_answer(n)
         self:enc_say("'Ha! Sharp one.' Karl hands you " .. (item == "pilk" and "a bottle of Pilk. "
             .. "'Pepsi and milk. Trust me.'" or "his " .. name .. "."))
         self:sfx("gift")
+        self:story_karl()
         self:end_encounter("Karl gave you " .. name .. ".")
         self:karl_work()
     else

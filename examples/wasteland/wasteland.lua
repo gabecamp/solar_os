@@ -322,6 +322,15 @@ local QUESTS = {
     supply = {offer = "Anna: 'We're out of bandages. Call me when you've two to spare.'",
               journal = "find 2 bandages, then call her.", need = {"bandage", 2},
               reward = {{"medkit", 1}, {"water_bottle", 2}}},
+    -- the storyline (src/58_story.lua): what the Signal counts
+    story = {pages = 6, signal_calls = 2, min_from_towns = 8,
+             shut_base = 45, shut_per_point = 8, fail_rads = 20, retry_hours = 12,
+             journal = {quarry = "The pages point to the old quarry, %s. The Institute.",
+                        gate = "The Institute's gate at the quarry needs a pass. Karl? Anna?",
+                        source = "You have a pass. The Institute gate, %s."},
+             intro = "The gate grinds open on a stair going down. At the bottom, a doorway "
+                  .. "full of a slow violet light, and a hum you feel in your fillings. The "
+                  .. "Signal is not on the radio here. It is in the walls."},
     fish = {offer = "Mother Okun: 'Bring me three fish. The ferry men row badly hungry.'",
             journal = "bring 3 fish to the Ferry Post.", need = 3,
             reward = {{"snare", 2}, {"lucky_lure", 1}}},
@@ -532,6 +541,8 @@ local ITEM_DB = {
     antenna      = {name = "Antenna",      slot = nil, consumable = nil, desc = "A repair part"},
     multitool    = {name = "Multitool",    slot = nil, consumable = nil, desc = "Tool for repairs"},
     lore_page    = {name = "Torn Page",    slot = nil, consumable = nil, desc = "E: read it"},
+    institute_pass = {name = "Institute Pass", slot = nil, consumable = nil,
+                      desc = "Opens the gate at the quarry"},
     -- trinkets: no use but one (leave them at the Little Ones' cairns)
     earring      = {name = "Plastic Earring", trinket = true, desc = "A toy. Someone small would love it."},
     toy_car      = {name = "Toy Car", trinket = true, desc = "A toy. Someone small would love it."},
@@ -822,6 +833,24 @@ end
 local SPRITE_W, SPRITE_H = 16, 16
 
 local SPRITE_ART = {
+    institute_pass = {
+        "................",
+        "................",
+        ".##############.",
+        ".#............#.",
+        ".#.####.......#.",
+        ".#.#..#.#####.#.",
+        ".#.#..#.......#.",
+        ".#.####.####..#.",
+        ".#............#.",
+        ".#.##########.#.",
+        ".#............#.",
+        ".#.#.#.#.#.#..#.",
+        ".##############.",
+        "................",
+        "................",
+        "................",
+    },
     -- trinkets (the Little Ones love them; src/57_little.lua)
     earring = {
         "................",
@@ -2427,6 +2456,18 @@ local GLYPH_ART = {
         "..#.#.....",
         ".#####....",
     },
+    quarry = {  -- a gate in the quarry wall
+        "##########",
+        "#........#",
+        "#.######.#",
+        "#.#.#.##.#",
+        "#.#.#.##.#",
+        "#.#.#.##.#",
+        "#.#.#.##.#",
+        "#.######.#",
+        "#........#",
+        "##########",
+    },
     warren = {  -- a burrow mouth under a mound
         "..........",
         "...####...",
@@ -3176,6 +3217,7 @@ function Game.new()
     self.ferry_trader = Game.starting_stock("ferry")
     self.peddler = Game.starting_stock("peddler")
     self.little = Game.new_little()
+    self.story = Game.new_story()
     self.trader = {stock = {}, restocked = 0}   -- what the trader has now (it changes as you trade)
     for _, st in ipairs(TRADE.stock) do
         self.trader.stock[#self.trader.stock + 1] = {item = st[1], qty = st[2]}
@@ -4134,6 +4176,7 @@ function Game:tick()
     self:geiger_scan()
     self:refresh_view()
     self:spot_sites()
+    self:story_check()
     if not self:check_death(self:death_reason()) then self:check_achievements() end
 end
 -- ---------------------------------------------------------------------
@@ -4159,7 +4202,7 @@ local SAVE = {version = 1, dir = "wasteland", file = "save.lua",
                         "difficulty", "dog", "radio", "karl_hint",
                         "base", "quest", "quests_done",
                         "lore_read", "signal_page", "skills", "stats",
-                        "ferry_trader", "peddler", "little"}}
+                        "ferry_trader", "peddler", "little", "story"}}
 
 -- Where the save lives: <preferred storage>/wasteland/save.lua
 function SAVE.path()
@@ -4607,6 +4650,7 @@ function Game:encounter_options()
     if kind == "anomaly" then return {{"Investigate", "investigate"}, {"Walk away", "leave_quietly"}} end
     if kind == "horror" then return self:horror_options(e) end
     if kind == "little" then return self:little_options() end
+    if kind == "institute" then return self:institute_options() end
     if kind == "dog" then
         local o = {}
         if self:dog_food() then o[1] = {"Offer it food", "tame"} end
@@ -4759,6 +4803,7 @@ function Game:encounter_action(action)
     e.msg = {}
     if action == "tame" then return self:dog_tame() end
     if action:find("_little$") then return self:little_action(action) end
+    if action:find("_institute$") then return self:institute_action(action) end
     if action == "look_away" or action == "speak" or action == "cover" or action == "follow" then
         return self:horror_action(action)
     end
@@ -5340,6 +5385,7 @@ function Game:karl_answer(n)
         self:enc_say("'Ha! Sharp one.' Karl hands you " .. (item == "pilk" and "a bottle of Pilk. "
             .. "'Pepsi and milk. Trust me.'" or "his " .. name .. "."))
         self:sfx("gift")
+        self:story_karl()
         self:end_encounter("Karl gave you " .. name .. ".")
         self:karl_work()
     else
@@ -5424,6 +5470,9 @@ function Game:spot_sites()
     if self:learn_site_seen("checkpoint") then
         self:push_log("A guard tower on the horizon: the Checkpoint.")
     end
+    if self.sites.quarry and self:learn_site_seen("quarry") then
+        self:push_log("A gate in the wall of the old quarry, " .. self:site_bearing("quarry") .. ".")
+    end
     if self.sites.ferry and self:learn_site_seen("ferry") then
         self:push_log("A jetty and a few huts by the water: the Ferry Post, " .. self:site_bearing("ferry") .. ".")
     end
@@ -5447,6 +5496,8 @@ function Game:arrive_site()
         self:learn_site("checkpoint")
         self:push_log("The Checkpoint. Guards watch from the tower. T.")
         return true
+    elseif site == "quarry" then
+        return self:quarry_arrive()
     elseif site == "ferry" then
         self:learn_site("ferry")
         self:push_log("The Ferry Post. Mother Okun trades from the jetty. T.")
@@ -5463,6 +5514,8 @@ function Game:site_action()
         self:open_trade("town")
     elseif site == "ferry" then
         self:open_trade("ferry")
+    elseif site == "quarry" then
+        self:open_institute()
     elseif site == "checkpoint" then
         self:open_gate()
     elseif self:peddler_key() == hex_key(self.player.q, self.player.r) then
@@ -5661,7 +5714,8 @@ end
 -- Out of the Zone: the run is over (and so is its save).
 function Game:finish_run(how)
     self.ending = {how = how, day = (self:clock()), hours = self.player.hours,
-                   artifacts = self:artifact_count(), lore = self:lore_ending_line()}
+                   artifacts = self:artifact_count(),
+                   lore = how ~= "quiet" and self:lore_ending_line() or nil}   -- (the Quiet says it all)
     self.screen = "ending"
     self:sfx("escape")
     self:record_run(how)
@@ -5790,6 +5844,29 @@ function Game.place_extras(tiles, sites, rad, world_seed)
         end
     end
     extras.warrens, extras.cairns = warrens, cairns
+
+    -- the old quarry and the Institute's gate (the storyline): hills, far
+    -- from both towns
+    local towns = {sites.trader, sites.ferry}
+    for _, min_d in ipairs({QUESTS.story.min_from_towns, 5}) do
+        local options = {}
+        for _, key in ipairs(keys) do
+            local q, r = parse_key(key)
+            local far = axial_distance(0, 0, q, r) >= 5
+            for _, t in pairs(towns) do
+                local a, b = parse_key(t)
+                if axial_distance(q, r, a, b) < min_d then far = false end
+            end
+            if tiles[key] == "hills" and not taken[key] and not rad[key] and far then
+                options[#options + 1] = key
+            end
+        end
+        if #options > 0 then
+            local key = options[roll(#options) + 1]
+            sites.quarry, taken[key] = key, true
+            break
+        end
+    end
     return extras
 end
 
@@ -6147,6 +6224,7 @@ function RADIO.trader(self)
     return true
 end
 function RADIO.anna(self)
+    if self:story_anna() then return true end
     local work = self:anna_work()
     if work == "offered" then return false end   -- free: she only asked
     if work then return work end
@@ -6172,6 +6250,7 @@ function RADIO.karl(self)
 end
 function RADIO.signal(self)
     local p = self.player
+    if self.story then self.story.calls = (self.story.calls or 0) + 1 end
     if not self.signal_page then   -- the first time, it reads you something
         self.signal_page = true
         self:read_lore("The Signal")
@@ -6823,6 +6902,7 @@ function Game:anna_work()
     if q and q.kind == "supply" then
         if not self:anna_ready() then return false end
         self:take_items(need[1], need[2])
+        if self.story then self.story.anna = true end   -- (she'll help you at the gate)
         self:give_reward(QUESTS.supply.reward, "Anna: 'Bless you.' A runner leaves a parcel:")
         self:radio_say("Anna: 'Bless you. The children here will sleep tonight. I've sent you something.'")
         return "open"   -- her channel stays open afterwards
@@ -7205,6 +7285,7 @@ local RECORDS = {
              end
              return true
          end},
+        {"quiet", "The Quiet", "Silence the Signal", function(_, how) return how == "quiet" end},
         {"night_owl", "Night Owl", "Live through 3 night horrors",
          function(g) return g:stat_of("horrors") >= 3 end},
     },
@@ -7422,7 +7503,7 @@ function Game:draw_records(w, h)
         local done = rec.achieved[a[1]]
         gfx.text(6, y, (done and "[x] " or "[ ] ") .. a[2])
         gfx.text(170, y, a[3])
-        y = y + 13
+        y = y + 12
     end
     if not SAVE.can_write() then gfx.text(6, h - 22, "(not saved: this SolarOS can't write files)") end
     gfx.text(6, h - 8, "Any key: back")
@@ -7706,6 +7787,163 @@ function Game:little_lines()
     end
     if best then out[#out + 1] = "Nearest cairn: " .. self:bearing_to(best) .. "." end
     return out
+end
+-- ---------------------------------------------------------------------
+-- The storyline: what the Signal counts (numbers and texts in QUESTS.story)
+--
+-- self.story = {step, calls, anna, warned, pass, retry_at} (saved).
+--   step nil      -> "quarry": read QUESTS.story.pages torn pages, or call the
+--                    Signal signal_calls times. The quarry (sites.quarry,
+--                    from Game.place_extras) goes in the journal.
+--   "quarry"      -> "gate": walk to the quarry; the gate needs a pass.
+--   "gate"        -> "source": Karl gives his son's old pass for a right
+--                    answer, or Anna sends it if you did her bandage job.
+--   "source"      -> T at the gate: the Institute (kind "institute"):
+--                    shut it down (a Multitool, a Tinker/Perception roll)
+--                    and walk out into "the Quiet" (an escape, how =
+--                    "quiet"); listen to it (every page, then you join the
+--                    count); or leave.
+-- ---------------------------------------------------------------------
+
+function Game.new_story()
+    return {calls = 0}
+end
+
+-- Starts the story when enough is known (from tick).
+function Game:story_check()
+    local st = self.story
+    if not st or st.step or not self.sites.quarry then return end
+    if self:lore_count() >= QUESTS.story.pages or st.calls >= QUESTS.story.signal_calls then
+        st.step = "quarry"
+        self:learn_site("quarry")
+        self:push_log("It all points one way: the old quarry, " .. self:site_bearing("quarry") .. ".")
+        self:sfx("emission")
+    end
+end
+
+-- Arriving at the quarry (from arrive_site).
+function Game:quarry_arrive()
+    local st = self.story
+    self:learn_site("quarry")
+    if st.step == "quarry" then st.step = "gate" end
+    if self:count_item("institute_pass") > 0 and st.step == "gate" then st.step = "source" end
+    if st.step == "source" then
+        self:push_log("The Institute's gate. Your pass fits the slot. T.")
+    elseif st.step == "gate" then
+        self:push_log("A rusted gate in the quarry wall: INSTITUTE. Sealed. It wants a pass.")
+    else
+        self:push_log("A rusted gate in the quarry wall, sealed. Something hums behind it.")
+    end
+    return true
+end
+
+-- Karl or Anna hands over the pass (once).
+function Game:give_pass(who)
+    local st = self.story
+    if st.pass then return false end
+    st.pass = true
+    if not self:put_stack("inventory", nil, {item = "institute_pass", qty = 1}) then
+        self:put_stack("ground", nil, {item = "institute_pass", qty = 1})
+    end
+    if st.step == "gate" then st.step = "source" end
+    self:sfx("gift")
+    self:push_log(who .. " gave you an Institute Pass.")
+    return true
+end
+
+-- Karl, after a right answer while the gate is shut.
+function Game:story_karl()
+    local st = self.story
+    if st and st.step == "gate" and not st.pass then
+        self:enc_say("Karl goes quiet. He takes a laminated card from his tackle box. "
+            .. "'My boy's. He worked there. Didn't come back. You might.'")
+        return self:give_pass("Karl")
+    end
+    return false
+end
+
+-- Anna on the radio: a warning, then (if you helped her) the pass.
+function Game:story_anna()
+    local st = self.story
+    if not st or not st.step then return false end
+    if st.step == "gate" and st.anna and not st.pass then
+        self:radio_say("Anna: 'You're going anyway. My brother's pass. A runner's bringing it. "
+            .. "Come back out, love.'")
+        return self:give_pass("Anna's runner")
+    end
+    if not st.warned then
+        st.warned = true
+        self:radio_say("Anna: 'My brother worked at the Institute. Don't go.'")
+        return true
+    end
+    return false
+end
+
+-- T at the quarry.
+function Game:open_institute()
+    local st = self.story
+    if self:count_item("institute_pass") == 0 then
+        self:push_log("The gate is sealed. It wants a pass.")
+        return
+    end
+    if st.retry_at and self.player.hours < st.retry_at then
+        self:push_log(("Your hands still shake. Try again in %dh."):format(st.retry_at - self.player.hours))
+        return
+    end
+    self:start_encounter({kind = "institute", name = "The Institute", art = "institute",
+                          who = "institute", intro = QUESTS.story.intro, start = "close", speed = 0})
+end
+
+function Game:shutdown_chance()
+    return math.max(5, math.min(95, QUESTS.story.shut_base + QUESTS.story.shut_per_point * (self.player.attrs.Perception - 3)
+        + 2 * self:skill_bonus("tinker")))
+end
+
+function Game:institute_options()
+    local tool = self:carrying(TECH.tool)
+    return {{tool and ("Shut it down (" .. self:shutdown_chance() .. "%)") or "Shut it down (needs a Multitool)",
+             "shut_institute"},
+            {"Listen to it", "listen_institute"},
+            {"Leave", "leave_quietly"}}
+end
+
+function Game:institute_action(action)
+    local p, st = self.player, self.story
+    if action == "shut_institute" then
+        if not self:carrying(TECH.tool) then
+            self:enc_say("The panel is all screws and fused wire. Not with your bare hands.")
+            return
+        end
+        if self:roll(self:shutdown_chance()) then
+            self:skill_xp("tinker", SKILLS.xp.repaired)
+            st.step = "done"
+            self.enc = nil
+            return self:finish_run("quiet")
+        end
+        p.rads = math.min(RAD.max, (p.rads or 0) + QUESTS.story.fail_rads)
+        st.retry_at = p.hours + QUESTS.story.retry_hours
+        self:enc_say("A spark, a smell of hot copper, and the light swells. You're thrown back "
+            .. "up the stair, teeth aching." .. (self:can_measure() and (" (+" .. QUESTS.story.fail_rads .. " rads)") or ""))
+        return self:end_encounter("The Institute threw you out.")
+    elseif action == "listen_institute" then
+        self.lore_read = {}
+        for i = 1, #LORE.pages do self.lore_read[i] = true end
+        self:enc_say("You listen. You understand all of it at once: the pages, the count, the eye. "
+            .. "And then you hear your own name, and it doesn't stop.")
+        p.health = 0
+        self.enc = nil
+        self:check_death("You joined the count.")
+    end
+end
+
+-- Journal line.
+function Game:story_text()
+    local st = self.story
+    if not st or not st.step or st.step == "done" or not self.sites.quarry then return nil end
+    local j = QUESTS.story.journal
+    if st.step == "quarry" then return j.quarry:format(self:site_bearing("quarry")) end
+    if st.step == "gate" then return j.gate end
+    return j.source:format(self:site_bearing("quarry"))
 end
 
 -- Equip slots sit ON the body part they dress, NEO Scavenger style: a box over
@@ -8645,6 +8883,17 @@ local PORTRAIT_DATA = {
             marks = {75, 53, 6, 53, 32, 51, 60, 51, 91, 52, 46, 49, 54, 58, 18, 55, 40, 58, 81, 46, 68, 45, 68, 59, 10, 43, 28, 60},
             data = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAoAAAAHAAAAAMAAAARwAAgAEAAEBVAAAgAAAAWEQAAAwAAABXVQAAAwAAgEVEAIAAAANAVVUCIAAADXBERBoQAAA1WFVVKAgAANVERESiBgAg1VdVFYoAgADVRVTAqwAg4PdVFfAAAAAAAAAAAAAAAABA/X8B4AqgCl9ERXwDAACAVVVVVQAAAABEREREAAAAAFVVVVUAAAAARERERAAAAABVVVVVAAAAAEREREQAAAAAVVVVVQAAAABEVFVVAAAAAFVVVVUAAAAARVVVVQIiIiBQVVUVgACAAAVVVcAPKCLgH1QV8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAfAAAAKAAAAMQAAACAAwAAVQcAAAAMAABEHQAAACAAAFV1AAAAgAAARNUBAAAgAwBVVQeAAIAGwFVVDXAAogo4VVUdXACIGoZVVTXXAqKqo1BV9/WAiKrgBVV99Q+oqvofVP/96gAAiPRFBNzsAAD8fFUV/OgAAPhwRAT48AAA+HBVFfDgAACAQEREAMAAAADAVVUVgAAAAABFRFUAAAAgAFVVVQACAAAARFVVAAIAIABUVVWgBgAA/FdVVSsiosNVVVXHiIiI5lVVVeWqqqruVVVV/YioqvpV1VX1qKCq6lgxd5cfAACIH1AV3D8gAvw/UBX8PwAA+B9QFfgPIAL4B1QV8AIAAIAAVVUAACIiAFBVVRUAAAAAVVVVVSIiIiJVVVVVAAAAAFVVVVUiIiICVVVVVQAAAABVVVVUEIIwhhnHMcY4zjjOfe99z7nve+//////////////////////9733fR+oqvgfUP19P6iqPj9Q/z8/qOoeH9T9Hw+oug8HdP8PAqjqDwDV/wcAqvoDUPX/A4Co/gFV1f8AoKr/AFX1/wCAqv8AVf1/AKK6fwBV/39/qOq/ilX9f1Ug+L+qcfxfVTn+j4h5/19Ve/6vqv//V1X//wsJ///Fwf//ioj/fRUUjryvikzd3x+g4v8Kdf/fX6rqn+vd/x/+qv8PuP//D/D+/w+I//8H3P//A+b//wH3/z8A4fwfgPWgAIA4AABgfQAAIB4AAFBfAACILwAA1FcAAMIDAAD1VQCA4AIAgHVWAIA4AgAAPVYAADkCAAA9VwCAGAEAAB1VAAAZAQCAHVXnPOc45xzHOUIYwhBXXfd/7u7+///////7//////////////////9/o///q1X1X9UAAACoVVVV1QAAAKpVVVX1AACAqFVVVdUAIiKqVVVV9QCIiKhVVVXVACIiqlVVVdUAiIioVVVV1QAiIqpVVVVVgIiIqFVVVdWiqqqqVXd39++5qKrHmdX9goqr+vcD////AOr/fwD8/z8A+P8fAPD/GADg/3UAQP9iAAAA1wEAAIoBAABfBwAALgYAAH8FAACuCAAA/xUAALoqAAD/dQAALusAAH/XAQB67gAAf/wBAGqoAAD/2AEA+qgDAP/QAQDqgAMA/9ADAPqgAwD/cQMA"},
     },
+    institute = {
+        near = {w = 96, h = 96, tw = 3, th = 3,
+            marks = {89, 53, 5, 52, 55, 52, 23, 53, 38, 53, 72, 53, 16, 59, 49, 59, 15, 45, 28, 61, 81, 48, 67, 45, 46, 45, 31, 44},
+            data = "////+v///////7/////////////////////++///////v//u/9/////vv7////////vvrv////////u7////f//+/qr////f/7+/q////3+//6+q////X7//r6r///93/++vqv///1X//7uq////V+/vq6r///9V//+7qv///1f/7+7//////7+7u/r/////7qqq7v////+7qqq7/3d3/6qqqqrfXd3dqqqqqn9Xdf+qioiqBQAA0AoAAKAHAABwCgAAoAUAAFAKAACgBQAAUAgAAIAFAABQAgAAoAUAAFAAAACABQAAQAIAACAFAABQAAAAgAXAAUACwAMgBcAHUO////////////v////////+7////////++/////////7v7////9///6+////////+rv7///3///qr+///////+q/v7//f///6r+//73////qur7/93///+q+/v79f///6ru//vV////qur/+/X///+o6u//1d///6r6///1////7++riv///1X/77sq////V//vr6r///9Vv/+vqv///1f/v6+q////Xf//v6r///93//6uqv///V3/+7ur///3X//v7yr//99f//+/K////3////+q////////+6////9X///vq////1X///+6/////////+////9d//+/qv//f3cAwAKABcADQAKAAyAFwANQAIACgAXAB0ACgAMgBcAHUADAAoAFwAdAAuADoAXgB1AI4AKABcAHUAKgA6AVUQVRAAAAAFVERFQCAAAAV1VVVaqIiKpdVVXVKiIiolVVVVWICIiIVVVVVaqqqqr/////rqqq6lVVVVWqqqqqV1VVdajq7//V////qur/+/X///+o6v/71f///6r6+//1////qur//tX9//+q+v7/df///6quv//d////qvv///f///+o7u///f///7r++///////qv/+///////qv///9f///6r7///V////uv/////////q////3f///6r+//93//////+vqv//////////////////q6r//9/d//+rqv////////7//////////////////7+qqv//////r6qq/////////////////7u7u///////qqqq//////////////////////////+/u7u7/////6+qqqr///////////////+qqqiq////////////////qqqqqt3d3d2qqqqq/////+7u7u7///////////////+qqqqq/////6qqqqr///////////////+7u7u7/////6qqqqr//////////////////////////7u7u7v/////qqqqqv///////////////6r6//////////////////+q6v//3d3//6qq/////////////////////////////6qq+v//////qqr6/////////////////7u7u///////qqqq/v//////////////////////////u7u7+/////+qqqrq////////////////"},
+        far = {w = 48, h = 48, tw = 2, th = 2,
+            marks = {41, 26, 20, 27, 4, 26, 13, 26, 32, 26, 37, 29, 8, 29, 27, 28, 24, 23, 16, 31, 36, 23, 23, 33, 9, 20, 42, 20},
+            data = "/////v///////7/7////////qqr//9/9/78DgP//A8D/rwKA//8BwP+7AoD/fwFA/68AgP9fAUD/rwKA/3+BQf+vgID/X4FB/6uCgf9/gUH/r4CB/3/BQf+vgoP/f8FB/68AAP9/VVX/v6qq/39VVf+vioj////9/7+ruv9/d3f//wAA//8AAP//AAD//wAA7/8AAP//AAD7/wAA//8AAO7/AAD//wAA+v8AAP//AADq/wAA/f8AALr/AAD//wAA6v8AAP3/AAD6/wAA//8AAOr/AAD9/wAA+v8AAP//AADu/wAA//8AAPv/AAD9/wAA+v8AAP//AAD7/wAA//8AAP/vqur//////7urqv////////////////+rqqr///////////////+/u7u7//////////////////////////8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA7v8AAP//AAC7/wAA//8AAP//AAD//wAAqv4AAP//AAD//wAA//8AALv7AAD//wAA//8AAP//AAD//wAA//8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},
+        close = {w = 96, h = 96, tw = 3, th = 3,
+            marks = {21, 53, 90, 54, 50, 51, 79, 50, 5, 51, 40, 55, 66, 55, 12, 58, 55, 60, 12, 45, 75, 59, 30, 47, 64, 43, 26, 61},
+            data = "///+rv///3//v7+r////9/7v76r//3/f//+7q////3///qqq///9Xb//qqr///9376+qqv//31X/v6uq//9/V/vvqor//19V/6+qKv/3f1X+qqoK//9dVf67qir//3dV/qqqCP/9XVX/u6oi//9XVf6uqgj//VVV/7uqIv//V1Wqqqqq3d3d3aqqqqp3d3f3qqqqql1VVd0iAAAiAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAADABwAAoAMAAPAHAOr+/u/9//3fqv/7v////3+q7u///f3f/6r6v///93//qur+/t3f//2quv/793///6qq/v/V/f3/qqr771X///+oqur/VN3//6qq679V9///iKrqv1Td3/+iqrr/Vff//4iqqv5U1f//oqq6/1X1//+Iqqr/VNX//6Kquv9V9f///qqqCP/9VVX+u6oi//9XVf6qqgj//1VV/7uqIv/3d1X/rqoI//9dVfurqiL//3dV766qCP9/XVXvv6oq//9/Vb+vqIr//1VV/76rKv//X1f/66oC//9/Vf6vqyD///9V+7+qAP9/f1X//7qq////f7//6qr//19V//4vKv//V1UA4AYAAOAHAADgAwAAwAEAAIACAADABwAA4AMAAOAHAADgBgAAwAcAAKAHAADwBwAA4A4AAOAHAACgDwAA8A8AAOAOAADwDwAAoAsAAPAfAAAAAABFRERUAAAAAFVVVVUAAAAAVVVVVaqqqqJXVVV1qoqoqlVVVVUiIiIiVVVVVYiqqv5U1f//oqq6/1X1//+Iqqr+VNXf/6Kq6r9V9f//iKrqvlTV99+iqvr/Vff//4iq6u9U3f3/qqr6+1V3//+oqu77VN3//6qq+/5193//gKi+/1X93/+Aqu//Vf///4Dq+r9V/f/fqrr/7/f///+q6v77Vf3//yrqv/9V9f///+uriv//V1X/v6uq////////+u7///////+7uv9/d3X/v6qq/9/dXf+vqqr/f3d3/+/u7v////////////////+qqqr/3d3d/6qqqv////+/qqqq//////////////////////////+rqqqq/////6qqqqr/////qqqqqv////+ICIiIVVVVVSKqIqJ/d3f/qqqqqv////+qqqqqV1VVVaqqqqpVVVVVqqqqqndXVXeqqqqq////////////////qqqqqt3d3d2qqqqq/////6qqqqr//////////////////////////6qqqqr/////qqqqqv////+qqqqq/////4jq7/9V1f//qqr+///////u7////////7q6//9Xd///qqr6/9Xd/f+qqvr/d3f3/+7u7v////////////////+qqqr/3d3d/6qqqv7/////qqqq+v//////////////////////////qqqq6v////+qqqqq/////6qqqqr/////"},
+    },
     long_man = {
         near = {w = 96, h = 96, tw = 3, th = 3,
             marks = {52, 53, 8, 53, 73, 52, 39, 52, 22, 53, 89, 51, 63, 58, 47, 45, 79, 62, 48, 62, 34, 61, 12, 42, 31, 45, 81, 43},
@@ -9208,6 +9457,10 @@ local TRADE_UI = {rows = 12, row_h = 14, top = 50, col_x = {mine = 6, theirs = 2
                           .. "at you and lifts the barrier. On the far side the grass is only "
                           .. "grass. Behind you something vast and patient hums, and you know "
                           .. "you will dream of it every night.",
+                      quiet = "The hum stops. For the first time since you came, the Zone is "
+                          .. "silent: no wind in the wires, no birds, no count. You walk out the "
+                          .. "way you came. The Checkpoint is empty, the barrier up, a radio on "
+                          .. "the sergeant's desk hissing nothing at all.",
                       bribe = "The guards weigh the artifacts in their gloved hands. One of "
                           .. "them starts to cry and doesn't know why. They wave you through "
                           .. "without a word, and the barrier drops behind you like a closing eye.",
@@ -9469,6 +9722,8 @@ function Game:journal_lines()
     if self:lore_count() > 0 then
         add(("Pages read: %d/%d. L to reread them."):format(self:lore_count(), #LORE.pages))
     end
+    local story = self:story_text()
+    if story then add(story) end
     local quest = self:quest_text()
     if quest then add("Quest - " .. quest) end
     local camp = self:base_text()

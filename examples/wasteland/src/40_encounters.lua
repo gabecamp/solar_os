@@ -105,6 +105,7 @@ function Game:encounter_options()
     if kind == "anomaly" then return {{"Investigate", "investigate"}, {"Walk away", "leave_quietly"}} end
     if kind == "horror" then return self:horror_options(e) end
     if kind == "little" then return self:little_options() end
+    if kind == "institute" then return self:institute_options() end
     if kind == "dog" then
         local o = {}
         if self:dog_food() then o[1] = {"Offer it food", "tame"} end
@@ -257,6 +258,7 @@ function Game:encounter_action(action)
     e.msg = {}
     if action == "tame" then return self:dog_tame() end
     if action:find("_little$") then return self:little_action(action) end
+    if action:find("_institute$") then return self:institute_action(action) end
     if action == "look_away" or action == "speak" or action == "cover" or action == "follow" then
         return self:horror_action(action)
     end

@@ -297,6 +297,15 @@ local QUESTS = {
     supply = {offer = "Anna: 'We're out of bandages. Call me when you've two to spare.'",
               journal = "find 2 bandages, then call her.", need = {"bandage", 2},
               reward = {{"medkit", 1}, {"water_bottle", 2}}},
+    -- the storyline (src/58_story.lua): what the Signal counts
+    story = {pages = 6, signal_calls = 2, min_from_towns = 8,
+             shut_base = 45, shut_per_point = 8, fail_rads = 20, retry_hours = 12,
+             journal = {quarry = "The pages point to the old quarry, %s. The Institute.",
+                        gate = "The Institute's gate at the quarry needs a pass. Karl? Anna?",
+                        source = "You have a pass. The Institute gate, %s."},
+             intro = "The gate grinds open on a stair going down. At the bottom, a doorway "
+                  .. "full of a slow violet light, and a hum you feel in your fillings. The "
+                  .. "Signal is not on the radio here. It is in the walls."},
     fish = {offer = "Mother Okun: 'Bring me three fish. The ferry men row badly hungry.'",
             journal = "bring 3 fish to the Ferry Post.", need = 3,
             reward = {{"snare", 2}, {"lucky_lure", 1}}},

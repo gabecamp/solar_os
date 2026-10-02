@@ -45,6 +45,19 @@ before and start it. For anything that goes wrong, a photo of the screen
     forest to hunt. **Expect:** a 96x96 picture top right, the story text,
     and a list of choices.
 
+## 6. New things to try (2026-10-02)
+- **Seasons and weather:** the panel's second line reads like "Aut Overcast"
+  (season, weather). Wait or walk a few days: fog (sight 1), storms (find
+  ruins, hills or trees), snow in winter (from day 11).
+- **Mother Okun:** the journal and the map show the Ferry Post once you've
+  seen it; **T** there trades (her prices are lower), **O** asks for work.
+- **The Peddler:** a cart glyph that moves every 12 hours; **T** on his hex.
+- **The Little Ones:** toys (crayons, a toy car...) turn up in searches.
+  Leave three at the little stone cairns near a burrow (**E** on the toy or
+  **T** on the cairn), then visit the burrow: small heads follow your
+  figure on the map.
+- **The quarry:** after reading six torn pages, the journal points to it.
+
 ## Expected numbers (measured on a PC with the test fake)
 - Lua memory: about **845 KB** once loaded, **~1 MB** at most while
   playing. The device info page (H, then V) shows the real figure. On the

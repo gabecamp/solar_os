@@ -21,7 +21,7 @@ local SAVE = {version = 1, dir = "wasteland", file = "save.lua",
                         "difficulty", "dog", "radio", "karl_hint",
                         "base", "quest", "quests_done",
                         "lore_read", "signal_page", "skills", "stats",
-                        "ferry_trader", "peddler", "little"}}
+                        "ferry_trader", "peddler", "little", "story"}}
 
 -- Where the save lives: <preferred storage>/wasteland/save.lua
 function SAVE.path()

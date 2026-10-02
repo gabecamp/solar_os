@@ -11,6 +11,10 @@ local TRADE_UI = {rows = 12, row_h = 14, top = 50, col_x = {mine = 6, theirs = 2
                           .. "at you and lifts the barrier. On the far side the grass is only "
                           .. "grass. Behind you something vast and patient hums, and you know "
                           .. "you will dream of it every night.",
+                      quiet = "The hum stops. For the first time since you came, the Zone is "
+                          .. "silent: no wind in the wires, no birds, no count. You walk out the "
+                          .. "way you came. The Checkpoint is empty, the barrier up, a radio on "
+                          .. "the sergeant's desk hissing nothing at all.",
                       bribe = "The guards weigh the artifacts in their gloved hands. One of "
                           .. "them starts to cry and doesn't know why. They wave you through "
                           .. "without a word, and the barrier drops behind you like a closing eye.",

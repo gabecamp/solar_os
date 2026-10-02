@@ -39,6 +39,7 @@ local RECORDS = {
              end
              return true
          end},
+        {"quiet", "The Quiet", "Silence the Signal", function(_, how) return how == "quiet" end},
         {"night_owl", "Night Owl", "Live through 3 night horrors",
          function(g) return g:stat_of("horrors") >= 3 end},
     },
@@ -256,7 +257,7 @@ function Game:draw_records(w, h)
         local done = rec.achieved[a[1]]
         gfx.text(6, y, (done and "[x] " or "[ ] ") .. a[2])
         gfx.text(170, y, a[3])
-        y = y + 13
+        y = y + 12
     end
     if not SAVE.can_write() then gfx.text(6, h - 22, "(not saved: this SolarOS can't write files)") end
     gfx.text(6, h - 8, "Any key: back")

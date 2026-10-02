@@ -316,6 +316,19 @@ are how it sees. The Signal has been counting the living since the first
 night, and the guards who confiscate every object are, without quite
 knowing it, trying not to be looked through.
 
+**The Institute (the storyline).** Read six torn pages, or call the Signal
+twice, and everything points to the **old quarry** in the hills: a sealed
+gate stencilled INSTITUTE. It needs a pass. **Karl** gives you his son's
+for a right answer (*"He worked there. Didn't come back. You might."*),
+or **Anna** sends her brother's by runner if you did her bandage job. Down
+the stair is a doorway of violet light and the hum: the Signal isn't on
+the radio here, it's in the walls. With a Multitool you can try to **shut
+it down** (a Tinkering and Perception roll; a failure throws you out with
+a dose of rads). Succeed and you walk out into **the Quiet**: the Zone
+falls silent, the Checkpoint stands empty, and that's a fourth way out
+(and its own achievement). Or **listen to it**: you understand all of it
+at once, and then you hear your own name.
+
 **The ending changes with what you've read:**
 - **0-3 pages:** you simply leave.
 - **4-8 pages:** you've read enough to wonder what you're carrying out,

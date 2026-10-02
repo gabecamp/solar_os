@@ -65,6 +65,9 @@ function Game:spot_sites()
     if self:learn_site_seen("checkpoint") then
         self:push_log("A guard tower on the horizon: the Checkpoint.")
     end
+    if self.sites.quarry and self:learn_site_seen("quarry") then
+        self:push_log("A gate in the wall of the old quarry, " .. self:site_bearing("quarry") .. ".")
+    end
     if self.sites.ferry and self:learn_site_seen("ferry") then
         self:push_log("A jetty and a few huts by the water: the Ferry Post, " .. self:site_bearing("ferry") .. ".")
     end
@@ -88,6 +91,8 @@ function Game:arrive_site()
         self:learn_site("checkpoint")
         self:push_log("The Checkpoint. Guards watch from the tower. T.")
         return true
+    elseif site == "quarry" then
+        return self:quarry_arrive()
     elseif site == "ferry" then
         self:learn_site("ferry")
         self:push_log("The Ferry Post. Mother Okun trades from the jetty. T.")
@@ -104,6 +109,8 @@ function Game:site_action()
         self:open_trade("town")
     elseif site == "ferry" then
         self:open_trade("ferry")
+    elseif site == "quarry" then
+        self:open_institute()
     elseif site == "checkpoint" then
         self:open_gate()
     elseif self:peddler_key() == hex_key(self.player.q, self.player.r) then
@@ -302,7 +309,8 @@ end
 -- Out of the Zone: the run is over (and so is its save).
 function Game:finish_run(how)
     self.ending = {how = how, day = (self:clock()), hours = self.player.hours,
-                   artifacts = self:artifact_count(), lore = self:lore_ending_line()}
+                   artifacts = self:artifact_count(),
+                   lore = how ~= "quiet" and self:lore_ending_line() or nil}   -- (the Quiet says it all)
     self.screen = "ending"
     self:sfx("escape")
     self:record_run(how)

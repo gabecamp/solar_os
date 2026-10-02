@@ -90,6 +90,7 @@ function Game:anna_work()
     if q and q.kind == "supply" then
         if not self:anna_ready() then return false end
         self:take_items(need[1], need[2])
+        if self.story then self.story.anna = true end   -- (she'll help you at the gate)
         self:give_reward(QUESTS.supply.reward, "Anna: 'Bless you.' A runner leaves a parcel:")
         self:radio_say("Anna: 'Bless you. The children here will sleep tonight. I've sent you something.'")
         return "open"   -- her channel stays open afterwards

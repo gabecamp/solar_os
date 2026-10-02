@@ -122,6 +122,7 @@ function RADIO.trader(self)
     return true
 end
 function RADIO.anna(self)
+    if self:story_anna() then return true end
     local work = self:anna_work()
     if work == "offered" then return false end   -- free: she only asked
     if work then return work end
@@ -147,6 +148,7 @@ function RADIO.karl(self)
 end
 function RADIO.signal(self)
     local p = self.player
+    if self.story then self.story.calls = (self.story.calls or 0) + 1 end
     if not self.signal_page then   -- the first time, it reads you something
         self.signal_page = true
         self:read_lore("The Signal")

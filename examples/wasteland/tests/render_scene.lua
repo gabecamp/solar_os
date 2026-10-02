@@ -476,3 +476,28 @@ g.player.q, g.player.r = tonumber(q), tonumber(r)
 g:little_arrive()   -- strangers at their warren: they come out to look
 g:draw_encounter(400, 300)
 solaros.dump("ops_little.txt")
+
+-- Scenes: the storyline (the quarry gate, the Institute, the Quiet ending)
+g = Game.new()
+g:start_game()
+if g.sites.quarry then
+    local q, r = g.sites.quarry:match("(-?%d+),(-?%d+)")
+    g.player.q, g.player.r = tonumber(q) - 1, tonumber(r) + 1
+    if not g.tiles[g.player.q .. "," .. g.player.r] then g.player.q, g.player.r = tonumber(q), tonumber(r) end
+    g.lore_read = {true, true, true, true, true, true}
+    g:story_check()
+    g:refresh_view()
+    g:spot_sites()
+    g:draw_map(400, 300)
+    solaros.dump("ops_map_quarry.txt")
+    g.player.q, g.player.r = tonumber(q), tonumber(r)
+    g.story.step, g.story.pass = "source", true
+    g.player.inventory = {{item = "institute_pass", qty = 1}, {item = "multitool", qty = 1}}
+    g:open_institute()
+    g:draw_encounter(400, 300)
+    solaros.dump("ops_institute.txt")
+    g.enc = nil
+    g:finish_run("quiet")
+    g:draw_ending(400, 300)
+    solaros.dump("ops_ending_quiet.txt")
+end
