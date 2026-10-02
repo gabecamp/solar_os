@@ -69,7 +69,10 @@ FAKE_FILES[REC] = nil
 Game.reload_records()
 local writes = 0
 local real_write = fake.storage.write_file
-fake.storage.write_file = function(path, data) if path == REC then writes = writes + 1 end return real_write(path, data) end
+fake.storage.write_file = function(path, data)   -- (saves go to REC .. ".new", then a rename)
+    if path == REC or path == REC .. ".new" then writes = writes + 1 end
+    return real_write(path, data)
+end
 g = fresh()
 g.player.hours = 30            -- First Steps unlocks at the end
 g.player.health = 0

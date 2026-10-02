@@ -67,6 +67,9 @@ function Game.records()
     local _, path = records_path()
     if path and storage and storage.read_file then
         local ok, text = pcall(storage.read_file, path, 16384)
+        if not ok then   -- (a save cut short before the rename: the new copy)
+            ok, text = pcall(storage.read_file, path .. ".new", 16384)
+        end
         local chunk = ok and type(text) == "string" and text ~= "" and load("return " .. text, "=records", "t", {})
         local good, data = false, nil
         if chunk then good, data = pcall(chunk) end
@@ -127,7 +130,7 @@ function Game.write_records()
             solaros.storage.write_file(dir .. "/records.bad.lua", RECORDS.bad_text)
             RECORDS.bad_text = nil
         end
-        solaros.storage.write_file(path, table.concat(SAVE.serialize(Game.records(), {})))
+        SAVE.write(path, table.concat(SAVE.serialize(Game.records(), {})))
     end)
 end
 

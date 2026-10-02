@@ -39,9 +39,9 @@ before and start it. For anything that goes wrong, a photo of the screen
 ## 4. Things that make sound or use storage (2 min)
 10. If you find a Geiger Counter, step onto a hot hex. **Expect:** a click
     and a "Geiger crackles" line.
-11. Quit with Q and start again. **Expect:** with the `write_file` firmware
-    patch, a title screen with **Continue**; without it, straight to the
-    creator (that's correct, not a bug).
+11. Quit with Q and start again. **Expect:** on SolarOS 4.15.17 or newer, a
+    title screen with **Continue**; on older firmware, straight to the creator
+    (that's correct, not a bug). H then V shows "Can save: yes" when it can.
 12. On the title (or the creator) press **R**. **Expect:** the records page
     with the achievement list; any key goes back. After a death it should
     show one more run.

@@ -148,4 +148,32 @@ FAKE_FILES, FAKE_DIRS = {}, {}
 shown = run({113})
 assert(not shown:find("Continue", 1, true), "no save, no title")
 
+print("9. a power cut can't lose the run: saves go to save.lua.new, then replace save.lua")
+FAKE_FILES, FAKE_DIRS = {}, {}
+local g9 = played_game()
+local real_rename = fake.storage.rename
+local renamed = {}
+fake.storage.rename = function(a, b) renamed[#renamed + 1] = a .. ">" .. b; return real_rename(a, b) end
+assert(g9:save())
+assert(renamed[1] == PATH .. ".new>" .. PATH and FAKE_FILES[PATH] and not FAKE_FILES[PATH .. ".new"])
+local good = FAKE_FILES[PATH]
+-- cut between removing the old save and the rename: only the new copy is left
+FAKE_FILES[PATH], FAKE_FILES[PATH .. ".new"] = nil, good
+local data = Game.read_save()
+assert(data and data.world_seed == g9.world_seed, "the .new copy is loaded")
+-- a half-written main file next to a good new copy: the good one wins
+FAKE_FILES[PATH] = good:sub(1, #good // 2)
+assert(Game.read_save() and Game.read_save().world_seed == g9.world_seed)
+-- the next save cleans up after itself
+assert(g9:save() and FAKE_FILES[PATH] and not FAKE_FILES[PATH .. ".new"])
+-- death removes both
+FAKE_FILES[PATH .. ".new"] = good
+Game.delete_save()
+assert(not FAKE_FILES[PATH] and not FAKE_FILES[PATH .. ".new"])
+-- firmware without rename: a plain write still saves
+fake.storage.rename = nil
+assert(g9:save() and FAKE_FILES[PATH] and not FAKE_FILES[PATH .. ".new"])
+fake.storage.rename = real_rename
+print("   OK")
+
 print("SAVE TESTS PASSED")

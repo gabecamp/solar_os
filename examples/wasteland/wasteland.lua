@@ -4472,9 +4472,10 @@ end
 -- ---------------------------------------------------------------------
 -- Saving and continuing
 --
--- Needs solaros.storage.write_file, which SolarOS gains with the patch in
--- firmware/ (upstream request pending). Without it the game runs exactly as
--- before and simply can't save.
+-- Needs solaros.storage.write_file (SolarOS 4.15.17 and newer). On older
+-- firmware the game runs exactly as before and simply can't save. Saves go
+-- through SAVE.write (write `.new`, then replace), so a power cut mid-save
+-- can't cost the run.
 --
 -- The save is a Lua table literal (read back with load() in an empty
 -- environment, so it can't run code). The world itself is not stored: it is
@@ -4505,6 +4506,34 @@ end
 
 function SAVE.can_write()
     return solaros.storage ~= nil and solaros.storage.write_file ~= nil
+end
+
+-- Write a whole file so a power cut can't leave it half-written: the new
+-- text goes to `path.new`, then replaces `path` (stock SolarOS's write_file
+-- overwrites in place). Without rename, a plain write. Raises on failure
+-- (callers pcall it).
+function SAVE.write(path, text)
+    local st = solaros.storage
+    if not st.rename then return st.write_file(path, text) end
+    local fresh = path .. ".new"
+    st.write_file(fresh, text)
+    if st.exists and st.exists(path) then st.remove(path) end
+    st.rename(fresh, path)
+end
+
+-- The text of `path`, or of `path.new` if that's all a cut-short save left:
+-- each candidate is handed to `accept`, and the first it returns is used.
+function SAVE.read(path, max, accept)
+    local st = solaros.storage
+    if not (st and st.read_file) then return nil end
+    for _, p in ipairs({path, path .. ".new"}) do
+        local ok, text = pcall(st.read_file, p, max)
+        if ok and type(text) == "string" and text ~= "" then
+            local value = accept(text)
+            if value ~= nil then return value end
+        end
+    end
+    return nil
 end
 
 -- Plain values and nested tables of them, keys sorted so saves are stable.
@@ -4557,7 +4586,7 @@ function Game:save()
     local dir, path = SAVE.path()
     local ok, err = pcall(function()
         if solaros.storage.makedirs then solaros.storage.makedirs(dir) end
-        solaros.storage.write_file(path, self:save_state())
+        SAVE.write(path, self:save_state())
     end)
     if not ok then return false, (tostring(err):gsub("^.-:%d+: ", "")) end
     self.saved_hour = self.player.hours
@@ -4566,19 +4595,17 @@ end
 
 -- The saved table, or nil (no save, unreadable, or from another version).
 function Game.read_save()
-    local storage = solaros.storage
-    if not (storage and storage.read_file) then return nil end
     local _, path = SAVE.path()
-    local ok, text = pcall(storage.read_file, path, 65536)
-    if not ok or type(text) ~= "string" or text == "" then return nil end
-    local chunk = load("return " .. text, "=save", "t", {})
-    if not chunk then return nil end
-    local good, data = pcall(chunk)
-    if not good or type(data) ~= "table" or data.version ~= SAVE.version
-        or type(data.player) ~= "table" or not data.world_seed then
-        return nil
-    end
-    return data
+    return SAVE.read(path, 65536, function(text)
+        local chunk = load("return " .. text, "=save", "t", {})
+        if not chunk then return nil end
+        local good, data = pcall(chunk)
+        if not good or type(data) ~= "table" or data.version ~= SAVE.version
+            or type(data.player) ~= "table" or not data.world_seed then
+            return nil
+        end
+        return data
+    end)
 end
 
 function Game:load_state(data)
@@ -4610,7 +4637,9 @@ function Game.delete_save()
     local storage = solaros.storage
     if not (storage and storage.remove and storage.exists) then return end
     local _, path = SAVE.path()
-    pcall(function() if storage.exists(path) then storage.remove(path) end end)
+    for _, p in ipairs({path, path .. ".new"}) do
+        pcall(function() if storage.exists(p) then storage.remove(p) end end)
+    end
 end
 
 -- Save after anything that took time, on the screens where a run is at rest.
@@ -7669,6 +7698,9 @@ function Game.records()
     local _, path = records_path()
     if path and storage and storage.read_file then
         local ok, text = pcall(storage.read_file, path, 16384)
+        if not ok then   -- (a save cut short before the rename: the new copy)
+            ok, text = pcall(storage.read_file, path .. ".new", 16384)
+        end
         local chunk = ok and type(text) == "string" and text ~= "" and load("return " .. text, "=records", "t", {})
         local good, data = false, nil
         if chunk then good, data = pcall(chunk) end
@@ -7729,7 +7761,7 @@ function Game.write_records()
             solaros.storage.write_file(dir .. "/records.bad.lua", RECORDS.bad_text)
             RECORDS.bad_text = nil
         end
-        solaros.storage.write_file(path, table.concat(SAVE.serialize(Game.records(), {})))
+        SAVE.write(path, table.concat(SAVE.serialize(Game.records(), {})))
     end)
 end
 
@@ -10117,7 +10149,7 @@ function Game:device_lines()
     else
         lines[#lines + 1] = "Storage: no solaros.storage"
     end
-    lines[#lines + 1] = "Can save: " .. (SAVE.can_write() and "yes (write_file)" or "no (needs the firmware patch)")
+    lines[#lines + 1] = "Can save: " .. (SAVE.can_write() and "yes (write_file)" or "no (needs SolarOS 4.15.17+)")
     local _, path = SAVE.path()
     if path and st and st.exists then
         local ok, there = pcall(st.exists, path)

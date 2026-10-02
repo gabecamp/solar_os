@@ -6,9 +6,9 @@ of the Zone, stay fed, warm and out of the radiation, and get out through
 the Checkpoint alive.
 
 - **Install:** copy `wasteland.lua` to the device and run it with the `lua`
-  app. Saving needs the `write_file` firmware patch (`firmware/`, and the
-  request to the SolarOS author in `firmware/UPSTREAM_REQUEST.md`); without
-  it the game runs but can't save.
+  app. Saving (Continue, and the records) needs SolarOS 4.15.17 or newer,
+  which added `solaros.storage.write_file`; on older firmware the game runs
+  but can't save.
 - **Keys:** Left/Right step west/east; Up or Down then Left/Right takes
   a diagonal (Up, Right = up-right; the hexes have six sides); WASD works
   the same. Space rests, F searches, I opens the bag,
