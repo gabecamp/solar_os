@@ -94,6 +94,7 @@ local ok, err = pcall(function()
     -- full frame is hundreds of gfx calls plus a panel refresh.
     local dirty = true
     while not game.quit and not solaros.should_exit() do
+        if game:show_queued_scene() then dirty = true end   -- (a story moment)
         if dirty then
             -- the bag screen patches itself when only its cursor moved; any
             -- other screen in between means it has to be drawn whole again
@@ -129,6 +130,8 @@ local ok, err = pcall(function()
                 game:draw_puzzle(w, h)
             elseif game.screen == "craft" then
                 game:draw_craft(w, h)
+            elseif game.screen == "scene" then
+                game:draw_scene(w, h)
             elseif game.screen == "map" then
                 game:draw_map(w, h)
             else
@@ -179,6 +182,8 @@ local ok, err = pcall(function()
                 elseif key == KEY.ENTER or key == KEY.LF then
                     game = Game.new()   -- a fresh world and the creator
                 end
+            elseif game.screen == "scene" then
+                game:scene_key(key)
             elseif game.screen == "map" then
                 handle_map_key(key)
             else

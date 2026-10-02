@@ -318,6 +318,32 @@ local QUESTS = {
             reward = {{"snare", 2}, {"lucky_lure", 1}}},
     dog = {offer = "Karl: 'Before you go - my old dog ran off. Find her by the water?'",
            journal = "find his dog by the river", near = 4, far = 8},
+    -- story moments (src/67_scenes.lua): shown once a run, art = a portrait
+    scenes = {
+        order = {"wake", "first_night", "first_emission", "little_ones", "the_gate"},
+        wake = {title = "The Zone",
+                text = "You wake in wet grass with nothing. No shoes, no coat, no name you "
+                    .. "can hold on to. Somewhere a dog barks, and stops. There's a pile of "
+                    .. "rags and a rusted can beside you, as if someone left them for you. "
+                    .. "The wind smells of iron. Make something to wear before the night."},
+        first_night = {title = "Night",
+                text = "The light goes all at once, like a switch. The grass keeps "
+                    .. "whispering after the wind stops. Stay by a fire or under a roof. "
+                    .. "Carry light. And if something tall stands at the edge of it, "
+                    .. "look away."},
+        first_emission = {title = "The sky",
+                text = "The sky bruises purple and the birds drop out of it. Every radio "
+                    .. "in the Zone hisses the same note. An emission is coming. Get into "
+                    .. "ruins or up into the hills, and stay there until it passes."},
+        little_ones = {title = "The Little Ones", art = "little",
+                text = "Under a mound, a burrow, and small grey faces watching you from "
+                    .. "it. Grinning. They were children once, people say. They like toys: "
+                    .. "leave one on a little cairn of stones and see what happens."},
+        the_gate = {title = "The quarry", art = "institute",
+                text = "A rusted gate in the quarry wall, and a word in old paint: "
+                    .. "INSTITUTE. Behind it something hums, low, in your teeth. Whatever "
+                    .. "the Signal is counting, it started here."},
+    },
 }
 
 -- Night horrors (src/54_night.lua): chance % per move after dark, halved

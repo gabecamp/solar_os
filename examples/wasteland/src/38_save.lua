@@ -21,7 +21,7 @@ local SAVE = {version = 1, dir = "wasteland", file = "save.lua",
                         "difficulty", "dog", "radio", "karl_hint",
                         "base", "quest", "quests_done",
                         "lore_read", "signal_page", "skills", "stats",
-                        "ferry_trader", "peddler", "little", "story", "run_id"}}
+                        "ferry_trader", "peddler", "little", "story", "run_id", "scenes_seen"}}
 
 -- Where the save lives: <preferred storage>/wasteland/save.lua
 function SAVE.path()
@@ -117,6 +117,7 @@ function Game:load_state(data)
     for _, f in ipairs(SAVE.fields) do
         if data[f] ~= nil then self[f] = data[f] end
     end
+    if data.scenes_seen == nil then self.scenes_seen = Game.all_scenes_seen() end   -- (older saves)
     -- saves from before emissions existed (or one left far behind) would
     -- otherwise never see another: schedule the next from now
     local E = RAD.emission

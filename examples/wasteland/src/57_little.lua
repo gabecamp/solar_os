@@ -97,6 +97,7 @@ function Game:spot_little()
         for _, k in ipairs((self.extras or {})[kind] or {}) do
             if vis[k] and not l.seen[k] then
                 l.seen[k] = true
+                if kind == "warrens" then self:queue_scene("little_ones") end
                 self:push_log(kind == "warrens" and ("A burrow under a mound, " .. self:bearing_to(k) .. ". Giggling.")
                     or ("A little cairn of stones, " .. self:bearing_to(k) .. "."))
             end
@@ -111,6 +112,7 @@ function Game:little_arrive()
     if not spot then return false end
     local l = self.little
     l.seen[key] = true
+    if spot == "warren" then self:queue_scene("little_ones") end
     if spot == "cairn" then
         self:push_log("A little cairn of stones, a shell on top. Toys left here are gone.")
         return false

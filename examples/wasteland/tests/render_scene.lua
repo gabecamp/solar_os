@@ -552,3 +552,11 @@ if g.sites.quarry then
     g:draw_ending(400, 300)
     solaros.dump("ops_ending_quiet.txt")
 end
+
+-- Story moments: waking up, and the quarry gate (with the Institute's portrait)
+for _, id in ipairs({"wake", "the_gate"}) do
+    g = Game.new()
+    g.scene, g.screen = id, "scene"
+    g:draw_scene(400, 300)
+    solaros.dump("ops_scene_" .. id .. ".txt")
+end

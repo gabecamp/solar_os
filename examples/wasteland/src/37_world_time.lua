@@ -205,6 +205,7 @@ function Game:tick()
         dose = dose + self:rad_hour()
         self:survive_hour()
         self:storm_hour(hour)
+        if self:is_night(hour) and not self:is_night(hour - 1) then self:queue_scene("first_night") end
         self:wear_all(WORLD.wear.day / 24)
         self:little_hour(hour)
         local heat = self:season(hour).thirst

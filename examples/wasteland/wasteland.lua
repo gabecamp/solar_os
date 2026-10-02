@@ -343,6 +343,32 @@ local QUESTS = {
             reward = {{"snare", 2}, {"lucky_lure", 1}}},
     dog = {offer = "Karl: 'Before you go - my old dog ran off. Find her by the water?'",
            journal = "find his dog by the river", near = 4, far = 8},
+    -- story moments (src/67_scenes.lua): shown once a run, art = a portrait
+    scenes = {
+        order = {"wake", "first_night", "first_emission", "little_ones", "the_gate"},
+        wake = {title = "The Zone",
+                text = "You wake in wet grass with nothing. No shoes, no coat, no name you "
+                    .. "can hold on to. Somewhere a dog barks, and stops. There's a pile of "
+                    .. "rags and a rusted can beside you, as if someone left them for you. "
+                    .. "The wind smells of iron. Make something to wear before the night."},
+        first_night = {title = "Night",
+                text = "The light goes all at once, like a switch. The grass keeps "
+                    .. "whispering after the wind stops. Stay by a fire or under a roof. "
+                    .. "Carry light. And if something tall stands at the edge of it, "
+                    .. "look away."},
+        first_emission = {title = "The sky",
+                text = "The sky bruises purple and the birds drop out of it. Every radio "
+                    .. "in the Zone hisses the same note. An emission is coming. Get into "
+                    .. "ruins or up into the hills, and stay there until it passes."},
+        little_ones = {title = "The Little Ones", art = "little",
+                text = "Under a mound, a burrow, and small grey faces watching you from "
+                    .. "it. Grinning. They were children once, people say. They like toys: "
+                    .. "leave one on a little cairn of stones and see what happens."},
+        the_gate = {title = "The quarry", art = "institute",
+                text = "A rusted gate in the quarry wall, and a word in old paint: "
+                    .. "INSTITUTE. Behind it something hums, low, in your teeth. Whatever "
+                    .. "the Signal is counting, it started here."},
+    },
 }
 
 -- Night horrors (src/54_night.lua): chance % per move after dark, halved
@@ -3399,6 +3425,7 @@ function Game:start_game()
     p.explored = {}
     self:refresh_view()
     self.screen = "map"
+    self:queue_scene("wake")
     return true
 end
 
@@ -4382,6 +4409,7 @@ function Game:tick()
         dose = dose + self:rad_hour()
         self:survive_hour()
         self:storm_hour(hour)
+        if self:is_night(hour) and not self:is_night(hour - 1) then self:queue_scene("first_night") end
         self:wear_all(WORLD.wear.day / 24)
         self:little_hour(hour)
         local heat = self:season(hour).thirst
@@ -4436,7 +4464,7 @@ local SAVE = {version = 1, dir = "wasteland", file = "save.lua",
                         "difficulty", "dog", "radio", "karl_hint",
                         "base", "quest", "quests_done",
                         "lore_read", "signal_page", "skills", "stats",
-                        "ferry_trader", "peddler", "little", "story", "run_id"}}
+                        "ferry_trader", "peddler", "little", "story", "run_id", "scenes_seen"}}
 
 -- Where the save lives: <preferred storage>/wasteland/save.lua
 function SAVE.path()
@@ -4532,6 +4560,7 @@ function Game:load_state(data)
     for _, f in ipairs(SAVE.fields) do
         if data[f] ~= nil then self[f] = data[f] end
     end
+    if data.scenes_seen == nil then self.scenes_seen = Game.all_scenes_seen() end   -- (older saves)
     -- saves from before emissions existed (or one left far behind) would
     -- otherwise never see another: schedule the next from now
     local E = RAD.emission
@@ -5385,7 +5414,7 @@ function Game:emission_log()
     local n = self.emission_news
     self.emission_caught = n and n.caught
     if not n then return end
-    if n.warn then self:sfx("siren") end
+    if n.warn then self:sfx("siren"); self:queue_scene("first_emission") end
     if n.caught then self:sfx("emission") end
     if n.warn then
         self:push_log(("The sky bruises purple. Emission in %dh! Ruins/hills!"):format(RAD.emission.warn))
@@ -7912,6 +7941,7 @@ function Game:spot_little()
         for _, k in ipairs((self.extras or {})[kind] or {}) do
             if vis[k] and not l.seen[k] then
                 l.seen[k] = true
+                if kind == "warrens" then self:queue_scene("little_ones") end
                 self:push_log(kind == "warrens" and ("A burrow under a mound, " .. self:bearing_to(k) .. ". Giggling.")
                     or ("A little cairn of stones, " .. self:bearing_to(k) .. "."))
             end
@@ -7926,6 +7956,7 @@ function Game:little_arrive()
     if not spot then return false end
     local l = self.little
     l.seen[key] = true
+    if spot == "warren" then self:queue_scene("little_ones") end
     if spot == "cairn" then
         self:push_log("A little cairn of stones, a shell on top. Toys left here are gone.")
         return false
@@ -8129,6 +8160,7 @@ end
 function Game:quarry_arrive()
     local st = self.story
     self:learn_site("quarry")
+    self:queue_scene("the_gate")
     if st.step == "quarry" then st.step = "gate" end
     if self:count_item("institute_pass") > 0 and st.step == "gate" then st.step = "source" end
     if st.step == "source" then
@@ -9443,6 +9475,65 @@ function Game:draw_portrait(e, x, y)
     gfx.rect(x, y, size, size)
 end
 -- ---------------------------------------------------------------------
+-- Story moments (texts in QUESTS.scenes): a short full-screen scene, once a
+-- run, at a few turning points. Game:queue_scene(id) from the moment's own
+-- code; the main loop shows queued scenes only from the map screen (so the
+-- tests and the balance sim, which call methods directly, never see one).
+-- self.scenes_seen = {id = true} (saved; an old save counts all as seen).
+-- ---------------------------------------------------------------------
+
+function Game:queue_scene(id)
+    self.scenes_seen = self.scenes_seen or {}
+    if self.scenes_seen[id] or not QUESTS.scenes[id] then return false end
+    self.scenes_seen[id] = true
+    self.scene_queue = self.scene_queue or {}
+    table.insert(self.scene_queue, id)
+    return true
+end
+
+-- From the main loop: true if a scene is now on screen.
+function Game:show_queued_scene()
+    local q = self.scene_queue
+    if self.screen ~= "map" or not q or #q == 0 then return false end
+    self.scene = table.remove(q, 1)
+    self.screen = "scene"
+    return true
+end
+
+function Game:scene_key()
+    self.scene = nil
+    self.screen = "map"
+end
+
+-- Every scene counted as seen (old saves: nothing replays).
+function Game.all_scenes_seen()
+    local seen = {}
+    for _, id in ipairs(QUESTS.scenes.order) do seen[id] = true end
+    return seen
+end
+
+function Game:draw_scene(w, h)
+    local sc = QUESTS.scenes[self.scene] or QUESTS.scenes.wake
+    gfx.clear(gfx.WHITE)
+    gfx.color(gfx.BLACK)
+    gfx.font(gfx.FONT_BOLD_14)
+    gfx.text(10, 24, sc.title)
+    gfx.font(gfx.FONT_MONO_12)
+    local cols = 54
+    if sc.art and draw_sprite then
+        self:draw_portrait({def = {art = sc.art}}, w - PORTRAIT_SIZE - 10, 34)
+        gfx.color(gfx.BLACK)
+        gfx.rect(w - PORTRAIT_SIZE - 11, 33, PORTRAIT_SIZE + 2, PORTRAIT_SIZE + 2)
+        cols = (w - PORTRAIT_SIZE - 30) // 7
+    end
+    local y = 50
+    for _, line in ipairs(wrap(sc.text, cols)) do
+        gfx.text(10, y, line)
+        y = y + 16
+    end
+    gfx.text(10, h - 8, "Any key to go on")
+end
+-- ---------------------------------------------------------------------
 -- Character creator screen
 -- rows 1..#ATTRIBUTES are attributes, the rest are TRAITS in order
 -- ---------------------------------------------------------------------
@@ -10238,6 +10329,7 @@ local ok, err = pcall(function()
     -- full frame is hundreds of gfx calls plus a panel refresh.
     local dirty = true
     while not game.quit and not solaros.should_exit() do
+        if game:show_queued_scene() then dirty = true end   -- (a story moment)
         if dirty then
             -- the bag screen patches itself when only its cursor moved; any
             -- other screen in between means it has to be drawn whole again
@@ -10273,6 +10365,8 @@ local ok, err = pcall(function()
                 game:draw_puzzle(w, h)
             elseif game.screen == "craft" then
                 game:draw_craft(w, h)
+            elseif game.screen == "scene" then
+                game:draw_scene(w, h)
             elseif game.screen == "map" then
                 game:draw_map(w, h)
             else
@@ -10323,6 +10417,8 @@ local ok, err = pcall(function()
                 elseif key == KEY.ENTER or key == KEY.LF then
                     game = Game.new()   -- a fresh world and the creator
                 end
+            elseif game.screen == "scene" then
+                game:scene_key(key)
             elseif game.screen == "map" then
                 handle_map_key(key)
             else

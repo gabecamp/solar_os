@@ -87,6 +87,7 @@ function Game:start_game()
     p.explored = {}
     self:refresh_view()
     self.screen = "map"
+    self:queue_scene("wake")
     return true
 end
 

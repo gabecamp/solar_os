@@ -19,11 +19,11 @@ end
 -- Run the real main loop (wasteland_run.lua) against a scripted key list.
 -- nil entries are idle getch timeouts. Returns refresh count, keys handled,
 -- and every string drawn with gfx.text. An Enter is sent first to get past
--- the character creator with the default build.
+-- the character creator with the default build, then a key past the wake scene.
 local function run_loop(keys, n)
-    local shifted = {10}
-    for k = 1, n do shifted[k + 1] = keys[k] end
-    keys, n = shifted, n + 1
+    local shifted = {10, 32}   -- (Enter past the creator, any key past the wake scene)
+    for k = 1, n do shifted[k + 2] = keys[k] end
+    keys, n = shifted, n + 2
     local i, handled, texts = 0, 0, {}
     local saved_getch, saved_exit, saved_text = gfx.getch, fake.should_exit, gfx.text
     gfx.getch = function()

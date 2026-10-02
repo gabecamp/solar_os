@@ -50,6 +50,11 @@ before and start it. For anything that goes wrong, a photo of the screen
     and a list of choices.
 
 ## 6. New things to try (2026-10-02)
+- **Story moments:** a new game opens on a short "The Zone" page (any key
+  goes on); the first night, the first emission warning, the first burrow
+  of the Little Ones and the quarry gate each get one too, once a run.
+- **Weather on the map:** rain and storms draw streaks over the map, snow
+  white flakes, fog a dotted veil; the panel reads like "Winter Snow".
 - **Clothes wear out:** wear something a few days, or fight in it, then put
   the bag cursor on it: "Shirt: Rag Shirt 80%". C, **Patch clothes** mends
   the most worn piece for 1 cloth.

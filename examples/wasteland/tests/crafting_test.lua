@@ -119,9 +119,10 @@ print("8. C opens crafting from the map, Enter makes a torch, the screen fits")
 local keys = {}
 for k = 1, 14 do keys[k] = 115 end
 keys[15] = 10                    -- creator: down to Start, Enter
-keys[16] = C.KEY.C               -- map: crafting
-keys[17] = 10                    -- make the first recipe (Torch)
-keys[18] = C.KEY.C               -- back to the map
+keys[16] = 32                    -- past the wake scene
+keys[17] = C.KEY.C               -- map: crafting
+keys[18] = 10                    -- make the first recipe (Torch)
+keys[19] = C.KEY.C               -- back to the map
 local i, texts = 0, {}
 local saved_getch, saved_exit, saved_text = gfx.getch, fake.should_exit, gfx.text
 gfx.getch = function() i = i + 1; if i > #keys then return 113 end; return keys[i] end

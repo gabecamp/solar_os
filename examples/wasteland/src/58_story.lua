@@ -35,6 +35,7 @@ end
 function Game:quarry_arrive()
     local st = self.story
     self:learn_site("quarry")
+    self:queue_scene("the_gate")
     if st.step == "quarry" then st.step = "gate" end
     if self:count_item("institute_pass") > 0 and st.step == "gate" then st.step = "source" end
     if st.step == "source" then
