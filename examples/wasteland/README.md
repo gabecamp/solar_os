@@ -236,9 +236,9 @@ Two rare kind faces on the road (encounters, not radio voices).
 - **The Fused:** two people walking as one, joined at the ribs by a bridge
   of bare bone that creaks when they breathe. They whisper to each other
   about you, agree on something, and turn.
-- **The Mouthless Man:** a man in a rotted raincoat whose mouth has healed
-  over smooth. He breathes through wet slits in his neck, faster once he
-  has seen you.
+- **The Mouthless Man:** a hooded man in a torn raincoat whose mouth is sewn
+  shut, the stitches long healed in, with a second seam down his throat. He
+  breathes through it, faster once he has seen you.
 - **The Bloom:** a woman covered head to chest in soft pink growths that
   swell and shrink as she breathes. She smiles through them, then comes
   closer far too quickly.
@@ -278,12 +278,14 @@ solve it and it may leave an artifact, fail it and it hurts in odd ways.
 - **The Humming Hollow:** a dip where the grass lies in a perfect spiral
   and the air hums in your teeth. A crow lands at the edge and is folded
   into nothing.
-- **The Drowned Bell:** a bell tolling under your feet, miles from any
-  church. The ground ripples like water, and something below answers.
-- **Wrong Stars:** at midday a patch of sky goes black and fills with
-  stars in shapes no one has named. Something up there notices you looking.
-- **The Stillness:** birds hang motionless mid-flight. Reach toward it and
-  every sound stops, even your own heartbeat.
+- **The Drowned Bell:** a great bronze bell hanging over a new pool with
+  nothing holding it up, miles from any church. It tolls by itself, the water
+  ripples in rings, and something below answers.
+- **Wrong Stars:** at midday a patch of sky goes black in the shape of an
+  eye and fills with stars no one has named. Something up there notices you looking.
+- **The Stillness:** birds hang motionless mid-flight, and a hand reaches up
+  out of the earth toward them. Step closer and every sound stops, even your
+  own heartbeat.
 - **The Door in the Field:** a door frame standing alone. Through it, this
   same field at night, and someone standing in it, waiting for you.
 

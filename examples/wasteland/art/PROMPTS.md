@@ -12,9 +12,15 @@ Done so far: `jawhound.jpg`, `stag.jpg` (the user's own); `bandits.jpg` and
 `fused.jpg` (Z-Image Turbo, seeds 1007/1004, first style); `boar.jpg`,
 `crows.jpg`, `bloom.jpg`, `tollman.jpg`, `medic.jpg` (Z-Image Turbo, new
 Cronenberg / S.T.A.L.K.E.R. / Lovecraft style, seeds 2101/2103/2106/2108/2109,
-from the prompts below with the style blocks appended). Still to make:
-wanderer, mouthless and the five anomalies. The free Hugging Face GPU quota
-covers about 7 images before it runs out; it refills over time.
+from the prompts below with the style blocks appended); `wanderer.jpg`
+(seed 2110), `mouthless.jpg` (2111: the model still drew lips, so they are
+sewn shut and the intro says so), and the anomalies `hollow.jpg` (2112),
+`bell.jpg` (2113: the bell hangs over a pool; intro rewritten), `stars.jpg`
+(2115), `stillness.jpg` (2116: the hand rises out of the ground; intro
+rewritten) and `door.jpg` (2118, after 2117 showed day through the door).
+Every portrait is done except Karl (the user's own photo, never generated).
+The free Hugging Face GPU quota covers about 7 images before it runs out; it
+refills over time.
 
 Notes:
 - The Fused: the model won't draw two bodies conjoined (seeds 2104, 2114 drew
