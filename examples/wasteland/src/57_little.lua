@@ -1,7 +1,7 @@
 -- ---------------------------------------------------------------------
 -- The Little Ones (numbers in LITTLE, 05_data_world)
 --
--- The Zone's children, grown small and grey and grinning. They live in
+-- The Zone's children, grown small, pale and huge-eyed (art/little.jpg). They live in
 -- warrens in the woods and hills and are never hostile, only mischievous.
 -- Trinkets (toys, crayons, buttons: worth nothing to anyone else) left at
 -- their cairns befriend them; with enough gifts a troupe follows you from
@@ -62,7 +62,7 @@ function Game:gift_little(item, points)
         local more = Game.troupe_size(l.friend)
         if more > l.n then
             l.n = more
-            self:push_log("Another Little One falls in behind you, grinning.")
+            self:push_log("Another Little One falls in behind you, staring.")
         end
     end
 end
@@ -239,7 +239,7 @@ function Game:little_action(action)
     elseif action == "offer_little" then
         local item = self:first_trinket()
         self:gift_little(item, 2)
-        self:enc_say("A small grey hand snatches the " .. ITEM_DB[item].name:lower()
+        self:enc_say("A small blotched hand snatches the " .. ITEM_DB[item].name:lower()
             .. ". Delighted shrieking under the ground.")
         if l.n == 0 and Game.troupe_size(l.friend) > 0 then
             self:end_encounter()

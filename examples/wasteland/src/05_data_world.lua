@@ -336,8 +336,9 @@ local QUESTS = {
                     .. "in the Zone hisses the same note. An emission is coming. Get into "
                     .. "ruins or up into the hills, and stay there until it passes."},
         little_ones = {title = "The Little Ones", art = "little",
-                text = "Under a mound, a burrow, and small grey faces watching you from "
-                    .. "it. Grinning. They were children once, people say. They like toys: "
+                text = "Under a mound, a burrow, and small pale faces watching you from "
+                    .. "it, huge eyes ringed dark. They were children once, people say. "
+                    .. "They wear strings of buttons and bottle caps. They like toys: "
                     .. "leave one on a little cairn of stones and see what happens."},
         the_gate = {title = "The quarry", art = "institute",
                 text = "A rusted gate in the quarry wall, and a word in old paint: "
@@ -369,7 +370,7 @@ local NIGHT = {
 }
 
 -- The Little Ones (src/57_little.lua): the Zone's children, grown small,
--- grey and grinning. Never hostile. Trinkets left at their cairns befriend
+-- pale and huge-eyed. Never hostile. Trinkets left at their cairns befriend
 -- them: at join_at gifts a troupe follows you from a warren (1 more per
 -- per_extra gifts, up to max). Their mood falls 1 per decay_hours without
 -- a gift; at 0 they go home. Every act_every hours one of them does
@@ -387,8 +388,9 @@ local LITTLE = {
     keep = {permit = true, institute_pass = true, lora_radio = true, medkit = true, bandage = true, splint = true,   -- (never taken)
             multitool = true, geiger = true, anomaly_detector = true, fishing_rod = true, snare = true},
     pebble = 40, pebble_dmg = {1, 3}, flee_bonus = 10, horror_run = 15,
-    intro = "Small grey faces in the grass, too many teeth in their grins. Children, once. "
-         .. "They giggle and edge closer, eyes on your bag.",
+    intro = "Small pale faces in the grass, blotched skin, huge eyes ringed dark. "
+         .. "Children, once, in rags, strung with buttons and bottle caps. They giggle "
+         .. "and edge closer, eyes on your bag.",
 }
 
 -- Skills that grow with use (src/55_skills.lua). levels = XP needed for

@@ -18,7 +18,8 @@ sewn shut and the intro says so), and the anomalies `hollow.jpg` (2112),
 `bell.jpg` (2113: the bell hangs over a pool; intro rewritten), `stars.jpg`
 (2115), `stillness.jpg` (2116: the hand rises out of the ground; intro
 rewritten) and `door.jpg` (2118, after 2117 showed day through the door).
-Every portrait is done except Karl (the user's own photo, never generated).
+`little.jpg` (the Little Ones) is the user's own picture. Every portrait
+is done except Karl (the user's own photo, never generated).
 The free Hugging Face GPU quota covers about 7 images before it runs out; it
 refills over time.
 

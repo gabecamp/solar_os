@@ -197,8 +197,9 @@ Two rare kind faces on the road (encounters, not radio voices).
 - **Lore:** most dogs here *came back wrong*. This one didn't, or not yet.
 
 ### The Little Ones
-- **Role:** small, grey, grinning creatures that live in burrows (warrens)
-  in the woods and hills. They're never hostile, only mischievous.
+- **Role:** small, pale, huge-eyed children, blotched by the Zone and dressed
+  in rags, who live in burrows (warrens) in the woods and hills. They wear
+  strings of buttons and bottle caps. They're never hostile, only mischievous.
   - **Befriending them:** you'll find little **cairns** of stones near
     their warrens. Leave a **trinket** there (**E** on it, or **T** on the
     cairn). Trinkets are toys and junk a toddler would play with: a plastic
@@ -221,7 +222,7 @@ Two rare kind faces on the road (encounters, not radio voices).
 - **Lore:** when the town was evacuated, not every child made it to the
   school. The ones who stayed in the cellars were small when the first
   emission came, and they stayed small. They don't talk, or don't want
-  to. They remember toys.
+  to. They remember toys, and wear the ones they're given.
 
 ### The Signal
 - **Role:** the fourth channel on the radio. The first call gives you a

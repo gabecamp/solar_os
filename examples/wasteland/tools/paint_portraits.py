@@ -160,6 +160,11 @@ PHOTO = {
                   "levels": (0.20, 0.75), "bg": 0.90},
     "door": {"near": (240, 100, 780, 960), "gamma": 0.8, "edge": 0.8,
              "levels": (0.05, 0.70)},
+    # the user's own picture (2026-10-02): a pale child on a mid-gray backdrop
+    # (~0.75), so a low bg cutoff; her face is nearly as pale, the eyes carry it
+    "little": {"far": (0, 20, 512, 768), "near": (60, 30, 470, 500),
+               "close": (150, 90, 400, 340), "gamma": 1.0, "edge": 0.9,
+               "levels": (0.15, 0.70), "bg": 0.72},
 }
 
 
