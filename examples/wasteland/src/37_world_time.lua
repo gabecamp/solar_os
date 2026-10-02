@@ -54,6 +54,7 @@ function Game:storm_hour(hour)
         return
     end
     p.storm_hours = (p.storm_hours or 0) + 1
+    self:wear_all(WORLD.wear.storm)
     p.needs.rest = clamp(p.needs.rest - st.rest)
     if p.storm_hours > st.grace then p.health = clamp(p.health - st.hurt) end
 end
@@ -63,11 +64,84 @@ function Game:weather_text()
     return self:season().short .. " " .. self:weather()
 end
 
--- Warmth from what you wear (not what you hold).
+-- -- clothes wear out (numbers in WORLD.wear) ---------------------------------
+-- p.wear[slot] = the condition (0-100, nil = 100) of what you wear there; off
+-- your body a stack carries it as `cond` (put_stack/remove_stack move it).
+-- At 0 a piece is torn: no warmth, half its pockets, until you patch it.
+
+-- Does this item wear out? (clothes, not tools or what's in your hands)
+function Game.wears(item)
+    local def = ITEM_DB[item]
+    return def ~= nil and def.slot ~= nil and not HOLD_SLOTS[def.slot] and not def.light
+end
+
+-- Condition of what you wear in `slot` (nil if nothing there wears out).
+function Game:cond(slot)
+    local item = self.player.equipped[slot]
+    if HOLD_SLOTS[slot] or not (item and Game.wears(item)) then return nil end
+    return (self.player.wear or {})[slot] or 100
+end
+
+function Game:torn(slot)
+    local c = self:cond(slot)
+    return c ~= nil and c <= 0
+end
+
+-- The piece you're wearing that is most worn (below `below`), or nil.
+function Game:most_worn(below)
+    local best, best_c
+    for _, slot in ipairs(EQUIP_SLOTS) do
+        local c = self:cond(slot)
+        if c and c < (below or 100) and (not best_c or c < best_c) then best, best_c = slot, c end
+    end
+    return best, best_c
+end
+
+function Game:wear_out(slot, amount)
+    local p, c = self.player, self:cond(slot)
+    if not c or c <= 0 then return end
+    local item = p.equipped[slot]
+    p.wear = p.wear or {}
+    p.wear[slot] = math.max(0, c - amount * (ITEM_DB[item].ragged_of and WORLD.wear.rag or 1))
+    if p.wear[slot] <= 0 then
+        self:push_log("Your " .. ITEM_DB[item].name:lower() .. " tears. Patch it (C).")
+        self:sfx("miss")
+    end
+end
+
+-- Crafting screen: what "Patch clothes" would mend.
+function Game:mend_text()
+    local slot, c = self:most_worn(90)
+    if not slot then return "Mends your most worn clothes" end
+    return ("Mends: %s%s"):format(ITEM_DB[self.player.equipped[slot]].name, Game.cond_text(c))
+end
+
+-- " 40%", " (torn)" or "" for a stack's condition (bag, ground, worn).
+function Game.cond_text(cond)
+    if not cond or cond >= 100 then return "" end
+    if cond <= 0 then return " (torn)" end
+    return (" %d%%"):format(math.floor(cond))
+end
+
+function Game:wear_all(amount)
+    for _, slot in ipairs(EQUIP_SLOTS) do self:wear_out(slot, amount) end
+end
+
+-- One piece you wear, at random (an enemy's blow lands on it).
+function Game:wear_hit()
+    local worn = {}
+    for _, slot in ipairs(EQUIP_SLOTS) do
+        local c = self:cond(slot)
+        if c and c > 0 then worn[#worn + 1] = slot end
+    end
+    if #worn > 0 then self:wear_out(worn[self:rand(#worn) + 1], WORLD.wear.hit) end
+end
+
+-- Warmth from what you wear (not what you hold); torn clothes give none.
 function Game:warmth()
     local total = 0
     for slot, item in pairs(self.player.equipped) do
-        if not HOLD_SLOTS[slot] then total = total + (ITEM_DB[item].warmth or 0) end
+        if not HOLD_SLOTS[slot] and not self:torn(slot) then total = total + (ITEM_DB[item].warmth or 0) end
     end
     return total
 end
@@ -127,6 +201,7 @@ function Game:tick()
         dose = dose + self:rad_hour()
         self:survive_hour()
         self:storm_hour(hour)
+        self:wear_all(WORLD.wear.day / 24)
         self:little_hour(hour)
         local heat = self:season(hour).thirst
         if heat > 0 then p.needs.thirst = clamp(p.needs.thirst - heat) end

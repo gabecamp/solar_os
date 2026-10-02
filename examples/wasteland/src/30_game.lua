@@ -267,8 +267,15 @@ function Game:get_stack(kind, k)
         return self.player.inventory[k]
     elseif kind == "equip" then
         local item = self.player.equipped[k]
-        return item and {item = item, qty = 1} or nil
+        return item and {item = item, qty = 1, cond = self:stack_cond(k)} or nil
     end
+end
+
+-- What the worn piece's condition becomes on a stack (nil when as new).
+function Game:stack_cond(slot)
+    local c = (self.player.wear or {})[slot]
+    if c and c < 100 then return c end
+    return nil
 end
 
 function Game:remove_stack(kind, k)
@@ -278,8 +285,10 @@ function Game:remove_stack(kind, k)
         return table.remove(self.player.inventory, k)
     elseif kind == "equip" then
         local item = self.player.equipped[k]
+        local cond = self:stack_cond(k)
         self.player.equipped[k] = nil
-        return item and {item = item, qty = 1} or nil
+        if self.player.wear then self.player.wear[k] = nil end
+        return item and {item = item, qty = 1, cond = cond} or nil
     end
 end
 
@@ -288,7 +297,7 @@ end
 -- stack is needed and the list already holds `cap` stacks.
 local function add_to_list(list, stack, cap)
     for _, s in ipairs(list) do
-        if s.item == stack.item then
+        if s.item == stack.item and s.cond == stack.cond then   -- (worn and new don't stack)
             s.qty = s.qty + stack.qty
             return true
         end
@@ -304,10 +313,14 @@ function Game:bag_capacity()
     local p = self.player
     -- a bag on your back (else what you can carry in your arms), plus the
     -- pockets in what you wear and the pouches on your belt
-    local bag = p.equipped.back and ITEM_DB[p.equipped.back].bag_cells or POCKET_CELLS
-    for _, item in pairs(p.equipped) do
+    -- (torn clothes hold half)
+    local function cells(slot, n)
+        return self:torn(slot) and n // 2 or n
+    end
+    local bag = p.equipped.back and cells("back", ITEM_DB[p.equipped.back].bag_cells or 0) or POCKET_CELLS
+    for slot, item in pairs(p.equipped) do
         local def = ITEM_DB[item]
-        bag = bag + (def.pocket_cells or 0) + (def.belt_cells or 0)
+        bag = bag + cells(slot, (def.pocket_cells or 0) + (def.belt_cells or 0))
     end
     return math.max(2, math.min(BACKPACK_CAP, bag + (p.bag_bonus or 0)))
 end
@@ -329,17 +342,19 @@ function Game:put_stack(kind, k, stack)
             return false
         end
         local current = self.player.equipped[k]
+        self.player.wear = self.player.wear or {}
         if current then
-            local old = {item = current, qty = 1}
+            local old = {item = current, qty = 1, cond = self:stack_cond(k)}
             if not add_to_list(self.player.inventory, old, self:bag_capacity()) then
                 add_to_list(self:ground_list(), old)
                 self:push_log("Bag full: " .. ITEM_DB[current].name .. " dropped.")
             end
         end
         self.player.equipped[k] = stack.item
+        self.player.wear[k] = stack.cond
         -- equipping takes one; anything else in the stack goes to the bag
         if stack.qty > 1 then
-            local rest = {item = stack.item, qty = stack.qty - 1}
+            local rest = {item = stack.item, qty = stack.qty - 1, cond = stack.cond}
             if not add_to_list(self.player.inventory, rest, self:bag_capacity()) then
                 add_to_list(self:ground_list(), rest)
             end

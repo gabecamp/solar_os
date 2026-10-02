@@ -65,6 +65,8 @@ function Game:current_conditions()
     if self.player.injuries.bleeding then table.insert(list, "Bleeding") end
     if self.player.injuries.wounded_hours > 0 then table.insert(list, "Wounded") end
     if self.player.health < 50 then table.insert(list, "Hurt") end
+    local _, worst = self:most_worn(1)
+    if worst and worst <= 0 then table.insert(list, "Torn clothes") end
     if (self.player.sick_hours or 0) > 0 then table.insert(list, "Sick") end
     local rad_stage = RAD.stages[self:rad_stage()]
     if rad_stage then table.insert(list, self:can_measure() and rad_stage.name or rad_stage.feel) end
@@ -422,7 +424,7 @@ function Game:cursor_description()
     if not stack then return where .. ": empty" end
     local text = where .. ": " .. ITEM_DB[stack.item].name
     if stack.qty > 1 then text = text .. " x" .. stack.qty end
-    return text
+    return text .. Game.cond_text(stack.cond)
 end
 
 -- Which ground stack starts the visible window: scrolled so the cursor is

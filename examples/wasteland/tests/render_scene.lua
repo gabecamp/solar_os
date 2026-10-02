@@ -33,6 +33,21 @@ for i, r in ipairs(g:known_recipes()) do if r.id == "rag_shirt" and not g.craft_
 g:draw_craft(400, 300)
 solaros.dump("ops_craft_rags.txt")
 
+-- Scene 0d: worn clothes - a torn rag shirt under the cursor, crafting shows the patch
+g = fresh()
+g.player.equipped = {shirt = "rag_shirt", pants = "jeans", feet = "foot_wraps", back = "bindle"}
+g:wear_out("shirt", 200); g:wear_out("pants", 35)
+g.inv_cursor = 1
+g:draw_inventory(400, 300)   -- (lays out the rows)
+while not g:cursor_description():find("^Shirt") and g.inv_cursor < 60 do g.inv_cursor = g.inv_cursor + 1 end
+g.log = {"Your rag shirt tears. Patch it (C)."}
+g:draw_inventory(400, 300)
+solaros.dump("ops_inventory_torn.txt")
+g.screen = "craft"
+for i, r in ipairs(g:known_recipes()) do if r.mend then g.craft_ui.cursor = i end end
+g:draw_craft(400, 300)
+solaros.dump("ops_craft_patch.txt")
+
 -- Scene 1: inventory, spawn tile with loot, dressed + a full-ish bag, cursor on a ground item
 g = dofile("kit.lua")(fresh())   -- the old starting clothes
 g.player.equipped.head = "cap"

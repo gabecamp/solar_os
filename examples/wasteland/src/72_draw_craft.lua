@@ -60,6 +60,7 @@ function Game:draw_craft(w, h)
         gfx.text(x, y, r.out and ("Makes: " .. ITEM_DB[r.out[1]].name)
             or (r.base == "claim" and "Makes this ruin your camp")
             or (r.base and ("Builds at your camp"))
+            or (r.mend and self:mend_text())
             or "Builds a campfire here")
         y = y + 18
         gfx.text(x, y, "Uses:")

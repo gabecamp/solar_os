@@ -74,6 +74,11 @@ local WORLD = {
     -- HP each hour after `grace` hours of it; nothing else moves in it
     storm = {open = {plains = true, ford = true}, rest = 4, grace = 2, hurt = 3, encounters = 0.5},
     calm_start = 12,                   -- no storm or fog in the first hours of a run
+    -- clothes wear out (src/37_world_time.lua): condition 100 -> 0 (torn: no
+    -- warmth, half the pockets). day: lost per 24 h worn; hit: one piece, per
+    -- enemy hit; storm: every piece, per exposed hour; rag: x for makeshift
+    -- clothes; mend: what "Patch clothes" (1 cloth) puts back
+    wear = {day = 2, hit = 4, storm = 1, rag = 2, mend = 50},
     fog_hide = 15,                     -- % on Hide in fog (encounters start near)
     night_need = 2, cold_rest_drain = 3, cold_grace = 2, cold_hurt = 2,
     night_encounters = 1.5, fire_rest_bonus = 0.5,

@@ -282,6 +282,8 @@ local RECIPES = {
      out = {"sack_pack", 1}, known = true},
     {id = "rag_mask", name = "Rag Mask", inputs = {cloth_scrap = 2, water_bottle = 1}, hours = 1,
      out = {"rag_mask", 1}, known = true},
+    -- mends the most worn thing you have on (WORLD.wear.mend)
+    {id = "patch", name = "Patch clothes", inputs = {cloth_scrap = 1}, hours = 1, mend = true, known = true},
     {id = "cook", name = "Cooked Meat", inputs = {strange_meat = 1}, fire = true, hours = 1,
      out = {"cooked_meat", 1}, known = true},
     {id = "boil", name = "Boil Water", inputs = {dirty_water = 1}, fire = true, hours = 1,

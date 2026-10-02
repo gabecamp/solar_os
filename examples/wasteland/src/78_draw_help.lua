@@ -20,6 +20,7 @@ local HELP = {
     {"PUZZLE", "Arrows move  T+arrow throw  1-4 sigils"},
     {"", "Q backs away from a puzzle unharmed"},
     {"TIPS", "You start with nothing: C makes rags."},
+    {"", "Clothes wear out: C, Patch clothes."},
     {"", "Emissions, storms: shelter in ruins/hills."},
     {"", "3 artifacts or a permit get you out."},
     {"", "Karl fishes rivers. Strays like food."},

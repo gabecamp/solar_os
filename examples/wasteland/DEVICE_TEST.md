@@ -50,6 +50,9 @@ before and start it. For anything that goes wrong, a photo of the screen
     and a list of choices.
 
 ## 6. New things to try (2026-10-02)
+- **Clothes wear out:** wear something a few days, or fight in it, then put
+  the bag cursor on it: "Shirt: Rag Shirt 80%". C, **Patch clothes** mends
+  the most worn piece for 1 cloth.
 - **Starting with nothing:** walk 2 to 6 hexes out and search the piles:
   your old T-shirt, jeans, boots and backpack are out there. The rags you
   craft show as holed versions of the real icons.

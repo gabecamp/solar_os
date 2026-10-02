@@ -99,6 +99,11 @@ local WORLD = {
     -- HP each hour after `grace` hours of it; nothing else moves in it
     storm = {open = {plains = true, ford = true}, rest = 4, grace = 2, hurt = 3, encounters = 0.5},
     calm_start = 12,                   -- no storm or fog in the first hours of a run
+    -- clothes wear out (src/37_world_time.lua): condition 100 -> 0 (torn: no
+    -- warmth, half the pockets). day: lost per 24 h worn; hit: one piece, per
+    -- enemy hit; storm: every piece, per exposed hour; rag: x for makeshift
+    -- clothes; mend: what "Patch clothes" (1 cloth) puts back
+    wear = {day = 2, hit = 4, storm = 1, rag = 2, mend = 50},
     fog_hide = 15,                     -- % on Hide in fog (encounters start near)
     night_need = 2, cold_rest_drain = 3, cold_grace = 2, cold_hurt = 2,
     night_encounters = 1.5, fire_rest_bonus = 0.5,
@@ -685,6 +690,8 @@ local RECIPES = {
      out = {"sack_pack", 1}, known = true},
     {id = "rag_mask", name = "Rag Mask", inputs = {cloth_scrap = 2, water_bottle = 1}, hours = 1,
      out = {"rag_mask", 1}, known = true},
+    -- mends the most worn thing you have on (WORLD.wear.mend)
+    {id = "patch", name = "Patch clothes", inputs = {cloth_scrap = 1}, hours = 1, mend = true, known = true},
     {id = "cook", name = "Cooked Meat", inputs = {strange_meat = 1}, fire = true, hours = 1,
      out = {"cooked_meat", 1}, known = true},
     {id = "boil", name = "Boil Water", inputs = {dirty_water = 1}, fire = true, hours = 1,
@@ -3536,8 +3543,15 @@ function Game:get_stack(kind, k)
         return self.player.inventory[k]
     elseif kind == "equip" then
         local item = self.player.equipped[k]
-        return item and {item = item, qty = 1} or nil
+        return item and {item = item, qty = 1, cond = self:stack_cond(k)} or nil
     end
+end
+
+-- What the worn piece's condition becomes on a stack (nil when as new).
+function Game:stack_cond(slot)
+    local c = (self.player.wear or {})[slot]
+    if c and c < 100 then return c end
+    return nil
 end
 
 function Game:remove_stack(kind, k)
@@ -3547,8 +3561,10 @@ function Game:remove_stack(kind, k)
         return table.remove(self.player.inventory, k)
     elseif kind == "equip" then
         local item = self.player.equipped[k]
+        local cond = self:stack_cond(k)
         self.player.equipped[k] = nil
-        return item and {item = item, qty = 1} or nil
+        if self.player.wear then self.player.wear[k] = nil end
+        return item and {item = item, qty = 1, cond = cond} or nil
     end
 end
 
@@ -3557,7 +3573,7 @@ end
 -- stack is needed and the list already holds `cap` stacks.
 local function add_to_list(list, stack, cap)
     for _, s in ipairs(list) do
-        if s.item == stack.item then
+        if s.item == stack.item and s.cond == stack.cond then   -- (worn and new don't stack)
             s.qty = s.qty + stack.qty
             return true
         end
@@ -3573,10 +3589,14 @@ function Game:bag_capacity()
     local p = self.player
     -- a bag on your back (else what you can carry in your arms), plus the
     -- pockets in what you wear and the pouches on your belt
-    local bag = p.equipped.back and ITEM_DB[p.equipped.back].bag_cells or POCKET_CELLS
-    for _, item in pairs(p.equipped) do
+    -- (torn clothes hold half)
+    local function cells(slot, n)
+        return self:torn(slot) and n // 2 or n
+    end
+    local bag = p.equipped.back and cells("back", ITEM_DB[p.equipped.back].bag_cells or 0) or POCKET_CELLS
+    for slot, item in pairs(p.equipped) do
         local def = ITEM_DB[item]
-        bag = bag + (def.pocket_cells or 0) + (def.belt_cells or 0)
+        bag = bag + cells(slot, (def.pocket_cells or 0) + (def.belt_cells or 0))
     end
     return math.max(2, math.min(BACKPACK_CAP, bag + (p.bag_bonus or 0)))
 end
@@ -3598,17 +3618,19 @@ function Game:put_stack(kind, k, stack)
             return false
         end
         local current = self.player.equipped[k]
+        self.player.wear = self.player.wear or {}
         if current then
-            local old = {item = current, qty = 1}
+            local old = {item = current, qty = 1, cond = self:stack_cond(k)}
             if not add_to_list(self.player.inventory, old, self:bag_capacity()) then
                 add_to_list(self:ground_list(), old)
                 self:push_log("Bag full: " .. ITEM_DB[current].name .. " dropped.")
             end
         end
         self.player.equipped[k] = stack.item
+        self.player.wear[k] = stack.cond
         -- equipping takes one; anything else in the stack goes to the bag
         if stack.qty > 1 then
-            local rest = {item = stack.item, qty = stack.qty - 1}
+            local rest = {item = stack.item, qty = stack.qty - 1, cond = stack.cond}
             if not add_to_list(self.player.inventory, rest, self:bag_capacity()) then
                 add_to_list(self:ground_list(), rest)
             end
@@ -3848,6 +3870,7 @@ function Game:craft_blocker(r)
     end
     if r.fire and not self:fire_here() then return "Needs a fire. Build a campfire here." end
     if r.place == "campfire" and self:fire_here() then return "A fire already burns here." end
+    if r.mend and not self:most_worn(90) then return "Nothing you wear needs mending." end
     return nil
 end
 
@@ -3865,7 +3888,11 @@ function Game:craft(r)
     apply_awake_hours(p, hours)
     self:skill_xp("tinker", SKILLS.xp.craft)
     self:sfx("chime")
-    if r.place == "campfire" then
+    if r.mend then
+        local slot = self:most_worn(90)
+        p.wear[slot] = math.min(100, p.wear[slot] + WORLD.wear.mend)
+        self:push_log(("You patch your %s (%d%%)."):format(ITEM_DB[p.equipped[slot]].name:lower(), math.floor(p.wear[slot])))
+    elseif r.place == "campfire" then
         self.camps[hex_key(p.q, p.r)] = {until_hour = p.hours + RECIPES.campfire_hours}
         self:push_log("You build a campfire. It will burn " .. RECIPES.campfire_hours .. "h.")
     else
@@ -4161,6 +4188,7 @@ function Game:storm_hour(hour)
         return
     end
     p.storm_hours = (p.storm_hours or 0) + 1
+    self:wear_all(WORLD.wear.storm)
     p.needs.rest = clamp(p.needs.rest - st.rest)
     if p.storm_hours > st.grace then p.health = clamp(p.health - st.hurt) end
 end
@@ -4170,11 +4198,84 @@ function Game:weather_text()
     return self:season().short .. " " .. self:weather()
 end
 
--- Warmth from what you wear (not what you hold).
+-- -- clothes wear out (numbers in WORLD.wear) ---------------------------------
+-- p.wear[slot] = the condition (0-100, nil = 100) of what you wear there; off
+-- your body a stack carries it as `cond` (put_stack/remove_stack move it).
+-- At 0 a piece is torn: no warmth, half its pockets, until you patch it.
+
+-- Does this item wear out? (clothes, not tools or what's in your hands)
+function Game.wears(item)
+    local def = ITEM_DB[item]
+    return def ~= nil and def.slot ~= nil and not HOLD_SLOTS[def.slot] and not def.light
+end
+
+-- Condition of what you wear in `slot` (nil if nothing there wears out).
+function Game:cond(slot)
+    local item = self.player.equipped[slot]
+    if HOLD_SLOTS[slot] or not (item and Game.wears(item)) then return nil end
+    return (self.player.wear or {})[slot] or 100
+end
+
+function Game:torn(slot)
+    local c = self:cond(slot)
+    return c ~= nil and c <= 0
+end
+
+-- The piece you're wearing that is most worn (below `below`), or nil.
+function Game:most_worn(below)
+    local best, best_c
+    for _, slot in ipairs(EQUIP_SLOTS) do
+        local c = self:cond(slot)
+        if c and c < (below or 100) and (not best_c or c < best_c) then best, best_c = slot, c end
+    end
+    return best, best_c
+end
+
+function Game:wear_out(slot, amount)
+    local p, c = self.player, self:cond(slot)
+    if not c or c <= 0 then return end
+    local item = p.equipped[slot]
+    p.wear = p.wear or {}
+    p.wear[slot] = math.max(0, c - amount * (ITEM_DB[item].ragged_of and WORLD.wear.rag or 1))
+    if p.wear[slot] <= 0 then
+        self:push_log("Your " .. ITEM_DB[item].name:lower() .. " tears. Patch it (C).")
+        self:sfx("miss")
+    end
+end
+
+-- Crafting screen: what "Patch clothes" would mend.
+function Game:mend_text()
+    local slot, c = self:most_worn(90)
+    if not slot then return "Mends your most worn clothes" end
+    return ("Mends: %s%s"):format(ITEM_DB[self.player.equipped[slot]].name, Game.cond_text(c))
+end
+
+-- " 40%", " (torn)" or "" for a stack's condition (bag, ground, worn).
+function Game.cond_text(cond)
+    if not cond or cond >= 100 then return "" end
+    if cond <= 0 then return " (torn)" end
+    return (" %d%%"):format(math.floor(cond))
+end
+
+function Game:wear_all(amount)
+    for _, slot in ipairs(EQUIP_SLOTS) do self:wear_out(slot, amount) end
+end
+
+-- One piece you wear, at random (an enemy's blow lands on it).
+function Game:wear_hit()
+    local worn = {}
+    for _, slot in ipairs(EQUIP_SLOTS) do
+        local c = self:cond(slot)
+        if c and c > 0 then worn[#worn + 1] = slot end
+    end
+    if #worn > 0 then self:wear_out(worn[self:rand(#worn) + 1], WORLD.wear.hit) end
+end
+
+-- Warmth from what you wear (not what you hold); torn clothes give none.
 function Game:warmth()
     local total = 0
     for slot, item in pairs(self.player.equipped) do
-        if not HOLD_SLOTS[slot] then total = total + (ITEM_DB[item].warmth or 0) end
+        if not HOLD_SLOTS[slot] and not self:torn(slot) then total = total + (ITEM_DB[item].warmth or 0) end
     end
     return total
 end
@@ -4234,6 +4335,7 @@ function Game:tick()
         dose = dose + self:rad_hour()
         self:survive_hour()
         self:storm_hour(hour)
+        self:wear_all(WORLD.wear.day / 24)
         self:little_hour(hour)
         local heat = self:season(hour).thirst
         if heat > 0 then p.needs.thirst = clamp(p.needs.thirst - heat) end
@@ -4829,6 +4931,7 @@ function Game:enemy_turn()
     local dmg = d.dmg[1] + self:rand(d.dmg[2] - d.dmg[1] + 1)
     if self:dog_guard(dmg) then return end
     p.health = clamp(p.health - dmg)
+    self:wear_hit()
     self:sfx("hurt")
     local text = "The " .. d.who .. " hits you (-" .. dmg .. " HP)."
     if d.bleed and d.bleed > 0 and not p.injuries.bleeding and self:roll(d.bleed) then
@@ -8114,6 +8217,8 @@ function Game:current_conditions()
     if self.player.injuries.bleeding then table.insert(list, "Bleeding") end
     if self.player.injuries.wounded_hours > 0 then table.insert(list, "Wounded") end
     if self.player.health < 50 then table.insert(list, "Hurt") end
+    local _, worst = self:most_worn(1)
+    if worst and worst <= 0 then table.insert(list, "Torn clothes") end
     if (self.player.sick_hours or 0) > 0 then table.insert(list, "Sick") end
     local rad_stage = RAD.stages[self:rad_stage()]
     if rad_stage then table.insert(list, self:can_measure() and rad_stage.name or rad_stage.feel) end
@@ -8471,7 +8576,7 @@ function Game:cursor_description()
     if not stack then return where .. ": empty" end
     local text = where .. ": " .. ITEM_DB[stack.item].name
     if stack.qty > 1 then text = text .. " x" .. stack.qty end
-    return text
+    return text .. Game.cond_text(stack.cond)
 end
 
 -- Which ground stack starts the visible window: scrolled so the cursor is
@@ -9505,6 +9610,7 @@ function Game:draw_craft(w, h)
         gfx.text(x, y, r.out and ("Makes: " .. ITEM_DB[r.out[1]].name)
             or (r.base == "claim" and "Makes this ruin your camp")
             or (r.base and ("Builds at your camp"))
+            or (r.mend and self:mend_text())
             or "Builds a campfire here")
         y = y + 18
         gfx.text(x, y, "Uses:")
@@ -9686,6 +9792,7 @@ local HELP = {
     {"PUZZLE", "Arrows move  T+arrow throw  1-4 sigils"},
     {"", "Q backs away from a puzzle unharmed"},
     {"TIPS", "You start with nothing: C makes rags."},
+    {"", "Clothes wear out: C, Patch clothes."},
     {"", "Emissions, storms: shelter in ruins/hills."},
     {"", "3 artifacts or a permit get you out."},
     {"", "Karl fishes rivers. Strays like food."},
@@ -9801,6 +9908,11 @@ function Game:journal_lines()
     add(("Day %d, %02d:00. %d hours in the Zone. %s."):format(day, hour, p.hours,
         DIFFICULTY[self.difficulty or "normal"].name))
     add(self:skills_line())
+    local worn, c = self:most_worn(100)
+    if worn then
+        add(("Most worn: %s,%s. C: Patch clothes."):format(ITEM_DB[self.player.equipped[worn]].name:lower(),
+            Game.cond_text(c)))
+    end
     local season, sday = self:season()
     local weather = self:weather()
     local advice = {Storm = " Find shelter: ruins, hills, trees.", Fog = " Sight is short.",

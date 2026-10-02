@@ -21,6 +21,10 @@ the Checkpoint alive.
   less: fewer pockets, a smaller bag. The T-shirt, jeans, boots and backpack you used
   to start in are lying somewhere 2 to 6 hexes away. A backpack holds 10,
   a satchel 6, jeans and a jacket 2 pockets each, a belt 1 or 2.
+- **Clothes wear out:** a little every day, more under an enemy's blows and
+  out in a storm; rags twice as fast. A torn piece (the bag shows "40%" or
+  "(torn)" under the cursor) gives no warmth and holds half as much until
+  you patch it: **Patch clothes** on the crafting screen, 1 cloth scrap.
 - **More:** `DEVICE_TEST.md` is a 10-minute check on the board;
   `HANDOFF.md` is the developer guide (code map, tests, tools).
 

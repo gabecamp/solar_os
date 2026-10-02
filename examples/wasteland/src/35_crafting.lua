@@ -80,6 +80,7 @@ function Game:craft_blocker(r)
     end
     if r.fire and not self:fire_here() then return "Needs a fire. Build a campfire here." end
     if r.place == "campfire" and self:fire_here() then return "A fire already burns here." end
+    if r.mend and not self:most_worn(90) then return "Nothing you wear needs mending." end
     return nil
 end
 
@@ -97,7 +98,11 @@ function Game:craft(r)
     apply_awake_hours(p, hours)
     self:skill_xp("tinker", SKILLS.xp.craft)
     self:sfx("chime")
-    if r.place == "campfire" then
+    if r.mend then
+        local slot = self:most_worn(90)
+        p.wear[slot] = math.min(100, p.wear[slot] + WORLD.wear.mend)
+        self:push_log(("You patch your %s (%d%%)."):format(ITEM_DB[p.equipped[slot]].name:lower(), math.floor(p.wear[slot])))
+    elseif r.place == "campfire" then
         self.camps[hex_key(p.q, p.r)] = {until_hour = p.hours + RECIPES.campfire_hours}
         self:push_log("You build a campfire. It will burn " .. RECIPES.campfire_hours .. "h.")
     else

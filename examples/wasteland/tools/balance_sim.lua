@@ -174,6 +174,9 @@ local function upkeep(g, stats)
         end
         if worst then g:try_transfer({"inventory", worst}, {"ground"}) end
     end
+    -- patch what's wearing thin (keeping cloth for bandages)
+    local _, worst = g:most_worn(40)
+    if worst and count(g, "cloth_scrap") >= 3 then try_craft(g, "patch") end
     -- dress: makeshift clothes for empty slots, then put on anything better
     -- lying here, straight from the ground
     for _, rag in ipairs(RAGS) do

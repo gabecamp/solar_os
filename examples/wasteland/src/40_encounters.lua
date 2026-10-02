@@ -201,6 +201,7 @@ function Game:enemy_turn()
     local dmg = d.dmg[1] + self:rand(d.dmg[2] - d.dmg[1] + 1)
     if self:dog_guard(dmg) then return end
     p.health = clamp(p.health - dmg)
+    self:wear_hit()
     self:sfx("hurt")
     local text = "The " .. d.who .. " hits you (-" .. dmg .. " HP)."
     if d.bleed and d.bleed > 0 and not p.injuries.bleeding and self:roll(d.bleed) then

@@ -14,6 +14,11 @@ function Game:journal_lines()
     add(("Day %d, %02d:00. %d hours in the Zone. %s."):format(day, hour, p.hours,
         DIFFICULTY[self.difficulty or "normal"].name))
     add(self:skills_line())
+    local worn, c = self:most_worn(100)
+    if worn then
+        add(("Most worn: %s,%s. C: Patch clothes."):format(ITEM_DB[self.player.equipped[worn]].name:lower(),
+            Game.cond_text(c)))
+    end
     local season, sday = self:season()
     local weather = self:weather()
     local advice = {Storm = " Find shelter: ruins, hills, trees.", Fog = " Sight is short.",
