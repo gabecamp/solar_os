@@ -155,12 +155,18 @@ local outfits = {
     {head = "cap", jacket = "jacket", pants = "jeans", feet = "boots"},
     {shirt = "tshirt", pants = "jeans", belt = "leather_belt", hands = "gloves", eyes = "sunglasses",
      ears = "earmuffs", neck = "scarf", wrists = "bracers", back = "backpack"},
+    -- torn (holes): a dark jacket, light rags, dark wraps
+    {jacket = "jacket", shirt = "rag_shirt", pants = "rag_trousers", feet = "foot_wraps",
+     torn = {"jacket", "pants", "feet"}},
 }
 for n, outfit in ipairs(outfits) do
     g = Game.new()
     g:start_game()
     g.player.equipped = {}
-    for slot, item in pairs(outfit) do g.player.equipped[slot] = item end
+    for slot, item in pairs(outfit) do
+        if slot ~= "torn" then g.player.equipped[slot] = item end
+    end
+    for _, slot in ipairs(outfit.torn or {}) do g:wear_out(slot, 200) end
     canvas = {}
     g:draw_silhouette()
     local rects = snapshot()
@@ -180,5 +186,19 @@ local first = g:doll_tiles()
 assert(g:doll_tiles() == first, "cached while the clothes stay the same")
 g.player.equipped.head = "cap"
 assert(g:doll_tiles() ~= first, "rebuilt when they change")
+
+print("7. tearing and patching change the doll: holes come and go")
+g = Game.new(); g:start_game()
+g.player.equipped = {jacket = "jacket"}
+canvas = {}; g:draw_doll()
+local whole = snapshot()
+g:wear_out("jacket", 200)
+canvas = {}; g:draw_doll()
+local torn = snapshot()
+assert(not same(whole, torn), "a torn jacket shows holes")
+g.player.wear.jacket = 60   -- patched
+canvas = {}; g:draw_doll()
+assert(same(whole, snapshot()), "patched: no holes")
+print("   OK")
 
 print("INVENTORY REDRAW TESTS PASSED")

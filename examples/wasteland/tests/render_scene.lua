@@ -36,7 +36,7 @@ solaros.dump("ops_craft_rags.txt")
 -- Scene 0d: worn clothes - a torn rag shirt under the cursor, crafting shows the patch
 g = fresh()
 g.player.equipped = {shirt = "rag_shirt", pants = "jeans", feet = "foot_wraps", back = "bindle"}
-g:wear_out("shirt", 200); g:wear_out("pants", 35)
+g:wear_out("shirt", 200); g:wear_out("pants", 200); g:wear_out("feet", 35)
 g.inv_cursor = 1
 g:draw_inventory(400, 300)   -- (lays out the rows)
 while not g:cursor_description():find("^Shirt") and g.inv_cursor < 60 do g.inv_cursor = g.inv_cursor + 1 end

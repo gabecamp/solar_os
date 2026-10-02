@@ -283,11 +283,26 @@ local function fill_clipped(clip, x, y, w, h)
     gfx.fill_rect(x, y, w, h)
 end
 
+-- Holes in a torn piece: 2x2 spots on a staggered grid (every 5 rows, 6
+-- columns, alternate rows shifted 3), fixed to the screen so the holes line
+-- up across body parts; in `hole_color` (the body shows through).
+local function punch_holes(clip, x, y, w, h, hole_color, color)
+    gfx.color(hole_color)
+    local row = (y + 4) // 5
+    for yy = row * 5, y + h - 2, 5 do
+        local shift = (yy // 5) % 2 * 3
+        local first = x + (shift - x) % 6
+        for xx = first, x + w - 2, 6 do fill_clipped(clip, xx, yy, 2, 2) end
+    end
+    gfx.color(color)
+end
+
 -- Paint one body part between two authored rows (clothing on the doll).
 -- inner/outer (optional, authored units) keep only the pixels whose distance
--- from the center line is in [inner, outer), on both sides.
-local function paint_part(part, src_y0, src_y1, color, inner, outer, clip)
+-- from the center line is in [inner, outer), on both sides. torn: with holes.
+local function paint_part(part, src_y0, src_y1, color, inner, outer, clip, torn)
     local y0, y1 = body_row(src_y0), body_row(src_y1)
+    local hole = color == gfx.LIGHT and gfx.WHITE or gfx.LIGHT
     local bands
     if outer then
         local i = math.floor(inner * BODY_SCALE + 0.5)
@@ -302,10 +317,14 @@ local function paint_part(part, src_y0, src_y1, color, inner, outer, clip)
                 if bands then
                     for _, band in ipairs(bands) do
                         local a, z = math.max(sp[1], band[1]), math.min(sp[2], band[2])
-                        if z > a then fill_clipped(clip, a, top, z - a, bottom - top) end
+                        if z > a then
+                            fill_clipped(clip, a, top, z - a, bottom - top)
+                            if torn then punch_holes(clip, a, top, z - a, bottom - top, hole, color) end
+                        end
                     end
                 else
                     fill_clipped(clip, sp[1], top, sp[2] - sp[1], bottom - top)
+                    if torn then punch_holes(clip, sp[1], top, sp[2] - sp[1], bottom - top, hole, color) end
                 end
             end
         end
@@ -342,8 +361,9 @@ function Game:draw_silhouette(clip)
         local item = self.player.equipped[slot]
         local wear = item and ITEM_DB[item].wear
         if wear then
+            local torn = self:torn(slot)
             for _, w in ipairs(wear) do
-                paint_part(w[1], w[2], w[3], gfx[w[4]], w[5], w[6], clip)
+                paint_part(w[1], w[2], w[3], gfx[w[4]], w[5], w[6], clip, torn)
             end
         end
     end
@@ -484,7 +504,9 @@ end
 -- Cached drawings of the doll for what you wear now (reset when it changes).
 function Game:doll_cache()
     local worn = {}   -- (only what is painted on the doll: not what's in your hands)
-    for _, s in ipairs(WEAR_ORDER) do worn[#worn + 1] = self.player.equipped[s] or "-" end
+    for _, s in ipairs(WEAR_ORDER) do   -- (a torn piece looks different: "!")
+        worn[#worn + 1] = (self.player.equipped[s] or "-") .. (self:torn(s) and "!" or "")
+    end
     worn = table.concat(worn, ",")
     if not (self.ring_cache and self.ring_cache.worn == worn) then self.ring_cache = {worn = worn} end
     return self.ring_cache
