@@ -172,6 +172,10 @@ PHOTO = {
     "institute": {"far": (0, 60, 512, 572), "near": (10, 100, 502, 592),
                   "close": (70, 180, 430, 540), "gamma": 1.0, "edge": 0.6, "rust": 2.0,
                   "levels": (0.11, 0.26), "bg": 0.99},
+    # the user's own picture (2026-10-03, 768x768): a dark many-legged thing
+    # hung with root-like strands, two glowing eyes, on a pale ground
+    "crawler": {"far": (36, 30, 740, 734), "near": (70, 10, 710, 650),
+                "close": (270, 40, 490, 260), "gamma": 0.7, "edge": 0.5, "bg": 0.80},
     # the user's own picture (2026-10-03, 512x768): the stray in dry scrub,
     # inside a yellowed print border; a scene, not a backdrop, so levels keep
     # the scrub and a dark dog gets its mid-tones lifted

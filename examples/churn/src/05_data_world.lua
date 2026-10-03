@@ -360,8 +360,9 @@ local NIGHT = {
          intro = "Someone stands at the edge of your light. Too tall. Its arms hang past its "
               .. "knees. It doesn't move, and you can't tell which way it's facing.", speed = 3},
         {kind = "beast", name = "The Crawler", art = "crawler", who = "crawler", dark = true,
-         intro = "Something low and wide moves in the grass, too many legs, too many eyes "
-              .. "catching your light. It clicks. It's coming.",
+         intro = "Something picks its way toward you on too many long, jointed legs, hung "
+              .. "with wet black strands like roots. Two eyes catch your light. It clicks. "
+              .. "It's coming.",
          hp = 40, dmg = {6, 12}, hit = 55, speed = 4, bleed = 25, start = "near",
          loot = {{"strange_meat", 2}, {"nothing", 1}}, loot_rolls = 1},
         {kind = "horror", horror = "whisper", name = "The Whisperers", art = "whisper",
