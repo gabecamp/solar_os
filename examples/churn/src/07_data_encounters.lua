@@ -58,9 +58,9 @@ local ENCOUNTERS = {
      hp = 40, dmg = {8, 18}, hit = 45, speed = 3, bleed = 15, flees_at = 10, start = "far",
      loot = {{"strange_meat", 2}, {"nothing", 1}}, loot_rolls = 2},
     {kind = "mutant", name = "The Fused", art = "fused", who = "fused pair",
-     intro = "Two people walk as one, joined at the ribs by a bridge of bare bone "
-          .. "that creaks when they breathe. They are whispering to each other "
-          .. "about you. They agree on something, and turn.",
+     intro = "Two people walk as one, joined at the ribs by a bridge of bare bone. "
+          .. "One breathes through an old gas mask; the other's face is coming away "
+          .. "like wet paper. They whisper about you, agree on something, and turn.",
      talk = "Both mouths answer at once, in words that aren't words.",
      hp = 50, dmg = {8, 14}, hit = 50, speed = 2, bleed = 10, start = "far",
      loot = {{"cloth_scrap", 3}, {"canned_beans", 1}, {"nothing", 2}}, loot_rolls = 2},

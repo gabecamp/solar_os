@@ -238,6 +238,18 @@ start_named(g, "Road Bandits")
 g:draw_encounter(400, 300)
 solaros.dump("ops_encounter_bandit.txt")
 
+-- Scenes 7b/7c: the user's own pictures - the Fused at Near, the stray dog
+g = fresh(); g:start_game()
+start_named(g, "The Fused")
+g.enc.range = "near"
+g:draw_encounter(400, 300)
+solaros.dump("ops_encounter_fused.txt")
+g = fresh(); g:start_game()
+g.tiles[g.player.q .. "," .. g.player.r] = "plains"
+for _ = 1, 5000 do if g:maybe_dog() then break end end   -- (the game's own dog encounter)
+g:draw_encounter(400, 300)
+solaros.dump("ops_encounter_dog.txt")
+
 -- Scene 8: mid-fight at Near with a spear and a rock: the most options at once
 g = fresh(); g:start_game()
 g.player.equipped.rhand, g.player.equipped.lhand = "spear", "rock"

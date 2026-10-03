@@ -130,8 +130,10 @@ PHOTO = {
              "close": (560, 230, 960, 630), "gamma": 0.85, "edge": 0.7},
     "crows": {"far": (130, 50, 920, 990), "near": (140, 50, 910, 700),
               "close": (300, 180, 760, 620), "gamma": 0.35, "edge": 0.7},
-    "fused": {"far": (0, 0, 1024, 1024), "near": (40, 40, 990, 990),
-              "close": (140, 40, 900, 560), "gamma": 1.0, "edge": 0.7, "bg": 0.78},
+    # the user's own picture (2026-10-03, 768x768): the pair on a pale gray
+    # backdrop in a worn print border (kept out of every crop); close = both faces
+    "fused": {"far": (48, 52, 736, 740), "near": (90, 52, 690, 652),
+              "close": (150, 60, 610, 520), "gamma": 0.75, "edge": 0.6, "bg": 0.80},
     "bloom": {"far": (0, 40, 1024, 1024), "near": (220, 40, 880, 760),
               "close": (320, 60, 780, 640), "gamma": 1.4, "edge": 0.8},
     # 2026-10-01, seeds 2101/2103/2106/2108/2109 (boar, crows, bloom, tollman,
@@ -164,6 +166,12 @@ PHOTO = {
     "little": {"far": (0, 20, 512, 768), "near": (60, 30, 470, 500),
                "close": (150, 90, 400, 340), "gamma": 1.0, "edge": 0.9,
                "levels": (0.15, 0.70), "bg": 0.72},
+    # the user's own picture (2026-10-03, 512x768): the stray in dry scrub,
+    # inside a yellowed print border; a scene, not a backdrop, so levels keep
+    # the scrub and a dark dog gets its mid-tones lifted
+    "stray": {"far": (24, 150, 488, 744), "near": (60, 200, 470, 640),
+              "close": (170, 220, 430, 500), "gamma": 1.0, "edge": 0.7,
+              "levels": (0.12, 0.60), "bg": 0.70},
 }
 
 

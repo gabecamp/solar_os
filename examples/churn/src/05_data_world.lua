@@ -258,7 +258,7 @@ local DOG = {
     meal_hours = 24, leave_after = 3,
     eats = {"rotten_meat", "strange_meat", "raw_fish", "cooked_meat", "cooked_fish", "jerky",
             "canned_beans"},
-    intro = "A thin mongrel watches you from the grass, ribs showing, one ear up. "
+    intro = "A grey-muzzled mongrel watches you from the dry scrub, mouth open, one ear up. "
          .. "It doesn't run. It doesn't come closer either.",
 }
 
