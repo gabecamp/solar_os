@@ -44,7 +44,7 @@ function Game:journal_lines()
     end
     local n_known = 0
     for _, r in ipairs(RECIPES) do if self.known[r.id] then n_known = n_known + 1 end end
-    add(("Recipes known: %d of %d. Study, read, listen."):format(n_known, #RECIPES))
+    add(("Recipes known: %d of %d. K: see them, and your skills."):format(n_known, #RECIPES))
     if self.last_tape then add("Last tape: " .. self.last_tape) end
     local story = self:story_text()
     if story then add(story) end
@@ -111,6 +111,6 @@ function Game:draw_journal(w, h)
         gfx.text(6, y, line)
         y = y + 14
     end
-    gfx.text(6, h - 8, self:lore_count() > 0 and "L: read pages   any key: back" or "Any key: back")
+    gfx.text(6, h - 8, (self:lore_count() > 0 and "L: read pages  " or "") .. "K: skills  any key: back")
     gfx.refresh()
 end

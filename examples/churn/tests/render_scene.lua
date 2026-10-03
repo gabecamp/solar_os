@@ -423,6 +423,11 @@ g:open_journal()
 g:draw_journal(400, 300)
 solaros.dump("ops_journal.txt")
 
+-- Scene: the skills page (K in the journal)
+g:open_skills()
+g:draw_skills(400, 300)
+solaros.dump("ops_skills.txt")
+
 -- Scenes: your camp (map from next door, and the stash box in the bag)
 g = fresh()
 g:start_game()

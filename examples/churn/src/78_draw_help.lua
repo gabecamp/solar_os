@@ -40,6 +40,7 @@ function Game:help_key(key)   -- help, info and journal: any key goes back
     if self.screen == "journal" and key == KEY.L and self:lore_count() > 0 then
         return self:open_lore()
     end
+    if self.screen == "journal" and key == KEY.K then return self:open_skills() end
     if self.screen == "help" and key == KEY.V then
         self.screen = "info"
     else

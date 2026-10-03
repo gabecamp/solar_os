@@ -12,8 +12,10 @@ the Checkpoint alive.
 - **Keys:** Left/Right step west/east; Up or Down then Left/Right takes
   a diagonal (Up, Right = up-right; the hexes have six sides); WASD works
   the same. Space rests, F searches, I opens the bag,
-  C crafts, E uses, G hunts or fishes, T trades, J opens the journal,
+  C crafts, E uses, G hunts or fishes, T trades, J opens the journal
+  (K there shows your skills and the recipes you know),
   R calls on the radio, M mutes, Q quits. **H** in game lists every key.
+  The bag (I) shows your HP, hunger, thirst, rest and warmth.
 - **You start with nothing:** no clothes, no shoes, no bag, and you know
   almost nothing. Your arms hold two things. The crafting screen (C) knows
   only how to survive the first day: a torch, a fire (the pile you wake next

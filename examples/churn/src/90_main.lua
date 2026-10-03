@@ -110,6 +110,8 @@ local ok, err = pcall(function()
                 game:draw_journal(w, h)
             elseif game.screen == "lore" then
                 game:draw_lore(w, h)
+            elseif game.screen == "skills" then
+                game:draw_skills(w, h)
             elseif game.screen == "info" then
                 game:draw_info(w, h)
             elseif game.screen == "records" then
@@ -173,6 +175,8 @@ local ok, err = pcall(function()
                 game:radio_key(key)
             elseif game.screen == "lore" then
                 game:lore_key(key)
+            elseif game.screen == "skills" then
+                game:skills_key(key, h)
             elseif game.screen == "gate" then
                 game:gate_key(key)
             elseif game.screen == "dead" or game.screen == "ending" then

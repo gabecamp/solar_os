@@ -59,4 +59,45 @@ assert(table.concat(texts, "\n"):find("more", 1, true), "a +n more line")
 local src = io.open("churn_run.lua"):read("a")
 assert(src:find("game:open_journal()", 1, true))
 
+print("4. K opens the skills page: levels, XP, bonuses and the recipes you know")
+local real_text = fake.gfx.text
+g = fresh()
+g.skills = {scav = 30, fish = 0, fight = 200, tinker = 50}
+g.screen = "map"; g:open_journal()
+g:help_key(KEY.K)
+assert(g.screen == "skills")
+local lines = table.concat(g:skills_page_lines(), "\n")
+for _, want in ipairs({"Scavenging          2   30/50    -10% duds", "Fighting            5   200 max",
+                       "Tinkering           3   50/90    +15% repair, -1h craft", "Recipes known: "}) do
+    assert(lines:find(want, 1, true), "missing: " .. want)
+end
+local first_known
+for _, r in ipairs(H.RECIPES) do if g.known[r.id] then first_known = r; break end end
+assert(first_known and lines:find(first_known.name, 1, true), "a known recipe is listed")
+for _, l in ipairs(g:skills_page_lines()) do assert(#l <= 55, "too wide: " .. l) end
+print("   OK")
+
+print("5. with every recipe known it scrolls, stays on screen, and any key goes back to the journal")
+for _, r in ipairs(H.RECIPES) do g.known[r.id] = true end
+local n = #g:skills_page_lines()
+assert(n > Game.skills_fit(300), "long enough to scroll")
+local function drawn()
+    local out = {}
+    gfx.text = function(x, y, s) assert(y <= 300 and x + 7 * #s <= 400, "off screen: " .. s); out[#out + 1] = s end
+    g:draw_skills(400, 300)
+    return out
+end
+local top = drawn()
+for _ = 1, 50 do g:skills_key(gfx.KEY_DOWN, 300) end
+local bottom = drawn()
+assert(top[2] ~= bottom[2], "scrolled")
+assert(bottom[#bottom - 1] == g:skills_page_lines()[n], "the last line shows at the bottom")
+for _ = 1, 50 do g:skills_key(gfx.KEY_UP, 300) end
+assert(drawn()[2] == top[2], "back at the top")
+g:skills_key(KEY.SPACE, 300)
+assert(g.screen == "journal")
+gfx.text = real_text
+assert(src:find('game.screen == "skills"', 1, true), "the main loop knows the screen")
+print("   OK")
+
 print("JOURNAL TESTS PASSED")

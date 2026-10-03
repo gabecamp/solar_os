@@ -201,4 +201,27 @@ canvas = {}; g:draw_doll()
 assert(same(whole, snapshot()), "patched: no holes")
 print("   OK")
 
+print("8. HP, hunger, thirst, rest and warmth show in the bag, and fit the column")
+g = Game.new(); g:start_game()
+local st = table.concat(g:inv_stats_lines(), "|")
+for _, want in ipairs({"Hunger ", "Thirst ", "HP ", "Rest ", "Warm "}) do
+    assert(st:find(want, 1, true), "missing " .. want)
+end
+local p = g.player
+p.health, p.needs.hunger, p.needs.thirst, p.needs.rest = 100, 100, 100, 100
+for _, l in ipairs(g:inv_stats_lines()) do assert(#l <= 26, "too wide: " .. l) end
+p.needs.hunger = 37.6
+assert(g:inv_stats_lines()[1]:find("Hunger 37 ", 1, true))
+assert(g:inv_stats_lines()[2]:find("Warm " .. g:warmth() .. "/", 1, true))
+local sig = g:inv_signature()
+p.needs.thirst = 12
+assert(g:inv_signature() ~= sig, "a change redraws the screen")
+local seen = {}
+local real = gfx.text
+gfx.text = function(x, y, s) seen[#seen + 1] = s end
+g.screen = "inventory"; g.inv_drawn = nil; g:draw_inventory(400, 300)
+gfx.text = real
+assert(table.concat(seen, "\n"):find("Thirst 12", 1, true), "drawn")
+print("   OK")
+
 print("INVENTORY REDRAW TESTS PASSED")

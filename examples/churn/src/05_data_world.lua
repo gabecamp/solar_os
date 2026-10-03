@@ -26,7 +26,7 @@ local POLL_MS = 250
 -- SolarOS sends Enter as '\n' (LF); CR is kept just in case.
 local KEY = {SPACE = 32, ENTER = 13, LF = 10, ESC = 27,
              A = 97, C = 99, D = 100, E = 101, F = 102, I = 105, Q = 113,
-             S = 115, T = 116, W = 119, H = 104, V = 118, G = 103, M = 109, J = 106, R = 114, O = 111, L = 108}
+             S = 115, T = 116, W = 119, H = 104, V = 118, G = 103, M = 109, J = 106, R = 114, O = 111, L = 108, K = 107}
 
 -- Terrain: id -> {name, cost (MP + hours), passable, shade}
 -- shade is one of gfx.WHITE / gfx.LIGHT / gfx.DARK / gfx.BLACK, used as
@@ -407,5 +407,8 @@ local SKILLS = {
     xp = {search = 1, find = 1, catch = 3, hunt = 2, hit = 1, kill = 3,
           craft = 1, repair = 2, repaired = 3},
     bonus = {scav = 5, fish = 4, fight = 3, tinker = 5},
+    -- the skills page (K in the journal): what a level's bonus does
+    what = {scav = "-%d%% duds", fish = "+%d%% catch, hunt", fight = "+%d%% to hit",
+            tinker = "+%d%% repair"},
     fast_craft = 3,
 }

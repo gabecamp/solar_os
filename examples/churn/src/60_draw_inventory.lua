@@ -467,7 +467,8 @@ end
 -- Everything the bag screen shows except where the cursor is: when only the
 -- cursor moved, the screen is patched instead of redrawn.
 function Game:inv_signature()
-    local p, out = self.player, {self:current_conditions(), self.ground_off or 0, self:bag_capacity(),
+    local p, out = self.player, {self:current_conditions(), table.concat(self:inv_stats_lines(), "|"),
+                                 self.ground_off or 0, self:bag_capacity(),
                                  (self:at_base() and self:base_has("box")) and "box" or "ground"}
     for _, list in ipairs({self:ground_list(), p.inventory}) do
         for _, s in ipairs(list) do out[#out + 1] = s.item .. "x" .. s.qty end
@@ -478,6 +479,18 @@ function Game:inv_signature()
     out[#out + 1] = sel and (sel[1] .. ":" .. sel[2]) or "-"
     for _, line in ipairs(self.log) do out[#out + 1] = line end
     return table.concat(out, "\n")
+end
+
+-- Your numbers, under the cursor's lines: "Hunger 70 Thirst 60" and
+-- "HP 85 Rest 80 Warm 3/5". Warmth is what you wear / what the weather,
+-- season and night ask for (cold_need); by a fire or in your bedroll it
+-- reads "fire" or "bed". Both lines fit the column at 3-digit values.
+function Game:inv_stats_lines()
+    local p = self.player
+    local warm = self:fire_at(p.hours) and "fire" or self:bed_here() and "bed"
+        or (self:warmth() .. "/" .. self:cold_need())
+    return {("Hunger %d Thirst %d"):format(math.floor(p.needs.hunger), math.floor(p.needs.thirst)),
+            ("HP %d Rest %d Warm %s"):format(math.floor(p.health), math.floor(p.needs.rest), warm)}
 end
 
 -- What the cursor is on and what it does, under the bag.
@@ -496,6 +509,10 @@ function Game:draw_inv_desc(w, clear)
     local stack = row and self:get_stack(row[1], row[2])
     local effect = stack and ITEM_DB[stack.item].desc
     if effect then gfx.text(INV_COL_X, CURSOR_DESC_Y + 14, effect:sub(1, max_chars)) end
+    -- your numbers, above the conditions (here because the erase above reaches them)
+    for i, line in ipairs(self:inv_stats_lines()) do
+        gfx.text(INV_COL_X, CONDITIONS_Y - 28 + 13 * (i - 1), line:sub(1, max_chars))
+    end
 end
 
 -- The doll's pixels on the 1px ring just outside a slot, as runs

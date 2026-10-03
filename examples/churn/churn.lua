@@ -51,7 +51,7 @@ local POLL_MS = 250
 -- SolarOS sends Enter as '\n' (LF); CR is kept just in case.
 local KEY = {SPACE = 32, ENTER = 13, LF = 10, ESC = 27,
              A = 97, C = 99, D = 100, E = 101, F = 102, I = 105, Q = 113,
-             S = 115, T = 116, W = 119, H = 104, V = 118, G = 103, M = 109, J = 106, R = 114, O = 111, L = 108}
+             S = 115, T = 116, W = 119, H = 104, V = 118, G = 103, M = 109, J = 106, R = 114, O = 111, L = 108, K = 107}
 
 -- Terrain: id -> {name, cost (MP + hours), passable, shade}
 -- shade is one of gfx.WHITE / gfx.LIGHT / gfx.DARK / gfx.BLACK, used as
@@ -432,6 +432,9 @@ local SKILLS = {
     xp = {search = 1, find = 1, catch = 3, hunt = 2, hit = 1, kill = 3,
           craft = 1, repair = 2, repaired = 3},
     bonus = {scav = 5, fish = 4, fight = 3, tinker = 5},
+    -- the skills page (K in the journal): what a level's bonus does
+    what = {scav = "-%d%% duds", fish = "+%d%% catch, hunt", fight = "+%d%% to hit",
+            tinker = "+%d%% repair"},
     fast_craft = 3,
 }
 -- ---------------------------------------------------------------------
@@ -8841,6 +8844,72 @@ function Game:skills_line()
     end
     return "Skills: " .. table.concat(parts, "  ")
 end
+
+-- ---------------------------------------------------------------------
+-- The skills page (K in the journal): each skill's level, XP and bonus,
+-- then the recipes you know. Up/Down scroll when it's longer than the
+-- screen; any other key goes back to the journal.
+-- ---------------------------------------------------------------------
+
+function Game:skills_page_lines()
+    local lines = {"Skill               Lv  XP       Bonus"}
+    for _, name in ipairs(SKILLS.order) do
+        local level, xp = self:skill_level(name), (self.skills or {})[name] or 0
+        local next_xp = SKILLS.levels[level + 1]
+        local bonus = SKILLS.what[name]:format(self:skill_bonus(name))
+        if name == "tinker" and level >= SKILLS.fast_craft then bonus = bonus .. ", -1h craft" end
+        lines[#lines + 1] = ("%-19s %d   %-8s %s"):format(SKILLS.long[name], level,
+            next_xp and (xp .. "/" .. next_xp) or (xp .. " max"), bonus)
+    end
+    lines[#lines + 1] = ("Levels: %s XP. Tinker %d: craft 1h faster."):format(
+        table.concat(SKILLS.levels, "/"), SKILLS.fast_craft)
+    lines[#lines + 1] = ""
+    local names = {}
+    for _, r in ipairs(RECIPES) do
+        if self.known[r.id] then names[#names + 1] = r.name end
+    end
+    lines[#lines + 1] = ("Recipes known: %d of %d"):format(#names, #RECIPES)
+    for _, l in ipairs(wrap(#names > 0 and table.concat(names, ", ") or "None yet.", 55)) do
+        lines[#lines + 1] = l
+    end
+    if #names < #RECIPES then lines[#lines + 1] = "Learn more: study, read notes, listen to tapes." end
+    return lines
+end
+
+function Game:open_skills()
+    self.skills_off = 0
+    self.screen = "skills"
+end
+
+function Game.skills_fit(h) return (h - 24 - 40) // 14 + 1 end
+
+function Game:skills_key(key, h)
+    local max_off = math.max(0, #self:skills_page_lines() - Game.skills_fit(h or 300))
+    if key == gfx.KEY_UP or key == KEY.W then
+        self.skills_off = math.max(0, (self.skills_off or 0) - 3)
+    elseif key == gfx.KEY_DOWN or key == KEY.S then
+        self.skills_off = math.min(max_off, (self.skills_off or 0) + 3)
+    else
+        self.screen = "journal"
+    end
+end
+
+function Game:draw_skills(w, h)
+    gfx.clear(gfx.WHITE)
+    gfx.color(gfx.BLACK)
+    gfx.font(gfx.FONT_BOLD_14)
+    gfx.text(6, 16, "Skills and recipes")
+    gfx.font(gfx.FONT_MONO_12)
+    local lines, fit = self:skills_page_lines(), Game.skills_fit(h)
+    local off = math.max(0, math.min(self.skills_off or 0, #lines - fit))
+    local y = 40
+    for i = off + 1, math.min(#lines, off + fit) do
+        gfx.text(6, y, lines[i])
+        y = y + 14
+    end
+    gfx.text(6, h - 8, #lines > fit and "Up/Dn scroll  any other key: back" or "Any key: back")
+    gfx.refresh()
+end
 -- ---------------------------------------------------------------------
 -- Run stats, lifetime records and achievements
 --
@@ -10320,7 +10389,8 @@ end
 -- Everything the bag screen shows except where the cursor is: when only the
 -- cursor moved, the screen is patched instead of redrawn.
 function Game:inv_signature()
-    local p, out = self.player, {self:current_conditions(), self.ground_off or 0, self:bag_capacity(),
+    local p, out = self.player, {self:current_conditions(), table.concat(self:inv_stats_lines(), "|"),
+                                 self.ground_off or 0, self:bag_capacity(),
                                  (self:at_base() and self:base_has("box")) and "box" or "ground"}
     for _, list in ipairs({self:ground_list(), p.inventory}) do
         for _, s in ipairs(list) do out[#out + 1] = s.item .. "x" .. s.qty end
@@ -10331,6 +10401,18 @@ function Game:inv_signature()
     out[#out + 1] = sel and (sel[1] .. ":" .. sel[2]) or "-"
     for _, line in ipairs(self.log) do out[#out + 1] = line end
     return table.concat(out, "\n")
+end
+
+-- Your numbers, under the cursor's lines: "Hunger 70 Thirst 60" and
+-- "HP 85 Rest 80 Warm 3/5". Warmth is what you wear / what the weather,
+-- season and night ask for (cold_need); by a fire or in your bedroll it
+-- reads "fire" or "bed". Both lines fit the column at 3-digit values.
+function Game:inv_stats_lines()
+    local p = self.player
+    local warm = self:fire_at(p.hours) and "fire" or self:bed_here() and "bed"
+        or (self:warmth() .. "/" .. self:cold_need())
+    return {("Hunger %d Thirst %d"):format(math.floor(p.needs.hunger), math.floor(p.needs.thirst)),
+            ("HP %d Rest %d Warm %s"):format(math.floor(p.health), math.floor(p.needs.rest), warm)}
 end
 
 -- What the cursor is on and what it does, under the bag.
@@ -10349,6 +10431,10 @@ function Game:draw_inv_desc(w, clear)
     local stack = row and self:get_stack(row[1], row[2])
     local effect = stack and ITEM_DB[stack.item].desc
     if effect then gfx.text(INV_COL_X, CURSOR_DESC_Y + 14, effect:sub(1, max_chars)) end
+    -- your numbers, above the conditions (here because the erase above reaches them)
+    for i, line in ipairs(self:inv_stats_lines()) do
+        gfx.text(INV_COL_X, CONDITIONS_Y - 28 + 13 * (i - 1), line:sub(1, max_chars))
+    end
 end
 
 -- The doll's pixels on the 1px ring just outside a slot, as runs
@@ -11972,6 +12058,7 @@ function Game:help_key(key)   -- help, info and journal: any key goes back
     if self.screen == "journal" and key == KEY.L and self:lore_count() > 0 then
         return self:open_lore()
     end
+    if self.screen == "journal" and key == KEY.K then return self:open_skills() end
     if self.screen == "help" and key == KEY.V then
         self.screen = "info"
     else
@@ -12099,7 +12186,7 @@ function Game:journal_lines()
     end
     local n_known = 0
     for _, r in ipairs(RECIPES) do if self.known[r.id] then n_known = n_known + 1 end end
-    add(("Recipes known: %d of %d. Study, read, listen."):format(n_known, #RECIPES))
+    add(("Recipes known: %d of %d. K: see them, and your skills."):format(n_known, #RECIPES))
     if self.last_tape then add("Last tape: " .. self.last_tape) end
     local story = self:story_text()
     if story then add(story) end
@@ -12166,7 +12253,7 @@ function Game:draw_journal(w, h)
         gfx.text(6, y, line)
         y = y + 14
     end
-    gfx.text(6, h - 8, self:lore_count() > 0 and "L: read pages   any key: back" or "Any key: back")
+    gfx.text(6, h - 8, (self:lore_count() > 0 and "L: read pages  " or "") .. "K: skills  any key: back")
     gfx.refresh()
 end
 -- ---------------------------------------------------------------------
@@ -12281,6 +12368,8 @@ local ok, err = pcall(function()
                 game:draw_journal(w, h)
             elseif game.screen == "lore" then
                 game:draw_lore(w, h)
+            elseif game.screen == "skills" then
+                game:draw_skills(w, h)
             elseif game.screen == "info" then
                 game:draw_info(w, h)
             elseif game.screen == "records" then
@@ -12344,6 +12433,8 @@ local ok, err = pcall(function()
                 game:radio_key(key)
             elseif game.screen == "lore" then
                 game:lore_key(key)
+            elseif game.screen == "skills" then
+                game:skills_key(key, h)
             elseif game.screen == "gate" then
                 game:gate_key(key)
             elseif game.screen == "dead" or game.screen == "ending" then

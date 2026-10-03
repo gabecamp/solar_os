@@ -46,3 +46,69 @@ function Game:skills_line()
     end
     return "Skills: " .. table.concat(parts, "  ")
 end
+
+-- ---------------------------------------------------------------------
+-- The skills page (K in the journal): each skill's level, XP and bonus,
+-- then the recipes you know. Up/Down scroll when it's longer than the
+-- screen; any other key goes back to the journal.
+-- ---------------------------------------------------------------------
+
+function Game:skills_page_lines()
+    local lines = {"Skill               Lv  XP       Bonus"}
+    for _, name in ipairs(SKILLS.order) do
+        local level, xp = self:skill_level(name), (self.skills or {})[name] or 0
+        local next_xp = SKILLS.levels[level + 1]
+        local bonus = SKILLS.what[name]:format(self:skill_bonus(name))
+        if name == "tinker" and level >= SKILLS.fast_craft then bonus = bonus .. ", -1h craft" end
+        lines[#lines + 1] = ("%-19s %d   %-8s %s"):format(SKILLS.long[name], level,
+            next_xp and (xp .. "/" .. next_xp) or (xp .. " max"), bonus)
+    end
+    lines[#lines + 1] = ("Levels: %s XP. Tinker %d: craft 1h faster."):format(
+        table.concat(SKILLS.levels, "/"), SKILLS.fast_craft)
+    lines[#lines + 1] = ""
+    local names = {}
+    for _, r in ipairs(RECIPES) do
+        if self.known[r.id] then names[#names + 1] = r.name end
+    end
+    lines[#lines + 1] = ("Recipes known: %d of %d"):format(#names, #RECIPES)
+    for _, l in ipairs(wrap(#names > 0 and table.concat(names, ", ") or "None yet.", 55)) do
+        lines[#lines + 1] = l
+    end
+    if #names < #RECIPES then lines[#lines + 1] = "Learn more: study, read notes, listen to tapes." end
+    return lines
+end
+
+function Game:open_skills()
+    self.skills_off = 0
+    self.screen = "skills"
+end
+
+function Game.skills_fit(h) return (h - 24 - 40) // 14 + 1 end
+
+function Game:skills_key(key, h)
+    local max_off = math.max(0, #self:skills_page_lines() - Game.skills_fit(h or 300))
+    if key == gfx.KEY_UP or key == KEY.W then
+        self.skills_off = math.max(0, (self.skills_off or 0) - 3)
+    elseif key == gfx.KEY_DOWN or key == KEY.S then
+        self.skills_off = math.min(max_off, (self.skills_off or 0) + 3)
+    else
+        self.screen = "journal"
+    end
+end
+
+function Game:draw_skills(w, h)
+    gfx.clear(gfx.WHITE)
+    gfx.color(gfx.BLACK)
+    gfx.font(gfx.FONT_BOLD_14)
+    gfx.text(6, 16, "Skills and recipes")
+    gfx.font(gfx.FONT_MONO_12)
+    local lines, fit = self:skills_page_lines(), Game.skills_fit(h)
+    local off = math.max(0, math.min(self.skills_off or 0, #lines - fit))
+    local y = 40
+    for i = off + 1, math.min(#lines, off + fit) do
+        gfx.text(6, y, lines[i])
+        y = y + 14
+    end
+    gfx.text(6, h - 8, #lines > fit and "Up/Dn scroll  any other key: back" or "Any key: back")
+    gfx.refresh()
+end
