@@ -41,7 +41,7 @@ g:intro_key(KEY.Q)
 assert(g.quit, "Q quits from the splash")
 print("   OK")
 
-print("3. the screens fit; an idle tick redraws only the eye and the prompt")
+print("3. the screens fit; an idle tick redraws only the blinking prompt")
 local texts = {}
 local real_text = gfx.text
 gfx.text = function(x, y, s)
@@ -64,7 +64,23 @@ local tick_calls = calls
 calls = 0
 g:draw_intro(400, 300)
 gfx.line, gfx.fill_rect, gfx.text, gfx.circle, gfx.fill_circle, gfx.pixel, gfx.clear = table.unpack(saved_fns)
-assert(tick_calls < calls and tick_calls < 80, ("tick %d calls, full %d"):format(tick_calls, calls))
-print(("   OK (idle tick %d draw calls, full splash %d)"):format(tick_calls, calls))
+assert(tick_calls < calls and tick_calls < 10, ("tick %d calls, full %d"):format(tick_calls, calls))
+print(("   OK (idle tick %d draw calls, full splash %d + the picture)"):format(tick_calls, calls))
+
+print("4. the title picture: whole 32x32 tiles, inside its frame on the left, drawn on both screens")
+local A = Game.TITLE_ART
+assert(A and A.w == A.tw * 32 and A.h == A.th * 32, "whole tiles")
+local tiles = Game.title_tiles()
+assert(#tiles > A.tw * A.th // 2, "most tiles have ink")
+for _, t in ipairs(tiles) do assert(#t.data == 128) end
+for _, screen in ipairs({"draw_intro", "draw_title"}) do
+    SPRITE_CALLS = {}
+    g[screen](g, 400, 300)
+    assert(#SPRITE_CALLS == #tiles, screen .. " draws the picture")
+    for _, c in ipairs(SPRITE_CALLS) do
+        assert(c.x >= 0 and c.y >= 0 and c.x + c.w <= Game.INTRO.panel and c.y + c.h <= 300, screen .. ": off its frame")
+    end
+end
+print("   OK (" .. #tiles .. " tiles)")
 
 print("\nINTRO TESTS PASSED")

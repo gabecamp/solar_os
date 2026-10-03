@@ -1,6 +1,6 @@
 -- ---------------------------------------------------------------------
--- The intro: a splash on every launch ("THE CHURN" in big block letters,
--- a slowly turning eye, an epigraph), then the title menu, then - for a
+-- The intro: a splash on every launch (the title picture, "THE CHURN" in
+-- big block letters, an epigraph), then the title menu, then - for a
 -- new survivor - a short story crawl before the creator.
 --   screen "intro" -> "title" -> "crawl" -> "creator"
 -- The tests and the balance sim build games with Game.new() and never
@@ -18,7 +18,7 @@ Game.INTRO = {
         R = {"####.", "#...#", "#...#", "####.", "#.#..", "#..#.", "#...#"},
         N = {"#...#", "##..#", "#.#.#", "#.#.#", "#..##", "#...#", "#...#"},
     },
-    title = "THE CHURN", cell = 5, eye_r = 44,
+    title = "THE CHURN", cell = 5,
     epigraph = {"The land does not lie still. It turns over in its",
                 "sleep, and what it turns up, it remembers."},
     -- New survivor: the story so far, a page at a time
@@ -76,58 +76,68 @@ function Game.draw_big_text(text, x, y, cell)
     end
 end
 
--- The turning eye: three spiral arms around a pupil, rotated by phase.
-function Game:draw_intro_eye(cx, cy, phase)
-    local R = Game.INTRO.eye_r
-    gfx.color(gfx.WHITE)
-    gfx.fill_rect(cx - R - 2, cy - R - 2, 2 * R + 5, 2 * R + 5)
-    gfx.color(gfx.BLACK)
-    gfx.circle(cx, cy, R)
-    for arm = 0, 2 do
-        local px, py
-        for s = 0, 14 do
-            local t = s / 14
-            local a = phase * 0.35 + arm * 2.094 + t * 4.2
-            local r = 8 + t * (R - 10)
-            local x, y = cx + math.floor(r * math.cos(a)), cy + math.floor(r * math.sin(a) * 0.8)
-            if px then gfx.line(px, py, x, y) end
-            px, py = x, y
+-- The title picture (art/title.png, baked into 69_title_art by
+-- tools/paint_title.py): its non-blank tiles, decoded once.
+function Game.title_tiles()
+    if Game.TITLE_TILES then return Game.TITLE_TILES end
+    local A, tiles = Game.TITLE_ART, {}
+    if A then
+        local bytes, empty = b64_decode(A.data), string.rep("\0", 128)
+        for ty = 0, A.th - 1 do
+            for tx = 0, A.tw - 1 do
+                local k = (ty * A.tw + tx) * 128
+                local tile = bytes:sub(k + 1, k + 128)
+                if tile ~= empty then tiles[#tiles + 1] = {x = tx * 32, y = ty * 32, data = tile} end
+            end
         end
     end
-    gfx.fill_circle(cx, cy, 6)
-    gfx.color(gfx.WHITE)
-    gfx.pixel(cx - 2, cy - 2)
-    gfx.color(gfx.BLACK)
+    Game.TITLE_TILES = tiles
+    return tiles
 end
 
-function Game:draw_intro(w, h)
-    local I = Game.INTRO
-    gfx.clear(gfx.WHITE)
+function Game.draw_title_art(x, y)
+    if not draw_sprite then return end   -- (a firmware without bitmaps: text only)
     gfx.color(gfx.BLACK)
-    local tw = (#I.title * 6 - 1) * I.cell
-    Game.draw_big_text(I.title, (w - tw) // 2, 18, I.cell)
-    self:draw_intro_eye(w // 2, 120, self.intro_phase or 0)
+    for _, t in ipairs(Game.title_tiles()) do draw_sprite(x + t.x, y + t.y, 32, 32, t.data) end
+    gfx.rect(x - 1, y - 1, Game.TITLE_ART.w + 2, Game.TITLE_ART.h + 2)
+end
+
+-- The picture on the left; the right panel starts here.
+Game.INTRO.panel = 204
+
+function Game:draw_intro(w, h)
+    local I, px = Game.INTRO, Game.INTRO.panel
+    local mid = px + (w - px) // 2
+    gfx.clear(gfx.WHITE)
+    Game.draw_title_art(4, 6)
+    gfx.color(gfx.BLACK)
+    for i, word in ipairs({"THE", "CHURN"}) do
+        Game.draw_big_text(word, mid - ((#word * 6 - 1) * I.cell) // 2, 28 + (i - 1) * 48, I.cell)
+    end
     gfx.font(gfx.FONT_MONO_12)
-    for i, line in ipairs(I.epigraph) do
-        gfx.text((w - #line * 7) // 2, 196 + (i - 1) * 16, line)
+    local y = 150
+    for _, line in ipairs(wrap(table.concat(I.epigraph, " "), (w - px - 6) // 7)) do
+        gfx.text(mid - (#line * 7) // 2, y, line)
+        y = y + 16
     end
     self:draw_intro_prompt(w, h)
     gfx.refresh()
 end
 
 function Game:draw_intro_prompt(w, h)
-    local text = "- press any key -"
+    local text, px = "- press any key -", Game.INTRO.panel
     gfx.color(gfx.WHITE)
-    gfx.fill_rect(0, h - 40, w, 20)
+    gfx.fill_rect(px, h - 40, w - px, 20)
     gfx.color(gfx.BLACK)
     gfx.font(gfx.FONT_MONO_12)
-    if (self.intro_phase or 0) % 4 ~= 3 then gfx.text((w - #text * 7) // 2, h - 26, text) end
+    if (self.intro_phase or 0) % 4 ~= 3 then
+        gfx.text(px + (w - px - #text * 7) // 2, h - 26, text)
+    end
 end
 
--- An idle poll on the splash: turn the eye a little (only it is redrawn).
+-- An idle poll on the splash: the prompt blinks (only it is redrawn).
 function Game:intro_tick(w, h)
     self.intro_phase = (self.intro_phase or 0) + 1
-    self:draw_intro_eye(w // 2, 120, self.intro_phase)
     self:draw_intro_prompt(w, h)
     gfx.refresh()
 end
@@ -145,7 +155,7 @@ function Game:title_rows()
     local rows = {}
     local d = self.title_save
     if d then
-        rows[#rows + 1] = {("Continue  (day %d, %d HP)"):format(
+        rows[#rows + 1] = {("Continue (day %d, %d HP)"):format(
             (WORLD.start_hour + d.player.hours) // 24 + 1, math.floor(d.player.health or 0)), "continue"}
     end
     rows[#rows + 1] = {"New survivor", "new"}
@@ -153,24 +163,27 @@ function Game:title_rows()
 end
 
 function Game:draw_title(w, h)
+    local I, px = Game.INTRO, Game.INTRO.panel
+    local mid = px + (w - px) // 2
     gfx.clear(gfx.WHITE)
+    Game.draw_title_art(4, 6)
     gfx.color(gfx.BLACK)
-    local I = Game.INTRO
     local tw = (#I.title * 6 - 1) * 3
-    Game.draw_big_text(I.title, (w - tw) // 2, 40, 3)
+    Game.draw_big_text(I.title, mid - tw // 2, 30, 3)
     gfx.font(gfx.FONT_MONO_12)
     local sub = "a survival game"
-    gfx.text((w - #sub * 7) // 2, 80, sub)
+    gfx.text(mid - (#sub * 7) // 2, 70, sub)
     for i, row in ipairs(self:title_rows()) do
-        local y = 130 + (i - 1) * 24
+        local y = 120 + (i - 1) * 24
         if i == self.title_cursor then
-            gfx.fill_rect(w // 2 - 110, y - 13, 220, 18)
+            gfx.fill_rect(px, y - 13, w - px - 4, 18)
             gfx.color(gfx.WHITE)
         end
-        gfx.text(w // 2 - 100, y, row[1])
+        gfx.text(px + 6, y, row[1])
         gfx.color(gfx.BLACK)
     end
-    gfx.text(6, h - 8, "Up/Dn pick  Enter choose  R records  Q quit")
+    gfx.text(px + 6, h - 22, "Up/Dn pick  Enter go")
+    gfx.text(px + 6, h - 8, "R records   Q quit")
     gfx.refresh()
 end
 

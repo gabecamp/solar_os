@@ -11177,8 +11177,8 @@ function Game:draw_scene(w, h)
     gfx.text(10, h - 8, "Any key to go on")
 end
 -- ---------------------------------------------------------------------
--- The intro: a splash on every launch ("THE CHURN" in big block letters,
--- a slowly turning eye, an epigraph), then the title menu, then - for a
+-- The intro: a splash on every launch (the title picture, "THE CHURN" in
+-- big block letters, an epigraph), then the title menu, then - for a
 -- new survivor - a short story crawl before the creator.
 --   screen "intro" -> "title" -> "crawl" -> "creator"
 -- The tests and the balance sim build games with Game.new() and never
@@ -11196,7 +11196,7 @@ Game.INTRO = {
         R = {"####.", "#...#", "#...#", "####.", "#.#..", "#..#.", "#...#"},
         N = {"#...#", "##..#", "#.#.#", "#.#.#", "#..##", "#...#", "#...#"},
     },
-    title = "THE CHURN", cell = 5, eye_r = 44,
+    title = "THE CHURN", cell = 5,
     epigraph = {"The land does not lie still. It turns over in its",
                 "sleep, and what it turns up, it remembers."},
     -- New survivor: the story so far, a page at a time
@@ -11254,58 +11254,68 @@ function Game.draw_big_text(text, x, y, cell)
     end
 end
 
--- The turning eye: three spiral arms around a pupil, rotated by phase.
-function Game:draw_intro_eye(cx, cy, phase)
-    local R = Game.INTRO.eye_r
-    gfx.color(gfx.WHITE)
-    gfx.fill_rect(cx - R - 2, cy - R - 2, 2 * R + 5, 2 * R + 5)
-    gfx.color(gfx.BLACK)
-    gfx.circle(cx, cy, R)
-    for arm = 0, 2 do
-        local px, py
-        for s = 0, 14 do
-            local t = s / 14
-            local a = phase * 0.35 + arm * 2.094 + t * 4.2
-            local r = 8 + t * (R - 10)
-            local x, y = cx + math.floor(r * math.cos(a)), cy + math.floor(r * math.sin(a) * 0.8)
-            if px then gfx.line(px, py, x, y) end
-            px, py = x, y
+-- The title picture (art/title.png, baked into 69_title_art by
+-- tools/paint_title.py): its non-blank tiles, decoded once.
+function Game.title_tiles()
+    if Game.TITLE_TILES then return Game.TITLE_TILES end
+    local A, tiles = Game.TITLE_ART, {}
+    if A then
+        local bytes, empty = b64_decode(A.data), string.rep("\0", 128)
+        for ty = 0, A.th - 1 do
+            for tx = 0, A.tw - 1 do
+                local k = (ty * A.tw + tx) * 128
+                local tile = bytes:sub(k + 1, k + 128)
+                if tile ~= empty then tiles[#tiles + 1] = {x = tx * 32, y = ty * 32, data = tile} end
+            end
         end
     end
-    gfx.fill_circle(cx, cy, 6)
-    gfx.color(gfx.WHITE)
-    gfx.pixel(cx - 2, cy - 2)
-    gfx.color(gfx.BLACK)
+    Game.TITLE_TILES = tiles
+    return tiles
 end
 
-function Game:draw_intro(w, h)
-    local I = Game.INTRO
-    gfx.clear(gfx.WHITE)
+function Game.draw_title_art(x, y)
+    if not draw_sprite then return end   -- (a firmware without bitmaps: text only)
     gfx.color(gfx.BLACK)
-    local tw = (#I.title * 6 - 1) * I.cell
-    Game.draw_big_text(I.title, (w - tw) // 2, 18, I.cell)
-    self:draw_intro_eye(w // 2, 120, self.intro_phase or 0)
+    for _, t in ipairs(Game.title_tiles()) do draw_sprite(x + t.x, y + t.y, 32, 32, t.data) end
+    gfx.rect(x - 1, y - 1, Game.TITLE_ART.w + 2, Game.TITLE_ART.h + 2)
+end
+
+-- The picture on the left; the right panel starts here.
+Game.INTRO.panel = 204
+
+function Game:draw_intro(w, h)
+    local I, px = Game.INTRO, Game.INTRO.panel
+    local mid = px + (w - px) // 2
+    gfx.clear(gfx.WHITE)
+    Game.draw_title_art(4, 6)
+    gfx.color(gfx.BLACK)
+    for i, word in ipairs({"THE", "CHURN"}) do
+        Game.draw_big_text(word, mid - ((#word * 6 - 1) * I.cell) // 2, 28 + (i - 1) * 48, I.cell)
+    end
     gfx.font(gfx.FONT_MONO_12)
-    for i, line in ipairs(I.epigraph) do
-        gfx.text((w - #line * 7) // 2, 196 + (i - 1) * 16, line)
+    local y = 150
+    for _, line in ipairs(wrap(table.concat(I.epigraph, " "), (w - px - 6) // 7)) do
+        gfx.text(mid - (#line * 7) // 2, y, line)
+        y = y + 16
     end
     self:draw_intro_prompt(w, h)
     gfx.refresh()
 end
 
 function Game:draw_intro_prompt(w, h)
-    local text = "- press any key -"
+    local text, px = "- press any key -", Game.INTRO.panel
     gfx.color(gfx.WHITE)
-    gfx.fill_rect(0, h - 40, w, 20)
+    gfx.fill_rect(px, h - 40, w - px, 20)
     gfx.color(gfx.BLACK)
     gfx.font(gfx.FONT_MONO_12)
-    if (self.intro_phase or 0) % 4 ~= 3 then gfx.text((w - #text * 7) // 2, h - 26, text) end
+    if (self.intro_phase or 0) % 4 ~= 3 then
+        gfx.text(px + (w - px - #text * 7) // 2, h - 26, text)
+    end
 end
 
--- An idle poll on the splash: turn the eye a little (only it is redrawn).
+-- An idle poll on the splash: the prompt blinks (only it is redrawn).
 function Game:intro_tick(w, h)
     self.intro_phase = (self.intro_phase or 0) + 1
-    self:draw_intro_eye(w // 2, 120, self.intro_phase)
     self:draw_intro_prompt(w, h)
     gfx.refresh()
 end
@@ -11323,7 +11333,7 @@ function Game:title_rows()
     local rows = {}
     local d = self.title_save
     if d then
-        rows[#rows + 1] = {("Continue  (day %d, %d HP)"):format(
+        rows[#rows + 1] = {("Continue (day %d, %d HP)"):format(
             (WORLD.start_hour + d.player.hours) // 24 + 1, math.floor(d.player.health or 0)), "continue"}
     end
     rows[#rows + 1] = {"New survivor", "new"}
@@ -11331,24 +11341,27 @@ function Game:title_rows()
 end
 
 function Game:draw_title(w, h)
+    local I, px = Game.INTRO, Game.INTRO.panel
+    local mid = px + (w - px) // 2
     gfx.clear(gfx.WHITE)
+    Game.draw_title_art(4, 6)
     gfx.color(gfx.BLACK)
-    local I = Game.INTRO
     local tw = (#I.title * 6 - 1) * 3
-    Game.draw_big_text(I.title, (w - tw) // 2, 40, 3)
+    Game.draw_big_text(I.title, mid - tw // 2, 30, 3)
     gfx.font(gfx.FONT_MONO_12)
     local sub = "a survival game"
-    gfx.text((w - #sub * 7) // 2, 80, sub)
+    gfx.text(mid - (#sub * 7) // 2, 70, sub)
     for i, row in ipairs(self:title_rows()) do
-        local y = 130 + (i - 1) * 24
+        local y = 120 + (i - 1) * 24
         if i == self.title_cursor then
-            gfx.fill_rect(w // 2 - 110, y - 13, 220, 18)
+            gfx.fill_rect(px, y - 13, w - px - 4, 18)
             gfx.color(gfx.WHITE)
         end
-        gfx.text(w // 2 - 100, y, row[1])
+        gfx.text(px + 6, y, row[1])
         gfx.color(gfx.BLACK)
     end
-    gfx.text(6, h - 8, "Up/Dn pick  Enter choose  R records  Q quit")
+    gfx.text(px + 6, h - 22, "Up/Dn pick  Enter go")
+    gfx.text(px + 6, h - 8, "R records   Q quit")
     gfx.refresh()
 end
 
@@ -11395,6 +11408,11 @@ function Game:crawl_key(key)
         if self.crawl_page > #Game.INTRO.crawl then self.screen = "creator" end
     end
 end
+-- GENERATED by tools/paint_title.py from art/title.png - do not edit.
+-- The title screens' picture: 192x288, 1-bit, 6x9 tiles of 32x32
+-- (128 bytes each, row-major, LSB = leftmost pixel), base64.
+Game.TITLE_ART = {w = 192, h = 288, tw = 6, th = 9,
+    data = "7q6qqv///9+7u6uq/////+6qqqr////9u7uqqv//f/+uqqqq///d/burqqr///f/qqqqqv/f1f27qqq6/393/6qqqqr/XV3/u6qquv939/+qqqqq/9Xd/6uqqrp/1///qqqqql/V//+rqru7f/X//6qqqqpf/f//qrqrq3f///+qqqqq3f3//6qqu7v/////qqqqqt////+quru7/////6qqqqr/////u7u7u/////+qqqqq/////7u7qqr/////qqqqqv///127q6qq//9/Vaqqqgr//V9Vq6oqoP//V1Wqqoqo/19V/aqqIqr/d9X/qqqqqv9V/V2qqqoqf1X/V6qqqqr/////u7u7qv////+qqqqq////37urqqr///93qqqqqv/fVVWqqqqq/3dVVaqqiABdVVVVqiIAAFdVVVUKAACIVVVV3aKqqqpV////gKqqqtXd3VWqqqoqf/9XVaqqCADdVUVEqgIAAFdVUVEKAKigVURVVQCgIoBVVVFRqqqqqv////+qqqqq/////6qqqqrd3d3dqqqqqnd3d3eqqqqqVVVVVaoqKqpVVVVVgAgAgFVVVVUAIgAAVVVVVQAAAABFRERVIoAqAHfVd1WqqqqAVVXdRSKiqqpVVVV1AACAiEVERFQAAAAAEVEREQAAAABVBEREAgAAAFVVVRWqqqqq/////6q6u6r/////qqqqqv3//9+qqqqq////96qqqqrV3d3dqqqqqlVVdVeAqqiqVVVVVaAiKqpVVVVVgAAIiFVVVVUAAiAgVVVVVSiAAABdVUVVqioCAP9fV1WqqqoA1d3dRaKqqgJV9/9XAKiqKkTV/VUAoKqqFVX//6qq7u7/////uru7u/////+qquru/////6q7u7v/////qqrq7t3///+qqru79////6qqqu5V/f//qqq7u1X///+oqqrqVd3//6qqurtV9f//iKiqqlXV/f8gqqq7VXX//wCoqqpUVf3/AKCqulVV9f8AgKqqVFXV/wAiqrpVVfX/qqqqqt3///+qqqqqd////6qqqqpd/f3dqqqqqn91/3+qqqoq/fX/Vaqqqqr/93/1qqqqoN31XdWqqqqif/1/9aqoqqhf/V1dqqoqKv9/V1eqqqoA3V1dRaqqqiL3V1dVqqoqiFVVVdWqKiqqdVd3f6qCqqpVVf3dqoKqqlVV//+qgKoI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LgCAiH9AVFQ7AAAiH1BRVR4AAAgfAERVCwAAIh8QURUOAAAAf0BEFbsCAAL/F1VV7gIAAP9/VUS7/z8g//9/Ve7u7gD///9Vu7u7AP///1Xu7u4C////R7u7uwP///9X7u7uAv///we7u7sD////B6IoAIBVVEBUIioAoFVVEFUICACAVBVAVCgAAKBVFVFViAAAqFUFRNQKAgCqVRERdQgAAKhVBUTVAgIAqFUBUVUAAACoRQBA1QAAAKoVEVF1AACAqgUEVNUAAICqERFVdQAAgKoERFTVAACgqhERVXcAAIiqAEBU1QAAoqoBUVV3gACgAFVVUEUAAqACFVVRFQAIgApVVEBVAgAAIFVREVUAAACAVUQFUAIAAgBVFRURCAAAAFVUQAQiAAAAV1UREaoAAABVVURUqiIAAHdVFRGqAAAAXVVFRKoCAAB3VRURqggAAF1VVQSqKiIAf1dVFaqKCADdVVVVqqoqAn93VVWooCoIUFVVVaCiqqJVVVVVgAqqilRVVVUAKqgqUVVRVQCAgAhBREVVggACqhUVVVUIAIiIVFRQVSAgIAJRUVEVAAAAAEABREAAACAAUUVRFQAIgABEVURVACIAIBFVFUEACAAABFVVVAAiIiARVVVVAIgICEBQVUUAIAICEVEVVQCIAABEVVVAAKIiAFFVVVWAAIAAFUVFVSogAABVURURgAgAAFVVQVUiIAIAVVVVVYgAiABVRVRVqioAAFVVFRGIiAgAVVVVVQIiIiIRVVVVAACIAEUARFUCAAAAVREBAQgAAABUVUVUICIAAFVVVRUAAAAAQFRVVQAAIiIREVVVAADu7gBE//8AALq7VRX//wAA7u4FQP7/AAC6uxER//8AAO7uRET//wAAurtVFf//AADu7gVA/P8AALi7VVX9/wAA6O5VVfz/AAC+u1VV//8AAOzuVUX8/wAAvrsRUf//AADu7lUE/v8AALq7ERH//wAA7u5ERP//AAC7u1UR///u7u4G////R7u7uwP///9X7u7uAv///0e7u7sD////F+7u7gL///8Hu7u7D////x/u7u4O////X7u7uzv///9/7u7urv///9+7u7vL////3+7u7o7///9fu7u7C////x/u7u4O////X7u7uzv///9/7u7uLv///3+7u7s7////fwAAgKoEVFXVAACiqgFVVXcAAKiqAFRV1QAAqqoQVVVXAICIAkBUVUUAoKoCUVVVVQCIqABEVVVEACIqAFFVFVUAiAiAVVVVRCGiKgBVVVVVAIgIgFRVVVQgIgqgVVUVVYCIAIBVVUVUICIAoFVVEVWACACAVVVEVCICAKBVFVFVqqoKCN1dVVWqqioCf3dXVaqqqgDdXVVVqqqqKnd3d1WqqqqK1V1VVaKqqipVd3VXCKqoqlVdVVUiqKqqVVVXVQCAqqhVVVVVKgCqolVVVVUKAAAIVUVFVKoCACBXVVVVqgAAAF1VVUSqKiIAd1VVVaqKiADdVVVVqqqqInd3V1UAgACIBEBVVQAAAgAVEVURAACAAAQEQEQAAAAAURERUQAAAABFRQBAAgIAAFVVFREIAAAAVVVVRCoiAgBVVVVViogIAFVVVVWqKiICVVVVVYCKiABUVVVVAKoqIlFVVVUAiIgIRFRVVQAgAABVUVURAAAAAEVEVUQCACAAVRFRVQAAAABVVEVUIiICAFVVVVUAAAAAQFRVRAAAIgAVEVUVAAAAAFRFAAAgAgAAUFVVVQAAAAAAREREAAAAABERVVUAAAAARQBERAAAAABVERERAAAAAFUEAAACAAAAVRUREQAAAABVVUQEAgAAAFVVEREAAAAAQAQERAAAAAARFRERAADu7lVF//8AgLu7FRX//wCA7u5VxP//AIC7uwGA//8AgO7uAMT//wDgu7sR8f//AODu7kTk//8AoLu7FfH//wD47u5E/P//ALi7u1H5//8A+O7uAPD//wC4u7sR/f//AOju7kT8//8AuLu7Ef3//wDo7u5E/P//ALi7uxXx///u7u4+////V7u7uwP///9X7u7uAv//f1e7uzsC//9/V+7uLgL//18Wu7s7Av//Xxfu7g4G//9fRru7CwL//xcX7u4GBv//Rwa7uwMG//8XFe7uAgj//0dYu7sHAP//FxHu7gAA//9FVLu7AAD//xFV7u4AAP//RUS7uwAA//8RVYAAAIhVVURVAAAAoBURUVUAAACoQUREVQAAAKoRFVV1AACAqEREVNUAAKCqUVVVdQAAiKhURVVVAACiqlVVVXUAAICqVFRVVQAAoqoRVVV1AACIqkREVdUAAKqqVVVVdwCAiKpUVVXdACKqqlVVVXcAiKiqVVVV3SAiqqpVVXX3qqqqit1dVVWqqqqqd3d3V6qqqqpdVVVVqqqqqn9VdVeqiqiq31VVVaqqoqr/d1VVqqqKqN1dVVWqqqqi/39XVaqqqoj/3d1Vqqqqqv//f1euqqqq///d3bu7qqr///9/7qqqqv////+7u7u7/////+7uru7/////u7u7u/////8AAAAAVUVERCIAAABVVVVRiAAAAFVVVEQqIgAAVVVVVYiIAIBVVVVVKiIqIlVVVVWKiAAIVVVVVSoiIipVVXVViiiAiFVVVVWqqiIqVVVXV4qqiopV3V1dqqqqKndfV3Wqqqqq3d1V3aqqqqp3//93qqqqqt////2rq7qr/////wAAAABFAABEAAAAAFEVEREAAAAAVVVEBCACAABVVVUVAAAAAFVVVVUiIgIAVVVVVYgIAABVVVVVIiIiAlVVVVWIiAiAVVVVVaIiIiJVVVVViIiIAFVVVVUqIiIiVVVVVYgIAABVVVVVqqoiInVVVVWqKACIXVVVVaqqKir/d1d3AODu7gDA//8AALu7ERH//wAA7u5ERP9/AAC6+1EV/38AAO5uRUT/fwIAujtVVf9/CADublVV/38ggLt7VdX/fwCA7u5VVf9/qAK+O1VV/X+ACOguVVX9f4IiujtVVf1/gIDs7lVV/f+iIrj7VVX9/4gI6u5dVf3/qqq6u3dV/f/u7gAA//9FVL67ACD9/1VV7O4AAPz/RFW4+wAi/X9VVezuAIj8/1VVuLsgov3/VVXo7gCI/P9VVbi7IqL9/1VV6O6AiPX/VVWiu6Kq9f9VVejuiKj1/1VVsrurqvX/V3Xo7oqq9f9VVbq7q6r1/1V36O6qqvX/1VWiu6uq9f/3fQCAqKpVVVXdIqqqqlVVdfeIqKqqVVXV3aqqqqpVVXf/iKqqqlVV3d2qqqqqVXV3/6iqqqpVVd3dqqqqqlV39/+qqqqqVdXd3aqqqqp1d/f/qqqqqlXd3f2qqqq6d3///6qqqqrV3f3/qqqqunf///+qqqqq3f///6qqu7v/////7u7u7v////+7u7u7/////+7u7u7/////u7u7u//////u7u7u/////7u7u7v/////7u7u7v////+7u7u7/////+7u7u7/////u7u7u//////u7u7u/////7u7u7v/////7u7u7v////+7u7u7/////+7u7u7/////u7u7u//////u7q7q/////7u7u7v/////7u7u7v////+7u7u7/////+7u7u7/////u7u7u//////u7u7u/////7u7u7v/////7u7u7v////+7u7u7/////+7u7u7/////u7u7u//////u7u7u/////7u7u7v/////7u7u7v////+7u7u7/////6qqiqr/X9VVu6uqqv9///eurqqq/////7u7u6v/////7u7u7v////+7u7u7/////+7u7u7/////u7u7u//////u7u7u/////7u7u7v/////7u7u7v////+7u7u7/////+7u7u7/////u7u7u//////u7u7u/////7u7u7v/////qqrq7l1V/f+qqrq7/////6qq6u7/////u7u6u//////u7u7u/////7u7u7v/////7u7u7v////+7u7u7/////+7u7u7/////u7u7u//////u7u7u/////7u7u7v/////7u7u7v////+7u7u7/////+7u7u7/////u7u7u//////o7qqq9f/V/bq7q7r3//f/6u6qqv3/3/+7u6q7/////+ru6u7/////u7u7u//////u7u7u/////7u7u7v/////7u7u7v////+7u7u7/////+7u7u7/////u7u7u//////u7u7u/////7u7u7v/////7u7u7v////+7u7u7/////6rq6u7/////u7u7u//////u7u7u/////7u7u7v/////7u7u7v////+7u7u7/////+7u7u7/////u7u7u//////u7u7u/////7u7u7v/////7u7u7v////+7u7u7/////+7u7u7/////u7u7u//////u7u7u/////7u7u7v/////"}
 -- ---------------------------------------------------------------------
 -- Character creator screen
 -- rows 1..#ATTRIBUTES are attributes, the rest are TRAITS in order
