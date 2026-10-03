@@ -111,7 +111,7 @@ local WORLD = {
     -- clothes; mend: what "Patch clothes" (1 cloth) puts back
     wear = {day = 2, hit = 4, storm = 1, rag = 2, mend = 50},
     fog_hide = 15,                     -- % on Hide in fog (encounters start near)
-    night_need = 2, cold_rest_drain = 3, cold_grace = 2, cold_hurt = 2,
+    night_need = 2, cold_rest_drain = 3, cold_grace = 3, cold_hurt = 2,
     night_encounters = 1.5, fire_rest_bonus = 0.5,
     rivers = 2, town_ruins = 9, lone_ruins = 8,
 }
@@ -233,7 +233,7 @@ local GOAL = {bribe = 3}
 -- (aim bonus). Snares: E sets one on the hex; each hour it has snare_chance
 -- [terrain] % to catch, collected when you step back onto it.
 local HUNT = {
-    fish_hours = 2, fish_chance = 40, hunt_hours = 2, hunt_chance = 45,
+    fish_hours = 2, fish_chance = 50, hunt_hours = 2, hunt_chance = 50,
     snare_chance = {forest = 5, plains = 3, hills = 3},
     snare_catch = {"strange_meat", 2},
 }
@@ -271,7 +271,7 @@ local KARL = {
 local DIFFICULTY = {
     order = {"easy", "normal", "hard"},
     easy   = {name = "Easy", short = "Easy",          food = 2.0, encounter = 0.5, rad = 0.5, emission = 0.5, drain = 0.65},
-    normal = {name = "Normal", short = "Normal",        food = 1.4, encounter = 0.85, rad = 1, emission = 1, drain = 0.85},
+    normal = {name = "Normal", short = "Normal",        food = 1.6, encounter = 0.85, rad = 1, emission = 1, drain = 0.8},
     hard   = {name = "Churn-Hardened", short = "Hard", food = 1.0, encounter = 1.2, rad = 1.25, emission = 1.25, drain = 1.05},
 }
 
@@ -7117,6 +7117,7 @@ function Game:tick()
     self:spot_sites()
     self:story_check()
     self:quest_tick()
+    self:hint_tick()
     if not self:check_death(self:death_reason()) then self:check_achievements() end
 end
 -- ---------------------------------------------------------------------
@@ -7146,7 +7147,7 @@ local SAVE = {version = 1, dir = "churn", old_dir = "wasteland", file = "save.lu
                         "lore_read", "signal_page", "skills", "stats",
                         "ferry_trader", "peddler", "little", "story", "run_id", "scenes_seen",
                         "research", "books_read", "tapedeck", "gun_wear", "noise_until",
-                        "placed", "crates", "vesna", "inst_chain", "rep", "karl_lure", "finds"}}
+                        "placed", "crates", "vesna", "inst_chain", "rep", "karl_lure", "finds", "hints"}}
 
 -- Where the save lives: <preferred storage>/churn/save.lua (dir: another folder)
 function SAVE.path(dir)
@@ -12526,6 +12527,50 @@ function Game:draw_inventory(w, h)
     gfx.refresh()
 end
 
+-- ---------------------------------------------------------------------
+-- First-day hints: the first time a situation comes up in a run, one
+-- "Tip:" line in the log (at most one a tick, from tick). self.hints =
+-- {id -> true} (saved), so each shows once a run. Every line fits the
+-- map's log (57 characters).
+-- ---------------------------------------------------------------------
+
+Game.HINTS = {
+    {"bleeding", "Tip: bleeding. E on a bandage or a rag stops it.",
+     function(g, p) return p.injuries.bleeding end},
+    {"cold", "Tip: cold hurts. Wear more, or C: a fire (matches).",
+     function(g, p) return (p.cold_hours or 0) > 0 end},
+    {"thirsty", "Tip: thirsty. E drinks; boil dirty water by a fire (C).",
+     function(g, p) return p.needs.thirst < 45 end},
+    {"hungry", "Tip: hungry. E eats; F searches; G hunts or fishes.",
+     function(g, p) return p.needs.hunger < 45 end},
+    {"tired", "Tip: tired. Space rests; it's safer by a fire.",
+     function(g, p) return p.needs.rest < 35 end},
+    {"night", "Tip: nights are cold and worse. Rest by a fire.",
+     function(g, p) return g:is_night() end},
+    {"fire", "Tip: by a fire, C has Study: work out a recipe.",
+     function(g, p) return g:fire_here() end},
+    {"book", "Tip: E on a book: its first read teaches a recipe.",
+     function(g, p)
+         for _, s in ipairs(p.inventory) do
+             if ITEM_DB[s.item].book and not (g.books_read or {})[s.item] then return true end
+         end
+     end},
+    {"radio", "Tip: R calls on the radio. Anna heals; Karl tells.",
+     function(g, p) return g:carrying("lora_radio") end},
+}
+
+function Game:hint_tick()
+    if self.no_hints then return end
+    self.hints = self.hints or {}
+    local p = self.player
+    for _, h in ipairs(Game.HINTS) do
+        if not self.hints[h[1]] and h[3](self, p) then
+            self.hints[h[1]] = true
+            self:push_log(h[2])
+            return
+        end
+    end
+end
 -- ---------------------------------------------------------------------
 -- Ranged weapons: the rare handguns (and the quiet bow and sling), plus
 -- the Elder Sign (numbers in CHURN.guns, items in 08_data_churn).

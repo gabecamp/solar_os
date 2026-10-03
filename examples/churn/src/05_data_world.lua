@@ -81,7 +81,7 @@ local WORLD = {
     -- clothes; mend: what "Patch clothes" (1 cloth) puts back
     wear = {day = 2, hit = 4, storm = 1, rag = 2, mend = 50},
     fog_hide = 15,                     -- % on Hide in fog (encounters start near)
-    night_need = 2, cold_rest_drain = 3, cold_grace = 2, cold_hurt = 2,
+    night_need = 2, cold_rest_drain = 3, cold_grace = 3, cold_hurt = 2,
     night_encounters = 1.5, fire_rest_bonus = 0.5,
     rivers = 2, town_ruins = 9, lone_ruins = 8,
 }
@@ -203,7 +203,7 @@ local GOAL = {bribe = 3}
 -- (aim bonus). Snares: E sets one on the hex; each hour it has snare_chance
 -- [terrain] % to catch, collected when you step back onto it.
 local HUNT = {
-    fish_hours = 2, fish_chance = 40, hunt_hours = 2, hunt_chance = 45,
+    fish_hours = 2, fish_chance = 50, hunt_hours = 2, hunt_chance = 50,
     snare_chance = {forest = 5, plains = 3, hills = 3},
     snare_catch = {"strange_meat", 2},
 }
@@ -241,7 +241,7 @@ local KARL = {
 local DIFFICULTY = {
     order = {"easy", "normal", "hard"},
     easy   = {name = "Easy", short = "Easy",          food = 2.0, encounter = 0.5, rad = 0.5, emission = 0.5, drain = 0.65},
-    normal = {name = "Normal", short = "Normal",        food = 1.4, encounter = 0.85, rad = 1, emission = 1, drain = 0.85},
+    normal = {name = "Normal", short = "Normal",        food = 1.6, encounter = 0.85, rad = 1, emission = 1, drain = 0.8},
     hard   = {name = "Churn-Hardened", short = "Hard", food = 1.0, encounter = 1.2, rad = 1.25, emission = 1.25, drain = 1.05},
 }
 

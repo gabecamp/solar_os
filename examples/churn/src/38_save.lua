@@ -25,7 +25,7 @@ local SAVE = {version = 1, dir = "churn", old_dir = "wasteland", file = "save.lu
                         "lore_read", "signal_page", "skills", "stats",
                         "ferry_trader", "peddler", "little", "story", "run_id", "scenes_seen",
                         "research", "books_read", "tapedeck", "gun_wear", "noise_until",
-                        "placed", "crates", "vesna", "inst_chain", "rep", "karl_lure", "finds"}}
+                        "placed", "crates", "vesna", "inst_chain", "rep", "karl_lure", "finds", "hints"}}
 
 -- Where the save lives: <preferred storage>/churn/save.lua (dir: another folder)
 function SAVE.path(dir)

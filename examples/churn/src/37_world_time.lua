@@ -239,5 +239,6 @@ function Game:tick()
     self:spot_sites()
     self:story_check()
     self:quest_tick()
+    self:hint_tick()
     if not self:check_death(self:death_reason()) then self:check_achievements() end
 end

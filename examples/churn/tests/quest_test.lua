@@ -431,4 +431,27 @@ g2 = Game.new()
 g2:load_state(Game.read_save())
 assert(g2.finds[ruin2].kind == "corpse" and g2.finds[crate_key].kind == "crate")
 
+print("17. first-day tips: each once a run, one a tick, saved")
+g = fresh()
+g.hints, g.log = {}, {}
+g.player.needs.hunger, g.player.needs.thirst = 30, 30
+g:hint_tick()
+local tips = 0
+for _, l in ipairs(g.log) do if l:find("^Tip: ") then tips = tips + 1 end end
+assert(tips == 1, "one a tick")
+g:hint_tick()
+assert(g.hints.thirsty and g.hints.hungry, "the next one, next tick")
+g:hint_tick(); g:hint_tick()
+for _, h in ipairs(Game.HINTS) do assert(#h[2] <= 57, h[1] .. " is too long for the log") end
+FAKE_FILES, FAKE_DIRS = {}, {}
+g.player.hours = g.player.hours + 1
+assert(g:save())
+g2 = Game.new()
+g2:load_state(Game.read_save())
+assert(g2.hints.thirsty and g2.hints.hungry)
+g2.log = {}
+g2.player.needs.hunger, g2.player.needs.thirst = 30, 30
+g2:hint_tick()
+for _, l in ipairs(g2.log) do assert(not l:find("hungry", 1, true), "not twice") end
+
 print("QUEST TESTS PASSED")

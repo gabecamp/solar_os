@@ -17,6 +17,8 @@ the Checkpoint alive.
   R calls on the radio, M mutes, Q quits (during a run it asks first: Q or
   Enter again to quit). **H** in game lists every key.
   The bag (I) shows your HP, hunger, thirst, rest and warmth.
+  The first time you're cold, hungry, thirsty, tired, bleeding, by a fire,
+  holding a book or a radio, a **Tip:** line in the log says what helps (once a run).
 - **You start with nothing:** no clothes, no shoes, no bag, and you know
   almost nothing. Your arms hold two things. The crafting screen (C) knows
   only how to survive the first day: a torch, a fire (the pile you wake next

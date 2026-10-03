@@ -28,7 +28,9 @@ local RUNS = tonumber(arg[1]) or 200
 local FIRST = tonumber(arg[2]) or 1
 local LEVEL = arg[3] or "normal"   -- easy / normal / hard
 local MAX_HOURS = 24 * 30
-local NO_STUDY = os.getenv("NO_STUDY")   -- (set: the bot never studies, reads or plays tapes)
+local NO_STUDY = os.getenv("NO_STUDY")
+NO_GATHER = not os.getenv("GATHER")     -- (GATHER=1: it also fishes and hunts, armed, when hungry;
+                                         -- it then dies more: it fights what it finds badly)   -- (set: the bot never studies, reads or plays tapes)
 
 local function key(q, r) return q .. "," .. r end
 -- an hour that passes with nothing done still costs food, water and rest
@@ -84,6 +86,15 @@ local function use(g, item)
     end
     return false
 end
+-- G: fish (by water, with a rod) or hunt (on game terrain). True if time passed.
+local function try_gather(g)
+    if NO_GATHER then return false end
+    local fishing = g:near_water() and g:carrying("fishing_rod")
+    if not fishing and g:weapon().dmg < 9 and not g:shooter() then return false end   -- (no bare-handed hunts)
+    local h = g.player.hours
+    g:gather()
+    return g.player.hours ~= h
+end
 local function recipe(id)
     for _, r in ipairs(D.RECIPES) do if r.id == id then return r end end
 end
@@ -138,7 +149,8 @@ end
 local KEEP = {water_bottle = true, dirty_water = true, empty_bottle = true, canned_beans = true,
               jerky = true, cooked_meat = true, berries = true, strange_meat = true,
               bandage = true, cloth_scrap = true, antirad = true, splint = true, permit = true,
-              stick = true, rock = true, geiger = true,
+              stick = true, rock = true, geiger = true, fishing_rod = true, raw_fish = true,
+              cooked_fish = true, smoked_meat = true,
               fire_drill = true, matches = true, lighter = true, newspaper = true}
 -- How good a piece of clothing is (warmth and room): the real thing beats
 -- its makeshift version.
@@ -202,9 +214,9 @@ local function upkeep(g, stats)
     end
     for _ = 1, 3 do
         if p.needs.hunger >= 55 then break end
-        if g:fire_here() then try_craft(g, "cook") end
+        if g:fire_here() then local _ = try_craft(g, "cook") or try_craft(g, "cook_fish") end
         local ate = false
-        for _, food in ipairs({"cooked_meat", "canned_beans", "jerky", "berries"}) do
+        for _, food in ipairs({"cooked_meat", "cooked_fish", "smoked_meat", "canned_beans", "jerky", "berries"}) do
             if not ate and use(g, food) then ate = true end
         end
         if not ate and p.needs.hunger < 25 then ate = use(g, "strange_meat") end
@@ -276,6 +288,7 @@ local function upkeep(g, stats)
     end
     if not p.equipped.feet or p.equipped.feet == "foot_wraps" then try_craft(g, "rag_shoes") end
     if g:fire_here() and count(g, "cooked_meat") >= 2 then try_craft(g, "smoked_meat") end
+    if not NO_GATHER and count(g, "fishing_rod") == 0 then try_craft(g, "fishing_rod") end
     if count(g, "scrawled_notes") > 0 then use(g, "scrawled_notes") end
     if count(g, "rope") > 0 and not p.equipped.belt then try_craft(g, "rope_belt") end
     -- cold at night: a fire
@@ -441,6 +454,8 @@ local function play(seed)
                     study(g, stats)
                     g:rest()
                     if p.hours == h then wait_hour(g) end
+                elseif p.needs.hunger < 50 and try_gather(g) then
+                    -- (hunted or fished: the catch is on the ground or in the bag)
                 elseif g:scavenge_left() > 0   -- finds land on the ground: a full bag doesn't stop you
                     and (g.tiles[here] == "ruins" or p.needs.hunger < 60) then
                     g:scavenge()
