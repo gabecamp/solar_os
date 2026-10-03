@@ -255,6 +255,7 @@ function Game:trade_key(key)
     elseif key == KEY.O then   -- (W is "up" here)
         if u.who == "ferry" then self:ferry_work()
         elseif u.who == "town" then self:trader_work()
+        elseif u.who == "peddler" then self:peddler_swap()
         else u.msg = "'Work? I'm a peddler. I peddle.'" end
     end
 end

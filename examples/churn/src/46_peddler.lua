@@ -238,3 +238,29 @@ function Game:ferry_work()
     u.msg = QUESTS.fish.offer
     self:push_log("Quest: " .. self:quest_text())
 end
+
+-- His one job (O at his cart): a tape with a voice on it for an Elder
+-- Sign, once a stop. Played-out tapes are blank; he wants a voice.
+function Game:peddler_swap()
+    local u, S, pd = self.trade_ui, QUESTS.swap, self.peddler
+    local visit = self.player.hours // TRADE.stay
+    if pd.swapped == visit then
+        u.msg = S.done
+        return
+    end
+    local tape
+    for _, s in ipairs(self.player.inventory) do
+        if CHURN.tapes[s.item] then tape = s.item; break end
+    end
+    if not tape then
+        u.msg = S.none
+        return
+    end
+    self:take_items(tape, 1)
+    pd.swapped = visit
+    local sign = {item = S.give, qty = 1}
+    if not self:put_stack("inventory", nil, sign) then self:put_stack("ground", nil, sign) end
+    self:sfx("gift")
+    u.msg = S.offer
+    self:push_log("You swapped the " .. ITEM_DB[tape].name .. " for an Elder Sign.")
+end

@@ -88,7 +88,13 @@ pours a Salt Circle (night horrors keep away from the hex).
 
 **Lockpicks** open the locked crates hidden in some ruins (search with F).
 They hold the rare things: lab books, ledgers, gunsmith kits, frames, rounds
-and the odd whole gun.
+and the odd whole gun. A USB drive's map sometimes marks an **Institute
+crate** a few hexes off (a "!" on the map and a journal line): Lockpicks
+open it for three finds.
+
+**Dead churners:** about one ruins search in thirty turns up a churner who
+didn't make it home (once a hex at most), with a tape, a book, a drive, gun
+parts, rounds or a cassette player on them.
 
 ## Handguns
 
@@ -170,7 +176,8 @@ What the Churn is like now:
     Anti-Rad, food and a Battery Cell), or *"Something's denned up out
     there, killing my runners. Clear it."* (a beast with half again its
     usual health, 5-9 hexes out; paid with a Multitool, gas mask or
-    machete).
+    machete), or *"Bring me a USB drive."* (paid with 9x18 rounds, a gun
+    barrel or firing pin, and food).
   - **On the radio ("Trader's net"):** points you at the way out and
     leaves supply parcels. Once every 3 days.
 - **Lore:** he calls everyone "friend", keeps the only Churn Permit for
@@ -193,7 +200,8 @@ What the Churn is like now:
   around the Churn, half a day at each. When you see him he goes in your
   journal (where and when). **T** on his hex to trade: odd things the
   Churn gives up, batteries, wire, the occasional torn page or broken
-  device. He doesn't take work.
+  device. **O** at his cart: he swaps an **Elder Sign** for a tape with a
+  voice on it (not a played-out blank), once a stop.
 - **Lore:** nobody has seen where he sleeps. The cart never seems to get
   emptier or fuller, and he always knows which way the next storm is
   coming from. *"Everything rattles. Everything's for sale."*
@@ -238,7 +246,9 @@ What the Churn is like now:
   bleeding stops. Once every 3 days.
   - **Her request:** *"We're out of bandages. Call me when you've two to
     spare."* Call with 2 bandages on you and a runner brings a Medkit and
-    two bottles of water. After that her line stays open.
+    two bottles of water. After that her line stays open. Or: *"There's a
+    surgeon's notebook out there somewhere."* Call with the Surgeon's
+    Notes and she sends a Medkit and a Suture Kit.
 - **Lore:** when the doctors were ordered out, she stayed. *"Somebody has
   to sew up the fools who come back for the money."* She keeps a candle in
   the window, and nobody asks why. Somewhere near her there are children

@@ -1360,6 +1360,33 @@ CHURN.crate_loot = {{"book_lab", 2}, {"book_gunsmith", 2}, {"tape_lab", 2}, {"gu
                     {"inst_sidearm", 1}, {"usb_drive", 3}, {"medkit", 2}, {"antirad", 3}}
 CHURN.crate_chance = 35   -- % a ruin hex has a locked crate to pick
 
+-- Jobs for the new loot (src/52_quests.lua, 46_peddler) and the rare dead
+-- churner in a ruin (59_research: corpse, once per hex at most).
+QUESTS.drive = {offer = "'Bring me a USB drive. Any. I've a buyer who reads them.'",
+                journal = "bring the trader a USB drive.", need = {"usb_drive", 1},
+                reward = {{"r9x18", 6}, {"canned_beans", 2}}, part = {"gun_barrel", "firing_pin"}}
+QUESTS.notes = {offer = "Anna: 'There's a surgeon's notebook out there somewhere. If you find it, "
+                    .. "call me. We've no doctor.'",
+                journal = "find the Surgeon's Notes, then call her.", need = {"book_surgeon", 1},
+                reward = {{"medkit", 1}, {"stitches", 1}}}
+QUESTS.swap = {offer = "'A tape for a sign. I collect voices. You'd want the sign, after dark.'",
+               none = "'Bring me a tape with a voice on it, and I've a sign for you.'",
+               done = "'One a stop. I'm a collector, not a fool.'", give = "elder_sign"}
+QUESTS.crate = {journal = "an Institute crate, marked on a drive's map.", near = 3, far = 7, chance = 35,
+                rolls = 3, locked = "A steel crate with the Institute's stencil. Locked. You need lockpicks."}
+CHURN.corpse = {chance = 3, prefix = "corpse:",
+    loot = {{"tape_cook", 2}, {"tape_gun", 2}, {"tape_choir", 1}, {"tape_lab", 1}, {"tape_tinker", 2},
+            {"book_field", 2}, {"book_gunsmith", 1}, {"book_tailor", 1}, {"usb_drive", 3},
+            {"gun_spring", 1}, {"firing_pin", 1}, {"gun_barrel", 1}, {"r9x18", 2}, {"r762t", 1},
+            {"cassette_player", 1}},
+    rounds = {r9x18 = 3, r762t = 3},   -- (+0..2)
+    epitaphs = {"A churner in a gas mask, still holding a bolt.",
+                "A churner under a collapsed stair, one boot off, as if they meant to run.",
+                "A churner sitting against the wall. Their notebook is just one word, over and over.",
+                "A churner wrapped in foil, curled small. The foil hums.",
+                "A churner with a radio still on, hissing, the battery almost gone.",
+                "A churner, face down. The floor around them has grown soft and warm."}}
+
 -- People who carry a gun (by who): the % chance they have it, rounds {lo, hi}
 -- loaded, a shot's damage and hit %. They shoot from near and far while the
 -- rounds last; the gun and what's left in it always drop. Show your own
@@ -4764,6 +4791,7 @@ function Game:scavenge()
     end
     self:scavenge_field()
     self:pick_crate(key)
+    self:find_corpse(key)
     if p.needs.hunger <= 0 then self:push_log("You are starving!") end
     if p.needs.thirst <= 0 then self:push_log("You are dehydrated!") end
     self:check_death(p.scav_hurt > 0 and "The Hollow Star emptied you." or "You bled out.")
@@ -7236,6 +7264,7 @@ function Game:trade_key(key)
     elseif key == KEY.O then   -- (W is "up" here)
         if u.who == "ferry" then self:ferry_work()
         elseif u.who == "town" then self:trader_work()
+        elseif u.who == "peddler" then self:peddler_swap()
         else u.msg = "'Work? I'm a peddler. I peddle.'" end
     end
 end
@@ -7561,6 +7590,32 @@ function Game:ferry_work()
     self.quest = {kind = "fish", giver = "Mother Okun"}
     u.msg = QUESTS.fish.offer
     self:push_log("Quest: " .. self:quest_text())
+end
+
+-- His one job (O at his cart): a tape with a voice on it for an Elder
+-- Sign, once a stop. Played-out tapes are blank; he wants a voice.
+function Game:peddler_swap()
+    local u, S, pd = self.trade_ui, QUESTS.swap, self.peddler
+    local visit = self.player.hours // TRADE.stay
+    if pd.swapped == visit then
+        u.msg = S.done
+        return
+    end
+    local tape
+    for _, s in ipairs(self.player.inventory) do
+        if CHURN.tapes[s.item] then tape = s.item; break end
+    end
+    if not tape then
+        u.msg = S.none
+        return
+    end
+    self:take_items(tape, 1)
+    pd.swapped = visit
+    local sign = {item = S.give, qty = 1}
+    if not self:put_stack("inventory", nil, sign) then self:put_stack("ground", nil, sign) end
+    self:sfx("gift")
+    u.msg = S.offer
+    self:push_log("You swapped the " .. ITEM_DB[tape].name .. " for an Elder Sign.")
 end
 -- ---------------------------------------------------------------------
 -- Sound effects: short melodies through solaros.audio
@@ -8456,7 +8511,10 @@ end
 -- QUESTS). One at a time: self.quest = {kind, giver, target, ...} (saved).
 --   fetch  (the trader, O on the trade screen): bring an artifact back.
 --   den    (the trader): kill the beast in a den a few hexes away.
+--   drive  (the trader): bring a USB drive back.
 --   supply (Anna, on the radio): have bandages on you when you call her.
+--   notes  (Anna): the Surgeon's Notes, the same way.
+--   crate  (a USB drive's map): an Institute crate; Lockpicks open it.
 --   dog    (Karl, after a right answer): find his lost dog by the river.
 -- Targets get a "!" on the map and a line in the journal.
 -- ---------------------------------------------------------------------
@@ -8501,6 +8559,18 @@ end
 -- W on the trade screen: ask for work, or hand it in.
 function Game:trader_work()
     local u, q = self.trade_ui, self.quest
+    if q and q.kind == "drive" then
+        if self:count_item("usb_drive") == 0 then
+            u.msg = "'No drive, no deal.'"
+            return
+        end
+        self:take_items("usb_drive", 1)
+        local D = QUESTS.drive
+        local reward = {D.reward[1], {D.part[self:rand(#D.part) + 1], 1}, D.reward[2]}
+        self:give_reward(reward, "The trader pockets the drive. He pays:")
+        u.msg = "'Bring me more if the Churn coughs them up.'"
+        return
+    end
     if q and q.kind == "fetch" then
         if self:artifact_count() == 0 then
             u.msg = "'Still waiting on that artifact.'"
@@ -8515,9 +8585,13 @@ function Game:trader_work()
         u.msg = "'Finish the job you've got first.'"
         return
     end
-    if self:rand(2) == 0 then
+    local pick = self:rand(3)
+    if pick == 0 then
         self.quest = {kind = "fetch", giver = "Trader"}
         u.msg = QUESTS.fetch.offer
+    elseif pick == 1 then
+        self.quest = {kind = "drive", giver = "Trader"}
+        u.msg = QUESTS.drive.offer
     else
         local key = self:quest_spot(QUESTS.den.near, QUESTS.den.far)
         if not key then u.msg = "'Nothing today.'"; return end
@@ -8528,30 +8602,36 @@ function Game:trader_work()
     self:push_log("Quest: " .. self:quest_text())
 end
 
--- Her supply job is done and in your bag (she answers even while busy).
+-- Her job (bandages or the notes) is done and in your bag (she answers
+-- even while busy).
 function Game:anna_ready()
-    local q, need = self.quest, QUESTS.supply.need
-    return q ~= nil and q.kind == "supply" and self:count_item(need[1]) >= need[2]
+    local q = self.quest
+    if not (q and (q.kind == "supply" or q.kind == "notes")) then return false end
+    local need = QUESTS[q.kind].need
+    return self:count_item(need[1]) >= need[2]
 end
 
 -- Anna's channel: hands in her supply job (true: the call is spent), or
 -- offers one when you're not hurt (free, like any call she doesn't answer).
 function Game:anna_work()
     local q = self.quest
-    local need = QUESTS.supply.need
-    if q and q.kind == "supply" then
+    if q and (q.kind == "supply" or q.kind == "notes") then
         if not self:anna_ready() then return false end
+        local need = QUESTS[q.kind].need
         self:take_items(need[1], need[2])
         if self.story then self.story.anna = true end   -- (she'll help you at the gate)
-        self:give_reward(QUESTS.supply.reward, "Anna: 'Bless you.' A runner leaves a parcel:")
-        self:radio_say("Anna: 'Bless you. The children here will sleep tonight. I've sent you something.'")
+        self:give_reward(QUESTS[q.kind].reward, "Anna: 'Bless you.' A runner leaves a parcel:")
+        self:radio_say(q.kind == "notes"
+            and "Anna: 'His hand. I knew him. Now somebody here can learn it. I've sent you something.'"
+            or "Anna: 'Bless you. The children here will sleep tonight. I've sent you something.'")
         return "open"   -- her channel stays open afterwards
     end
     local p = self.player
     local hurt = p.health < MAX_HEALTH or p.injuries.bleeding or p.injuries.wounded_hours > 0
     if not q and not hurt then
-        self.quest = {kind = "supply", giver = "Anna"}
-        self:radio_say(QUESTS.supply.offer)
+        local kind = self:rand(2) == 0 and "notes" or "supply"
+        self.quest = {kind = kind, giver = "Anna"}
+        self:radio_say(QUESTS[kind].offer)
         self:push_log("Quest: " .. self:quest_text())
         return "offered"
     end
@@ -8588,6 +8668,7 @@ function Game:quest_arrive()
             .. "Karl will be glad. Tied to its collar:")
         return false
     end
+    if q.kind == "crate" then return self:open_quest_crate() end
     if q.kind == "den" then
         local animals = ENCOUNTERS_BY_KIND.animal
         local base = animals[self:rand(#animals) + 1]
@@ -8621,6 +8702,40 @@ function Game:quest_text()
     if not q then return nil end
     local where = q.target and (" " .. self:bearing_to(q.target) .. ".") or ""
     return q.giver .. ": " .. QUESTS[q.kind].journal .. where
+end
+
+-- A drive's map (pair_usb): a locked Institute crate a few hexes off.
+function Game:mark_crate()
+    if self.quest then return false end
+    local C = QUESTS.crate
+    local key = self:quest_spot(C.near, C.far)
+    if not key then return false end
+    self.quest = {kind = "crate", giver = "A USB drive", target = key}
+    self.player.explored[key] = true
+    self:push_log("A map on the drive: an Institute crate, " .. self:bearing_to(key) .. ".")
+    return true
+end
+
+-- Standing on the marked crate: Lockpicks open it (the job stays till then).
+function Game:open_quest_crate()
+    local C = QUESTS.crate
+    if self:count_item("lockpicks") == 0 then
+        self:push_log(C.locked)
+        return false
+    end
+    local found = {}
+    for _ = 1, C.rolls do
+        local item
+        self.seed, item = weighted_pick(self.seed, CHURN.crate_loot)
+        self:put_stack("ground", nil, {item = item, qty = 1})
+        found[#found + 1] = ITEM_DB[item].name
+    end
+    self:skill_xp("tinker", SKILLS.xp.repair)
+    self.quest = nil
+    self.quests_done = (self.quests_done or 0) + 1
+    self:sfx("gift")
+    self:push_log("The lock gives. Inside: " .. table.concat(found, ", ") .. ". (I to pick up)")
+    return false
 end
 -- ---------------------------------------------------------------------
 -- Lore: torn pages that tell what happened here (LORE.pages, in order)
@@ -9858,6 +9973,8 @@ function Game:pair_usb()
     end
     if not self.sites_known.checkpoint and self:rand(3) == 0 then
         self:hear_of_exit("A map on the drive")
+    elseif self:roll(QUESTS.crate.chance) and self:mark_crate() then
+        -- (the crate is the job now)
     elseif self:rand(3) == 0 then
         self:mark_stash()
     elseif learned == 0 then
@@ -9961,6 +10078,28 @@ function Game:pick_crate(key)
     self:skill_xp("tinker", SKILLS.xp.repair)
     self:sfx("gift")
     self:push_log("You pick a locked crate: " .. table.concat(found, ", ") .. ".")
+end
+
+-- F in ruins: now and then (CHURN.corpse.chance %, once a hex) a dead churner,
+-- with what they carried for the Churn: tapes, books, drives, gun parts.
+function Game:find_corpse(key)
+    local C = CHURN.corpse
+    if self.tiles[key] ~= "ruins" then return end
+    self.crates = self.crates or {}
+    local mark = C.prefix .. key
+    if self.crates[mark] then return end
+    if not self:roll(C.chance) then return end
+    self.crates[mark] = true
+    local found = {}
+    for _ = 1, 1 + self:rand(2) do
+        local item
+        self.seed, item = weighted_pick(self.seed, C.loot)
+        local qty = C.rounds[item] and C.rounds[item] + self:rand(3) or 1
+        self:put_stack("ground", nil, {item = item, qty = qty})
+        found[#found + 1] = ITEM_DB[item].name .. (qty > 1 and (" x" .. qty) or "")
+    end
+    self:push_log(C.epitaphs[self:rand(#C.epitaphs) + 1])
+    self:push_log("On them: " .. table.concat(found, ", ") .. ".")
 end
 
 -- Equip slots sit ON the body part they dress, NEO Scavenger style: a box over

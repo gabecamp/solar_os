@@ -427,6 +427,33 @@ CHURN.crate_loot = {{"book_lab", 2}, {"book_gunsmith", 2}, {"tape_lab", 2}, {"gu
                     {"inst_sidearm", 1}, {"usb_drive", 3}, {"medkit", 2}, {"antirad", 3}}
 CHURN.crate_chance = 35   -- % a ruin hex has a locked crate to pick
 
+-- Jobs for the new loot (src/52_quests.lua, 46_peddler) and the rare dead
+-- churner in a ruin (59_research: corpse, once per hex at most).
+QUESTS.drive = {offer = "'Bring me a USB drive. Any. I've a buyer who reads them.'",
+                journal = "bring the trader a USB drive.", need = {"usb_drive", 1},
+                reward = {{"r9x18", 6}, {"canned_beans", 2}}, part = {"gun_barrel", "firing_pin"}}
+QUESTS.notes = {offer = "Anna: 'There's a surgeon's notebook out there somewhere. If you find it, "
+                    .. "call me. We've no doctor.'",
+                journal = "find the Surgeon's Notes, then call her.", need = {"book_surgeon", 1},
+                reward = {{"medkit", 1}, {"stitches", 1}}}
+QUESTS.swap = {offer = "'A tape for a sign. I collect voices. You'd want the sign, after dark.'",
+               none = "'Bring me a tape with a voice on it, and I've a sign for you.'",
+               done = "'One a stop. I'm a collector, not a fool.'", give = "elder_sign"}
+QUESTS.crate = {journal = "an Institute crate, marked on a drive's map.", near = 3, far = 7, chance = 35,
+                rolls = 3, locked = "A steel crate with the Institute's stencil. Locked. You need lockpicks."}
+CHURN.corpse = {chance = 3, prefix = "corpse:",
+    loot = {{"tape_cook", 2}, {"tape_gun", 2}, {"tape_choir", 1}, {"tape_lab", 1}, {"tape_tinker", 2},
+            {"book_field", 2}, {"book_gunsmith", 1}, {"book_tailor", 1}, {"usb_drive", 3},
+            {"gun_spring", 1}, {"firing_pin", 1}, {"gun_barrel", 1}, {"r9x18", 2}, {"r762t", 1},
+            {"cassette_player", 1}},
+    rounds = {r9x18 = 3, r762t = 3},   -- (+0..2)
+    epitaphs = {"A churner in a gas mask, still holding a bolt.",
+                "A churner under a collapsed stair, one boot off, as if they meant to run.",
+                "A churner sitting against the wall. Their notebook is just one word, over and over.",
+                "A churner wrapped in foil, curled small. The foil hums.",
+                "A churner with a radio still on, hissing, the battery almost gone.",
+                "A churner, face down. The floor around them has grown soft and warm."}}
+
 -- People who carry a gun (by who): the % chance they have it, rounds {lo, hi}
 -- loaded, a shot's damage and hit %. They shoot from near and far while the
 -- rounds last; the gun and what's left in it always drop. Show your own

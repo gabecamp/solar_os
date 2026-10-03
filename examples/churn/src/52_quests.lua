@@ -3,7 +3,10 @@
 -- QUESTS). One at a time: self.quest = {kind, giver, target, ...} (saved).
 --   fetch  (the trader, O on the trade screen): bring an artifact back.
 --   den    (the trader): kill the beast in a den a few hexes away.
+--   drive  (the trader): bring a USB drive back.
 --   supply (Anna, on the radio): have bandages on you when you call her.
+--   notes  (Anna): the Surgeon's Notes, the same way.
+--   crate  (a USB drive's map): an Institute crate; Lockpicks open it.
 --   dog    (Karl, after a right answer): find his lost dog by the river.
 -- Targets get a "!" on the map and a line in the journal.
 -- ---------------------------------------------------------------------
@@ -48,6 +51,18 @@ end
 -- W on the trade screen: ask for work, or hand it in.
 function Game:trader_work()
     local u, q = self.trade_ui, self.quest
+    if q and q.kind == "drive" then
+        if self:count_item("usb_drive") == 0 then
+            u.msg = "'No drive, no deal.'"
+            return
+        end
+        self:take_items("usb_drive", 1)
+        local D = QUESTS.drive
+        local reward = {D.reward[1], {D.part[self:rand(#D.part) + 1], 1}, D.reward[2]}
+        self:give_reward(reward, "The trader pockets the drive. He pays:")
+        u.msg = "'Bring me more if the Churn coughs them up.'"
+        return
+    end
     if q and q.kind == "fetch" then
         if self:artifact_count() == 0 then
             u.msg = "'Still waiting on that artifact.'"
@@ -62,9 +77,13 @@ function Game:trader_work()
         u.msg = "'Finish the job you've got first.'"
         return
     end
-    if self:rand(2) == 0 then
+    local pick = self:rand(3)
+    if pick == 0 then
         self.quest = {kind = "fetch", giver = "Trader"}
         u.msg = QUESTS.fetch.offer
+    elseif pick == 1 then
+        self.quest = {kind = "drive", giver = "Trader"}
+        u.msg = QUESTS.drive.offer
     else
         local key = self:quest_spot(QUESTS.den.near, QUESTS.den.far)
         if not key then u.msg = "'Nothing today.'"; return end
@@ -75,30 +94,36 @@ function Game:trader_work()
     self:push_log("Quest: " .. self:quest_text())
 end
 
--- Her supply job is done and in your bag (she answers even while busy).
+-- Her job (bandages or the notes) is done and in your bag (she answers
+-- even while busy).
 function Game:anna_ready()
-    local q, need = self.quest, QUESTS.supply.need
-    return q ~= nil and q.kind == "supply" and self:count_item(need[1]) >= need[2]
+    local q = self.quest
+    if not (q and (q.kind == "supply" or q.kind == "notes")) then return false end
+    local need = QUESTS[q.kind].need
+    return self:count_item(need[1]) >= need[2]
 end
 
 -- Anna's channel: hands in her supply job (true: the call is spent), or
 -- offers one when you're not hurt (free, like any call she doesn't answer).
 function Game:anna_work()
     local q = self.quest
-    local need = QUESTS.supply.need
-    if q and q.kind == "supply" then
+    if q and (q.kind == "supply" or q.kind == "notes") then
         if not self:anna_ready() then return false end
+        local need = QUESTS[q.kind].need
         self:take_items(need[1], need[2])
         if self.story then self.story.anna = true end   -- (she'll help you at the gate)
-        self:give_reward(QUESTS.supply.reward, "Anna: 'Bless you.' A runner leaves a parcel:")
-        self:radio_say("Anna: 'Bless you. The children here will sleep tonight. I've sent you something.'")
+        self:give_reward(QUESTS[q.kind].reward, "Anna: 'Bless you.' A runner leaves a parcel:")
+        self:radio_say(q.kind == "notes"
+            and "Anna: 'His hand. I knew him. Now somebody here can learn it. I've sent you something.'"
+            or "Anna: 'Bless you. The children here will sleep tonight. I've sent you something.'")
         return "open"   -- her channel stays open afterwards
     end
     local p = self.player
     local hurt = p.health < MAX_HEALTH or p.injuries.bleeding or p.injuries.wounded_hours > 0
     if not q and not hurt then
-        self.quest = {kind = "supply", giver = "Anna"}
-        self:radio_say(QUESTS.supply.offer)
+        local kind = self:rand(2) == 0 and "notes" or "supply"
+        self.quest = {kind = kind, giver = "Anna"}
+        self:radio_say(QUESTS[kind].offer)
         self:push_log("Quest: " .. self:quest_text())
         return "offered"
     end
@@ -135,6 +160,7 @@ function Game:quest_arrive()
             .. "Karl will be glad. Tied to its collar:")
         return false
     end
+    if q.kind == "crate" then return self:open_quest_crate() end
     if q.kind == "den" then
         local animals = ENCOUNTERS_BY_KIND.animal
         local base = animals[self:rand(#animals) + 1]
@@ -168,4 +194,38 @@ function Game:quest_text()
     if not q then return nil end
     local where = q.target and (" " .. self:bearing_to(q.target) .. ".") or ""
     return q.giver .. ": " .. QUESTS[q.kind].journal .. where
+end
+
+-- A drive's map (pair_usb): a locked Institute crate a few hexes off.
+function Game:mark_crate()
+    if self.quest then return false end
+    local C = QUESTS.crate
+    local key = self:quest_spot(C.near, C.far)
+    if not key then return false end
+    self.quest = {kind = "crate", giver = "A USB drive", target = key}
+    self.player.explored[key] = true
+    self:push_log("A map on the drive: an Institute crate, " .. self:bearing_to(key) .. ".")
+    return true
+end
+
+-- Standing on the marked crate: Lockpicks open it (the job stays till then).
+function Game:open_quest_crate()
+    local C = QUESTS.crate
+    if self:count_item("lockpicks") == 0 then
+        self:push_log(C.locked)
+        return false
+    end
+    local found = {}
+    for _ = 1, C.rolls do
+        local item
+        self.seed, item = weighted_pick(self.seed, CHURN.crate_loot)
+        self:put_stack("ground", nil, {item = item, qty = 1})
+        found[#found + 1] = ITEM_DB[item].name
+    end
+    self:skill_xp("tinker", SKILLS.xp.repair)
+    self.quest = nil
+    self.quests_done = (self.quests_done or 0) + 1
+    self:sfx("gift")
+    self:push_log("The lock gives. Inside: " .. table.concat(found, ", ") .. ". (I to pick up)")
+    return false
 end

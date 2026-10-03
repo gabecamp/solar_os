@@ -60,6 +60,7 @@ print("4. over many searches each terrain yields its own loot, and every entry t
 for terrain, table_ in pairs(LOOT) do
     local seen = {}
     local g2 = fresh(terrain)
+    g2.find_corpse = function() end   -- (a dead churner's things aren't the terrain's)
     for _ = 1, 2000 do   -- (ruins have ~80 entries, many of weight 1)
         g2.scavenged = {}
         g2.player.mp = 2

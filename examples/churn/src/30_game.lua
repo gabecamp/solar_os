@@ -256,6 +256,7 @@ function Game:scavenge()
     end
     self:scavenge_field()
     self:pick_crate(key)
+    self:find_corpse(key)
     if p.needs.hunger <= 0 then self:push_log("You are starving!") end
     if p.needs.thirst <= 0 then self:push_log("You are dehydrated!") end
     self:check_death(p.scav_hurt > 0 and "The Hollow Star emptied you." or "You bled out.")

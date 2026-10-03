@@ -188,6 +188,8 @@ function Game:pair_usb()
     end
     if not self.sites_known.checkpoint and self:rand(3) == 0 then
         self:hear_of_exit("A map on the drive")
+    elseif self:roll(QUESTS.crate.chance) and self:mark_crate() then
+        -- (the crate is the job now)
     elseif self:rand(3) == 0 then
         self:mark_stash()
     elseif learned == 0 then
@@ -291,4 +293,26 @@ function Game:pick_crate(key)
     self:skill_xp("tinker", SKILLS.xp.repair)
     self:sfx("gift")
     self:push_log("You pick a locked crate: " .. table.concat(found, ", ") .. ".")
+end
+
+-- F in ruins: now and then (CHURN.corpse.chance %, once a hex) a dead churner,
+-- with what they carried for the Churn: tapes, books, drives, gun parts.
+function Game:find_corpse(key)
+    local C = CHURN.corpse
+    if self.tiles[key] ~= "ruins" then return end
+    self.crates = self.crates or {}
+    local mark = C.prefix .. key
+    if self.crates[mark] then return end
+    if not self:roll(C.chance) then return end
+    self.crates[mark] = true
+    local found = {}
+    for _ = 1, 1 + self:rand(2) do
+        local item
+        self.seed, item = weighted_pick(self.seed, C.loot)
+        local qty = C.rounds[item] and C.rounds[item] + self:rand(3) or 1
+        self:put_stack("ground", nil, {item = item, qty = qty})
+        found[#found + 1] = ITEM_DB[item].name .. (qty > 1 and (" x" .. qty) or "")
+    end
+    self:push_log(C.epitaphs[self:rand(#C.epitaphs) + 1])
+    self:push_log("On them: " .. table.concat(found, ", ") .. ".")
 end
