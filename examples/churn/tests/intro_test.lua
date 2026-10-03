@@ -67,20 +67,24 @@ gfx.line, gfx.fill_rect, gfx.text, gfx.circle, gfx.fill_circle, gfx.pixel, gfx.c
 assert(tick_calls < calls and tick_calls < 10, ("tick %d calls, full %d"):format(tick_calls, calls))
 print(("   OK (idle tick %d draw calls, full splash %d + the picture)"):format(tick_calls, calls))
 
-print("4. the title picture: whole 32x32 tiles, inside its frame on the left, drawn on both screens")
-local A = Game.TITLE_ART
-assert(A and A.w == A.tw * 32 and A.h == A.th * 32, "whole tiles")
-local tiles = Game.title_tiles()
-assert(#tiles > A.tw * A.th // 2, "most tiles have ink")
-for _, t in ipairs(tiles) do assert(#t.data == 128) end
-for _, screen in ipairs({"draw_intro", "draw_title"}) do
+print("4. the pictures: whole 32x32 tiles, the splash's on the start screen, the title's on the menu")
+local drawn = {}
+for _, pair in ipairs({{"draw_intro", "SPLASH_ART"}, {"draw_title", "TITLE_ART"}}) do
+    local screen, name = pair[1], pair[2]
+    local A = Game[name]
+    assert(A and A.w == A.tw * 32 and A.h == A.th * 32, name .. ": whole tiles")
+    local tiles = Game.art_tiles(name)
+    assert(#tiles > A.tw * A.th // 2, name .. ": most tiles have ink")
     SPRITE_CALLS = {}
     g[screen](g, 400, 300)
-    assert(#SPRITE_CALLS == #tiles, screen .. " draws the picture")
-    for _, c in ipairs(SPRITE_CALLS) do
+    assert(#SPRITE_CALLS == #tiles, screen .. " draws " .. name)
+    for i, c in ipairs(SPRITE_CALLS) do
+        assert(c.data == tiles[i].data, screen .. ": its own picture")
         assert(c.x >= 0 and c.y >= 0 and c.x + c.w <= Game.INTRO.panel and c.y + c.h <= 300, screen .. ": off its frame")
     end
+    drawn[#drawn + 1] = SPRITE_CALLS[1].data
 end
-print("   OK (" .. #tiles .. " tiles)")
+assert(Game.SPLASH_ART.data ~= Game.TITLE_ART.data, "two different pictures")
+print("   OK")
 
 print("\nINTRO TESTS PASSED")

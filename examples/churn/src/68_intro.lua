@@ -1,5 +1,5 @@
 -- ---------------------------------------------------------------------
--- The intro: a splash on every launch (the title picture, "THE CHURN" in
+-- The intro: a splash on every launch (its picture, "THE CHURN" in
 -- big block letters, an epigraph), then the title menu, then - for a
 -- new survivor - a short story crawl before the creator.
 --   screen "intro" -> "title" -> "crawl" -> "creator"
@@ -76,11 +76,13 @@ function Game.draw_big_text(text, x, y, cell)
     end
 end
 
--- The title picture (art/title.png, baked into 69_title_art by
--- tools/paint_title.py): its non-blank tiles, decoded once.
-function Game.title_tiles()
-    if Game.TITLE_TILES then return Game.TITLE_TILES end
-    local A, tiles = Game.TITLE_ART, {}
+-- The title screens' pictures (art/splash.png -> Game.SPLASH_ART on the
+-- start screen, art/title.png -> Game.TITLE_ART on the title menu; baked
+-- into 69_title_art by tools/paint_title.py): non-blank tiles, decoded once.
+Game.ART_TILES = {}
+function Game.art_tiles(name)
+    if Game.ART_TILES[name] then return Game.ART_TILES[name] end
+    local A, tiles = Game[name], {}
     if A then
         local bytes, empty = b64_decode(A.data), string.rep("\0", 128)
         for ty = 0, A.th - 1 do
@@ -91,15 +93,15 @@ function Game.title_tiles()
             end
         end
     end
-    Game.TITLE_TILES = tiles
+    Game.ART_TILES[name] = tiles
     return tiles
 end
 
-function Game.draw_title_art(x, y)
-    if not draw_sprite then return end   -- (a firmware without bitmaps: text only)
+function Game.draw_art(name, x, y)
+    if not (draw_sprite and Game[name]) then return end   -- (no bitmaps: text only)
     gfx.color(gfx.BLACK)
-    for _, t in ipairs(Game.title_tiles()) do draw_sprite(x + t.x, y + t.y, 32, 32, t.data) end
-    gfx.rect(x - 1, y - 1, Game.TITLE_ART.w + 2, Game.TITLE_ART.h + 2)
+    for _, t in ipairs(Game.art_tiles(name)) do draw_sprite(x + t.x, y + t.y, 32, 32, t.data) end
+    gfx.rect(x - 1, y - 1, Game[name].w + 2, Game[name].h + 2)
 end
 
 -- The picture on the left; the right panel starts here.
@@ -109,7 +111,7 @@ function Game:draw_intro(w, h)
     local I, px = Game.INTRO, Game.INTRO.panel
     local mid = px + (w - px) // 2
     gfx.clear(gfx.WHITE)
-    Game.draw_title_art(4, 6)
+    Game.draw_art("SPLASH_ART", 4, 6)
     gfx.color(gfx.BLACK)
     for i, word in ipairs({"THE", "CHURN"}) do
         Game.draw_big_text(word, mid - ((#word * 6 - 1) * I.cell) // 2, 28 + (i - 1) * 48, I.cell)
@@ -166,7 +168,7 @@ function Game:draw_title(w, h)
     local I, px = Game.INTRO, Game.INTRO.panel
     local mid = px + (w - px) // 2
     gfx.clear(gfx.WHITE)
-    Game.draw_title_art(4, 6)
+    Game.draw_art("TITLE_ART", 4, 6)
     gfx.color(gfx.BLACK)
     local tw = (#I.title * 6 - 1) * 3
     Game.draw_big_text(I.title, mid - tw // 2, 30, 3)

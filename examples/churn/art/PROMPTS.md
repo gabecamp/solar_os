@@ -32,9 +32,12 @@ Notes:
   skin of the lower face is stitched shut and healed into scar tissue", or an
   image editor to paint the mouth out.
 
-**title.png** (the title screens) is the user's own picture: a lone figure
-under a spiralling sky. `python3 tools/paint_title.py` bakes it (192x288,
-1-bit) into `src/69_title_art.lua`; run it again after replacing the file.
+**splash.png** (the start screen: a lone figure under a spiralling storm,
+lightning and crows) and **title.png** (the title menu: a figure with a
+backpack under a spiralling sky) are the user's own pictures.
+`python3 tools/paint_title.py` bakes them (192x288, 1-bit; tone and an edge
+crop per picture in its `PICTURES` list) into `src/69_title_art.lua`; run it
+again after replacing either file.
 
 **karl.jpg** (Karl, the riddling fisherman) will be the user's own photo of a
 real person: no prompt, and never generated. Until it's added he shows a
