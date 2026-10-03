@@ -176,6 +176,12 @@ PHOTO = {
     # hung with root-like strands, two glowing eyes, on a pale ground
     "crawler": {"far": (36, 30, 740, 734), "near": (70, 10, 710, 650),
                 "close": (270, 40, 490, 260), "gamma": 0.7, "edge": 0.5, "bg": 0.80},
+    # the user's own picture (2026-10-03, 512x768): three pale faces looking
+    # up out of black water under reeds. Pale on black, the reverse of the
+    # rest: bg off (it would wipe the faces); close = the nearest face
+    "whisper": {"far": (0, 200, 512, 712), "near": (78, 300, 498, 720),
+                "close": (90, 530, 290, 730), "gamma": 1.4, "edge": 0.6,
+                "levels": (0.14, 0.95), "bg": 1.01},
     # the user's own picture (2026-10-03, 512x768): the stray in dry scrub,
     # inside a yellowed print border; a scene, not a backdrop, so levels keep
     # the scrub and a dark dog gets its mid-tones lifted
