@@ -167,7 +167,7 @@ shaft of light, a hand reaching into the frame toward them.
 A lone wooden door frame standing in an empty field, no walls; through it you
 see the same field at night, with a dark figure standing there waiting.
 
-## Still to do (2026-10-03): the night things and the Institute
+## The night things and the Institute (2026-10-03; all four done: the user's `institute.png`, `whisper.png`, `long_man.png`, `crawler.jpg` from these prompts)
 
 The user's own pictures (`fused.jpg`, `stray.jpg`) set the look for these:
 an old silver-gelatin photograph on a worn, yellowed print. Paste this after

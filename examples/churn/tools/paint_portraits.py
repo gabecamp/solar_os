@@ -176,6 +176,12 @@ PHOTO = {
     # hung with root-like strands, two glowing eyes, on a pale ground
     "crawler": {"far": (36, 30, 740, 734), "near": (70, 10, 710, 650),
                 "close": (270, 40, 490, 260), "gamma": 0.7, "edge": 0.5, "bg": 0.80},
+    # the user's own picture (2026-10-03, 768x768): a gaunt, bowed figure in a
+    # pale shaft of light, the print's edges burnt orange: a negative rust
+    # turns the orange white so the burns don't dither into black blotches
+    "long_man": {"far": (75, 70, 735, 730), "near": (180, 50, 580, 450),
+                 "close": (240, 70, 420, 250), "gamma": 1.0, "edge": 0.6,
+                 "rust": -1.5, "bg": 0.80},
     # the user's own picture (2026-10-03, 512x768): three pale faces looking
     # up out of black water under reeds. Pale on black, the reverse of the
     # rest: bg off (it would wipe the faces); close = the nearest face
@@ -234,7 +240,8 @@ def photo_view(gray, box, size, gamma, edge, bg_level=0.86, levels=(0.08, 0.80))
 def rust_gray(img, k):
     """Grayscale where rust (red over blue) reads darker by k per level of
     red-minus-blue: for pictures whose subject and ground are the same
-    brightness but not the same colour (the Institute's door on its rock)."""
+    brightness but not the same colour (the Institute's door on its rock).
+    A negative k lightens it instead (the Long Man's burnt orange edges)."""
     r, _, b = img.convert("RGB").split()
     gray = np.asarray(img.convert("L"), dtype=np.float32)
     rust = np.clip(np.asarray(r, dtype=np.float32) - np.asarray(b, dtype=np.float32), 0, 255)

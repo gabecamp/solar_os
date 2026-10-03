@@ -357,8 +357,9 @@ local NIGHT = {
     horrors = {
         {kind = "horror", horror = "long_man", name = "The Long Man", art = "long_man",
          who = "long man", start = "far",
-         intro = "Someone stands at the edge of your light. Too tall. Its arms hang past its "
-              .. "knees. It doesn't move, and you can't tell which way it's facing.", speed = 3},
+         intro = "Someone stands at the edge of your light. Too tall, too thin, head bowed as "
+              .. "if listening to the ground. Veins show black through its skin, and a wire "
+              .. "hangs from its mouth. It doesn't move.", speed = 3},
         {kind = "beast", name = "The Crawler", art = "crawler", who = "crawler", dark = true,
          intro = "Something picks its way toward you on too many long, jointed legs, hung "
               .. "with wet black strands like roots. Two eyes catch your light. It clicks. "
