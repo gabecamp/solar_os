@@ -78,14 +78,20 @@ minutes on a Pi 3B+, once.
 
 | Option | What it does |
 |---|---|
-| `--scale N` | Window size: 400x300 times N. The default is 2 (800x600). |
-| `--fullscreen` | Fill the screen with the largest whole scale, centered. Good for a TV or a 7" panel. |
+| `--scale N` | Window size: 400x300 times N. The default is 2 (800x600); 0 = fit (the biggest whole scale your screen holds). |
+| `--fullscreen`, `--windowed` | Fill the screen with the largest whole scale, centered (good for a TV or a 7" panel), or not. |
 | `--look gray` | The default: four flat grays. |
 | `--look device` | The handheld's 1-bit reflective LCD, the same dither as the firmware. |
 | `--look amber`, `--look green` | Old terminal tints. |
 | `--mute` | No sound. The game's own **M** key also mutes. |
 | `--data DIR` | Where saves and records go. The default is `~/.local/share/the-churn`, or `%APPDATA%\TheChurn` on Windows. |
 | `--game FILE` | Run another build of the game; the default is `../churn.lua`. |
+
+The same choices are in the window itself: **F1** opens its settings (scale,
+fullscreen, look, sound; arrows or the D-pad change them, Esc or B closes).
+They're saved to `settings.json` in the data folder and used next time; an
+option on the command line wins over them. **F11** toggles fullscreen any
+time. While the settings are open the game doesn't see your keys.
 
 ## Keys
 
@@ -94,6 +100,29 @@ The same as on the device; **H** in the game lists them all.
 - **Moving:** Left/Right step west or east. Up or Down, then Left/Right, takes a diagonal. WASD works the same.
 - **Actions:** Space rests, F searches, E uses or drinks, I opens the bag, C crafts, J opens the journal, T trades.
 - **Quit:** Q on the map, or close the window.
+- **Window:** F1 settings, F11 fullscreen.
+
+### Gamepad
+
+Plug one in any time (an Xbox-style pad; others work with their buttons in
+the same places).
+
+| Pad | Key | Does |
+|---|---|---|
+| D-pad or left stick | arrows | move, pick (held: repeats) |
+| A | Enter | choose |
+| B | Esc | back |
+| X | E | use, drink |
+| Y | I | the bag |
+| LB | C | crafting |
+| RB | J | the journal |
+| Back / Select | H | help (when you let go) |
+| Start | Space | rest (when you let go) |
+| Back + Start together | Q | quit |
+
+If your pad numbers its buttons differently, add `"pad_buttons"` to
+`settings.json`, e.g. `{"pad_buttons": {"0": 10, "1": 27, "2": "e", "3": "i"}}`
+(button number -> key: a letter or a key code; 10 is Enter, 27 Esc).
 
 The game saves when you quit, and the title screen offers **Continue** next time.
 

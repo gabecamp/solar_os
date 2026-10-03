@@ -15,10 +15,15 @@ and any change to the Lua game shows up here with no Python work.
 Looks: gray (four flat grays), device (the reflective LCD's 1-bit dither),
 amber and green (terminal tints). Saves and records go to a per-user data
 folder (see --data). Close the window or press Q on the map to quit.
+
+F1 opens the window's own settings (scale, fullscreen, look, sound; kept in
+settings.json in the data folder; flags on the command line win), F11
+toggles fullscreen, and a gamepad plays too (PAD_BUTTONS below).
 """
 
 import argparse
 import array
+import json
 import math
 import os
 import sys
@@ -49,6 +54,20 @@ THRESHOLD = {WHITE: 16, LIGHT: 12, DARK: 5, BLACK: 0}
 BAYER4 = ((0, 8, 2, 10), (12, 4, 14, 6), (3, 11, 1, 9), (15, 7, 13, 5))
 TINTS = {"amber": ((18, 10, 0), (255, 176, 40)), "green": ((4, 16, 6), (90, 255, 120))}
 
+LOOKS = ("gray", "device", "amber", "green")
+SCALES = (0, 1, 2, 3, 4, 5)          # 0 = fit: the biggest whole scale the screen holds
+
+# A gamepad (XInput-style button numbers, as SDL's joystick API reports an
+# Xbox pad; settings.json "pad_buttons" can remap them): A Enter, B Esc,
+# X use (E), Y bag (I), LB craft (C), RB journal (J), Back help (H), Start
+# rest (Space). Back and Start act when let go, so holding both quits (Q).
+# The D-pad and the left stick are the arrows.
+PAD_BUTTONS = {0: 10, 1: KEY_ESCAPE, 2: ord("e"), 3: ord("i"), 4: ord("c"), 5: ord("j"),
+               6: ord("h"), 7: ord(" ")}
+PAD_BACK, PAD_START = 6, 7
+STICK_DEADZONE = 0.5
+REPEAT_DELAY, REPEAT_EVERY = 0.30, 0.15   # held D-pad / stick, in seconds
+
 FONT_FILES = {
     FONT_MONO_12: ("DejaVuSansMono.ttf", 11),
     FONT_BOLD_14: ("DejaVuSansMono-Bold.ttf", 13),
@@ -72,6 +91,16 @@ def default_data_dir():
     return os.path.join(base, "the-churn")
 
 
+def load_settings(data_dir):
+    """The settings.json in the data folder ({} when there is none or it's bad)."""
+    try:
+        with open(os.path.join(data_dir, "settings.json")) as f:
+            got = json.load(f)
+        return got if isinstance(got, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
 def _text(value):
     """A Lua string (bytes with encoding=None) as Python text."""
     if isinstance(value, bytes):
@@ -85,7 +114,20 @@ class Host:
     def __init__(self, scale=2, fullscreen=False, look="gray", mute=False, data_dir=None,
                  keys=None, on_frame=None, caption="The Churn"):
         self.scale, self.fullscreen, self.look = scale, fullscreen, look
+        self.sound = not mute
         self.data_dir = os.path.abspath(data_dir or default_data_dir())
+        self.menu = None          # the F1 settings: the row picked, while open
+        self.pads = {}            # instance id -> joystick
+        self.pad_held = set()     # buttons down (for the Back + Start chord)
+        self.pad_chord = False
+        self.pad_buttons = dict(PAD_BUTTONS)
+        for k, v in (load_settings(self.data_dir).get("pad_buttons") or {}).items():
+            try:
+                self.pad_buttons[int(k)] = ord(v) if isinstance(v, str) else int(v)
+            except (TypeError, ValueError):
+                pass
+        self.held = None          # (key, next repeat time) for the D-pad or stick
+        self.hat_dir = self.stick_dir = None
         self.script = list(keys) if keys is not None else None   # tests: keys to send, then quit
         self.on_frame = on_frame                                    # tests: called after each refresh
         self.closed = False
@@ -97,22 +139,121 @@ class Host:
         pygame.init()
         pygame.display.set_caption(caption)
         pygame.key.set_repeat(300, 60)
-        flags = pygame.FULLSCREEN if fullscreen else 0
-        size = (0, 0) if fullscreen else (W * scale, H * scale)
-        self.window = pygame.display.set_mode(size, flags)
+        self.window = None
+        self._set_mode()
         self.canvas = pygame.Surface((W, H))
         self.canvas.fill(GRAY[WHITE])
         self.fonts = {fid: self._load_font(fid) for fid in FONT_FILES}
-        self.patterns = self._dither_patterns() if look == "device" else None
+        self.patterns = None
         self.audio_ok = False
-        if not mute:
+        self.tones = {}
+        self._apply_sound()
+        try:
+            pygame.joystick.init()
+        except pygame.error:
+            pass
+
+    # -- the window and its settings -------------------------------------------
+
+    def _fit_scale(self):
+        try:
+            dw, dh = pygame.display.get_desktop_sizes()[0]
+        except (AttributeError, IndexError, pygame.error):
+            return 2
+        return max(1, min((dw - 40) // W, (dh - 80) // H))
+
+    def _set_mode(self):
+        if self.fullscreen:
+            self.window = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+        else:
+            k = self.scale or self._fit_scale()
+            self.window = pygame.display.set_mode((W * k, H * k))
+
+    def _apply_sound(self):
+        if self.sound and not self.audio_ok:
             try:
                 pygame.mixer.init(frequency=22050, size=-16, channels=1)
                 self.channel = pygame.mixer.Channel(0)
                 self.audio_ok = True
             except pygame.error:
                 pass
-        self.tones = {}
+        elif not self.sound and self.audio_ok:
+            self.channel.stop()
+            self.notes = []
+            self.audio_ok = False
+
+    def settings(self):
+        return {"scale": self.scale, "fullscreen": self.fullscreen, "look": self.look,
+                "sound": self.sound}
+
+    def save_settings(self):
+        path = os.path.join(self.data_dir, "settings.json")
+        keep = load_settings(self.data_dir)     # (pad_buttons and anything else stay)
+        keep.update(self.settings())
+        try:
+            os.makedirs(self.data_dir, exist_ok=True)
+            with open(path + ".tmp", "w") as f:
+                json.dump(keep, f, indent=1)
+            os.replace(path + ".tmp", path)
+        except OSError as err:
+            print("warning: settings not saved: %s" % err, file=sys.stderr)
+
+    MENU_ROWS = ("scale", "fullscreen", "look", "sound")
+
+    def _menu_value(self, row):
+        if row == "scale":
+            return "fit" if self.scale == 0 else "%dx" % self.scale
+        if row == "fullscreen":
+            return "on" if self.fullscreen else "off"
+        if row == "look":
+            return self.look
+        return "on" if self.sound else "off"
+
+    def _menu_change(self, row, step):
+        if row == "scale":
+            i = SCALES.index(self.scale) if self.scale in SCALES else 2
+            self.scale = SCALES[(i + step) % len(SCALES)]
+            if not self.fullscreen:
+                self._set_mode()
+        elif row == "fullscreen":
+            self.fullscreen = not self.fullscreen
+            self._set_mode()
+        elif row == "look":
+            self.look = LOOKS[(LOOKS.index(self.look) + step) % len(LOOKS)]
+        else:
+            self.sound = not self.sound
+            self._apply_sound()
+        self.save_settings()
+
+    def _menu_key(self, ev):
+        """A key while the settings are open: they get it, the game doesn't."""
+        rows = self.MENU_ROWS
+        if ev.key in (pygame.K_F1, pygame.K_ESCAPE):
+            self.menu = None
+        elif ev.key in (pygame.K_UP, pygame.K_w):
+            self.menu = (self.menu - 1) % len(rows)
+        elif ev.key in (pygame.K_DOWN, pygame.K_s):
+            self.menu = (self.menu + 1) % len(rows)
+        elif ev.key in (pygame.K_LEFT, pygame.K_a):
+            self._menu_change(rows[self.menu], -1)
+        elif ev.key in (pygame.K_RIGHT, pygame.K_d, pygame.K_RETURN, pygame.K_SPACE):
+            self._menu_change(rows[self.menu], 1)
+        self.present()
+
+    def _draw_menu(self, surf):
+        font = self.fonts[FONT_MONO_12]
+        x, y, w, h = 100, 80, 200, 112
+        surf.fill(GRAY[WHITE], (x, y, w, h))
+        pygame.draw.rect(surf, GRAY[BLACK], (x, y, w, h), 2)
+
+        def put(tx, ty, text):
+            surf.blit(font.render(text, False, GRAY[BLACK]), (tx, ty - font.get_ascent()))
+        put(x + 10, y + 16, "Settings (this window)")
+        for i, row in enumerate(self.MENU_ROWS):
+            ty = y + 38 + 15 * i
+            put(x + 10, ty, (">" if i == self.menu else " ") + " %-11s< %s >" % (
+                row.capitalize(), self._menu_value(row)))
+        put(x + 10, y + h - 10, "Arrows change  Esc/F1 back")
 
     # -- fonts and looks ---------------------------------------------------
 
@@ -143,6 +284,8 @@ class Host:
     def _shown(self):
         """The canvas as it should look: grays, dithered, or tinted."""
         if self.look == "device":
+            if self.patterns is None:
+                self.patterns = self._dither_patterns()
             out = self.canvas.copy()
             for c in (LIGHT, DARK):
                 mask = pygame.mask.from_threshold(self.canvas, GRAY[c], (1, 1, 1, 255))
@@ -227,15 +370,26 @@ class Host:
 
     def refresh(self, *_):
         self.frames += 1
-        shown = self._shown()
+        self.present()
+        if self.on_frame:
+            self.on_frame(self)
+
+    def present(self):
+        """The canvas (and the settings, when open) on the window."""
+        base = self.canvas
+        if self.menu is not None:
+            self.canvas = base.copy()
+            self._draw_menu(self.canvas)
+        try:
+            shown = self._shown()
+        finally:
+            self.canvas = base
         ww, wh = self.window.get_size()
-        k = max(1, min(ww // W, wh // H)) if self.fullscreen else self.scale
+        k = max(1, min(ww // W, wh // H))   # (the window is a whole scale, or fullscreen)
         scaled = pygame.transform.scale(shown, (W * k, H * k))
         self.window.fill((0, 0, 0))
         self.window.blit(scaled, ((ww - W * k) // 2, (wh - H * k) // 2))
         pygame.display.flip()
-        if self.on_frame:
-            self.on_frame(self)
 
     def size(self):
         return W, H
@@ -251,6 +405,122 @@ class Host:
         if ev.unicode and len(ev.unicode) == 1 and 32 <= ord(ev.unicode) < 127:
             return ord(ev.unicode.lower()) if ev.unicode.isalpha() else ord(ev.unicode)
         return None
+
+    # -- gamepads ---------------------------------------------------------------
+
+    @staticmethod
+    def _dir_key(x, y):
+        """A D-pad or stick direction as an arrow (left/right before up/down)."""
+        if x:
+            return KEY_LEFT if x < 0 else KEY_RIGHT
+        if y:
+            return KEY_UP if y > 0 else KEY_DOWN   # (a hat's y is up-positive)
+        return None
+
+    def _hold(self, key, now):
+        """A direction pressed (or let go: None): repeats while held."""
+        if key is None:
+            self.held = None
+            return None
+        if self.held and self.held[0] == key:
+            return None
+        self.held = (key, now + REPEAT_DELAY)
+        return key
+
+    def _pad_event(self, ev, now):
+        """A joystick event as a game key (or None)."""
+        if ev.type == pygame.JOYDEVICEADDED:
+            try:
+                pad = pygame.joystick.Joystick(ev.device_index)
+                self.pads[pad.get_instance_id()] = pad
+            except pygame.error:
+                pass
+            return None
+        if ev.type == pygame.JOYDEVICEREMOVED:
+            self.pads.pop(getattr(ev, "instance_id", None), None)
+            return None
+        if ev.type == pygame.JOYBUTTONDOWN:
+            b = ev.button
+            self.pad_held.add(b)
+            if b in (PAD_BACK, PAD_START):
+                if {PAD_BACK, PAD_START} <= self.pad_held:
+                    self.pad_chord = True
+                    return ord("q")
+                return None             # (on release, unless it becomes the chord)
+            return self.pad_buttons.get(b)
+        if ev.type == pygame.JOYBUTTONUP:
+            b = ev.button
+            self.pad_held.discard(b)
+            if b in (PAD_BACK, PAD_START):
+                if self.pad_chord:
+                    if not (self.pad_held & {PAD_BACK, PAD_START}):
+                        self.pad_chord = False
+                    return None
+                return self.pad_buttons.get(b)
+            return None
+        if ev.type == pygame.JOYHATMOTION:
+            x, y = ev.value
+            self.hat_dir = self._dir_key(x, y)
+            return self._hold(self.hat_dir or self.stick_dir, now)
+        if ev.type == pygame.JOYAXISMOTION and ev.axis in (0, 1):
+            pad = self.pads.get(getattr(ev, "instance_id", None))
+            ax = [0.0, 0.0]
+            ax[ev.axis] = ev.value
+            if pad is not None:
+                other = 1 - ev.axis
+                try:
+                    ax[other] = pad.get_axis(other)
+                except pygame.error:
+                    pass
+            x = ax[0] if abs(ax[0]) >= STICK_DEADZONE else 0
+            y = -ax[1] if abs(ax[1]) >= STICK_DEADZONE else 0   # (stick y is down-positive)
+            if x and y:   # a diagonal: the stronger one
+                if abs(x) >= abs(y):
+                    y = 0
+                else:
+                    x = 0
+            self.stick_dir = self._dir_key(x, y)
+            return self._hold(self.stick_dir or self.hat_dir, now)
+        return None
+
+    def _repeat_key(self, now):
+        """The held direction again, once its repeat time comes."""
+        if self.held and now >= self.held[1]:
+            self.held = (self.held[0], now + REPEAT_EVERY)
+            return self.held[0]
+        return None
+
+    def event_key(self, ev, now=None):
+        """One pygame event as a game key, or None (the window's own keys,
+        the settings, gamepads)."""
+        now = time.monotonic() if now is None else now
+        if ev.type == pygame.KEYDOWN:
+            if ev.key == pygame.K_F11:
+                self.fullscreen = not self.fullscreen
+                self._set_mode()
+                self.save_settings()
+                self.present()
+                return None
+            if self.menu is not None:
+                self._menu_key(ev)
+                return None
+            if ev.key == pygame.K_F1:
+                self.menu = 0
+                self.present()
+                return None
+            return self._key_code(ev)
+        if ev.type in (pygame.VIDEOEXPOSE, pygame.WINDOWEXPOSED):
+            self.present()
+            return None
+        code = self._pad_event(ev, now)
+        if self.menu is not None and code is not None:
+            # the pad drives the settings too: arrows, A changes, B closes
+            fake = {KEY_UP: pygame.K_UP, KEY_DOWN: pygame.K_DOWN, KEY_LEFT: pygame.K_LEFT,
+                    KEY_RIGHT: pygame.K_RIGHT, 10: pygame.K_RETURN, KEY_ESCAPE: pygame.K_ESCAPE}
+            if code in fake:
+                self._menu_key(pygame.event.Event(pygame.KEYDOWN, key=fake[code]))
+            return None
+        return code
 
     def getch(self, timeout_ms=None):
         """The next key, waiting up to timeout_ms (nil: forever)."""
@@ -270,12 +540,13 @@ class Host:
                 if ev.type == pygame.QUIT:
                     self.closed = True
                     return None
-                if ev.type == pygame.KEYDOWN:
-                    code = self._key_code(ev)
-                    if code is not None:
-                        return code
-                if ev.type in (pygame.VIDEOEXPOSE, pygame.WINDOWEXPOSED):
-                    self.refresh()
+                code = self.event_key(ev)
+                if code is not None:
+                    return code
+            if self.menu is None:
+                code = self._repeat_key(time.monotonic())
+                if code is not None:
+                    return code
             if self.closed or (deadline is not None and time.monotonic() >= deadline):
                 return None
             pygame.time.wait(5)
@@ -459,18 +730,33 @@ def run(game_path=DEFAULT_GAME, **options):
     return host
 
 
+def options_from(args, saved):
+    """Host options: the command line wins, then settings.json, then defaults."""
+    def pick(flag, key, default):
+        if flag is not None:
+            return flag
+        return saved.get(key, default)
+    scale = pick(args.scale, "scale", 2)
+    look = pick(args.look, "look", "gray")
+    return {"scale": scale if scale in SCALES else 2,
+            "fullscreen": bool(pick(args.fullscreen, "fullscreen", False)),
+            "look": look if look in LOOKS else "gray",
+            "mute": bool(args.mute) if args.mute is not None else not saved.get("sound", True)}
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="The Churn on a PC or Raspberry Pi.")
-    ap.add_argument("--scale", type=int, default=2, help="window size: 400x300 times this (default 2)")
-    ap.add_argument("--fullscreen", action="store_true", help="fill the screen (largest whole scale)")
-    ap.add_argument("--look", choices=("gray", "device", "amber", "green"), default="gray",
+    ap.add_argument("--scale", type=int, help="window size: 400x300 times this, 0 = fit (default 2)")
+    ap.add_argument("--fullscreen", action="store_true", default=None,
+                    help="fill the screen (largest whole scale)")
+    ap.add_argument("--windowed", dest="fullscreen", action="store_false", help="a window, not fullscreen")
+    ap.add_argument("--look", choices=LOOKS,
                     help="gray (default), device (1-bit dither like the LCD), amber, green")
-    ap.add_argument("--mute", action="store_true", help="no sound")
+    ap.add_argument("--mute", action="store_true", default=None, help="no sound")
     ap.add_argument("--data", help="where saves and records go (default: %s)" % default_data_dir())
     ap.add_argument("--game", default=DEFAULT_GAME, help="the game file (default: ../churn.lua)")
     a = ap.parse_args(argv)
-    host = run(a.game, scale=max(1, a.scale), fullscreen=a.fullscreen, look=a.look,
-               mute=a.mute, data_dir=a.data)
+    host = run(a.game, data_dir=a.data, **options_from(a, load_settings(a.data or default_data_dir())))
     pygame.quit()
     return 1 if host.error else 0
 

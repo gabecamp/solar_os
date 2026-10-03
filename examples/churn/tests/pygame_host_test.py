@@ -116,6 +116,67 @@ def main():
         pygame.image.save(pygame.transform.scale(ha._shown(), (800, 600)),
                           os.path.join(prev, "pygame_bag_amber.png"))
         print("   OK")
+
+        print("8. gamepad: buttons, the D-pad and stick (with repeat), Back + Start quits")
+        h = host_mod.Host(mute=True, data_dir=os.path.join(tmp, "pad"))
+        E = pygame.event.Event
+        btn = lambda b, up=False: h.event_key(E(pygame.JOYBUTTONUP if up else pygame.JOYBUTTONDOWN,
+                                                 button=b, joy=0, instance_id=0), now=0)
+        for b, want in ((0, 10), (1, 0x1B), (2, ord("e")), (3, ord("i")), (4, ord("c")), (5, ord("j"))):
+            assert btn(b) == want, (b, btn(b))
+            assert btn(b, up=True) is None
+        assert btn(6) is None and btn(6, up=True) == ord("h"), "Back acts when let go"
+        assert btn(7) is None and btn(7, up=True) == ord(" "), "Start = rest"
+        assert btn(6) is None and btn(7) == ord("q"), "Back + Start = Q"
+        assert btn(7, up=True) is None and btn(6, up=True) is None, "no H or Space after the chord"
+        assert btn(6) is None and btn(6, up=True) == ord("h"), "and the chord is over"
+        hat = lambda v, now: h.event_key(E(pygame.JOYHATMOTION, value=v, hat=0, joy=0, instance_id=0), now=now)
+        assert hat((0, 1), 0) == UP and hat((1, 0), 0) == RIGHT and hat((0, -1), 0) == DOWN
+        assert h._repeat_key(0.1) is None, "no repeat before the delay"
+        assert h._repeat_key(host_mod.REPEAT_DELAY + 0.01) == DOWN, "held: it repeats"
+        assert hat((0, 0), 1) is None and h._repeat_key(5) is None, "let go: it stops"
+        axis = lambda a, v: h.event_key(E(pygame.JOYAXISMOTION, axis=a, value=v, joy=0, instance_id=0), now=0)
+        assert axis(0, 0.2) is None, "inside the deadzone"
+        assert axis(0, -0.9) == LEFT and axis(0, -0.95) is None, "one press per push"
+        assert axis(0, 0.0) is None and axis(1, 0.8) == DOWN and axis(1, -0.8) == UP
+        print("   OK")
+
+        print("9. F1 settings: change, saved to settings.json; the game gets no keys meanwhile")
+        data = os.path.join(tmp, "settings")
+        h = host_mod.Host(mute=False, data_dir=data, look="gray", scale=2)
+        key = lambda k, u="": h.event_key(E(pygame.KEYDOWN, key=k, unicode=u, mod=0))
+        assert key(pygame.K_i, "i") == ord("i")
+        assert key(pygame.K_F1) is None and h.menu == 0
+        assert key(pygame.K_i, "i") is None and key(pygame.K_q, "q") is None, "the settings swallow keys"
+        key(pygame.K_DOWN); key(pygame.K_DOWN)           # Look
+        key(pygame.K_RIGHT)
+        assert h.look == "device"
+        key(pygame.K_DOWN); key(pygame.K_RETURN)         # Sound off
+        assert h.sound is False
+        key(pygame.K_UP); key(pygame.K_UP); key(pygame.K_UP); key(pygame.K_LEFT)   # Scale 2 -> 1
+        assert h.scale == 1 and h.window.get_size() == (400, 300)
+        h.present()                                      # (draws with the overlay up)
+        assert key(pygame.K_ESCAPE) is None and h.menu is None
+        assert key(pygame.K_i, "i") == ord("i"), "closed: keys reach the game again"
+        saved = host_mod.load_settings(data)
+        assert saved == {"scale": 1, "fullscreen": False, "look": "device", "sound": False}, saved
+        a = type("A", (), {"scale": None, "look": None, "fullscreen": None, "mute": None})()
+        o = host_mod.options_from(a, saved)
+        assert o == {"scale": 1, "fullscreen": False, "look": "device", "mute": True}, o
+        a.scale, a.look = 3, "amber"
+        o = host_mod.options_from(a, saved)
+        assert o["scale"] == 3 and o["look"] == "amber" and o["mute"], "flags win"
+        assert host_mod.options_from(a, {"scale": 99, "look": "pink"})["look"] == "amber"
+        assert host_mod.options_from(type(a)(), {"scale": 99, "look": "pink"}) == \
+            {"scale": 2, "fullscreen": False, "look": "gray", "mute": False}, "bad values: defaults"
+        assert key(pygame.K_F11) is None and h.fullscreen and host_mod.load_settings(data)["fullscreen"]
+        key(pygame.K_F11)
+        assert not h.fullscreen
+        # a pad drives the settings too
+        assert key(pygame.K_F1) is None
+        assert btn(0) is None and h.scale == 2, "A changes the row (scale 1 -> 2)"
+        assert btn(1) is None and h.menu is None, "B closes"
+        print("   OK")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     print("\nPYGAME HOST TESTS PASSED")
