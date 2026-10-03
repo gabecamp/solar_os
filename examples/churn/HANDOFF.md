@@ -14,7 +14,7 @@ A complete, playable Lua game for the user's ESP32-S3 SolarTerm (Waveshare RLCD 
 - **Verified on the device:** only the early builds ("it works!"). Everything since is tested on a PC against a fake `solaros` module. `DEVICE_TEST.md` is the 10-minute checklist for the board, and **H then V** in game shows the device info page.
 - **Balance** (`tools/balance_sim.lua`, a bot playing 30-day runs with the real code): deaths Easy ~22%, Normal ~39%, Churn-Hardened ~60% since the empty start and clothes wearing out (they were ~12 / ~22 / ~50; see "Start with nothing").
 - **Perf** (`tools/perf_check.lua`, in the suite): bundle ~580 KB; Lua heap ~1070 KB loaded, ~1.22 MB peak (limit 1300 KB in run_tests.sh; Lua is in PSRAM); busiest frames: map with everything explored ~490 gfx calls (~190 by day), the bag ~280 for a full redraw and ~100 for a cursor move. **On the device every gfx call is an event drained 24 per app tick** (25 ms default, `src/apps/solar_os_lua.c` `SOLUA_DRAIN_EVENTS_PER_TICK`), about 960 calls/s, so draw calls are the speed budget, not Lua time.
-- **Open items:** the portrait regeneration waits for the Hugging Face ZeroGPU quota (a scheduled check-in retries it); the user will supply `art/karl.jpg` themself (Karl is a real person: **never generate him**).
+- **Open items:** seven portraits wait for the Hugging Face ZeroGPU quota (no check-in is scheduled any more; see the 2026-10-03 note); the user will supply `art/karl.jpg` themself (Karl is a real person: **never generate him**).
 
 ## Code map
 
@@ -105,7 +105,9 @@ The sim is not byte-reproducible between processes (Lua 5.4 varies `pairs` order
 > - **Guns** (`src/62_guns.lua`): `ITEM_DB[..].shoot = {dmg, ammo, jam, hit, quiet, curse}`; `ranged_options` puts "Shoot" first when a held shooter has ammo; `shoot` (CHURN.guns: wear per shot, jam grows with wear, `noise_until` -> `noise_mult` in `maybe_encounter`, animals may bolt). Assembly recipes have `chance` (Game:craft: on a failure one non-frame part breaks). `clean = true` recipe resets `self.gun_wear`. One `marsh_revolver` per world (`TECH.world_items`). Elder Sign: option vs horrors/dark, ends it.
 > - **Saved:** research, books_read, tapedeck, gun_wear, noise_until, placed, crates.
 > - **Tests:** `intro_test`, `research_test`, `guns_test`; many older tests updated for the smaller known set, the matches in the pile and the property inputs. Balance (200 runs, seed 1, normal): about as before (starved 14.5% vs 21.5%, alive at cap 21% vs 17.5%; the bot doesn't study). Perf: bundle 578 KB, heap peak ~1220 KB of the 1300 KB budget (Lua is in the 8 MB PSRAM).
-> - **Known flake (pre-existing):** `glyph_test` fails for ~15% of world seeds (a 32x29 sprite on the map isn't recognised as a glyph or a hex mask), on the old code too. Not fixed here.
+> - **Renamed (same day, the user's ask):** `examples/wasteland` -> `examples/churn`, `wasteland.lua` -> `churn.lua`, `wasteland_pygame.py` -> `churn_pygame.py`, `WASTELAND_SEED` -> `CHURN_SEED`. Saves/records live in `<mount>/churn/`; `SAVE.read` falls back to `<mount>/wasteland/` (`SAVE.old_dir`), and `delete_save` clears both.
+> - **glyph_test flake fixed:** ~15% of world seeds (old code too) failed because the world started in rain/snow/fog and `draw_weather` tiles the map with 32x29 sprites. The test now pins clear weather (`clear_day`); seeds 1-200 pass.
+> - **Portraits still blocked:** a retry on 2026-10-03 hit the ZeroGPU quota again (0s left). Left: wanderer, mouthless, hollow, bell, stars, stillness, door (see `art/PROMPTS.md`). No routine re-armed.
 
 The dated notes below were written as each feature landed; part names in older notes predate the 2026-10-01 split of `05_data` (now `05_data_world`, `06_data_items`, `07_data_encounters`) and of the puzzles into `41_puzzles`.
 

@@ -36,8 +36,15 @@ for id, art in pairs(GLYPH_ART) do
 end
 print("3. glyphs pack to 20 bytes and round-trip exactly")
 
+-- (a world can start in rain, snow or fog: the weather overlay is tiles of
+-- its own, so these map checks pin a clear day)
+local function clear_day(g)
+    g.weather = function() return "Clear" end
+    return g
+end
+
 -- 4. draw a fully revealed map: sprite contract holds (stub validates ints + byte count)
-local g = Game.new()
+local g = clear_day(Game.new())
 for key in pairs(g.tiles) do g.player.visible[key] = true; g.player.explored[key] = true end
 -- hexes are drawn as bitmap masks (fill, outline): set those apart too
 local function is_mask(c)
@@ -88,7 +95,7 @@ assert(map_glyphs == on_map, "every map glyph stays inside the map area (x < 256
 print(("4. revealed map drew %d of %d hexes + %d legend glyphs, all inside the map window"):format(on_map, tiles, legend))
 
 -- 5. fog: an unseen tile draws nothing; an explored-only tile draws a glyph
-g = Game.new()
+g = clear_day(Game.new())
 g.player.visible = {}; g.player.explored = {}
 SPRITE_CALLS = {}
 g:draw_map(400, 300)
@@ -155,7 +162,7 @@ end
 assert(GLYPHS.weather("Rain", 0) ~= GLYPHS.weather("Rain", 1), "the rain moves with the hour")
 assert(GLYPHS.weather("Clear", 0) == nil and GLYPHS.weather("Overcast", 0) == nil)
 local function weather_calls(kind)
-    local g = Game.new(); g:start_game()
+    local g = clear_day(Game.new()); g:start_game()
     g.weather = function() return kind end
     SPRITE_CALLS = {}
     g:draw_map(400, 300)
