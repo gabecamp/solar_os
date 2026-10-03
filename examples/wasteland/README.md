@@ -14,13 +14,16 @@ the Checkpoint alive.
   the same. Space rests, F searches, I opens the bag,
   C crafts, E uses, G hunts or fishes, T trades, J opens the journal,
   R calls on the radio, M mutes, Q quits. **H** in game lists every key.
-- **You start with nothing:** no clothes, no shoes, no bag. Your arms hold
-  two things. The crafting screen (C) knows a makeshift version of every
-  piece of clothing, made from cloth scraps, sticks, rope and scrap (the
-  pile you wake next to has enough for a first outfit or a fire): foot
-  wraps, a rag shirt, rag trousers, a patchwork coat, a bindle (5 cells) or
-  a sack pack (8), and so on. Each is as warm as the real thing but holds
-  less: fewer pockets, a smaller bag. The T-shirt, jeans, boots and backpack you used
+- **You start with nothing:** no clothes, no shoes, no bag, and you know
+  almost nothing. Your arms hold two things. The crafting screen (C) knows
+  only how to survive the first day: a torch, a fire (the pile you wake next
+  to has sticks, a rock and a box of matches), a bandage, foot wraps, a rag
+  shirt and trousers, a bindle (5 cells), patching, cooking and boiling.
+  Makeshift clothes are as warm as the real thing but hold less: fewer
+  pockets, a smaller bag.
+- **Everything else is learned** (see *Crafting and research* below): study
+  by a fire or at your camp, read books, play the dead's cassettes, or let
+  the LoRa radio read a USB drive. The T-shirt, jeans, boots and backpack you used
   to start in are lying somewhere 2 to 6 hexes away. A backpack holds 10,
   a satchel 6, jeans and a jacket 2 pockets each, a belt 1 or 2.
 - **Clothes wear out:** a little every day, more under an enemy's blows and
@@ -32,6 +35,78 @@ the Checkpoint alive.
   `python3 python_version/wasteland_pygame.py`). See its README.
 - **More:** `DEVICE_TEST.md` is a 10-minute check on the board;
   `HANDOFF.md` is the developer guide (code map, tests, tools).
+
+---
+
+## Crafting and research
+
+Recipes are grouped into seven topics. Each teaches its recipes in order,
+simplest first:
+
+| Topic | Its book | Teaches, for example |
+|---|---|---|
+| Tailoring | Seamstress's Almanac | string, rope, rag gear, a sack pack, rag shoes, a foil poncho, hide gloves/tunic/pack, a pelt coat |
+| Bushcraft | Field Manual | stone knife, glass shiv, spear, snare, fishing rod, bark tea, cured hide, charcoal, smoked meat, a sling, a bow and arrows, a can rattle, a tarp lean-to, a travois |
+| Medicine | Surgeon's Notes | filtered water, splints, a suture kit, herb tincture, a medkit |
+| Tinkering | Radio Ham Handbook | shiv, machete, rain barrel, lockpicks, cracking a phone, the Choir Cell, a hand cart |
+| Chemistry | Institute Lab Book | painkillers, gunpowder, flares, sedatives, gun oil, Rad Purge |
+| Gunsmithing | Gunsmith's Ledger | cleaning guns, reloading rounds, assembling the PM, Nagant, Tokarev and Institute Sidearm |
+| Warding | The Choir Hymnal | a salt circle, the Elder Sign, a black candle, a glow jar, a choir charm |
+
+- **Study** (crafting screen, *Study: topic*, by a fire or at your camp):
+  3 hours for research points, more with a high Perception and with the
+  topic's book in reach (x2). Enough points teach the next recipe.
+  Chemistry needs chemicals to work with, Gunsmithing a gun or a gun part,
+  and Warding something of *theirs* (black ichor, a pale eye). Warding takes
+  something out of you each time.
+- **Books** (E): the first read teaches the next recipe in the topic; a
+  reread only helps.
+- **Cassettes** (E): a Cassette Player with charge (a Battery Cell, E) plays
+  the logs of dead stalkers. Each tape teaches once, and some mention a stash.
+- **USB drives** (E): with a LoRa Radio, a charge reads a drive: one or two
+  recipes, sometimes a map to the Checkpoint or a stash. Corrupt drives fail
+  and can be tried again. Locked phones crack open (Tinkering) into a drive.
+- **Scrawled Notes** still teach a random recipe.
+
+**Properties:** many recipes ask for a kind of thing instead of one item,
+as NEO Scavenger does: any *sharp edge* (glass shard, stone knife, scalpel,
+screwdriver, crowbar, shiv, kitchen knife, hacksaw, multitool, knife,
+hunting knife, machete, broad spear), any *thread* (string, sinew, choir
+wire, copper wire, rope), any *fireproof pot* (tin can, metal pot; a plastic
+bottle melts), any *heat source* (fire drill, matches, lighter, torch), any
+*fuel*, *shaft* or *hide*. A craft uses the cheapest thing that fits, so the
+glass goes before your knife. A fire needs a heat source, and boiling or
+cooking needs a pot (the empty tin from the beans is your first).
+
+**Placed things:** E sets a Can Rattle (something coming at you is heard
+first), pitches a Tarp Lean-to (cover from storms and emissions anywhere) or
+pours a Salt Circle (night horrors keep away from the hex).
+
+**Lockpicks** open the locked crates hidden in some ruins (search with F).
+They hold the rare things: lab books, ledgers, gunsmith kits, frames, rounds
+and the odd whole gun.
+
+## Handguns
+
+Guns are rare and loud. Hold one with its rounds in reach, and a fight
+offers **Shoot** at any range. Each shot uses a round, wears the gun a
+little (a worn gun jams more; *Clean Guns* with gun oil and a rag fixes
+that) and is heard for hours, so more things come looking. Animals may
+bolt at the noise.
+
+| Gun | Rounds | Notes |
+|---|---|---|
+| PM Pistol | 9x18 | the commonest; bandits carry them |
+| Nagant Revolver | 7.62N | never jams, a little less accurate |
+| Tokarev TT | 7.62x25 | hits hardest of the pistols |
+| Institute Sidearm | 9x18 | precise, rarely jams; its frame has no maker's mark |
+| The Marsh Revolver | .38 | one per world, never made. Hits like nothing else, and every shot costs you rest. Something counts them. |
+
+Most guns are **assembled** (Gunsmithing): a frame (it decides the gun) plus
+a slide, barrel, recoil spring, firing pin and magazine (a cylinder for the
+Nagant), with a Gunsmith Kit or a Multitool. It can fail, and then a part
+breaks. Rounds **reload** from brass casings, gunpowder and lead (.38s want
+black ichor too). The **bow** (arrows) and **sling** (rocks) shoot quietly.
 
 ---
 

@@ -66,7 +66,15 @@ function Game:draw_craft(w, h)
             or (r.burn and ("Lights a small fire (" .. r.burn .. "h)"))
             or "Builds a campfire here")
         y = y + 18
-        gfx.text(x, y, "Uses:")
+        if r.study then   -- research: the topic's book doubles it
+            local book = Game.topic_def(r.study).book
+            local have = self:count_item(book) > 0
+            gfx.text(x, y, "Book: " .. ITEM_DB[book].name)
+            y = y + 13
+            gfx.text(x + 7, y, have and "in reach: x2 points" or "(would double it)")
+        else
+            gfx.text(x, y, "Uses:")
+        end
         for _, iq in ipairs(Game.recipe_inputs(r)) do
             y = y + 13
             local have = self:count_item(iq[1])

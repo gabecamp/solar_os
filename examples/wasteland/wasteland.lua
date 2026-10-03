@@ -10665,7 +10665,7 @@ function Game:shoot()
     local p, e, G = self.player, self.enc, CHURN.guns
     local item, sh = self:shooter()
     if not item then return end
-    local name = ITEM_DB[item].name:lower()
+    local name = ITEM_DB[item].name
     self:take_items(sh.ammo, 1)
     if not sh.quiet then
         self.gun_wear = self.gun_wear or {}
@@ -11692,7 +11692,15 @@ function Game:draw_craft(w, h)
             or (r.burn and ("Lights a small fire (" .. r.burn .. "h)"))
             or "Builds a campfire here")
         y = y + 18
-        gfx.text(x, y, "Uses:")
+        if r.study then   -- research: the topic's book doubles it
+            local book = Game.topic_def(r.study).book
+            local have = self:count_item(book) > 0
+            gfx.text(x, y, "Book: " .. ITEM_DB[book].name)
+            y = y + 13
+            gfx.text(x + 7, y, have and "in reach: x2 points" or "(would double it)")
+        else
+            gfx.text(x, y, "Uses:")
+        end
         for _, iq in ipairs(Game.recipe_inputs(r)) do
             y = y + 13
             local have = self:count_item(iq[1])
@@ -11868,13 +11876,13 @@ local HELP = {
     {"", "T trade/Checkpoint   C craft   J journal"},
     {"", "G hunt, or fish   R radio   M sound"},
     {"BAG", "Arrows pick  Enter select, Enter move"},
-    {"", "E use: eat, drink, wear, read, set snare"},
+    {"", "E use: eat, wear, read, play a tape, set"},
     {"CRAFT", "Up/Dn pick  Enter make  C/Q back"},
     {"TRADE", "Lt/Rt side  Enter +1  E -1  T deal  O work"},
     {"FIGHTS", "Up/Dn pick  Enter choose"},
     {"PUZZLE", "Arrows move  T+arrow throw  1-4 sigils"},
     {"", "Q backs away from a puzzle unharmed"},
-    {"TIPS", "You start with nothing: C makes rags."},
+    {"TIPS", "You know little: C, Study by a fire."},
     {"", "Clothes wear out: C, Patch clothes."},
     {"", "Emissions, storms: shelter in ruins/hills."},
     {"", "3 artifacts or a permit get you out."},
@@ -12019,6 +12027,10 @@ function Game:journal_lines()
     if self:lore_count() > 0 then
         add(("Pages read: %d/%d. L to reread them."):format(self:lore_count(), #LORE.pages))
     end
+    local n_known = 0
+    for _, r in ipairs(RECIPES) do if self.known[r.id] then n_known = n_known + 1 end end
+    add(("Recipes known: %d of %d. Study, read, listen."):format(n_known, #RECIPES))
+    if self.last_tape then add("Last tape: " .. self.last_tape) end
     local story = self:story_text()
     if story then add(story) end
     local quest = self:quest_text()

@@ -13,7 +13,7 @@ A complete, playable Lua game for the user's ESP32-S3 SolarTerm (Waveshare RLCD 
 
 - **Verified on the device:** only the early builds ("it works!"). Everything since is tested on a PC against a fake `solaros` module. `DEVICE_TEST.md` is the 10-minute checklist for the board, and **H then V** in game shows the device info page.
 - **Balance** (`tools/balance_sim.lua`, a bot playing 30-day runs with the real code): deaths Easy ~22%, Normal ~39%, Churn-Hardened ~60% since the empty start and clothes wearing out (they were ~12 / ~22 / ~50; see "Start with nothing").
-- **Perf** (`tools/perf_check.lua`, in the suite): bundle ~460 KB; Lua heap ~845 KB loaded, ~1 MB peak (limit 1300 KB in run_tests.sh; Lua is in PSRAM); busiest frames: map with everything explored ~490 gfx calls (~190 by day), the bag ~280 for a full redraw and ~100 for a cursor move. **On the device every gfx call is an event drained 24 per app tick** (25 ms default, `src/apps/solar_os_lua.c` `SOLUA_DRAIN_EVENTS_PER_TICK`), about 960 calls/s, so draw calls are the speed budget, not Lua time.
+- **Perf** (`tools/perf_check.lua`, in the suite): bundle ~580 KB; Lua heap ~1070 KB loaded, ~1.22 MB peak (limit 1300 KB in run_tests.sh; Lua is in PSRAM); busiest frames: map with everything explored ~490 gfx calls (~190 by day), the bag ~280 for a full redraw and ~100 for a cursor move. **On the device every gfx call is an event drained 24 per app tick** (25 ms default, `src/apps/solar_os_lua.c` `SOLUA_DRAIN_EVENTS_PER_TICK`), about 960 calls/s, so draw calls are the speed budget, not Lua time.
 - **Open items:** the portrait regeneration waits for the Hugging Face ZeroGPU quota (a scheduled check-in retries it); the user will supply `art/karl.jpg` themself (Karl is a real person: **never generate him**).
 
 ## Code map
@@ -26,10 +26,12 @@ A complete, playable Lua game for the user's ESP32-S3 SolarTerm (Waveshare RLCD 
 | `05_data_world` | tunables, `KEY`, terrain, `WORLD` (time, weather, cold), `RAD`, `SURVIVE`, `TRADE`, `GOAL`, `HUNT`, `KARL`, `DIFFICULTY`, `DOG`, `TECH`, `BASE`, `QUESTS`, `NIGHT`, `SKILLS` |
 | `06_data_items` | body slots, `ITEM_DB`, `ARTIFACTS`, `SCAVENGE_LOOT`, `RECIPES`, world wearables |
 | `07_data_encounters` | `FIGHT`, encounter kinds and ranges, `ENCOUNTERS`, `ANOMALIES`, puzzle sizes |
+| `08_data_churn` | `CHURN`: item properties, research topics, tapes, guns; adds the new items, recipes, loot, drops, trade values |
+| `09_art_churn` | `CHURN.art`: GENERATED-by-hand 16x16 sprites for the new items (the rest borrow one: `ITEM_DB[..].look`) |
 | `10_sprites` | ASCII-art item sprites and terrain glyphs, packed at load |
 | `20_world` | hex math, `generate_world` (terrain, rivers, fords, town, sites, radiation), visibility, `recompute_stats` |
 | `30_game` | `Game.new`, the creator, stacks and slots, moving, scavenging, eating |
-| `35_crafting` | recipes known, blockers, `craft` |
+| `35_crafting` | recipes known, property inputs (`@sharp`), blockers, `craft` (assembly chance, cleaning) |
 | `36_survival` | water, sickness, perishing food, death reasons |
 | `37_world_time` | clock, weather, cold, `Game:tick` (runs every hour that passed) |
 | `38_save` | `SAVE.fields`, save/load/delete, `write_file` detection |
@@ -57,6 +59,9 @@ A complete, playable Lua game for the user's ESP32-S3 SolarTerm (Waveshare RLCD 
 | `70_draw_screens` | title, creator, encounter, death screens |
 | `72_draw_craft` | crafting screen |
 | `76_draw_trade` | trade, Checkpoint and ending screens |
+| `59_research` | topics, studying, books, cassettes, USB drives, placed things, lockpicked crates |
+| `62_guns` | shooting, wear and jams, noise, the Elder Sign |
+| `68_intro` | the splash, the title menu, the story crawl |
 | `78_draw_help` | `HELP`, the help screen and device info page |
 | `79_draw_journal` | journal (J) |
 | `90_main` | the main loop (`pcall`, always `gfx["end"]()`) |
@@ -91,6 +96,16 @@ The sim is not byte-reproducible between processes (Lua 5.4 varies `pairs` order
 ---
 
 # History (newest first)
+
+> **The Churn (2026-10-03, the user: rename the Zone to the Churn, rename the game, an intro screen, much bigger crafting and loot from `craft.txt` with a STALKER/Lovecraft feel, recipes learned not known, rare handguns and parts):**
+> - **Name and intro.** Every "Zone" is now "the Churn" (Churn Permit, Churn-Hardened; ids unchanged, so saves load). The game is "The Churn"; files keep their names. `src/68_intro.lua`: `Game:begin_intro(saved)` from the main loop -> `intro` (big block letters from `Game.INTRO.glyphs`, one fill_rect per run; a spiral eye redrawn alone on idle polls, `intro_tick`, ~48 calls) -> `title` (always shown now; Continue only with a save) -> `crawl` (4 pages, Esc skips) -> `creator`. Every scripted-key test now starts with `10, 10, 27` (intro, New survivor, skip), or `10` then the title with a save; `regression_test`'s `run_loop` clears the fake save first.
+> - **Learned recipes.** Only 15 recipes are `known`: survival basics. The rest have `topic` (08 sets it for old ones). `src/59_research.lua`: `study_recipes()` adds "Study: <topic>" pseudo-recipes (`r.study`) to `known_recipes()` (by a fire or at camp; `CHURN.topics[..].needs`/`cost`); `topic_next` = the first unknown recipe of the topic in RECIPES order; points in `self.research`. Books (`ITEM_DB[..].book = topic`, first read teaches, `self.books_read`), tapes (`CHURN.tapes`, need `cassette_player` + `self.tapedeck.charge`; Battery Cell charges it when the radio doesn't need it), USB drives (`pair_usb`: a radio charge, `usb_fail`% corrupt). `use_churn_item` is called early in `use_item`.
+> - **Properties.** `CHURN.props[name] = {name, items}` (cheapest first). An input/tool key `"@name"` means any of them: `count_item`/`take_items` dispatch on `Game.prop_of`; `Game.input_name` names it on screen. Campfire needs `@heat` and `@fuel`; boil/cook need `@fire_container`; beans leave a `tin_can`; the start pile has matches (index 6: ground indices 1-5 unchanged).
+> - **Items/loot.** ~110 new items in 08 (35 sprites in 09, the rest `look` = borrow a sprite, resolved after the ragged pass). Loot additions keep each terrain's dud share (nothing + trinkets) unchanged by growing `nothing`. Enemy loot gains hides/sinew/bone/ichor/brass/guns (+1 roll). Worn `fx` (travois/hand cart -1 MP, choir charm) is applied in `recompute_stats`. `self.placed[key][item]` for can rattle (start_encounter: range far), tarp lean-to (storm and emission cover), salt circle (horror chance /4); held `light` items (black candle also halves horrors). Lockpicks: `pick_crate` after a ruins search, once per hex (`self.crates`).
+> - **Guns** (`src/62_guns.lua`): `ITEM_DB[..].shoot = {dmg, ammo, jam, hit, quiet, curse}`; `ranged_options` puts "Shoot" first when a held shooter has ammo; `shoot` (CHURN.guns: wear per shot, jam grows with wear, `noise_until` -> `noise_mult` in `maybe_encounter`, animals may bolt). Assembly recipes have `chance` (Game:craft: on a failure one non-frame part breaks). `clean = true` recipe resets `self.gun_wear`. One `marsh_revolver` per world (`TECH.world_items`). Elder Sign: option vs horrors/dark, ends it.
+> - **Saved:** research, books_read, tapedeck, gun_wear, noise_until, placed, crates.
+> - **Tests:** `intro_test`, `research_test`, `guns_test`; many older tests updated for the smaller known set, the matches in the pile and the property inputs. Balance (200 runs, seed 1, normal): about as before (starved 14.5% vs 21.5%, alive at cap 21% vs 17.5%; the bot doesn't study). Perf: bundle 578 KB, heap peak ~1220 KB of the 1300 KB budget (Lua is in the 8 MB PSRAM).
+> - **Known flake (pre-existing):** `glyph_test` fails for ~15% of world seeds (a 32x29 sprite on the map isn't recognised as a glyph or a hex mask), on the old code too. Not fixed here.
 
 The dated notes below were written as each feature landed; part names in older notes predate the 2026-10-01 split of `05_data` (now `05_data_world`, `06_data_items`, `07_data_encounters`) and of the puzzles into `41_puzzles`.
 

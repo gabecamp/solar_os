@@ -573,3 +573,39 @@ solaros.dump("ops_title.txt")
 g.crawl_page = 3
 g:draw_crawl(400, 300)
 solaros.dump("ops_crawl.txt")
+
+-- Scene: crafting by a fire - a Study entry under the cursor, research under way
+g = Game.new()
+g:start_game()
+g.camps[g.player.q .. "," .. g.player.r] = {until_hour = g.player.hours + 9}
+g.research = {bushcraft = 5}
+table.insert(g.player.inventory, {item = "book_field", qty = 1})
+g.screen = "craft"
+for i, r in ipairs(g:known_recipes()) do if r.study == "bushcraft" then g.craft_ui.cursor = i end end
+g.log = {"You study bushcraft for 3h. (5/8)"}
+g:draw_craft(400, 300)
+solaros.dump("ops_craft_study.txt")
+
+-- Scene: assembling a pistol (a learned recipe with a chance)
+g.known.assemble_pm = true
+for _, id in ipairs({"frame_pm", "gun_slide", "gun_barrel", "gun_spring", "firing_pin", "magazine"}) do
+    table.insert(g:ground_list(), {item = id, qty = 1})
+end
+table.insert(g:ground_list(), {item = "multitool", qty = 1})
+for i, r in ipairs(g:known_recipes()) do if r.id == "assemble_pm" then g.craft_ui.cursor = i end end
+g.log = {"From the tape: Assemble PM."}
+g:draw_craft(400, 300)
+solaros.dump("ops_craft_gun.txt")
+
+-- Scene: a gunfight - the PM in hand, rounds in the bag
+g = Game.new()
+g:start_game()
+g.player.equipped.rhand = "pm_pistol"
+table.insert(g.player.inventory, {item = "r9x18", qty = 7})
+g:start_encounter({kind = "animal", name = "Jawhound", art = "jawhound", who = "jawhound",
+    intro = "A dog stands in the scrub, but wrong: eyes crowd its flanks and back, all of them open.",
+    hp = 30, dmg = {6, 12}, hit = 60, speed = 4, bleed = 30, flees_at = 8, start = "far",
+    loot = {{"nothing", 1}}})
+g:enc_say("The PM Pistol cracks. You hit the jawhound (-19). It's bleeding.")
+g:draw_encounter(400, 300)
+solaros.dump("ops_encounter_gun.txt")

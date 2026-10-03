@@ -42,6 +42,10 @@ function Game:journal_lines()
     if self:lore_count() > 0 then
         add(("Pages read: %d/%d. L to reread them."):format(self:lore_count(), #LORE.pages))
     end
+    local n_known = 0
+    for _, r in ipairs(RECIPES) do if self.known[r.id] then n_known = n_known + 1 end end
+    add(("Recipes known: %d of %d. Study, read, listen."):format(n_known, #RECIPES))
+    if self.last_tape then add("Last tape: " .. self.last_tape) end
     local story = self:story_text()
     if story then add(story) end
     local quest = self:quest_text()

@@ -58,7 +58,7 @@ function Game:shoot()
     local p, e, G = self.player, self.enc, CHURN.guns
     local item, sh = self:shooter()
     if not item then return end
-    local name = ITEM_DB[item].name:lower()
+    local name = ITEM_DB[item].name
     self:take_items(sh.ammo, 1)
     if not sh.quiet then
         self.gun_wear = self.gun_wear or {}
