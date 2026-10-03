@@ -65,14 +65,14 @@ for _, c in ipairs(SPRITE_CALLS) do
     assert(c.x >= 0 and c.y >= 0 and c.x + c.w <= 400 and c.y + c.h <= 300,
         ("sprite off screen at %d,%d"):format(c.x, c.y))
 end
--- expected: ground 5 (rock, sticks, cloth, beans, water) + bag 2 + equipped (tshirt,jeans,boots,backpack,cap,gloves)
+-- expected: ground 6 (rock, sticks, cloth, beans, water, matches) + bag 2 + equipped (tshirt,jeans,boots,backpack,cap,gloves)
 -- 6 x 5 (each worn icon is drawn 4x in white as a halo, then once in black)
 -- (the doll itself is drawn as bitmap tiles: count the 16x16 icons apart)
 local icons = 0
 for _, c in ipairs(SPRITE_CALLS) do if c.w == 16 and c.h == 16 then icons = icons + 1 end end
-assert(icons == 37, "expected 37 icon sprites, got " .. icons)
-assert(#SPRITE_CALLS == 37 + #game:doll_tiles(), "the rest are the doll's tiles")
-print("   count matches: 5 ground + 2 bag + 6 worn x 5 (halo) = 37 icons, + " .. #game:doll_tiles()
+assert(icons == 38, "expected 38 icon sprites, got " .. icons)
+assert(#SPRITE_CALLS == 38 + #game:doll_tiles(), "the rest are the doll's tiles")
+print("   count matches: 6 ground + 2 bag + 6 worn x 5 (halo) = 38 icons, + " .. #game:doll_tiles()
     .. " doll tiles, all on screen")
 
 -- 5. an item with no art must fall back to a letter, not crash

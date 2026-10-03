@@ -26,7 +26,9 @@ function Game:maybe_encounter(terrain_id)
     if chance then chance = chance * self:diff("encounter") end
     if chance and self:is_night() then chance = chance * WORLD.night_encounters end
     if chance and self:weather() == "Storm" then chance = chance * WORLD.storm.encounters end
-    if chance and self:roll(chance * self.player.encounter_mult) then self:start_encounter(self:pick_encounter()) end
+    if chance and self:roll(chance * self.player.encounter_mult * self:noise_mult()) then
+        self:start_encounter(self:pick_encounter())
+    end
 end
 
 -- A kind by ENCOUNTER_KINDS weight (skipping kinds with no entries), then
@@ -47,6 +49,10 @@ function Game:start_encounter(def)
                 intro = wrap(def.intro, ENC_INTRO_COLS), cursor = 1, aim = 0,
                 demanding = def.kind == "bandit"}
     if def.kind == "bandit" then self:enc_say(def.demand) end
+    if self:placed_here("can_rattle") and self.enc.range ~= "far" then   -- the cans rang
+        self.enc.range = "far"
+        self:enc_say("The cans you strung up clatter. You're ready for it.")
+    end
     if self:weather() == "Fog" then   -- it was on you before you saw it
         self.enc.fog = true
         if self.enc.range == "far" then self.enc.range = "near" end
@@ -103,7 +109,7 @@ function Game:encounter_options()
     local kind = e.def.kind
     if kind == "helper" then return {{"Talk", "talk"}, {"Walk on", "leave_quietly"}} end
     if kind == "anomaly" then return {{"Investigate", "investigate"}, {"Walk away", "leave_quietly"}} end
-    if kind == "horror" then return self:horror_options(e) end
+    if kind == "horror" then return self:sign_options(self:horror_options(e), e) end
     if kind == "little" then return self:little_options() end
     if kind == "institute" then return self:institute_options() end
     if kind == "dog" then
@@ -147,7 +153,7 @@ function Game:encounter_options()
     if e.range == "far" or (e.fog and e.range == "near") then o[#o + 1] = {"Hide", "hide"} end
     if kind == "mutant" and not e.talked then o[#o + 1] = {"Talk", "talk"} end
     o[#o + 1] = {"Flee", "flee"}
-    return o
+    return self:ranged_options(o, e)
 end
 
 function Game:enemy_dies()
@@ -260,6 +266,7 @@ function Game:encounter_action(action)
     if action == "tame" then return self:dog_tame() end
     if action:find("_little$") then return self:little_action(action) end
     if action:find("_institute$") then return self:institute_action(action) end
+    if action == "elder" then return self:raise_sign() end
     if action == "look_away" or action == "speak" or action == "cover" or action == "follow" then
         return self:horror_action(action)
     end
@@ -296,6 +303,8 @@ function Game:encounter_action(action)
     elseif action == "back" then
         e.range = FARTHER[e.range]
         self:enc_say("You back away. Range: " .. RANGE_NAME[e.range] .. ".")
+    elseif action == "shoot" then
+        self:shoot()
     elseif action == "attack" then
         local w, wname = self:weapon()
         local hit = FIGHT.PLAYER_HIT + 8 * (p.attrs.Speed - 3) + e.aim + self:skill_bonus("fight")

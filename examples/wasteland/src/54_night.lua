@@ -14,6 +14,8 @@ function Game:horror_chance()
     local chance = NIGHT.chance
     if self:has_light() then chance = chance / 2 end
     if self:fire_here() then chance = chance / 2 end
+    if self:placed_here("salt_circle") then chance = chance / 4 end   -- the circle holds
+    if self:carrying("black_candle") then chance = chance / 2 end
     return chance
 end
 

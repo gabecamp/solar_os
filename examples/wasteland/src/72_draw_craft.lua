@@ -45,7 +45,7 @@ function Game:draw_craft(w, h)
     local ly = CRAFT_UI.list_y + math.min(#list, rows) * CRAFT_UI.row_h + 8
     if unknown > 0 and ly + 13 < h - 64 then
         gfx.text(8, ly, unknown .. " more unknown:")
-        gfx.text(8, ly + 13, "read Scrawled Notes")
+        gfx.text(8, ly + 13, "study, read, listen")
     end
     gfx.line(CRAFT_UI.detail_x - 4, 26, CRAFT_UI.detail_x - 4, h - 60)
 
@@ -58,21 +58,24 @@ function Game:draw_craft(w, h)
             draw_sprite(w - 26, y - 12, SPRITE_W, SPRITE_H, icon)
         end
         gfx.text(x, y, r.out and ("Makes: " .. ITEM_DB[r.out[1]].name)
+            or (r.study and self:study_text(r.study))
+            or (r.clean and "Cleans your guns: less jamming")
             or (r.base == "claim" and "Makes this ruin your camp")
             or (r.base and ("Builds at your camp"))
             or (r.mend and self:mend_text())
+            or (r.burn and ("Lights a small fire (" .. r.burn .. "h)"))
             or "Builds a campfire here")
         y = y + 18
         gfx.text(x, y, "Uses:")
         for _, iq in ipairs(Game.recipe_inputs(r)) do
             y = y + 13
             local have = self:count_item(iq[1])
-            gfx.text(x + 7, y, ITEM_DB[iq[1]].name .. " " .. math.min(have, 99) .. "/" .. iq[2]
+            gfx.text(x + 7, y, Game.input_name(iq[1]) .. " " .. math.min(have, 99) .. "/" .. iq[2]
                 .. (have >= iq[2] and "" or "  x"))
         end
         for _, tool in ipairs(r.tools or {}) do
             y = y + 13
-            gfx.text(x, y, "Tool: " .. ITEM_DB[tool].name .. (self:count_item(tool) > 0 and "" or "  x"))
+            gfx.text(x, y, "Tool: " .. Game.input_name(tool) .. (self:count_item(tool) > 0 and "" or "  x"))
         end
         if r.fire then
             y = y + 13
@@ -83,6 +86,9 @@ function Game:draw_craft(w, h)
         if r.repair then   -- repairs can fail (and burn a part)
             y = y + 14
             gfx.text(x, y, "Chance " .. self:repair_chance(r.repair) .. "% (Perception)")
+        elseif r.chance then
+            y = y + 14
+            gfx.text(x, y, "Chance " .. self:craft_chance(r) .. "% (Perception)")
         end
         y = y + 18
         local why = self:craft_blocker(r)

@@ -1567,6 +1567,11 @@ local function pack_bitmap(name, rows, w, h)
     return packed
 end
 
+-- The Churn's new items: their own art (09_art_churn), or a look-alike's
+-- (ITEM_DB[..].look, resolved below, after the ragged clothes: a look may
+-- itself borrow, so in passes).
+for id, rows in pairs(CHURN.art) do SPRITE_ART[id] = rows end
+
 -- Makeshift clothes borrow the real thing's sprite, full of holes.
 for item_id, def in pairs(ITEM_DB) do
     local base = def.ragged_of and SPRITE_ART[def.ragged_of]
@@ -1581,6 +1586,12 @@ for item_id, def in pairs(ITEM_DB) do
             rows[y] = table.concat(out)
         end
         SPRITE_ART[item_id] = rows
+    end
+end
+
+for _ = 1, 3 do
+    for item_id, def in pairs(ITEM_DB) do
+        if def.look and not SPRITE_ART[item_id] then SPRITE_ART[item_id] = SPRITE_ART[def.look] end
     end
 end
 

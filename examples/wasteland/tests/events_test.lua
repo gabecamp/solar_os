@@ -111,6 +111,7 @@ g:use_item("inventory", 1)
 assert(g.player.injuries.wounded_hours == 8 and #g.player.inventory == 0)
 g.player.inventory = {{item = "dirty_water", qty = 1}, {item = "cloth_scrap", qty = 1}}
 local filter
+g.known.filter = true   -- (learned: Medicine)
 for _, rr in ipairs(g:known_recipes()) do if rr.id == "filter" then filter = rr end end
 assert(filter and g:craft(filter))
 local clean = false   -- (the cloth may come off the ground: inputs use the ground first)

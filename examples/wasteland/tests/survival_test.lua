@@ -91,7 +91,7 @@ no_sickness(function()
     assert(g.player.needs.thirst > 20 + SURVIVE.drink_here - 5)
 end)
 
-print("4. Boil Water at a fire makes it clean")
+print("4. Boil Water at a fire, in a can, makes it clean")
 g = fresh()
 local boil
 for _, r in ipairs(S.RECIPES) do if r.id == "boil" then boil = r end end
@@ -99,6 +99,8 @@ assert(boil and boil.known and boil.fire)
 g.player.inventory = {{item = "dirty_water", qty = 1}}
 assert(not g:craft(boil), "needs a fire")
 g.camps[key(0, 0)] = {until_hour = g.player.hours + 12}
+assert(not g:craft(boil), "and a fireproof pot")
+table.insert(g.player.inventory, {item = "tin_can", qty = 1})
 assert(g:craft(boil))
 assert(count(g, "water_bottle") == 1 and count(g, "dirty_water") == 0)
 

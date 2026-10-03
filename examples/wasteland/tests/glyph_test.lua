@@ -79,7 +79,7 @@ local on_map = #SPRITE_CALLS - legend
 assert(on_map > 40 and on_map < tiles - 1,
        ("the map window should show a screenful of the %d hexes, drew %d"):format(tiles, on_map))
 for _, c in ipairs(SPRITE_CALLS) do
-    assert(c.w == GW and c.h == GH and #c.data == 20)
+    assert(c.w == GW and c.h == GH and #c.data == 20, ("odd sprite %dx%d %d bytes"):format(c.w, c.h, #c.data))
     assert(c.x >= 0 and c.y >= 0 and c.x + c.w <= 400 and c.y + c.h <= 300, "glyph off screen")
 end
 local map_glyphs = 0

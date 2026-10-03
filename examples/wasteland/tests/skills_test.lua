@@ -148,8 +148,8 @@ for _, r in ipairs(H.RECIPES) do if r.out and r.out[1] == "spear" then spear = r
 assert(spear and spear.hours > 1)
 g.known[spear.id] = true
 g.player.inventory = {}
-for item, n in pairs(spear.inputs) do g.player.inventory[#g.player.inventory + 1] = {item = item, qty = n * 2} end
-for _, item in ipairs(spear.tools or {}) do g.player.inventory[#g.player.inventory + 1] = {item = item, qty = 1} end
+-- (a shaft and a sharp edge: a stick and a knife)
+g.player.inventory = {{item = "stick", qty = 2}, {item = "knife", qty = 1}}
 local h0 = g.player.hours
 assert(g:craft(spear))
 assert(g.skills.tinker == SKILLS.xp.craft)

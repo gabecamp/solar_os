@@ -30,12 +30,26 @@ end
 print("1. every recipe uses real items, has an icon for what it makes, and some start known")
 local known, unknown = 0, 0
 for _, r in ipairs(C.RECIPES) do
+    -- an input or tool is an item, or "@prop": a property whose items all exist
+    local function real(item)
+        if item:sub(1, 1) == "@" then
+            local prop = C.CHURN.props[item:sub(2)]
+            if not prop then return false end
+            for _, id in ipairs(prop.items) do assert(C.ITEM_DB[id], item .. ": unknown item " .. id) end
+            return true
+        end
+        return C.ITEM_DB[item] ~= nil
+    end
     for item, qty in pairs(r.inputs) do
-        assert(C.ITEM_DB[item], r.id .. ": unknown input " .. item)
+        assert(real(item), r.id .. ": unknown input " .. item)
         assert(math.type(qty) == "integer" and qty > 0)
     end
-    for _, t in ipairs(r.tools or {}) do assert(C.ITEM_DB[t], r.id .. ": unknown tool " .. t) end
-    assert(r.out or r.place or r.base or r.mend, r.id .. " makes nothing")
+    for _, t in ipairs(r.tools or {}) do assert(real(t), r.id .. ": unknown tool " .. t) end
+    -- what isn't known from the start is taught by a research topic
+    local topic_ok = r.known
+    for _, t in ipairs(C.CHURN.topics) do if t.id == r.topic then topic_ok = true end end
+    assert(topic_ok, r.id .. ": neither known nor in a topic")
+    assert(r.out or r.place or r.base or r.mend or r.clean, r.id .. " makes nothing")
     if r.out then
         assert(C.ITEM_DB[r.out[1]] and C.SPRITES[r.out[1]], r.id .. ": output has no item/icon")
     end
@@ -69,12 +83,13 @@ print("   OK")
 
 print("4. tools stay; unknown recipes wait for notes; notes teach them")
 g = fresh()
-g.player.inventory = {{item = "stick", qty = 1}, {item = "rope", qty = 1}, {item = "knife", qty = 1}}
+g.player.inventory = {{item = "stick", qty = 1}, {item = "knife", qty = 1}}
 assert(not g:craft(find(g, "spear")), "spear isn't known yet")
 g.known.spear = true
 assert(g:craft(find(g, "spear")))
 assert(bag_count(g, "knife") == 1, "the knife is a tool, not used up")
-assert(bag_count(g, "spear") == 1 and bag_count(g, "stick") == 0 and bag_count(g, "rope") == 0)
+assert(bag_count(g, "spear") == 1 and bag_count(g, "stick") == 0,
+       "a spear is a shaft and a sharp edge to whittle it with")
 g = fresh()
 g.sites_known.checkpoint = true   -- otherwise some notes sketch the way out instead
 local n_before = #g:known_recipes()
@@ -84,7 +99,8 @@ g:use_item("inventory", 1)
 assert(#g:known_recipes() == n_before + 1 or (#g:known_recipes() == n_before and next(g.stashes)),
        "notes teach one recipe")
 assert(bag_count(g, "scrawled_notes") == 1, "and are used up")
-for _ = 1, 40 do g:read_notes() end   -- some mark stashes instead
+local reads = 0
+while #g:known_recipes() < #C.RECIPES and reads < 600 do g:read_notes(); reads = reads + 1 end   -- some mark stashes instead
 assert(#g:known_recipes() == #C.RECIPES, "enough notes teach everything")
 assert(g:read_notes() and next(g.stashes), "then the notes mark stashes instead")
 print("   OK")
@@ -94,7 +110,12 @@ g = fresh()
 g.player.inventory = {{item = "strange_meat", qty = 1}}
 assert(not g:craft(find(g, "cook")), "no fire yet")
 g.player.inventory = {{item = "stick", qty = 3}, {item = "rock", qty = 1}, {item = "strange_meat", qty = 1}}
+assert(not g:craft(find(g, "campfire")), "a fire needs a heat source")
+table.insert(g.player.inventory, {item = "matches", qty = 1})
 assert(g:craft(find(g, "campfire")) and g:fire_here())
+assert(bag_count(g, "matches") == 1, "the matches are a tool")
+assert(not g:craft(find(g, "cook")), "cooking needs a fireproof pot")
+table.insert(g:ground_list(), {item = "tin_can", qty = 1})   -- (the bag is full)
 assert(not g:craft(find(g, "campfire")), "one fire per tile")
 assert(g:craft(find(g, "cook")) and bag_count(g, "cooked_meat") == 1)
 g.player.hours = g.player.hours + C.RECIPES.campfire_hours

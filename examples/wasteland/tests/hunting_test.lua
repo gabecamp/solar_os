@@ -97,13 +97,16 @@ g.player.inventory = {{item = "snare", qty = 1}}
 g:use_item("inventory", 1)
 assert(count(g, "snare") == 1 and has_log(g, "Nothing would walk"))
 
-print("5. recipes known, items drawn, fish cooks at a fire")
+print("5. cooking fish is known, rod and snare are Bushcraft; fish cooks at a fire, in a can")
 g = fresh()
-for _, id in ipairs({"fishing_rod", "snare", "cook_fish"}) do assert(g.known[id], id) end
+assert(g.known.cook_fish)
+for _, r in ipairs(H.RECIPES) do
+    if r.id == "fishing_rod" or r.id == "snare" then assert(not g.known[r.id] and r.topic == "bushcraft", r.id) end
+end
 for _, id in ipairs({"fishing_rod", "snare", "raw_fish", "cooked_fish"}) do assert(H.SPRITES[id], id) end
 local cook
 for _, r in ipairs(H.RECIPES) do if r.id == "cook_fish" then cook = r end end
-g.player.inventory = {{item = "raw_fish", qty = 1}}
+g.player.inventory = {{item = "raw_fish", qty = 1}, {item = "tin_can", qty = 1}}
 g.camps[key(g.player.q, g.player.r)] = {until_hour = g.player.hours + 5}
 assert(g:craft(cook) and count(g, "cooked_fish") == 1)
 

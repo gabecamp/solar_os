@@ -27,7 +27,7 @@ assert(#g.player.inventory == 0, "nothing carried")
 assert(g:bag_capacity() == 2, "your arms hold 2")
 print("   OK")
 
-print("2. every piece of clothing has a crafted, known, poorer version")
+print("2. every piece of clothing has a crafted, poorer version (known, or learned in Tailoring)")
 local rag_of = {}
 for id, def in pairs(ITEM_DB) do
     if def.ragged_of then
@@ -36,14 +36,15 @@ for id, def in pairs(ITEM_DB) do
         assert(cells(def) < cells(real) or cells(real) == 0, id .. ": less room than " .. def.ragged_of)
         assert((def.warmth or 0) <= (real.warmth or 0), id .. ": no warmer than " .. def.ragged_of)
         local r = recipe(id)
-        assert(r and g.known[r.id], id .. ": a recipe you know from the start")
+        assert(r and (g.known[r.id] or r.topic == "rags"), id .. ": a recipe, known or Tailoring")
         rag_of[def.ragged_of] = id
     end
 end
 local special = {karls_hat = true, karls_waders = true, headlamp = true}   -- gifts and tech
 for id, def in pairs(ITEM_DB) do
     local hand = def.slot == "lhand" or def.slot == "rhand"
-    if def.slot and not hand and not def.ragged_of and not special[id] then
+    -- (gear you craft yourself - hide, foil, a pelt coat - is its own makeshift)
+    if def.slot and not hand and not def.ragged_of and not special[id] and not recipe(id) then
         assert(rag_of[id], id .. " has no makeshift version")
     end
 end

@@ -693,7 +693,8 @@ local RECIPES = {
      out = {"torch", 1}, known = true},
     {id = "bandage", name = "Bandage", inputs = {cloth_scrap = 2}, hours = 1,
      out = {"bandage", 1}, known = true},
-    {id = "campfire", name = "Campfire", inputs = {stick = 3, rock = 1}, hours = 1,
+    -- (an "@" input is a property: any item that has it; see CHURN.props)
+    {id = "campfire", name = "Campfire", inputs = {["@fuel"] = 3, rock = 1}, tools = {"@heat"}, hours = 1,
      place = "campfire", known = true},
     -- makeshift clothes: all known from the start (you start with nothing,
     -- so they come near the top of the list)
@@ -718,9 +719,9 @@ local RECIPES = {
      out = {"rag_mask", 1}, known = true},
     -- mends the most worn thing you have on (WORLD.wear.mend)
     {id = "patch", name = "Patch clothes", inputs = {cloth_scrap = 1}, hours = 1, mend = true, known = true},
-    {id = "cook", name = "Cooked Meat", inputs = {strange_meat = 1}, fire = true, hours = 1,
+    {id = "cook", name = "Cooked Meat", inputs = {strange_meat = 1}, tools = {"@fire_container"}, fire = true, hours = 1,
      out = {"cooked_meat", 1}, known = true},
-    {id = "boil", name = "Boil Water", inputs = {dirty_water = 1}, fire = true, hours = 1,
+    {id = "boil", name = "Boil Water", inputs = {dirty_water = 1}, tools = {"@fire_container"}, fire = true, hours = 1,
      out = {"water_bottle", 1}, known = true},
     {id = "rope_belt", name = "Rope Belt", inputs = {rope = 1, cloth_scrap = 1}, hours = 1,
      out = {"rope_belt", 1}, known = true},
@@ -728,9 +729,9 @@ local RECIPES = {
      out = {"shiv", 1}, known = true},
     {id = "fishing_rod", name = "Fishing Rod", inputs = {stick = 1, rope = 1, scrap_metal = 1},
      hours = 1, out = {"fishing_rod", 1}, known = true},
-    {id = "snare", name = "Snare", inputs = {rope = 1, stick = 2}, hours = 1,
+    {id = "snare", name = "Snare", inputs = {["@thread_s"] = 1, ["@shaft"] = 2}, hours = 1,
      out = {"snare", 1}, known = true},
-    {id = "cook_fish", name = "Cooked Fish", inputs = {raw_fish = 1}, fire = true, hours = 1,
+    {id = "cook_fish", name = "Cooked Fish", inputs = {raw_fish = 1}, tools = {"@fire_container"}, fire = true, hours = 1,
      out = {"cooked_fish", 1}, known = true},
     -- base building (base = what it builds; see BASE and src/51_base.lua)
     {id = "claim", name = "Claim this ruin", inputs = {rope = 2, scrap_metal = 3}, hours = 4,
@@ -745,10 +746,10 @@ local RECIPES = {
      base = "barricade", known = true},
     {id = "filter", name = "Filter Water", inputs = {dirty_water = 1, cloth_scrap = 1}, hours = 1,
      out = {"water_bottle", 1}, known = true},
-    {id = "splint", name = "Splint", inputs = {stick = 2, cloth_scrap = 1}, hours = 1,
+    {id = "splint", name = "Splint", inputs = {["@shaft"] = 1, ["@thread_s"] = 2}, hours = 1,
      out = {"splint", 1}, known = true},
     {id = "rope", name = "Rope", inputs = {cloth_scrap = 3}, hours = 1, out = {"rope", 1}},
-    {id = "spear", name = "Spear", inputs = {stick = 1, rope = 1}, tools = {"knife"},
+    {id = "spear", name = "Spear", inputs = {["@shaft"] = 1}, tools = {"@sharp"},
      hours = 2, out = {"spear", 1}},
     {id = "club", name = "Stone Club", inputs = {stick = 1, rock = 1, rope = 1}, hours = 2,
      out = {"stone_club", 1}},
@@ -911,6 +912,1128 @@ for _, e in ipairs(ENCOUNTERS) do
     table.insert(ENCOUNTERS_BY_KIND[e.kind], e)
 end
 
+-- ---------------------------------------------------------------------
+-- The Churn's bigger crafting: item properties, research topics, the media
+-- that teach recipes (books, cassettes, USB drives), the new materials and
+-- recipes (many adapted from NEO Scavenger's), wards against the things in
+-- the dark, and the rare handguns with their parts and rounds.
+--
+-- Everything is one table, CHURN (one local: see the 200-local note in
+-- 35_crafting); the items, recipes and loot are added to ITEM_DB, RECIPES,
+-- SCAVENGE_LOOT, TRADE and the encounters' loot below.
+-- ---------------------------------------------------------------------
+
+local CHURN = {
+    -- Properties, NEO Scavenger style: a recipe can ask for "@sharp" (any
+    -- sharp edge) instead of one item. items = what counts, cheapest first:
+    -- a craft uses up (or works with) the first one you have.
+    props = {
+        sharp = {name = "sharp edge", items = {"glass_shard", "stone_knife", "scalpel", "screwdriver",
+                 "crowbar", "glass_shiv", "shiv", "kitchen_knife", "hacksaw", "multitool", "knife",
+                 "hunting_knife", "machete", "broad_spear"}},
+        thread_s = {name = "thread", items = {"string", "sinew", "choir_wire", "copper_wire", "rope"}},
+        thread_m = {name = "cord", items = {"rope", "duct_tape"}},
+        shaft = {name = "shaft", items = {"stick", "large_branch", "pipe"}},
+        shaft_l = {name = "long shaft", items = {"large_branch", "pipe"}},
+        fuel = {name = "fuel", items = {"newspaper", "stick", "charcoal", "large_branch"}},
+        heat = {name = "heat source", items = {"fire_drill", "matches", "lighter", "torch"}},
+        fire_container = {name = "fireproof pot", items = {"tin_can", "metal_pot"}},
+        rigid = {name = "small metal", items = {"screws", "scrap_metal"}},
+        fletching = {name = "fletching", items = {"feathers", "newspaper"}},
+        hide = {name = "hide", items = {"hide", "jawhound_pelt"}},
+        gun_tool = {name = "gun tools", items = {"gunsmith_kit", "multitool"}},
+    },
+
+    -- Research (src/59_research.lua). A topic's recipes are learned in
+    -- RECIPES order. Study at a fire or your camp: hours, then points
+    -- (base, +per_point per Perception over 3, + tinker skill / 5; x2 with
+    -- the topic's book in reach); need (+ need_step per recipe already
+    -- known in the topic) points learns the next one. needs: one of these
+    -- in reach to study the topic at all. cost: extra rest it takes.
+    topics = {
+        {id = "rags", name = "Tailoring", book = "book_tailor"},
+        {id = "bushcraft", name = "Bushcraft", book = "book_field"},
+        {id = "medicine", name = "Medicine", book = "book_surgeon"},
+        {id = "tinkering", name = "Tinkering", book = "book_radio"},
+        {id = "chemistry", name = "Chemistry", book = "book_lab",
+         needs = {"chemicals", "book_lab", "gunpowder"}},
+        {id = "gunsmithing", name = "Gunsmithing", book = "book_gunsmith",
+         needs = {"book_gunsmith", "pm_pistol", "nagant", "tokarev", "inst_sidearm", "marsh_revolver",
+                  "frame_pm", "frame_nagant", "frame_tt", "frame_inst", "gun_barrel", "firing_pin"}},
+        {id = "warding", name = "Warding", book = "book_hymnal", cost = 15,
+         needs = {"ichor", "pale_eye", "book_hymnal", "elder_sign"}},
+    },
+    study = {hours = 3, base = 4, per_point = 1, book_mult = 2, need = 8, need_step = 2,
+             read_hours = 2, tape_hours = 1, tape_max = 4, usb_hours = 1, usb_fail = 25},
+
+    -- Cassettes: the logs of the dead. Each teaches from its topic once.
+    tapes = {
+        tape_cook = {topic = "bushcraft", voice = "A tired man: 'Day forty. Bark tea for the gut, "
+            .. "smoke the meat or lose it. The ground moved again last night. Our hut is "
+            .. "a field further east than it was.'"},
+        tape_medic = {topic = "medicine", voice = "A woman, calm: 'Boil the thread. Stitch toward "
+            .. "you. If the wound sings, don't close it. Walk away and don't look back.'"},
+        tape_gun = {topic = "gunsmithing", voice = "Someone chewing: 'The Makarov's a brick, it "
+            .. "forgives you. Brass, powder, lead. Count your rounds. Out here the dark counts them too.'"},
+        tape_choir = {topic = "warding", voice = "Static, then singing - many voices, one breath. "
+            .. "Under it a man whispers: 'Salt the ground. Wax and black water. Draw the sign. "
+            .. "They can't cross what they can't read.'"},
+        tape_lab = {topic = "chemistry", voice = "A clipped voice: 'Institute log 7. Sample "
+            .. "reacts to charcoal and nitrate. The quarry samples react to us. Recommend "
+            .. "we stop listening to them.'"},
+        tape_tinker = {topic = "tinkering", voice = "A teenager: 'If you're hearing this, the "
+            .. "Choir Cell works. Phone memory, screwdriver, patience. Mum, if you find "
+            .. "this - I went north.'"},
+    },
+    usb_topics = {"gunsmithing", "chemistry", "tinkering", "warding"},
+
+    -- Ranged weapons (src/50s: Game:shoot): shoot = {dmg, ammo, jam %, hit
+    -- bonus, quiet (no noise), curse (rest lost per shot)}. Guns wear a
+    -- little each shot (self.gun_wear), and a worn gun jams more.
+    guns = {wear_per_shot = 3, jam_per_wear = 5, noise_hours = 6, noise_mult = 1.5,
+            shoot_hit = 55, far_penalty = 10, animal_flee = 25, bleed = 30},
+}
+
+-- -- the new items -------------------------------------------------------
+-- look = whose sprite it borrows (10_sprites copies it) where it has none of its own.
+for id, def in pairs({
+    -- materials and simple tools
+    glass_shard  = {name = "Glass Shard",  desc = "A sharp edge. Fragile"},
+    string       = {name = "String",       desc = "Thread, for crafting"},
+    sinew        = {name = "Sinew",        desc = "Thread, from an animal"},
+    choir_wire   = {name = "Choir Wire",   desc = "Hums when you hold it. Thread"},
+    large_branch = {name = "Large Branch", desc = "A long shaft; fuel"},
+    newspaper    = {name = "Old Newspaper", desc = "Fuel. The headlines are wrong"},
+    tin_can      = {name = "Tin Can",      desc = "Fireproof: boil and cook in it"},
+    metal_pot    = {name = "Metal Pot",    desc = "Fireproof: boil and cook in it"},
+    matches      = {name = "Matches",      desc = "Heat: light fires (C)"},
+    lighter      = {name = "Lighter",      desc = "Heat: light fires (C)"},
+    fire_drill   = {name = "Fire Drill",   desc = "Heat: slow, but it works"},
+    bark         = {name = "Tree Bark",    desc = "Tannin: for tea and hides"},
+    raw_hide     = {name = "Raw Hide",     desc = "Cure it with bark tea"},
+    hide         = {name = "Cured Hide",   desc = "For crafting"},
+    jawhound_pelt = {name = "Jawhound Pelt", desc = "Still has eyes in it. Hide"},
+    bone         = {name = "Bone",         desc = "For crafting"},
+    feathers     = {name = "Crow Feathers", desc = "Fletching, for arrows"},
+    tarp         = {name = "Tarp",         desc = "For a shelter or a travois"},
+    foil         = {name = "Foil Scrap",   desc = "For crafting"},
+    screws       = {name = "Screws",       desc = "Small metal, for crafting"},
+    mech_parts   = {name = "Mech. Parts",  desc = "Gears and springs"},
+    duct_tape    = {name = "Duct Tape",    desc = "Cord, for crafting"},
+    salt         = {name = "Salt",         desc = "For wards and curing"},
+    pale_wax     = {name = "Pale Wax",     desc = "From the Institute's candles"},
+    ichor        = {name = "Black Ichor",  desc = "It bled. It shouldn't have"},
+    pale_eye     = {name = "Pale Eye",     desc = "It still follows you"},
+    chemicals    = {name = "Chemicals",    desc = "Lab stock. Don't drink it"},
+    charcoal     = {name = "Charcoal",     desc = "Fuel; for gunpowder"},
+    gunpowder    = {name = "Gunpowder",    desc = "For rounds"},
+    brass        = {name = "Brass Casings", desc = "Spent. Reload them"},
+    lead_scrap   = {name = "Lead Scrap",   desc = "For bullets"},
+    gun_oil      = {name = "Gun Oil",      desc = "For cleaning a gun"},
+    laptop_battery = {name = "Laptop Battery", desc = "For a Choir Cell"},
+    locked_phone = {name = "Locked Phone", desc = "Crack it open (C)"},
+    pliers       = {name = "Pliers",       desc = "A tool"},
+    screwdriver  = {name = "Screwdriver",  desc = "A tool; a crude edge",
+                    weapon = {dmg = 7, reach = "close", bleed = 15}},
+    crowbar      = {name = "Crowbar",      desc = "Weapon: 14 dmg; a tool",
+                    weapon = {dmg = 14, reach = "close"}},
+    hacksaw      = {name = "Hacksaw",      desc = "A tool; an edge"},
+    scalpel      = {name = "Scalpel",      desc = "A sharp edge",
+                    weapon = {dmg = 6, reach = "close", bleed = 40}},
+    kitchen_knife = {name = "Kitchen Knife", desc = "Weapon: 10 dmg, bleeds",
+                     weapon = {dmg = 10, reach = "close", bleed = 25}},
+    hunting_knife = {name = "Hunting Knife", desc = "Weapon: 15 dmg, bleeds",
+                     weapon = {dmg = 15, reach = "close", bleed = 35}},
+    gunsmith_kit = {name = "Gunsmith Kit", desc = "Tools for guns"},
+    -- crafted gear
+    stone_knife  = {name = "Stone Knife",  desc = "Weapon: 7 dmg; an edge",
+                    weapon = {dmg = 7, reach = "close", bleed = 15}},
+    glass_shiv   = {name = "Glass Shiv",   desc = "Weapon: 9 dmg, bleeds",
+                    weapon = {dmg = 9, reach = "close", bleed = 35}},
+    broad_spear  = {name = "Broad Spear",  desc = "Weapon: 14 dmg, reach",
+                    weapon = {dmg = 14, reach = "near", bleed = 25}},
+    bone_needle  = {name = "Bone Needle",  desc = "A tool for stitching"},
+    rag_shoes    = {name = "Rag Shoes",    slot = "feet", warmth = 1, ragged_of = "boots",
+                    desc = "Warmer than wraps", wear = {{"legs", 274, 290, "DARK"}}},
+    foil_poncho  = {name = "Foil Poncho",  slot = "jacket", warmth = 1, rad_armor = 0.85,
+                    desc = "Worn: some radiation", vague_desc = "Worn: crackles faintly",
+                    wear = {{"torso", 146, 215, "LIGHT", 5, 40}, {"arms", 150, 200, "LIGHT"}}},
+    hide_tunic   = {name = "Hide Tunic",   slot = "shirt", warmth = 2, desc = "Worn: warmth 2",
+                    wear = {{"torso", 146, 227, "DARK"}, {"arms", 150, 180, "DARK"}}},
+    hide_gloves  = {name = "Hide Gloves",  slot = "hands", warmth = 1,
+                    wear = {{"arms", 234, 252, "DARK"}}},
+    hide_pack    = {name = "Hide Pack",    slot = "back", bag_cells = 12, desc = "Worn: 12 bag cells",
+                    wear = {{"torso", 147, 200, "BLACK", 9, 13}}},
+    pelt_coat    = {name = "Pelt Coat",    slot = "jacket", warmth = 4, pocket_cells = 2,
+                    desc = "Warmth 4, +2 cells. It watches", wear = {{"torso", 146, 226, "BLACK", 5, 40},
+                    {"arms", 150, 234, "BLACK"}}},
+    travois      = {name = "Travois",      slot = "back", bag_cells = 14, fx = {mp = -1},
+                    desc = "Dragged: 14 cells, -1 MP", wear = {{"torso", 147, 196, "DARK", 9, 13}}},
+    hand_cart    = {name = "Hand Cart",    slot = "back", bag_cells = 16, fx = {mp = -1},
+                    desc = "Pushed: 16 cells, -1 MP", wear = {{"torso", 147, 196, "BLACK", 9, 13}}},
+    lockpicks    = {name = "Lockpicks",    desc = "Opens locked crates (F)"},
+    can_rattle   = {name = "Can Rattle",   desc = "E: hang it here; warns you"},
+    tarp_shelter = {name = "Tarp Lean-to", desc = "E: pitch it; cover from storms"},
+    bark_tea     = {name = "Bark Tea",     consumable = {thirst = 30}, cures = true,
+                    desc = "E: drink; settles sickness"},
+    smoked_meat  = {name = "Smoked Meat",  consumable = {hunger = 40}, desc = "Keeps a long time"},
+    stitches     = {name = "Suture Kit",   desc = "E: stops bleeding, heals a wound"},
+    tincture     = {name = "Herb Tincture", consumable = {rads = -25, thirst = -5},
+                    desc = "E: -25 rads", vague_desc = "E: bitter, settling"},
+    painkillers  = {name = "Painkillers",  desc = "E: +12 HP"},
+    sedative     = {name = "Sedative",     consumable = {rest = 35}, desc = "E: sleep comes"},
+    rad_purge    = {name = "Rad Purge",    consumable = {rads = -100, thirst = -15, hunger = -10},
+                    desc = "E: -100 rads. Rough", vague_name = "Grey Syrup", vague_desc = "E: purges you"},
+    flare        = {name = "Flare",        desc = "Throw it: burns, scares",
+                    weapon = {dmg = 8, reach = "close", thrown = true}},
+    choir_cell   = {name = "Choir Cell",   desc = "E: fully charges your devices"},
+    -- wards against what walks in the dark
+    salt_circle  = {name = "Salt Circle",  desc = "E: pour it; wards this hex"},
+    black_candle = {name = "Black Candle", light = true, ward = true,
+                    desc = "Hold it: light; horrors hang back"},
+    glow_jar     = {name = "Glow Jar",     light = true, desc = "Hold it: a cold light"},
+    choir_charm  = {name = "Choir Charm",  slot = "neck", fx = {encounter = 0.8, thirst = 1.1},
+                    desc = "Worn: fewer meetings, thirst", wear = {{"torso", 140, 146, "BLACK", 0, 4}}},
+    elder_sign   = {name = "Elder Sign",   desc = "Raise it at a horror: it goes"},
+    -- media that teach (src/59_research.lua)
+    book_tailor  = {name = "Seamstress's Almanac", book = "rags", desc = "E: read (Tailoring)"},
+    book_field   = {name = "Field Manual", book = "bushcraft", desc = "E: read (Bushcraft)"},
+    book_surgeon = {name = "Surgeon's Notes", book = "medicine", desc = "E: read (Medicine)"},
+    book_radio   = {name = "Radio Ham Handbook", book = "tinkering", desc = "E: read (Tinkering)"},
+    book_lab     = {name = "Institute Lab Book", book = "chemistry", desc = "E: read (Chemistry)"},
+    book_gunsmith = {name = "Gunsmith's Ledger", book = "gunsmithing", desc = "E: read (Gunsmithing)"},
+    book_hymnal  = {name = "The Choir Hymnal", book = "warding", desc = "E: read (Warding). Costs you"},
+    cassette_player = {name = "Cassette Player", desc = "Plays tapes; Battery Cell: E"},
+    tape_cook    = {name = "Tape: Day Forty", desc = "E: play it"},
+    tape_medic   = {name = "Tape: The Medic", desc = "E: play it"},
+    tape_gun     = {name = "Tape: Count Rounds", desc = "E: play it"},
+    tape_choir   = {name = "Tape: The Choir", desc = "E: play it"},
+    tape_lab     = {name = "Tape: Institute 7", desc = "E: play it"},
+    tape_tinker  = {name = "Tape: I Went North", desc = "E: play it"},
+    blank_tape   = {name = "Blank Tape",   desc = "Played out"},
+    usb_drive    = {name = "USB Drive",    desc = "E: pair it with the LoRa Radio"},
+    -- handguns: weapon = pistol-whip at arm's length; shoot = the shot (CHURN.guns)
+    pm_pistol    = {name = "PM Pistol",    weapon = {dmg = 5, reach = "close"},
+                    shoot = {dmg = 22, ammo = "r9x18", jam = 6, hit = 0}, desc = "Shoots 9x18"},
+    nagant       = {name = "Nagant Revolver", weapon = {dmg = 5, reach = "close"},
+                    shoot = {dmg = 24, ammo = "r762n", jam = 0, hit = -5}, desc = "Shoots 7.62N; never jams"},
+    tokarev      = {name = "Tokarev TT",   weapon = {dmg = 6, reach = "close"},
+                    shoot = {dmg = 30, ammo = "r762t", jam = 8, hit = 0}, desc = "Shoots 7.62x25; hits hard"},
+    inst_sidearm = {name = "Institute Sidearm", weapon = {dmg = 5, reach = "close"},
+                    shoot = {dmg = 26, ammo = "r9x18", jam = 2, hit = 15}, desc = "Shoots 9x18; precise"},
+    marsh_revolver = {name = "Marsh Revolver", weapon = {dmg = 6, reach = "close"},
+                      shoot = {dmg = 40, ammo = "r38", jam = 0, hit = 5, curse = 8},
+                      desc = "Shoots .38. Each shot costs you"},
+    bow          = {name = "Greenwood Bow", weapon = {dmg = 3, reach = "close"},
+                    shoot = {dmg = 12, ammo = "arrow", jam = 0, hit = -5, quiet = true}, desc = "Shoots arrows; quiet"},
+    sling        = {name = "Sling",        shoot = {dmg = 7, ammo = "rock", jam = 0, hit = -10, quiet = true},
+                    desc = "Hurls rocks; quiet"},
+    arrow        = {name = "Arrows",       desc = "Ammo: the bow"},
+    r9x18        = {name = "9x18 Rounds",  desc = "Ammo: PM, Institute"},
+    r762n        = {name = "7.62N Rounds", desc = "Ammo: Nagant"},
+    r762t        = {name = "7.62x25 Rounds", desc = "Ammo: Tokarev"},
+    r38          = {name = ".38 Rounds",   desc = "Ammo: Marsh Revolver"},
+    -- gun parts: a frame decides the gun; the rest are shared
+    frame_pm     = {name = "PM Frame",     desc = "Gun part: PM Pistol"},
+    frame_nagant = {name = "Nagant Frame", desc = "Gun part: Nagant"},
+    frame_tt     = {name = "TT Frame",     desc = "Gun part: Tokarev"},
+    frame_inst   = {name = "Odd Frame",    desc = "Gun part: no maker's mark"},
+    gun_slide    = {name = "Slide",        desc = "Gun part"},
+    gun_barrel   = {name = "Gun Barrel",   desc = "Gun part"},
+    gun_spring   = {name = "Recoil Spring", desc = "Gun part"},
+    firing_pin   = {name = "Firing Pin",   desc = "Gun part"},
+    magazine     = {name = "Magazine",     desc = "Gun part: pistols"},
+    cylinder     = {name = "Cylinder",     desc = "Gun part: revolvers"},
+}) do ITEM_DB[id] = def end
+-- sprites borrowed from a look-alike (the rest have art in CHURN.art below)
+for id, look in pairs({
+    sinew = "string", choir_wire = "string", metal_pot = "tin_can", lighter = "matches",
+    raw_hide = "hide", jawhound_pelt = "hide", newspaper = "lore_page", duct_tape = "rope",
+    pale_eye = "ichor", charcoal = "rock", lead_scrap = "scrap_metal", screws = "bolts",
+    mech_parts = "scrap_metal", foil = "cloth_scrap", gun_oil = "water_bottle",
+    laptop_battery = "battery_cell", locked_phone = "usb_drive", pliers = "multitool",
+    screwdriver = "shiv", hacksaw = "machete", scalpel = "shiv", kitchen_knife = "knife",
+    hunting_knife = "knife", gunsmith_kit = "multitool", stone_knife = "shiv",
+    glass_shiv = "shiv", broad_spear = "spear", bone_needle = "bone", hide_gloves = "gloves",
+    hide_tunic = "tshirt", hide_pack = "backpack", pelt_coat = "jacket", travois = "sack_pack",
+    hand_cart = "backpack", lockpicks = "bolts", smoked_meat = "jerky", tincture = "antirad",
+    painkillers = "antirad", sedative = "antirad", rad_purge = "antirad", choir_cell = "battery_cell",
+    glow_jar = "water_bottle", salt_circle = "salt", bark_tea = "water_bottle", stitches = "bandage",
+    book_tailor = "book_field", book_surgeon = "book_field", book_radio = "book_field",
+    book_lab = "book_field", book_gunsmith = "book_field", book_hymnal = "book_field",
+    tape_medic = "tape_cook", tape_gun = "tape_cook", tape_choir = "tape_cook",
+    tape_lab = "tape_cook", tape_tinker = "tape_cook", blank_tape = "tape_cook",
+    marsh_revolver = "nagant", tokarev = "pm_pistol", inst_sidearm = "pm_pistol",
+    r762n = "r9x18", r762t = "r9x18", r38 = "r9x18", brass = "r9x18",
+    frame_pm = "pm_pistol", frame_nagant = "nagant", frame_tt = "pm_pistol", frame_inst = "pm_pistol",
+    gun_slide = "gun_barrel", gun_spring = "mech_parts", firing_pin = "gun_barrel",
+    magazine = "r9x18", cylinder = "mech_parts",
+}) do ITEM_DB[id].look = look end
+ITEM_DB.canned_beans.empty = "tin_can"   -- the can is your first pot
+
+-- -- recipes ------------------------------------------------------------
+-- Existing recipes: which topic teaches them (everything not listed and
+-- not marked known below has to be learned).
+for id, topic in pairs({
+    rope = "rags", rag_hood = "rags", hand_wraps = "rags", ear_wraps = "rags", slit_goggles = "rags",
+    rag_scarf = "rags", patch_coat = "rags", scrap_bracers = "rags", sack_pack = "rags",
+    rag_mask = "rags", rope_belt = "rags",
+    snare = "bushcraft", fishing_rod = "bushcraft", spear = "bushcraft", club = "bushcraft",
+    bedroll = "bushcraft", barricade = "bushcraft",
+    filter = "medicine", splint = "medicine",
+    shiv = "tinkering", machete = "tinkering", spiked_club = "tinkering", pipe_spear = "tinkering",
+    barrel = "tinkering",
+}) do
+    for _, r in ipairs(RECIPES) do
+        if r.id == id then r.topic, r.known = topic, nil end
+    end
+end
+for _, r in ipairs({
+    -- known from the start: you wake with nothing, and need these to live
+    {id = "fire_drill", name = "Fire Drill", inputs = {stick = 2, cloth_scrap = 1}, hours = 1,
+     out = {"fire_drill", 1}, known = true},
+    {id = "small_fire", name = "Small Fire", inputs = {["@fuel"] = 1}, tools = {"@heat"}, hours = 1,
+     place = "campfire", burn = 4, known = true},
+    -- Tailoring
+    {id = "string", name = "String", inputs = {cloth_scrap = 1}, hours = 1, out = {"string", 2}, topic = "rags"},
+    {id = "bone_needle", name = "Bone Needle", inputs = {bone = 1}, tools = {"@sharp"}, hours = 1,
+     out = {"bone_needle", 1}, topic = "rags"},
+    {id = "rag_shoes", name = "Rag Shoes", inputs = {cloth_scrap = 2, ["@thread_s"] = 2}, hours = 1,
+     out = {"rag_shoes", 1}, topic = "rags"},
+    {id = "foil_poncho", name = "Foil Poncho", inputs = {foil = 4, ["@thread_s"] = 2}, hours = 2,
+     out = {"foil_poncho", 1}, topic = "rags"},
+    {id = "hide_gloves", name = "Hide Gloves", inputs = {["@hide"] = 1, ["@thread_s"] = 1},
+     tools = {"@sharp"}, hours = 1, out = {"hide_gloves", 1}, topic = "rags"},
+    {id = "hide_tunic", name = "Hide Tunic", inputs = {["@hide"] = 3, ["@thread_s"] = 3},
+     tools = {"@sharp", "bone_needle"}, hours = 3, out = {"hide_tunic", 1}, topic = "rags"},
+    {id = "hide_pack", name = "Hide Pack", inputs = {["@hide"] = 3, ["@thread_m"] = 1},
+     tools = {"@sharp", "bone_needle"}, hours = 3, out = {"hide_pack", 1}, topic = "rags"},
+    {id = "pelt_coat", name = "Pelt Coat", inputs = {jawhound_pelt = 1, ["@thread_m"] = 1},
+     tools = {"@sharp", "bone_needle"}, hours = 4, out = {"pelt_coat", 1}, topic = "rags"},
+    -- Bushcraft
+    {id = "stone_knife", name = "Stone Knife", inputs = {rock = 2}, hours = 1, out = {"stone_knife", 1},
+     topic = "bushcraft"},
+    {id = "glass_shiv", name = "Glass Shiv", inputs = {glass_shard = 1, ["@thread_s"] = 1, cloth_scrap = 1},
+     hours = 1, out = {"glass_shiv", 1}, topic = "bushcraft"},
+    {id = "bark_tea", name = "Bark Tea", inputs = {water_bottle = 1, bark = 2}, tools = {"@fire_container"},
+     fire = true, hours = 1, out = {"bark_tea", 1}, topic = "bushcraft"},
+    {id = "cure_hide", name = "Cure Hide", inputs = {raw_hide = 1, bark_tea = 1}, hours = 4,
+     out = {"hide", 1}, topic = "bushcraft"},
+    {id = "charcoal", name = "Charcoal", inputs = {stick = 2}, fire = true, hours = 2,
+     out = {"charcoal", 2}, topic = "bushcraft"},
+    {id = "smoked_meat", name = "Smoked Meat", inputs = {cooked_meat = 1, ["@fuel"] = 1}, fire = true,
+     hours = 3, out = {"smoked_meat", 1}, topic = "bushcraft"},
+    {id = "sling", name = "Sling", inputs = {cloth_scrap = 1, ["@thread_s"] = 2}, hours = 1,
+     out = {"sling", 1}, topic = "bushcraft"},
+    {id = "broad_spear", name = "Broad Spear", inputs = {spear = 1, glass_shard = 1, ["@thread_s"] = 1},
+     hours = 1, out = {"broad_spear", 1}, topic = "bushcraft"},
+    {id = "can_rattle", name = "Can Rattle", inputs = {tin_can = 2, ["@rigid"] = 1, ["@thread_s"] = 1},
+     hours = 1, out = {"can_rattle", 1}, topic = "bushcraft"},
+    {id = "tarp_shelter", name = "Tarp Lean-to", inputs = {tarp = 1, ["@shaft"] = 2, ["@thread_m"] = 1},
+     hours = 2, out = {"tarp_shelter", 1}, topic = "bushcraft"},
+    {id = "bow", name = "Greenwood Bow", inputs = {large_branch = 1, ["@thread_m"] = 1}, tools = {"@sharp"},
+     hours = 3, out = {"bow", 1}, topic = "bushcraft"},
+    {id = "arrows", name = "Arrows", inputs = {stick = 1, bone = 1, ["@thread_s"] = 1, ["@fletching"] = 1},
+     tools = {"@sharp"}, hours = 2, out = {"arrow", 3}, topic = "bushcraft"},
+    {id = "travois", name = "Travois", inputs = {large_branch = 2, ["@thread_m"] = 1, tarp = 1}, hours = 3,
+     out = {"travois", 1}, topic = "bushcraft"},
+    -- Medicine
+    {id = "stitches", name = "Suture Kit", inputs = {["@thread_s"] = 1, vodka = 1}, tools = {"bone_needle"},
+     hours = 1, out = {"stitches", 1}, topic = "medicine"},
+    {id = "tincture", name = "Herb Tincture", inputs = {bark = 1, berries = 2, vodka = 1}, hours = 2,
+     out = {"tincture", 1}, topic = "medicine"},
+    {id = "medkit", name = "Medkit", inputs = {bandage = 2, stitches = 1, painkillers = 1}, hours = 1,
+     out = {"medkit", 1}, topic = "medicine"},
+    -- Tinkering
+    {id = "lockpicks", name = "Lockpicks", inputs = {["@rigid"] = 1}, tools = {"pliers"}, hours = 2,
+     out = {"lockpicks", 1}, topic = "tinkering"},
+    {id = "crack_phone", name = "Crack Phone", inputs = {locked_phone = 1}, tools = {"screwdriver"}, hours = 2,
+     out = {"usb_drive", 1}, topic = "tinkering"},
+    {id = "choir_cell", name = "Choir Cell", inputs = {laptop_battery = 1, mech_parts = 1, choir_wire = 1},
+     tools = {"pliers", "screwdriver"}, hours = 3, out = {"choir_cell", 1}, topic = "tinkering"},
+    {id = "hand_cart", name = "Hand Cart", inputs = {mech_parts = 2, scrap_metal = 4, ["@rigid"] = 2},
+     tools = {"pliers"}, hours = 4, out = {"hand_cart", 1}, topic = "tinkering"},
+    -- Chemistry
+    {id = "painkillers", name = "Painkillers", inputs = {chemicals = 1, bark = 1}, hours = 1,
+     out = {"painkillers", 2}, topic = "chemistry"},
+    {id = "gunpowder", name = "Gunpowder", inputs = {chemicals = 1, charcoal = 1, salt = 1}, hours = 2,
+     out = {"gunpowder", 2}, topic = "chemistry"},
+    {id = "flare", name = "Flare", inputs = {chemicals = 1, tin_can = 1}, hours = 1, out = {"flare", 2},
+     topic = "chemistry"},
+    {id = "sedative", name = "Sedative", inputs = {chemicals = 1, berries = 2}, hours = 1,
+     out = {"sedative", 1}, topic = "chemistry"},
+    {id = "gun_oil", name = "Gun Oil", inputs = {chemicals = 1, pale_wax = 1}, hours = 1,
+     out = {"gun_oil", 2}, topic = "chemistry"},
+    {id = "rad_purge", name = "Rad Purge", inputs = {antirad = 1, chemicals = 2}, fire = true, hours = 2,
+     out = {"rad_purge", 1}, topic = "chemistry"},
+    -- Gunsmithing: chance = assembly can fail and break a part (Perception, tinker)
+    {id = "clean_gun", name = "Clean Guns", inputs = {gun_oil = 1, cloth_scrap = 1}, hours = 1,
+     clean = true, topic = "gunsmithing"},
+    {id = "reload_9x18", name = "Reload 9x18", inputs = {brass = 3, gunpowder = 1, lead_scrap = 1},
+     tools = {"@gun_tool"}, hours = 2, out = {"r9x18", 3}, topic = "gunsmithing"},
+    {id = "assemble_pm", name = "Assemble PM", chance = 55, tools = {"@gun_tool"}, hours = 4,
+     inputs = {frame_pm = 1, gun_slide = 1, gun_barrel = 1, gun_spring = 1, firing_pin = 1, magazine = 1},
+     out = {"pm_pistol", 1}, topic = "gunsmithing"},
+    {id = "reload_762n", name = "Reload 7.62N", inputs = {brass = 3, gunpowder = 1, lead_scrap = 1},
+     tools = {"@gun_tool"}, hours = 2, out = {"r762n", 3}, topic = "gunsmithing"},
+    {id = "assemble_nagant", name = "Assemble Nagant", chance = 50, tools = {"@gun_tool"}, hours = 4,
+     inputs = {frame_nagant = 1, gun_barrel = 1, cylinder = 1, gun_spring = 1, firing_pin = 1},
+     out = {"nagant", 1}, topic = "gunsmithing"},
+    {id = "reload_762t", name = "Reload 7.62x25", inputs = {brass = 3, gunpowder = 1, lead_scrap = 1},
+     tools = {"@gun_tool"}, hours = 2, out = {"r762t", 3}, topic = "gunsmithing"},
+    {id = "assemble_tt", name = "Assemble Tokarev", chance = 45, tools = {"@gun_tool"}, hours = 4,
+     inputs = {frame_tt = 1, gun_slide = 1, gun_barrel = 1, gun_spring = 1, firing_pin = 1, magazine = 1},
+     out = {"tokarev", 1}, topic = "gunsmithing"},
+    {id = "assemble_inst", name = "Assemble Sidearm", chance = 35, tools = {"gunsmith_kit"}, hours = 6,
+     inputs = {frame_inst = 1, gun_slide = 1, gun_barrel = 1, gun_spring = 1, firing_pin = 1, magazine = 1},
+     out = {"inst_sidearm", 1}, topic = "gunsmithing"},
+    {id = "reload_38", name = "Reload .38", inputs = {brass = 3, gunpowder = 1, lead_scrap = 1, ichor = 1},
+     tools = {"@gun_tool"}, hours = 3, out = {"r38", 3}, topic = "gunsmithing"},
+    -- Warding
+    {id = "salt_circle", name = "Salt Circle", inputs = {salt = 2}, hours = 1, out = {"salt_circle", 1},
+     topic = "warding"},
+    {id = "elder_sign", name = "Elder Sign", inputs = {bone = 1, ichor = 1}, tools = {"@sharp"}, hours = 2,
+     out = {"elder_sign", 1}, topic = "warding"},
+    {id = "black_candle", name = "Black Candle", inputs = {pale_wax = 1, ichor = 1, ["@thread_s"] = 1},
+     hours = 2, out = {"black_candle", 1}, topic = "warding"},
+    {id = "glow_jar", name = "Glow Jar", inputs = {empty_bottle = 1, ichor = 1, salt = 1}, hours = 1,
+     out = {"glow_jar", 1}, topic = "warding"},
+    {id = "choir_charm", name = "Choir Charm", inputs = {choir_wire = 2, bone = 1, pale_eye = 1}, hours = 3,
+     out = {"choir_charm", 1}, topic = "warding"},
+}) do RECIPES[#RECIPES + 1] = r end
+
+-- -- where it all turns up ---------------------------------------------
+-- {item, weight} added to each terrain's scavenge table; "nothing" grows
+-- with them, so a search comes up empty as often as before (the Churn is
+-- stingy) but what it does turn up is more varied.
+for terrain, adds in pairs({
+    plains = {{"glass_shard", 2}, {"string", 2}, {"newspaper", 2}, {"tin_can", 2}, {"matches", 1},
+              {"foil", 1}, {"screws", 1}, {"tarp", 1}, {"brass", 1}, {"usb_drive", 1}, {"book_field", 1}},
+    forest = {{"large_branch", 4}, {"bark", 4}, {"feathers", 2}, {"bone", 2}, {"string", 1},
+              {"tape_cook", 1}},
+    ruins  = {{"glass_shard", 3}, {"string", 2}, {"tin_can", 3}, {"metal_pot", 1}, {"matches", 2},
+              {"lighter", 1}, {"newspaper", 2}, {"foil", 2}, {"screws", 2}, {"mech_parts", 1},
+              {"duct_tape", 1}, {"salt", 2}, {"chemicals", 1}, {"pliers", 1}, {"screwdriver", 1},
+              {"kitchen_knife", 1}, {"crowbar", 1}, {"laptop_battery", 1}, {"locked_phone", 1},
+              {"usb_drive", 1}, {"cassette_player", 1}, {"tape_medic", 1}, {"tape_tinker", 1},
+              {"tape_gun", 1}, {"book_tailor", 1}, {"book_surgeon", 1}, {"book_radio", 1},
+              {"brass", 2}, {"lead_scrap", 1}, {"r9x18", 1}, {"r762t", 1}, {"gun_spring", 1},
+              {"magazine", 1}, {"frame_pm", 1}, {"gun_barrel", 1}, {"firing_pin", 1}, {"gun_slide", 1}},
+    hills  = {{"bone", 3}, {"large_branch", 2}, {"salt", 1}, {"hunting_knife", 1}, {"r762n", 1},
+              {"frame_nagant", 1}, {"cylinder", 1}, {"tape_choir", 1}, {"book_hymnal", 1}, {"pale_wax", 1}},
+    ford   = {{"glass_shard", 2}, {"bone", 1}, {"tin_can", 1}, {"choir_wire", 1}},
+}) do
+    -- (duds = nothing and trinkets; loot[1] is {"nothing", n})
+    local loot, rest, trink, added = SCAVENGE_LOOT[terrain], 0, 0, 0
+    for i = 2, #loot do
+        rest = rest + loot[i][2]
+        if ITEM_DB[loot[i][1]].trinket then trink = trink + loot[i][2] end
+    end
+    local share = (loot[1][2] + trink) / (loot[1][2] + rest)
+    for _, a in ipairs(adds) do loot[#loot + 1] = a; added = added + a[2] end
+    loot[1][2] = math.ceil((share * (rest + added) - trink) / (1 - share))
+end
+
+-- Locked crates (F with Lockpicks in ruins, once per hex): the rare stuff.
+CHURN.crate_loot = {{"book_lab", 2}, {"book_gunsmith", 2}, {"tape_lab", 2}, {"gunsmith_kit", 2},
+                    {"frame_tt", 2}, {"frame_inst", 1}, {"chemicals", 4}, {"gunpowder", 3},
+                    {"r9x18", 4}, {"r762t", 2}, {"pm_pistol", 1}, {"tokarev", 1}, {"nagant", 1},
+                    {"inst_sidearm", 1}, {"usb_drive", 3}, {"medkit", 2}, {"antirad", 3}}
+CHURN.crate_chance = 35   -- % a ruin hex has a locked crate to pick
+
+-- Enemies leave more: hides, sinew and bone from beasts, guns from people.
+for _, e in ipairs(ENCOUNTERS) do
+    local extra = ({
+        jawhound = {{"jawhound_pelt", 2}, {"sinew", 1}, {"bone", 1}},
+        boar = {{"raw_hide", 2}, {"sinew", 1}, {"bone", 2}},
+        ["crow-knot"] = {{"feathers", 3}, {"bone", 1}},
+        stag = {{"raw_hide", 2}, {"sinew", 2}, {"bone", 2}},
+        ["fused pair"] = {{"ichor", 2}, {"bone", 1}},
+        ["mouthless man"] = {{"ichor", 1}, {"locked_phone", 1}},
+        bloom = {{"ichor", 1}, {"pale_eye", 1}},
+        bandit = {{"brass", 2}, {"r9x18", 1}, {"pm_pistol", 1}, {"gun_spring", 1}, {"lighter", 1}},
+        ["toll man"] = {{"brass", 1}, {"r762n", 1}, {"frame_pm", 1}, {"matches", 1}},
+    })[e.who]
+    if extra and e.loot then
+        for _, x in ipairs(extra) do e.loot[#e.loot + 1] = x end
+        e.loot_rolls = (e.loot_rolls or 1) + 1
+    end
+end
+
+-- Barter values for the new things (TRADE.value; default 1).
+for id, v in pairs({
+    glass_shard = 1, string = 1, sinew = 2, choir_wire = 6, large_branch = 0, newspaper = 0,
+    tin_can = 1, metal_pot = 5, matches = 4, lighter = 8, fire_drill = 1, bark = 0, raw_hide = 3,
+    hide = 6, jawhound_pelt = 14, bone = 1, feathers = 1, tarp = 6, foil = 1, screws = 2, mech_parts = 5,
+    duct_tape = 4, salt = 3, pale_wax = 5, ichor = 10, pale_eye = 15, chemicals = 8, charcoal = 1,
+    gunpowder = 8, brass = 2, lead_scrap = 2, gun_oil = 5, laptop_battery = 8, locked_phone = 8,
+    pliers = 6, screwdriver = 5, crowbar = 12, hacksaw = 6, scalpel = 6, kitchen_knife = 8,
+    hunting_knife = 18, gunsmith_kit = 30, stone_knife = 2, glass_shiv = 3, broad_spear = 12,
+    bone_needle = 3, rag_shoes = 2, foil_poncho = 10, hide_tunic = 12, hide_gloves = 6, hide_pack = 20,
+    pelt_coat = 35, travois = 10, hand_cart = 25, lockpicks = 10, can_rattle = 3, tarp_shelter = 10,
+    bark_tea = 4, smoked_meat = 9, stitches = 10, tincture = 10, painkillers = 8, sedative = 8,
+    rad_purge = 30, flare = 6, choir_cell = 40, salt_circle = 8, black_candle = 20, glow_jar = 15,
+    choir_charm = 30, elder_sign = 25,
+    book_tailor = 10, book_field = 10, book_surgeon = 14, book_radio = 14, book_lab = 20,
+    book_gunsmith = 25, book_hymnal = 30, cassette_player = 15, blank_tape = 1, usb_drive = 15,
+    tape_cook = 6, tape_medic = 6, tape_gun = 6, tape_choir = 6, tape_lab = 6, tape_tinker = 6,
+    pm_pistol = 60, nagant = 65, tokarev = 75, inst_sidearm = 100, marsh_revolver = 120,
+    bow = 15, sling = 3, arrow = 2, r9x18 = 4, r762n = 4, r762t = 5, r38 = 8,
+    frame_pm = 15, frame_nagant = 15, frame_tt = 18, frame_inst = 30, gun_slide = 8, gun_barrel = 10,
+    gun_spring = 5, firing_pin = 6, magazine = 6, cylinder = 10,
+}) do TRADE.value[id] = v end
+for _, st in ipairs({{"matches", 2}, {"string", 3}, {"r9x18", 4}, {"book_surgeon", 1}}) do
+    TRADE.stock[#TRADE.stock + 1] = st
+end
+for _, id in ipairs({"matches", "r9x18", "brass"}) do TRADE.restock[#TRADE.restock + 1] = id end
+do
+local ped = TRADE.people.peddler
+for _, st in ipairs({{"cassette_player", 1}, {"tape_lab", 1}, {"usb_drive", 1}, {"gun_barrel", 1},
+                     {"r762n", 3}}) do ped.stock[#ped.stock + 1] = st end
+for _, id in ipairs({"brass", "screws", "chemicals", "firing_pin", "tape_cook"}) do
+    ped.restock[#ped.restock + 1] = id
+end
+local ferry = TRADE.people.ferry
+for _, st in ipairs({{"bark", 3}, {"metal_pot", 1}, {"salt", 2}, {"book_field", 1}}) do
+    ferry.stock[#ferry.stock + 1] = st
+end
+end
+-- one Marsh Revolver lies somewhere in each world (a relic: never made)
+TECH.world_items[#TECH.world_items + 1] = "marsh_revolver"
+-- GENERATED from scratch art (16x16, '#' = ink): sprites for the
+-- Churn's new items. Items without art borrow a look-alike's (ITEM_DB[..].look).
+CHURN.art = {
+    glass_shard = {
+        "................",
+        "..........#.....",
+        ".........##.....",
+        "........#.#.....",
+        ".......#..#.....",
+        "......#...#.....",
+        ".....#....#.....",
+        "....#....#......",
+        "...#....#.......",
+        "..#....#........",
+        "..#...#.........",
+        "..#..#..........",
+        "..#.#...........",
+        "..##............",
+        "..#.............",
+        "................",
+    },
+    string = {
+        "................",
+        ".....######.....",
+        "...##......##...",
+        "..#..######..#..",
+        ".#.##......##.#.",
+        ".#.#..####..#.#.",
+        ".#.#.#....#.#.#.",
+        ".#.#.#.##.#.#.#.",
+        ".#.#.#....#.#.#.",
+        ".#.#..####..#.#.",
+        ".#.##......##.#.",
+        "..#..######..#..",
+        "...##......##...",
+        ".....######...#.",
+        "...............#",
+        "................",
+    },
+    large_branch = {
+        "................",
+        "..............##",
+        ".............##.",
+        "............##..",
+        "...........##.#.",
+        "..........##.#..",
+        ".........###....",
+        "........###.....",
+        "..#....###......",
+        "...#..###.......",
+        "....####........",
+        "...###..........",
+        "..###...........",
+        ".###............",
+        "###.............",
+        "##..............",
+    },
+    tin_can = {
+        "................",
+        "................",
+        "...##########...",
+        "..#..........#..",
+        "..############..",
+        "..#..........#..",
+        "..#.########.#..",
+        "..#.#......#.#..",
+        "..#.#.#..#.#.#..",
+        "..#.#......#.#..",
+        "..#.########.#..",
+        "..#..........#..",
+        "..#..........#..",
+        "..############..",
+        "...##########...",
+        "................",
+    },
+    matches = {
+        "................",
+        "...#.#.#........",
+        "..###########...",
+        "..#.#.#.#...#...",
+        "..#.#.#.#...#...",
+        "..#.#.#.#...#...",
+        "..#.#.#.#...#...",
+        "..###########...",
+        "..#.........#...",
+        "..#.#######.#...",
+        "..#.#.....#.#...",
+        "..#.#######.#...",
+        "..#.........#...",
+        "..###########...",
+        "................",
+        "................",
+    },
+    fire_drill = {
+        ".......#........",
+        ".......#........",
+        ".......#........",
+        ".......#........",
+        ".....#####......",
+        ".......#........",
+        ".......#........",
+        ".......#........",
+        ".......#........",
+        ".......#........",
+        ".......#........",
+        ".....#.#.#......",
+        "..############..",
+        "..#..........#..",
+        "..############..",
+        "................",
+    },
+    bark = {
+        "................",
+        "...#########....",
+        "..#.#.#.#.#.#...",
+        "..##.#..#.#.##..",
+        "..#.#.#.#..#.#..",
+        "..##..#.#.#.##..",
+        "..#.#.#..#.#.#..",
+        "..##.#.#.#..##..",
+        "..#.#..#.#.#.#..",
+        "..##.#.#..#.##..",
+        "..#.#.#.#.#..#..",
+        "..##..#.#.#.##..",
+        "..#.#.#.#.#.#...",
+        "...#########....",
+        "................",
+        "................",
+    },
+    hide = {
+        "................",
+        "...##.....##....",
+        "..####...####...",
+        "..###########...",
+        "...#########....",
+        "...#.#.#.#.#....",
+        "...##.#.#.##....",
+        "...#.#.#.#.#....",
+        "...##.#.#.##....",
+        "...#.#.#.#.#....",
+        "...#########....",
+        "..###########...",
+        "..####...####...",
+        "...##.....##....",
+        "................",
+        "................",
+    },
+    bone = {
+        "................",
+        "..##............",
+        ".####...........",
+        ".#####..........",
+        "..#####.........",
+        "....###.........",
+        ".....###........",
+        "......###.......",
+        ".......###......",
+        "........###.....",
+        ".........#####..",
+        ".........######.",
+        "..........####..",
+        "...........##...",
+        "................",
+        "................",
+    },
+    feathers = {
+        ".............#..",
+        "...........###..",
+        "..........####..",
+        ".........#####..",
+        "........#####...",
+        ".......#####.#..",
+        "......#####.#...",
+        ".....#####.#....",
+        "....#####.#.....",
+        "...#####.#......",
+        "...####.#.......",
+        "....##.#........",
+        "......#.........",
+        ".....#..........",
+        "....#...........",
+        "...#............",
+    },
+    tarp = {
+        "................",
+        ".#.............#",
+        ".##############.",
+        ".#.#.#.#.#.#.##.",
+        ".##.#.#.#.#.#.#.",
+        ".#.#.#.#.#.#.##.",
+        ".##.#.#.#.#.#.#.",
+        ".#.#.#.#.#.#.##.",
+        ".##.#.#.#.#.#.#.",
+        ".#.#.#.#.#.#.##.",
+        ".##.#.#.#.#.#.#.",
+        ".##############.",
+        ".#.............#",
+        "................",
+        "................",
+        "................",
+    },
+    salt = {
+        "................",
+        "......####......",
+        ".....#....#.....",
+        "......####......",
+        ".....#....#.....",
+        "....#......#....",
+        "...#........#...",
+        "...#.######.#...",
+        "...#.#.#.#..#...",
+        "...#.######.#...",
+        "...#........#...",
+        "...#.#..#.#.#...",
+        "...#........#...",
+        "....########....",
+        "................",
+        "................",
+    },
+    pale_wax = {
+        "................",
+        "................",
+        "....########....",
+        "...#........#...",
+        "..#..........#..",
+        "..############..",
+        "..#.#.#.#.#.##..",
+        "..##.#.#.#.#.#..",
+        "..#.#.#.#.#.##..",
+        "..##.#.#.#.#.#..",
+        "..############..",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+    },
+    ichor = {
+        ".......#........",
+        ".......#........",
+        "......###.......",
+        "......###.......",
+        ".....#####......",
+        ".....#####......",
+        "....#######.....",
+        "...#########....",
+        "...####.####....",
+        "..####...####...",
+        "..###.....###...",
+        "..###.....###...",
+        "..####...####...",
+        "...#########....",
+        "....#######.....",
+        "......###.......",
+    },
+    chemicals = {
+        "................",
+        ".....######.....",
+        "......#..#......",
+        "......#..#......",
+        "......#..#......",
+        ".....#....#.....",
+        "....#......#....",
+        "...#........#...",
+        "..#..........#..",
+        "..#.########.#..",
+        "..#.#.#.#.##.#..",
+        "..#.########.#..",
+        "..#..........#..",
+        "...##########...",
+        "................",
+        "................",
+    },
+    gunpowder = {
+        "................",
+        "....########....",
+        "...#........#...",
+        "...##########...",
+        "...#........#...",
+        "...#..#..#..#...",
+        "...#...##...#...",
+        "...#..####..#...",
+        "...#...##...#...",
+        "...#..#..#..#...",
+        "...#........#...",
+        "...#........#...",
+        "...##########...",
+        "................",
+        "................",
+        "................",
+    },
+    crowbar = {
+        "..##............",
+        ".#..#...........",
+        ".#..............",
+        ".#..............",
+        "..#.............",
+        "...#............",
+        "....#...........",
+        ".....#..........",
+        "......#.........",
+        ".......#........",
+        "........#.......",
+        ".........#......",
+        "..........#.....",
+        "...........#....",
+        "............##..",
+        ".............##.",
+    },
+    foil_poncho = {
+        "................",
+        "......####......",
+        ".....#....#.....",
+        ".....#....#.....",
+        "....##....##....",
+        "...#.#.#.#.#.#..",
+        "..#.#.#.#.#.#.#.",
+        ".#.#.#.#.#.#.#.#",
+        ".#..#.#.#.#.#..#",
+        ".#.#.#.#.#.#.#.#",
+        ".##.#.#.#.#.#.##",
+        "...#.#.#.#.#.#..",
+        "...##.#.#.#.##..",
+        ".....########...",
+        "................",
+        "................",
+    },
+    can_rattle = {
+        "#..............#",
+        ".#............#.",
+        "..#....##....#..",
+        "...#...##...#...",
+        "....####.####...",
+        "....#..#.#..#...",
+        "....####.####...",
+        "....#..#.#..#...",
+        "....####.####...",
+        "...........#....",
+        "..........###...",
+        "..........#.#...",
+        "..........###...",
+        "..........#.#...",
+        "..........###...",
+        "................",
+    },
+    tarp_shelter = {
+        "................",
+        ".......#........",
+        "......###.......",
+        ".....#.#.#......",
+        "....#.#.#.#.....",
+        "...#.#.#.#.#....",
+        "..#.#.#.#.#.#...",
+        ".#.#.#.#.#.#.#..",
+        "#.#.#.#.#.#.#.#.",
+        "#.............#.",
+        "#.............#.",
+        "#.............#.",
+        "#.............#.",
+        "#.............#.",
+        "###############.",
+        "................",
+    },
+    flare = {
+        ".......#.#......",
+        "........#.......",
+        ".......#.#......",
+        "......####......",
+        "......####......",
+        "......#..#......",
+        "......#..#......",
+        "......####......",
+        "......#..#......",
+        "......#..#......",
+        "......#..#......",
+        "......#..#......",
+        "......#..#......",
+        "......#..#......",
+        "......####......",
+        "................",
+    },
+    black_candle = {
+        ".......#........",
+        "......###.......",
+        "......###.......",
+        ".......#........",
+        "......###.......",
+        ".....#####......",
+        ".....#####......",
+        ".....#####......",
+        ".....#####......",
+        ".....#####......",
+        ".....#####......",
+        ".....#####......",
+        ".....#####......",
+        "...#########....",
+        "..###########...",
+        "................",
+    },
+    choir_charm = {
+        "#..............#",
+        ".#............#.",
+        "..#..........#..",
+        "...#........#...",
+        "....#......#....",
+        ".....#....#.....",
+        "......####......",
+        ".....#....#.....",
+        "....#.#..#.#....",
+        "....#..##..#....",
+        "....#.#..#.#....",
+        ".....#....#.....",
+        "......####......",
+        "................",
+        "................",
+        "................",
+    },
+    elder_sign = {
+        "................",
+        ".......##.......",
+        ".......##.......",
+        "...#...##...#...",
+        "....#..##..#....",
+        ".....#.##.#.....",
+        "......####......",
+        ".#############..",
+        "......####......",
+        ".....#.##.#.....",
+        "....#..##..#....",
+        "...#...##...#...",
+        ".......##.......",
+        ".......##.......",
+        "................",
+        "................",
+    },
+    book_field = {
+        "................",
+        "..############..",
+        "..#.##########..",
+        "..#.#........#..",
+        "..#.#.######.#..",
+        "..#.#........#..",
+        "..#.#.####...#..",
+        "..#.#........#..",
+        "..#.#.######.#..",
+        "..#.#........#..",
+        "..#.#........#..",
+        "..#.##########..",
+        "..#.#........#..",
+        "..############..",
+        "................",
+        "................",
+    },
+    cassette_player = {
+        "................",
+        ".##############.",
+        ".#............#.",
+        ".#.##########.#.",
+        ".#.#..#..#..#.#.",
+        ".#.#.###.###.##.",
+        ".#.#..#..#..#.#.",
+        ".#.##########.#.",
+        ".#............#.",
+        ".#.##.##.##.#.#.",
+        ".#.##.##.##.#.#.",
+        ".#............#.",
+        ".##############.",
+        "................",
+        "................",
+        "................",
+    },
+    tape_cook = {
+        "................",
+        "................",
+        ".##############.",
+        ".#............#.",
+        ".#.##########.#.",
+        ".#.#.##..##.#.#.",
+        ".#.#.##..##.#.#.",
+        ".#.##########.#.",
+        ".#............#.",
+        ".#...######...#.",
+        ".#..#......#..#.",
+        ".##############.",
+        "................",
+        "................",
+        "................",
+        "................",
+    },
+    usb_drive = {
+        "................",
+        "................",
+        "................",
+        "................",
+        "..######........",
+        "..#.#..#########",
+        "..#....#.......#",
+        "..#.#..#.......#",
+        "..#....#.......#",
+        "..######.......#",
+        ".......#########",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+    },
+    pm_pistol = {
+        "................",
+        "................",
+        "................",
+        "..##############",
+        "..#............#",
+        "..##############",
+        "..#######.......",
+        "..######..#.....",
+        "..####.#..#.....",
+        "..####..##......",
+        "..####..........",
+        "..####..........",
+        "..####..........",
+        "..#####.........",
+        "................",
+        "................",
+    },
+    nagant = {
+        "................",
+        "................",
+        "................",
+        "....###########.",
+        ".#######.......#",
+        ".####..#########",
+        "..#####.###.....",
+        "..###.#.#.#.....",
+        "..#####..#......",
+        "..####..........",
+        "..####..........",
+        "..####..........",
+        "..#####.........",
+        "................",
+        "................",
+        "................",
+    },
+    r9x18 = {
+        "................",
+        "................",
+        "...#...#...#....",
+        "..###.###.###...",
+        "..###.###.###...",
+        "..###.###.###...",
+        "..#.#.#.#.#.#...",
+        "..#.#.#.#.#.#...",
+        "..#.#.#.#.#.#...",
+        "..###.###.###...",
+        "................",
+        "...#...#...#....",
+        "..###.###.###...",
+        "..###.###.###...",
+        "..#.#.#.#.#.#...",
+        "..###.###.###...",
+    },
+    gun_barrel = {
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        ".##############.",
+        ".#............##",
+        ".##############.",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+    },
+    bow = {
+        "....###.........",
+        "......##........",
+        ".......#........",
+        "........#.......",
+        "........#.......",
+        ".........#......",
+        ".........#......",
+        ".........#......",
+        ".........#......",
+        ".........#......",
+        "........#.......",
+        "........#.......",
+        ".......#........",
+        "......##........",
+        "....###.........",
+        "................",
+    },
+    arrow = {
+        ".............###",
+        "..............##",
+        ".............#.#",
+        "............#...",
+        "...........#....",
+        "..........#.....",
+        ".........#......",
+        "........#.......",
+        ".......#........",
+        "......#.........",
+        ".....#..........",
+        ".#..#...........",
+        "..##............",
+        ".###............",
+        "#..#............",
+        "................",
+    },
+    sling = {
+        "................",
+        ".#..............",
+        "..#.............",
+        "...#............",
+        "....#.......#...",
+        ".....#.....#....",
+        "......#...#.....",
+        ".......###......",
+        "......#####.....",
+        "......#####.....",
+        ".......###......",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+    },
+}
 -- ---------------------------------------------------------------------
 -- Item sprites (16x16, 1-bit)
 --
@@ -2480,6 +3603,11 @@ local function pack_bitmap(name, rows, w, h)
     return packed
 end
 
+-- The Churn's new items: their own art (09_art_churn), or a look-alike's
+-- (ITEM_DB[..].look, resolved below, after the ragged clothes: a look may
+-- itself borrow, so in passes).
+for id, rows in pairs(CHURN.art) do SPRITE_ART[id] = rows end
+
 -- Makeshift clothes borrow the real thing's sprite, full of holes.
 for item_id, def in pairs(ITEM_DB) do
     local base = def.ragged_of and SPRITE_ART[def.ragged_of]
@@ -2494,6 +3622,12 @@ for item_id, def in pairs(ITEM_DB) do
             rows[y] = table.concat(out)
         end
         SPRITE_ART[item_id] = rows
+    end
+end
+
+for _ = 1, 3 do
+    for item_id, def in pairs(ITEM_DB) do
+        if def.look and not SPRITE_ART[item_id] then SPRITE_ART[item_id] = SPRITE_ART[def.look] end
     end
 end
 
@@ -3091,6 +4225,7 @@ local function generate_world(seed)
         {item = "cloth_scrap", qty = 6},
         {item = "canned_beans", qty = 1},
         {item = "water_bottle", qty = 2},
+        {item = "matches", qty = 1},
     }
 
     -- Scatter loot on other passable tiles: every wearable once, plus a few
@@ -3220,6 +4355,10 @@ local function recompute_stats(player)
     end
     for _, t in ipairs(TRAITS) do
         if player.traits[t.name] then add(t.fx) end
+    end
+    -- worn things with fx (a travois slows you, a charm thins the meetings)
+    for slot, item in pairs(player.equipped) do
+        if not HOLD_SLOTS[slot] and ITEM_DB[item].fx then add(ITEM_DB[item].fx) end
     end
     -- artifacts work while held
     for _, slot in ipairs({"lhand", "rhand"}) do
@@ -3592,6 +4731,7 @@ function Game:scavenge()
         self:push_log("Press I to pick it up.")
     end
     self:scavenge_field()
+    self:pick_crate(key)
     if p.needs.hunger <= 0 then self:push_log("You are starving!") end
     if p.needs.thirst <= 0 then self:push_log("You are dehydrated!") end
     self:check_death(p.scav_hurt > 0 and "The Hollow Star emptied you." or "You bled out.")
@@ -3815,6 +4955,7 @@ function Game:use_item(kind, k)
         if self:read_lore() then self:use_one(kind, k, stack) end
         return
     end
+    if self:use_churn_item(kind, k, stack) then return end   -- books, tapes, wards... (59_research)
     if def.trinket then
         if self:little_spot(hex_key(p.q, p.r)) == "cairn" then
             if kind == "inventory" then self:offer_trinket(stack.item) end
@@ -3894,8 +5035,25 @@ end
 -- to be there. Crafting takes hours, and hours drain your needs.
 -- ---------------------------------------------------------------------
 
--- How many of an item you can reach right now.
+-- A property input ("@sharp"): its CHURN.props entry, else nil.
+function Game.prop_of(item)
+    return item:sub(1, 1) == "@" and CHURN.props[item:sub(2)] or nil
+end
+
+-- What the crafting screen calls an input: an item's name, or a property's.
+function Game.input_name(item)
+    local prop = Game.prop_of(item)
+    return prop and prop.name or ITEM_DB[item].name
+end
+
+-- How many of an item (or of anything with a property) you can reach right now.
 function Game:count_item(item)
+    local prop = Game.prop_of(item)
+    if prop then
+        local n = 0
+        for _, id in ipairs(prop.items) do n = n + self:count_item(id) end
+        return n
+    end
     local n = 0
     for _, s in ipairs(self.player.inventory) do
         if s.item == item then n = n + s.qty end
@@ -3912,6 +5070,17 @@ end
 -- Use up qty of an item: the ground first, then the bag, your hands last
 -- (so a weapon you're holding is the last thing to go).
 function Game:take_items(item, qty)
+    local prop = Game.prop_of(item)
+    if prop then   -- the cheapest things with the property first
+        for _, id in ipairs(prop.items) do
+            local take = math.min(qty, self:count_item(id))
+            if take > 0 then
+                self:take_items(id, take)
+                qty = qty - take
+            end
+        end
+        return qty == 0
+    end
     local function from_list(list)
         local i = 1
         while qty > 0 and i <= #list do
@@ -3941,6 +5110,16 @@ function Game:fire_here()
     return camp ~= nil and self.player.hours < camp.until_hour
 end
 
+-- Any gun or bow you can reach (for Clean Guns).
+function Game:guns_in_reach()
+    local list = {}
+    for id, def in pairs(ITEM_DB) do
+        if def.shoot and not def.shoot.quiet and self:count_item(id) > 0 then list[#list + 1] = id end
+    end
+    table.sort(list)
+    return list
+end
+
 -- The recipe's inputs in a fixed order (pairs() order isn't stable).
 -- (A field, not a top-level local: the bundled file is one Lua chunk and
 -- a chunk may have at most 200 locals.)
@@ -3953,22 +5132,24 @@ end
 
 -- nil if you can make it now, else the reason you can't.
 function Game:craft_blocker(r)
-    if not (r.repair or self.known[r.id]) then return "You don't know how to make that." end
+    if not (r.repair or r.study or self.known[r.id]) then return "You don't know how to make that." end
+    if r.study then return self:study_blocker(r.study) end
     if r.base then
         local why = self:base_blocker(r)
         if why then return why end
     end
     for _, iq in ipairs(Game.recipe_inputs(r)) do
         if self:count_item(iq[1]) < iq[2] then
-            return "Need " .. iq[2] .. " " .. ITEM_DB[iq[1]].name .. "."
+            return "Need " .. iq[2] .. " " .. Game.input_name(iq[1]) .. "."
         end
     end
     for _, tool in ipairs(r.tools or {}) do
-        if self:count_item(tool) < 1 then return "Need a " .. ITEM_DB[tool].name .. " to work with." end
+        if self:count_item(tool) < 1 then return "Need a " .. Game.input_name(tool) .. " to work with." end
     end
     if r.fire and not self:fire_here() then return "Needs a fire. Build a campfire here." end
     if r.place == "campfire" and self:fire_here() then return "A fire already burns here." end
     if r.mend and not self:most_worn(90) then return "Nothing you wear needs mending." end
+    if r.clean and #self:guns_in_reach() == 0 then return "No gun here to clean." end
     return nil
 end
 
@@ -3979,8 +5160,27 @@ function Game:craft(r)
         return false
     end
     if r.repair then return self:repair(r) end
+    if r.study then return self:study(r.study) end
     if r.base then return self:build_base(r) end
     local p, hours = self.player, self:craft_hours(r)
+    if r.chance then   -- fiddly work (a gun): it can fail and break a part
+        local chance = self:craft_chance(r)
+        p.hours = p.hours + hours
+        apply_awake_hours(p, hours)
+        self:skill_xp("tinker", SKILLS.xp.repair)
+        if not self:roll(chance) then
+            local parts = {}
+            for _, iq in ipairs(Game.recipe_inputs(r)) do
+                if not iq[1]:find("^frame_") then parts[#parts + 1] = iq[1] end
+            end
+            local lost = parts[self:rand(#parts) + 1]
+            self:take_items(lost, 1)
+            self:sfx("miss")
+            self:push_log("It won't go together. The " .. ITEM_DB[lost].name:lower() .. " is ruined.")
+            return true
+        end
+        hours = 0
+    end
     for _, iq in ipairs(Game.recipe_inputs(r)) do self:take_items(iq[1], iq[2]) end
     p.hours = p.hours + hours
     apply_awake_hours(p, hours)
@@ -3991,8 +5191,13 @@ function Game:craft(r)
         p.wear[slot] = math.min(100, p.wear[slot] + WORLD.wear.mend)
         self:push_log(("You patch your %s (%d%%)."):format(ITEM_DB[p.equipped[slot]].name:lower(), math.floor(p.wear[slot])))
     elseif r.place == "campfire" then
-        self.camps[hex_key(p.q, p.r)] = {until_hour = p.hours + RECIPES.campfire_hours}
-        self:push_log("You build a campfire. It will burn " .. RECIPES.campfire_hours .. "h.")
+        local burn = r.burn or RECIPES.campfire_hours
+        self.camps[hex_key(p.q, p.r)] = {until_hour = p.hours + burn}
+        self:push_log("You build " .. (r.burn and "a small fire" or "a campfire") .. ". It will burn " .. burn .. "h.")
+    elseif r.clean then
+        self.gun_wear = self.gun_wear or {}
+        for _, id in ipairs(self:guns_in_reach()) do self.gun_wear[id] = 100 end
+        self:push_log("You strip, oil and wipe every gun you have. They shine.")
     else
         local stack = {item = r.out[1], qty = r.out[2]}
         if not self:put_stack("inventory", nil, stack) then
@@ -4004,6 +5209,12 @@ function Game:craft(r)
     end
     self:check_death("You bled out.")
     return true
+end
+
+-- Assembly odds (a recipe with `chance`): Perception and tinkering.
+function Game:craft_chance(r)
+    return math.max(5, math.min(95, r.chance + TECH.per_point * (self.player.attrs.Perception - 3)
+                                    + self:skill_bonus("tinker")))
 end
 
 -- Scrawled Notes: learn a recipe you don't know yet (the notes are used up).
@@ -4036,6 +5247,7 @@ function Game:known_recipes()
         if self.known[r.id] then list[#list + 1] = r end
     end
     for _, r in ipairs(self:repair_recipes()) do list[#list + 1] = r end   -- broken tech you carry
+    for _, r in ipairs(self:study_recipes()) do list[#list + 1] = r end    -- research (59_research)
     return list
 end
 
@@ -4083,6 +5295,10 @@ function Game:after_consume(def, kind, k)
         end
     end
     if def.sick and self:roll(def.sick) then self:make_sick() end
+    if def.cures and (p.sick_hours or 0) > 0 then
+        p.sick_hours = 0
+        self:push_log("Your gut settles.")
+    end
 end
 
 function Game:make_sick()
@@ -4275,7 +5491,7 @@ end
 function Game:storm_exposed(hours)
     local p = self.player
     return self:weather(hours) == "Storm" and WORLD.storm.open[self.tiles[hex_key(p.q, p.r)]] == true
-        and not self:bed_here()
+        and not self:bed_here() and not self:placed_here("tarp_shelter")
 end
 
 -- One hour of a storm (from tick): exposed, it wears you down.
@@ -4400,6 +5616,9 @@ end
 function Game:has_light()
     local eq = self.player.equipped
     if eq.rhand == "torch" or eq.lhand == "torch" then return true end
+    for _, slot in ipairs({"rhand", "lhand"}) do   -- a black candle, a glow jar
+        if eq[slot] and ITEM_DB[eq[slot]].light then return true end
+    end
     for slot, item in pairs(eq) do
         if not HOLD_SLOTS[slot] and ITEM_DB[item].light then return true end   -- a headlamp
     end
@@ -4492,7 +5711,9 @@ local SAVE = {version = 1, dir = "wasteland", file = "save.lua",
                         "difficulty", "dog", "radio", "karl_hint",
                         "base", "quest", "quests_done",
                         "lore_read", "signal_page", "skills", "stats",
-                        "ferry_trader", "peddler", "little", "story", "run_id", "scenes_seen"}}
+                        "ferry_trader", "peddler", "little", "story", "run_id", "scenes_seen",
+                        "research", "books_read", "tapedeck", "gun_wear", "noise_until",
+                        "placed", "crates"}}
 
 -- Where the save lives: <preferred storage>/wasteland/save.lua
 function SAVE.path()
@@ -4825,7 +6046,9 @@ function Game:maybe_encounter(terrain_id)
     if chance then chance = chance * self:diff("encounter") end
     if chance and self:is_night() then chance = chance * WORLD.night_encounters end
     if chance and self:weather() == "Storm" then chance = chance * WORLD.storm.encounters end
-    if chance and self:roll(chance * self.player.encounter_mult) then self:start_encounter(self:pick_encounter()) end
+    if chance and self:roll(chance * self.player.encounter_mult * self:noise_mult()) then
+        self:start_encounter(self:pick_encounter())
+    end
 end
 
 -- A kind by ENCOUNTER_KINDS weight (skipping kinds with no entries), then
@@ -4846,6 +6069,10 @@ function Game:start_encounter(def)
                 intro = wrap(def.intro, ENC_INTRO_COLS), cursor = 1, aim = 0,
                 demanding = def.kind == "bandit"}
     if def.kind == "bandit" then self:enc_say(def.demand) end
+    if self:placed_here("can_rattle") and self.enc.range ~= "far" then   -- the cans rang
+        self.enc.range = "far"
+        self:enc_say("The cans you strung up clatter. You're ready for it.")
+    end
     if self:weather() == "Fog" then   -- it was on you before you saw it
         self.enc.fog = true
         if self.enc.range == "far" then self.enc.range = "near" end
@@ -4902,7 +6129,7 @@ function Game:encounter_options()
     local kind = e.def.kind
     if kind == "helper" then return {{"Talk", "talk"}, {"Walk on", "leave_quietly"}} end
     if kind == "anomaly" then return {{"Investigate", "investigate"}, {"Walk away", "leave_quietly"}} end
-    if kind == "horror" then return self:horror_options(e) end
+    if kind == "horror" then return self:sign_options(self:horror_options(e), e) end
     if kind == "little" then return self:little_options() end
     if kind == "institute" then return self:institute_options() end
     if kind == "dog" then
@@ -4946,7 +6173,7 @@ function Game:encounter_options()
     if e.range == "far" or (e.fog and e.range == "near") then o[#o + 1] = {"Hide", "hide"} end
     if kind == "mutant" and not e.talked then o[#o + 1] = {"Talk", "talk"} end
     o[#o + 1] = {"Flee", "flee"}
-    return o
+    return self:ranged_options(o, e)
 end
 
 function Game:enemy_dies()
@@ -5059,6 +6286,7 @@ function Game:encounter_action(action)
     if action == "tame" then return self:dog_tame() end
     if action:find("_little$") then return self:little_action(action) end
     if action:find("_institute$") then return self:institute_action(action) end
+    if action == "elder" then return self:raise_sign() end
     if action == "look_away" or action == "speak" or action == "cover" or action == "follow" then
         return self:horror_action(action)
     end
@@ -5095,6 +6323,8 @@ function Game:encounter_action(action)
     elseif action == "back" then
         e.range = FARTHER[e.range]
         self:enc_say("You back away. Range: " .. RANGE_NAME[e.range] .. ".")
+    elseif action == "shoot" then
+        self:shoot()
     elseif action == "attack" then
         local w, wname = self:weapon()
         local hit = FIGHT.PLAYER_HIT + 8 * (p.attrs.Speed - 3) + e.aim + self:skill_bonus("fight")
@@ -5371,7 +6601,7 @@ function Game:emission_hour(hour)
     self.emission_news = self.emission_news or {}
     if hour == start - E.warn then self.emission_news.warn = true end
     if hour >= start and hour < start + E.hours then
-        if E.shelter[self.tiles[hex_key(p.q, p.r)]] then
+        if E.shelter[self.tiles[hex_key(p.q, p.r)]] or self:placed_here("tarp_shelter") then
             self.emission_news.sheltered = true
         else
             local harm = self:diff("emission")
@@ -7435,6 +8665,8 @@ function Game:horror_chance()
     local chance = NIGHT.chance
     if self:has_light() then chance = chance / 2 end
     if self:fire_here() then chance = chance / 2 end
+    if self:placed_here("salt_circle") then chance = chance / 4 end   -- the circle holds
+    if self:carrying("black_candle") then chance = chance / 2 end
     return chance
 end
 
@@ -8277,6 +9509,300 @@ function Game:story_text()
     if st.step == "gate" then return j.gate end
     return j.source:format(self:site_bearing("quarry"))
 end
+-- ---------------------------------------------------------------------
+-- Research: how the Churn's recipes are learned (numbers in CHURN, 08).
+--
+-- Almost nothing is known at the start. Each recipe belongs to a topic
+-- (Tailoring, Bushcraft, Medicine, Tinkering, Chemistry, Gunsmithing,
+-- Warding) and a topic's recipes are learned in RECIPES order, by:
+--   * studying at a fire or your camp (crafting screen, "Study: <topic>"):
+--     hours for points, more with the topic's book in reach;
+--   * reading a book (E): its topic's next recipe, the first time;
+--   * playing a cassette (E, with a charged Cassette Player): one recipe
+--     and a dead stalker's voice;
+--   * pairing a USB drive with the LoRa Radio (E): one or two recipes from
+--     what's on it, sometimes a stash or the way out;
+--   * Scrawled Notes, as before: a random recipe.
+-- self.research = {topic -> points}, self.books_read = {book -> true},
+-- self.tapedeck = {charge} (saved).
+-- Also here: the other new things you use with E, and lockpicked crates.
+-- ---------------------------------------------------------------------
+
+function Game.topic_def(id)
+    for _, t in ipairs(CHURN.topics) do if t.id == id then return t end end
+end
+
+-- The next recipe the topic would teach, and how many of it you know.
+function Game:topic_next(topic)
+    local known = 0
+    for _, r in ipairs(RECIPES) do
+        if r.topic == topic then
+            if self.known[r.id] then known = known + 1 else return r, known end
+        end
+    end
+    return nil, known
+end
+
+-- Points a topic needs for its next recipe.
+function Game:topic_need(topic)
+    local _, known = self:topic_next(topic)
+    return CHURN.study.need + CHURN.study.need_step * known
+end
+
+-- Learn the topic's next recipe (nil if there's none left).
+function Game:learn_next(topic, how)
+    local r = self:topic_next(topic)
+    if not r then return nil end
+    self.known[r.id] = true
+    self:stat("learned")
+    self:push_log((how or "You work it out") .. ": " .. r.name .. ".")
+    return r
+end
+
+-- "Study: <topic>" entries for the crafting screen (topics with something left).
+function Game:study_recipes()
+    local list = {}
+    for _, t in ipairs(CHURN.topics) do
+        if self:topic_next(t.id) then
+            list[#list + 1] = {id = "study_" .. t.id, name = "Study: " .. t.name, inputs = {},
+                               hours = CHURN.study.hours, study = t.id}
+        end
+    end
+    return list
+end
+
+function Game:study_text(topic)
+    self.research = self.research or {}
+    local r = self:topic_next(topic)
+    return ("Research %d/%d%s"):format(self.research[topic] or 0, self:topic_need(topic),
+                                       r and "" or " (done)")
+end
+
+function Game:study_blocker(topic)
+    if not (self:fire_here() or self:at_base()) then return "Study by a fire or at your camp." end
+    local t = Game.topic_def(topic)
+    if t.needs then
+        local have = false
+        for _, id in ipairs(t.needs) do if self:count_item(id) > 0 then have = true end end
+        if not have then
+            local names = {}
+            for i = 1, math.min(2, #t.needs) do names[i] = ITEM_DB[t.needs[i]].name end
+            return "Nothing to study it from (" .. table.concat(names, ", ") .. "...)."
+        end
+    end
+    return nil
+end
+
+-- Study points for one session.
+function Game:study_points(topic)
+    local S, t = CHURN.study, Game.topic_def(topic)
+    local pts = math.max(1, S.base + S.per_point * (self.player.attrs.Perception - 3)
+                            + self:skill_bonus("tinker") // 5)
+    if t.book and self:count_item(t.book) > 0 then pts = pts * S.book_mult end
+    return pts
+end
+
+function Game:study(topic)
+    local p, t = self.player, Game.topic_def(topic)
+    self.research = self.research or {}
+    local hours = CHURN.study.hours
+    p.hours = p.hours + hours
+    apply_awake_hours(p, hours)
+    if t.cost then p.needs.rest = math.max(0, p.needs.rest - t.cost) end
+    local pts = self:study_points(topic)
+    self.research[topic] = (self.research[topic] or 0) + pts
+    self:skill_xp("tinker", SKILLS.xp.craft)
+    local need = self:topic_need(topic)
+    if self.research[topic] >= need then
+        self.research[topic] = self.research[topic] - need
+        self:sfx("gift")
+        self:learn_next(topic, "Hours of " .. t.name:lower() .. " pay off")
+    else
+        self:push_log(("You study %s for %dh. (%d/%d)"):format(t.name:lower(), hours,
+                                                              self.research[topic], need))
+    end
+    if t.cost then self:push_log("It leaves you hollow. (-" .. t.cost .. " rest)") end
+    return true
+end
+
+-- E on a book: the first read of each book teaches its topic's next recipe
+-- (later reads still give study points, at a fire or not).
+function Game:read_book(item)
+    local p, def = self.player, ITEM_DB[item]
+    local topic, t = def.book, Game.topic_def(def.book)
+    self.books_read = self.books_read or {}
+    self.research = self.research or {}
+    p.hours = p.hours + CHURN.study.read_hours
+    apply_awake_hours(p, CHURN.study.read_hours)
+    if t.cost then p.needs.rest = math.max(0, p.needs.rest - t.cost) end
+    if not self.books_read[item] then
+        self.books_read[item] = true
+        if self:learn_next(topic, "From the " .. def.name) then return end
+    end
+    if not self:topic_next(topic) then
+        self:push_log("You know everything in the " .. def.name .. ".")
+        return
+    end
+    self.research[topic] = (self.research[topic] or 0) + CHURN.study.base
+    self:push_log(("You reread the %s. (%s %d/%d)"):format(def.name, t.name, self.research[topic],
+                                                         self:topic_need(topic)))
+end
+
+-- E on a cassette: needs a charged player in reach. The tape plays once.
+function Game:play_tape(item)
+    local tape = CHURN.tapes[item]
+    if self:count_item("cassette_player") == 0 then
+        self:push_log("You need a Cassette Player to hear it.")
+        return false
+    end
+    self.tapedeck = self.tapedeck or {charge = 0}
+    if self.tapedeck.charge <= 0 then
+        self:push_log("The player is dead. A Battery Cell (E) would wake it.")
+        return false
+    end
+    self.tapedeck.charge = self.tapedeck.charge - 1
+    local p = self.player
+    p.hours = p.hours + CHURN.study.tape_hours
+    apply_awake_hours(p, CHURN.study.tape_hours)
+    self:push_log(tape.voice:sub(1, 60) .. "...")
+    self.last_tape = tape.voice   -- (the journal shows it whole)
+    if not self:learn_next(tape.topic, "From the tape") then
+        self:push_log("Nothing on it you didn't know.")
+    end
+    if self:rand(3) == 0 then self:mark_stash() end
+    return true
+end
+
+-- E on a USB drive: the radio reads it (a charge). Sometimes it fails.
+function Game:pair_usb()
+    if not (self:carrying("lora_radio") and self.radio) then
+        self:push_log("Nothing to read it with. A LoRa Radio could.")
+        return false
+    end
+    if self.radio.charge <= 0 then
+        self:push_log("The radio has no charge to read it.")
+        return false
+    end
+    self.radio.charge = self.radio.charge - 1
+    local p = self.player
+    p.hours = p.hours + CHURN.study.usb_hours
+    apply_awake_hours(p, CHURN.study.usb_hours)
+    if self:roll(CHURN.study.usb_fail - self:skill_bonus("tinker")) then
+        self:push_log("The radio chokes on it: corrupt. Try again later.")
+        return false
+    end
+    local topics = CHURN.usb_topics
+    local learned = 0
+    for _ = 1, 1 + self:rand(2) do
+        local topic = topics[self:rand(#topics) + 1]
+        if self:learn_next(topic, "Off the drive") then learned = learned + 1 end
+    end
+    if not self.sites_known.checkpoint and self:rand(3) == 0 then
+        self:hear_of_exit("A map on the drive")
+    elseif self:rand(3) == 0 then
+        self:mark_stash()
+    elseif learned == 0 then
+        self:push_log("Photos of a family. A field that isn't there any more.")
+    end
+    return true
+end
+
+-- E on a Battery Cell or Choir Cell: the radio first, then the tape player.
+function Game:charge_tapedeck(full)
+    if self:count_item("cassette_player") == 0 then return false end
+    self.tapedeck = self.tapedeck or {charge = 0}
+    if self.tapedeck.charge >= CHURN.study.tape_max then
+        self:push_log("The cassette player is charged.")
+        return false
+    end
+    self.tapedeck.charge = CHURN.study.tape_max
+    self:push_log("The cassette player clicks and whirs. (" .. CHURN.study.tape_max .. " tapes)")
+    return true
+end
+
+-- The new things E does; true if it handled the item.
+function Game:use_churn_item(kind, k, stack)
+    local p, item, def = self.player, stack.item, ITEM_DB[stack.item]
+    local key = hex_key(p.q, p.r)
+    if def.book then
+        self:read_book(item)
+    elseif CHURN.tapes[item] then
+        if self:play_tape(item) then
+            self:use_one(kind, k, stack)
+            local blank = {item = "blank_tape", qty = 1}
+            if not self:put_stack("inventory", nil, blank) then self:put_stack("ground", nil, blank) end
+        end
+    elseif item == "usb_drive" then
+        if self:pair_usb() then self:use_one(kind, k, stack) end
+    elseif item == "battery_cell" and self:count_item("cassette_player") > 0
+           and not (self:carrying("lora_radio") and self.radio and self.radio.charge < TECH.radio_max) then
+        if self:charge_tapedeck() then self:use_one(kind, k, stack) end
+    elseif item == "choir_cell" then
+        local any = false
+        if self:carrying("lora_radio") and self.radio then self.radio.charge = TECH.radio_max; any = true end
+        if self:charge_tapedeck() then any = true end
+        if any then
+            self:use_one(kind, k, stack)
+            self:push_log("The Choir Cell sings, and everything you carry wakes.")
+        else
+            self:push_log("Nothing here to charge.")
+        end
+    elseif item == "stitches" then
+        if not p.injuries.bleeding and p.injuries.wounded_hours <= 0 then
+            self:push_log("No wound to stitch.")
+            return true
+        end
+        p.injuries.bleeding = false
+        p.injuries.wounded_hours = math.max(0, p.injuries.wounded_hours // 2 - 6)
+        p.health = math.min(MAX_HEALTH, p.health + 10)
+        self:use_one(kind, k, stack)
+        self:push_log("You stitch it shut, teeth gritted. (+10 HP)")
+    elseif item == "painkillers" then
+        p.health = math.min(MAX_HEALTH, p.health + 12)
+        self:use_one(kind, k, stack)
+        self:push_log("The edges go soft. (+12 HP)")
+    elseif item == "can_rattle" or item == "tarp_shelter" or item == "salt_circle" then
+        self.placed = self.placed or {}
+        self.placed[key] = self.placed[key] or {}
+        if self.placed[key][item] then
+            self:push_log("There's one here already.")
+            return true
+        end
+        self.placed[key][item] = true
+        self:use_one(kind, k, stack)
+        self:push_log(({can_rattle = "You string the cans round the camp. Anything coming will ring them.",
+                        tarp_shelter = "You pitch the lean-to. Cover from the weather, here.",
+                        salt_circle = "You pour the circle unbroken. Here, the dark has to knock."})[item])
+    else
+        return false
+    end
+    return true
+end
+
+-- Something placed on this hex (E on a can rattle, lean-to, salt circle).
+function Game:placed_here(item)
+    local here = self.placed and self.placed[hex_key(self.player.q, self.player.r)]
+    return here ~= nil and here[item] == true
+end
+
+-- F in ruins with Lockpicks: some hexes hide a locked crate (once a hex).
+function Game:pick_crate(key)
+    if self.tiles[key] ~= "ruins" or self:count_item("lockpicks") == 0 then return end
+    self.crates = self.crates or {}
+    if self.crates[key] then return end
+    self.crates[key] = true
+    if not self:roll(CHURN.crate_chance + self:skill_bonus("scav")) then return end
+    local found = {}
+    for _ = 1, 2 do
+        local item
+        self.seed, item = weighted_pick(self.seed, CHURN.crate_loot)
+        self:put_stack("ground", nil, {item = item, qty = 1})
+        found[#found + 1] = ITEM_DB[item].name
+    end
+    self:skill_xp("tinker", SKILLS.xp.repair)
+    self:sfx("gift")
+    self:push_log("You pick a locked crate: " .. table.concat(found, ", ") .. ".")
+end
 
 -- Equip slots sit ON the body part they dress, NEO Scavenger style: a box over
 -- the head, the face, the torso, the legs, a hand... sized to that part, with
@@ -9079,6 +10605,122 @@ function Game:draw_inventory(w, h)
     gfx.refresh()
 end
 
+-- ---------------------------------------------------------------------
+-- Ranged weapons: the rare handguns (and the quiet bow and sling), plus
+-- the Elder Sign (numbers in CHURN.guns, items in 08_data_churn).
+--
+-- A gun or bow in a hand, with its rounds anywhere in reach, adds "Shoot"
+-- to a fight at any range; each shot uses one. Guns are loud (more
+-- encounters for a few hours; animals may bolt), they wear a little each
+-- shot and a worn gun jams more (Clean Guns: gunsmithing). The Marsh
+-- Revolver hits hardest and takes something from you every time.
+-- self.gun_wear = {gun -> %}, self.noise_until = hour (saved).
+-- ---------------------------------------------------------------------
+
+-- The ranged weapon in your hands with ammo for it: item, its shoot table.
+function Game:shooter()
+    for _, slot in ipairs({"rhand", "lhand"}) do
+        local item = self.player.equipped[slot]
+        local sh = item and ITEM_DB[item].shoot
+        if sh and self:count_item(sh.ammo) > 0 then return item, sh end
+    end
+end
+
+function Game:gun_wear_of(item)
+    return (self.gun_wear or {})[item] or 100
+end
+
+-- Jam chance: the gun's own, plus more as it wears.
+function Game:jam_chance(item)
+    local sh = ITEM_DB[item].shoot
+    if sh.jam == 0 then return 0 end
+    return sh.jam + (100 - self:gun_wear_of(item)) // CHURN.guns.jam_per_wear
+end
+
+function Game:shoot_chance(item)
+    local p, e, G = self.player, self.enc, CHURN.guns
+    return G.shoot_hit + 8 * (p.attrs.Perception - 3) + (e.aim or 0) + self:skill_bonus("fight")
+        + ITEM_DB[item].shoot.hit - (e.range == "far" and G.far_penalty or 0)
+end
+
+-- Extra fight options: Shoot, and the Elder Sign against what walks at night.
+function Game:ranged_options(o, e)
+    local item = self:shooter()
+    if item then
+        local ammo = ITEM_DB[item].shoot.ammo
+        table.insert(o, 1, {("Shoot (%s, %d)"):format(ITEM_DB[item].name, math.min(99, self:count_item(ammo))),
+                            "shoot"})
+    end
+    return self:sign_options(o, e)
+end
+
+function Game:sign_options(o, e)
+    if (e.def.kind == "horror" or e.def.dark) and self:count_item("elder_sign") > 0 then
+        table.insert(o, 1, {"Raise the Elder Sign", "elder"})
+    end
+    return o
+end
+
+function Game:shoot()
+    local p, e, G = self.player, self.enc, CHURN.guns
+    local item, sh = self:shooter()
+    if not item then return end
+    local name = ITEM_DB[item].name:lower()
+    self:take_items(sh.ammo, 1)
+    if not sh.quiet then
+        self.gun_wear = self.gun_wear or {}
+        self.gun_wear[item] = math.max(0, self:gun_wear_of(item) - G.wear_per_shot)
+        self.noise_until = p.hours + G.noise_hours
+    end
+    if sh.curse then
+        p.needs.rest = math.max(0, p.needs.rest - sh.curse)
+    end
+    if self:roll(self:jam_chance(item)) then
+        self:sfx("miss")
+        self:enc_say("Click. The " .. name .. " jams, and you lose the round clearing it.")
+        return
+    end
+    if self:roll(self:shoot_chance(item)) then
+        self:skill_xp("fight", SKILLS.xp.hit)
+        local dmg = math.max(1, sh.dmg - self:rand(sh.dmg // 4 + 1))
+        e.aim = 0
+        local how = sh.quiet and ("Your shot from the " .. name .. " strikes the " .. e.def.who)
+                              or ("The " .. name .. " cracks. You hit the " .. e.def.who)
+        self:enc_hit(dmg, sh.quiet and 15 or G.bleed, how)
+        if sh.curse and not e.over then self:enc_say("Something in the dark counts the shot.") end
+    else
+        self:sfx("miss")
+        e.aim = 0
+        self:enc_say(sh.quiet and "Your shot goes wide." or ("The " .. name .. " cracks. You miss."))
+    end
+    if not e.over and not sh.quiet and e.def.kind == "animal" and self:roll(G.animal_flee) then
+        self:enc_say("The noise is too much for the " .. e.def.who .. ". It bolts.")
+        e.outcome = "fled"
+        self:end_encounter("The " .. e.def.who .. " ran from the gunshot.")
+    end
+end
+
+-- The Elder Sign: whatever it is, it can't stay where the sign is shown.
+-- The sign crumbles.
+function Game:raise_sign()
+    self:take_items("elder_sign", 1)
+    self:sfx("emission")
+    self:enc_say("You hold up the scratched bone. The air folds around it, and the "
+        .. Game.e_name(self.enc.def) .. " is simply not there any more. The bone crumbles to salt.")
+    self.enc.outcome = "fled"
+    return self:end_encounter("The Elder Sign sent it away.")
+end
+
+-- (a horror has no `who` sometimes; its name will do)
+function Game.e_name(def)
+    return def.who or def.name:lower()
+end
+
+-- Gunshots carry: encounters are likelier for a while after.
+function Game:noise_mult()
+    if self.noise_until and self.player.hours < self.noise_until then return CHURN.guns.noise_mult end
+    return 1
+end
 -- GENERATED by tools/paint_portraits.py - do not edit; repaint instead.
 -- Encounter portraits: per subject, near (96x96), far (48x48) and close
 -- (96x96 zoom on the face) 1-bit views as base64 32x32 sprite tiles
@@ -10029,7 +11671,7 @@ function Game:draw_craft(w, h)
     local ly = CRAFT_UI.list_y + math.min(#list, rows) * CRAFT_UI.row_h + 8
     if unknown > 0 and ly + 13 < h - 64 then
         gfx.text(8, ly, unknown .. " more unknown:")
-        gfx.text(8, ly + 13, "read Scrawled Notes")
+        gfx.text(8, ly + 13, "study, read, listen")
     end
     gfx.line(CRAFT_UI.detail_x - 4, 26, CRAFT_UI.detail_x - 4, h - 60)
 
@@ -10042,21 +11684,24 @@ function Game:draw_craft(w, h)
             draw_sprite(w - 26, y - 12, SPRITE_W, SPRITE_H, icon)
         end
         gfx.text(x, y, r.out and ("Makes: " .. ITEM_DB[r.out[1]].name)
+            or (r.study and self:study_text(r.study))
+            or (r.clean and "Cleans your guns: less jamming")
             or (r.base == "claim" and "Makes this ruin your camp")
             or (r.base and ("Builds at your camp"))
             or (r.mend and self:mend_text())
+            or (r.burn and ("Lights a small fire (" .. r.burn .. "h)"))
             or "Builds a campfire here")
         y = y + 18
         gfx.text(x, y, "Uses:")
         for _, iq in ipairs(Game.recipe_inputs(r)) do
             y = y + 13
             local have = self:count_item(iq[1])
-            gfx.text(x + 7, y, ITEM_DB[iq[1]].name .. " " .. math.min(have, 99) .. "/" .. iq[2]
+            gfx.text(x + 7, y, Game.input_name(iq[1]) .. " " .. math.min(have, 99) .. "/" .. iq[2]
                 .. (have >= iq[2] and "" or "  x"))
         end
         for _, tool in ipairs(r.tools or {}) do
             y = y + 13
-            gfx.text(x, y, "Tool: " .. ITEM_DB[tool].name .. (self:count_item(tool) > 0 and "" or "  x"))
+            gfx.text(x, y, "Tool: " .. Game.input_name(tool) .. (self:count_item(tool) > 0 and "" or "  x"))
         end
         if r.fire then
             y = y + 13
@@ -10067,6 +11712,9 @@ function Game:draw_craft(w, h)
         if r.repair then   -- repairs can fail (and burn a part)
             y = y + 14
             gfx.text(x, y, "Chance " .. self:repair_chance(r.repair) .. "% (Perception)")
+        elseif r.chance then
+            y = y + 14
+            gfx.text(x, y, "Chance " .. self:craft_chance(r) .. "% (Perception)")
         end
         y = y + 18
         local why = self:craft_blocker(r)

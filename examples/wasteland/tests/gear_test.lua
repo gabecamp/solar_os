@@ -28,10 +28,11 @@ assert(g:bag_capacity() == cap + 2)
 g.player.equipped.belt = "rope_belt"
 assert(g:bag_capacity() == cap + 1)
 
-print("2. the Rope Belt and Shiv are known; the heavier weapons come from notes")
+print("2. the Rope Belt and Shiv are learned (Tailoring, Tinkering), like the heavier weapons")
 g = fresh()
-assert(g.known.rope_belt and g.known.shiv)
+assert(not g.known.rope_belt and not g.known.shiv)
 assert(not g.known.machete and not g.known.spiked_club and not g.known.pipe_spear)
+g.known.rope_belt, g.known.shiv = true, true
 g.player.inventory = {{item = "rope", qty = 1}, {item = "cloth_scrap", qty = 1}}
 assert(g:craft(find(g, "rope_belt")) and bag_count(g, "rope_belt") == 1)
 g.player.inventory = {{item = "scrap_metal", qty = 1}, {item = "cloth_scrap", qty = 1}}

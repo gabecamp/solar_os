@@ -17,7 +17,7 @@ function Game:emission_hour(hour)
     self.emission_news = self.emission_news or {}
     if hour == start - E.warn then self.emission_news.warn = true end
     if hour >= start and hour < start + E.hours then
-        if E.shelter[self.tiles[hex_key(p.q, p.r)]] then
+        if E.shelter[self.tiles[hex_key(p.q, p.r)]] or self:placed_here("tarp_shelter") then
             self.emission_news.sheltered = true
         else
             local harm = self:diff("emission")

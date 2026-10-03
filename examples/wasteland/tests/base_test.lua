@@ -44,6 +44,10 @@ assert(g.base and g.base.key == key and g:at_base() and g.player.hours == hours 
 assert(g:craft_blocker(recipe("claim")):find("already"))
 
 print("2. building: only at camp, once each; the barrel needs the box")
+for _, part in ipairs({"bedroll", "barrel", "barricade"}) do   -- (learned: Bushcraft, Tinkering)
+    assert(g:craft_blocker(recipe(part)):find("know"), part)
+    g.known[part] = true
+end
 assert(g:craft_blocker(recipe("barrel")):find("Stash box"))
 assert(g:craft(recipe("box")) and g:base_has("box"))
 assert(g:craft_blocker(recipe("box")) == "Already built.")

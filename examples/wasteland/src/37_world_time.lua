@@ -43,7 +43,7 @@ end
 function Game:storm_exposed(hours)
     local p = self.player
     return self:weather(hours) == "Storm" and WORLD.storm.open[self.tiles[hex_key(p.q, p.r)]] == true
-        and not self:bed_here()
+        and not self:bed_here() and not self:placed_here("tarp_shelter")
 end
 
 -- One hour of a storm (from tick): exposed, it wears you down.
@@ -168,6 +168,9 @@ end
 function Game:has_light()
     local eq = self.player.equipped
     if eq.rhand == "torch" or eq.lhand == "torch" then return true end
+    for _, slot in ipairs({"rhand", "lhand"}) do   -- a black candle, a glow jar
+        if eq[slot] and ITEM_DB[eq[slot]].light then return true end
+    end
     for slot, item in pairs(eq) do
         if not HOLD_SLOTS[slot] and ITEM_DB[item].light then return true end   -- a headlamp
     end

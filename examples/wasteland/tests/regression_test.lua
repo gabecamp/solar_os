@@ -180,7 +180,8 @@ local bi2 = find(g:ground_list(), "canned_beans")
 assert(g:try_transfer({"ground", bi2}, {"equip", "lhand"}))
 g.player.needs.hunger = 10
 g:use_item("equip", "lhand")
-assert(g.player.equipped.lhand == nil and g.player.needs.hunger == 50, "E on held beans eats them")
+assert(g.player.equipped.lhand == "tin_can" and g.player.needs.hunger == 50,
+       "E on held beans eats them (the empty can stays in your hand: your first pot)")
 assert(not g:try_transfer({"equip", "rhand"}, {"equip", "head"}), "a rock is still not a hat")
 print("    OK")
 

@@ -23,6 +23,10 @@ function Game:after_consume(def, kind, k)
         end
     end
     if def.sick and self:roll(def.sick) then self:make_sick() end
+    if def.cures and (p.sick_hours or 0) > 0 then
+        p.sick_hours = 0
+        self:push_log("Your gut settles.")
+    end
 end
 
 function Game:make_sick()

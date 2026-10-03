@@ -254,6 +254,7 @@ function Game:scavenge()
         self:push_log("Press I to pick it up.")
     end
     self:scavenge_field()
+    self:pick_crate(key)
     if p.needs.hunger <= 0 then self:push_log("You are starving!") end
     if p.needs.thirst <= 0 then self:push_log("You are dehydrated!") end
     self:check_death(p.scav_hurt > 0 and "The Hollow Star emptied you." or "You bled out.")
@@ -477,6 +478,7 @@ function Game:use_item(kind, k)
         if self:read_lore() then self:use_one(kind, k, stack) end
         return
     end
+    if self:use_churn_item(kind, k, stack) then return end   -- books, tapes, wards... (59_research)
     if def.trinket then
         if self:little_spot(hex_key(p.q, p.r)) == "cairn" then
             if kind == "inventory" then self:offer_trinket(stack.item) end

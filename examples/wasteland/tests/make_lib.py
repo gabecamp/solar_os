@@ -68,7 +68,7 @@ lib = src[:cut]
           "b64_decode = b64_decode, PORTRAIT_SIZE = PORTRAIT_SIZE}\n")
 (here / "lib_crafting.lua").write_text(
     lib + "\nreturn Game, {RECIPES = RECIPES, ITEM_DB = ITEM_DB, SPRITES = SPRITES, "
-          "SCAVENGE_LOOT = SCAVENGE_LOOT, KEY = KEY, KARL = KARL, TECH = TECH}\n")
+          "SCAVENGE_LOOT = SCAVENGE_LOOT, KEY = KEY, KARL = KARL, TECH = TECH, CHURN = CHURN}\n")
 (here / "lib_world.lua").write_text(
     lib + "\nreturn Game, {WORLD = WORLD, GRID_RADIUS = GRID_RADIUS, TERRAIN = TERRAIN, "
           "AXIAL_DIRS = AXIAL_DIRS, generate_world = generate_world, ITEM_DB = ITEM_DB, "

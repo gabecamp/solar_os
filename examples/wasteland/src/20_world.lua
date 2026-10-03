@@ -226,6 +226,7 @@ local function generate_world(seed)
         {item = "cloth_scrap", qty = 6},
         {item = "canned_beans", qty = 1},
         {item = "water_bottle", qty = 2},
+        {item = "matches", qty = 1},
     }
 
     -- Scatter loot on other passable tiles: every wearable once, plus a few
@@ -355,6 +356,10 @@ local function recompute_stats(player)
     end
     for _, t in ipairs(TRAITS) do
         if player.traits[t.name] then add(t.fx) end
+    end
+    -- worn things with fx (a travois slows you, a charm thins the meetings)
+    for slot, item in pairs(player.equipped) do
+        if not HOLD_SLOTS[slot] and ITEM_DB[item].fx then add(ITEM_DB[item].fx) end
     end
     -- artifacts work while held
     for _, slot in ipairs({"lhand", "rhand"}) do
