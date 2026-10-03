@@ -114,3 +114,76 @@ function Game:noise_mult()
     if self.noise_until and self.player.hours < self.noise_until then return CHURN.guns.noise_mult end
     return 1
 end
+
+-- -- armed enemies (CHURN.armed) -------------------------------------------
+
+-- Some people carry a gun: e.gun = {item, rounds}.
+function Game:arm_enemy()
+    local e = self.enc
+    local a = CHURN.armed[e.def.who]
+    if not a or not self:roll(a.chance) then return end
+    e.gun = {item = a.item, rounds = a.rounds[1] + self:rand(a.rounds[2] - a.rounds[1] + 1)}
+    self:enc_say("The " .. e.def.who .. " carries a " .. ITEM_DB[a.item].name .. ".")
+end
+
+-- "PM", "Nagant", "Tokarev": for the fight's status line.
+function Game:enemy_gun_name()
+    local g = self.enc.gun
+    return g and g.rounds > 0 and ITEM_DB[g.item].name:match("^%S+")
+end
+
+-- An armed enemy short of arm's reach shoots instead of closing in, while
+-- its rounds last. Loud, like yours. True when it took its turn.
+function Game:enemy_shoots()
+    local e, p, A = self.enc, self.player, CHURN.armed
+    local g = e.gun
+    if not g or e.range == "close" or e.demanding then return false end
+    if g.rounds <= 0 then
+        if not g.empty then
+            g.empty = true
+            self:enc_say("The " .. e.def.who .. "'s gun clicks empty. It comes for you instead.")
+            return true
+        end
+        return false
+    end
+    local a = A[e.def.who]
+    g.rounds = g.rounds - 1
+    self.noise_until = p.hours + CHURN.guns.noise_hours
+    local hit = a.hit - FIGHT.ENEMY_DODGE * (p.attrs.Speed - 3)
+        - (e.range == "far" and A.far_penalty or 0) - (e.fog and A.fog or 0)
+    local gun = ITEM_DB[g.item].name
+    if not self:roll(hit) then
+        self:sfx("miss")
+        self:enc_say("The " .. e.def.who .. "'s " .. gun .. " cracks. The shot goes past you.")
+        return true
+    end
+    self:enemy_hits(a.dmg, CHURN.guns.bleed, "The " .. e.def.who .. " shoots you")
+    return true
+end
+
+-- Your loaded gun against their demand: they back off (an end), or call it.
+function Game:bluff()
+    local e, A = self.enc, CHURN.armed
+    e.bluffed = true
+    if self:roll(e.gun and A.bluff or A.bluff_unarmed) then
+        self:enc_say("You let them see the gun. A long look, then they back away into the ruins.")
+        e.outcome = "fled"
+        self:end_encounter("The " .. e.def.who .. " backed off from your gun.")
+        return true
+    end
+    e.demanding = false
+    self:enc_say("'You won't,' they say, and spread out.")
+end
+
+-- On a kill: its gun, and whatever it hadn't fired.
+function Game:drop_enemy_gun(found)
+    local g = self.enc.gun
+    if not g then return end
+    self:put_stack("ground", nil, {item = g.item, qty = 1})
+    found[#found + 1] = ITEM_DB[g.item].name
+    if g.rounds > 0 then
+        local ammo = ITEM_DB[g.item].shoot.ammo
+        self:put_stack("ground", nil, {item = ammo, qty = g.rounds})
+        found[#found + 1] = g.rounds .. " " .. ITEM_DB[ammo].name:lower()
+    end
+end

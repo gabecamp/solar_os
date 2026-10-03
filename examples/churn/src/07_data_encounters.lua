@@ -92,6 +92,15 @@ local ENCOUNTERS = {
      demand = "'Something to eat. That's the toll.'",
      hp = 30, dmg = {7, 14}, hit = 55, speed = 3, bleed = 5, flees_at = 6, start = "near",
      loot = {{"pipe", 3}, {"canned_beans", 2}, {"sunglasses", 1}}, loot_rolls = 2},
+    -- rare = % the pick stands (else it's the Road Bandits); armed: CHURN.armed
+    {kind = "bandit", name = "Rival Churners", art = "bandits", who = "rival churner", rare = 40,
+     intro = "Two churners in patched gas masks, packs heavy with the day's digging. "
+          .. "One lifts a Tokarev, not quite at you. 'Same ground, same luck,' she "
+          .. "says. 'Only one of us walks home with it.'",
+     demand = "'Food for the road, and you go back the way you came.'",
+     hp = 40, dmg = {6, 12}, hit = 55, speed = 4, bleed = 20, flees_at = 10, start = "far",
+     loot = {{"canned_beans", 2}, {"water_bottle", 2}, {"cloth_scrap", 2}, {"usb_drive", 1},
+             {"blank_tape", 1}, {"r762t", 2}}, loot_rolls = 2},
     {kind = "helper", name = "Old Medic", art = "medic", who = "medic", help = "medic",
      intro = "An old woman with a red cross painted on her pack waves you over. Her "
           .. "eyes are clear and her hands are steady. 'You look like you could use "

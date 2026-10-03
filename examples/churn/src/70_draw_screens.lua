@@ -113,8 +113,11 @@ function Game:draw_encounter(w, h)
     local status = "You " .. math.floor(p.health) .. " HP"
     if p.injuries.bleeding then status = status .. " bleeding" end
     if e.def.hp then
-        status = "Range " .. RANGE_NAME[e.range] .. "   " .. status
-            .. "   It: " .. (e.seen and self:enemy_condition() or "?")
+        local gun, sep = self:enemy_gun_name(), "   "
+        if gun then sep = "  " end   -- (room for the gun on one line)
+        status = "Range " .. RANGE_NAME[e.range] .. sep .. status
+            .. sep .. "It: " .. (e.seen and self:enemy_condition() or "?")
+            .. (gun and " (" .. gun .. ")" or "")
     end
     gfx.text(6, 186, status)
     gfx.line(6, 192, w - 6, 192)

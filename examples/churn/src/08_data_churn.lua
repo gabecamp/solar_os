@@ -427,6 +427,17 @@ CHURN.crate_loot = {{"book_lab", 2}, {"book_gunsmith", 2}, {"tape_lab", 2}, {"gu
                     {"inst_sidearm", 1}, {"usb_drive", 3}, {"medkit", 2}, {"antirad", 3}}
 CHURN.crate_chance = 35   -- % a ruin hex has a locked crate to pick
 
+-- People who carry a gun (by who): the % chance they have it, rounds {lo, hi}
+-- loaded, a shot's damage and hit %. They shoot from near and far while the
+-- rounds last; the gun and what's left in it always drop. Show your own
+-- loaded gun while they demand food: bluff % they back off (more if unarmed).
+CHURN.armed = {
+    bandit = {item = "pm_pistol", chance = 40, rounds = {2, 5}, dmg = {10, 18}, hit = 45},
+    ["toll man"] = {item = "nagant", chance = 30, rounds = {2, 4}, dmg = {12, 20}, hit = 40},
+    ["rival churner"] = {item = "tokarev", chance = 100, rounds = {3, 6}, dmg = {12, 22}, hit = 50},
+    far_penalty = 15, fog = 15, bluff = 45, bluff_unarmed = 75,
+}
+
 -- Enemies leave more: hides, sinew and bone from beasts, guns from people.
 for _, e in ipairs(ENCOUNTERS) do
     local extra = ({
@@ -439,6 +450,7 @@ for _, e in ipairs(ENCOUNTERS) do
         bloom = {{"ichor", 1}, {"pale_eye", 1}},
         bandit = {{"brass", 2}, {"r9x18", 1}, {"pm_pistol", 1}, {"gun_spring", 1}, {"lighter", 1}},
         ["toll man"] = {{"brass", 1}, {"r762n", 1}, {"frame_pm", 1}, {"matches", 1}},
+        ["rival churner"] = {{"brass", 2}, {"gun_spring", 1}, {"firing_pin", 1}, {"book_gunsmith", 1}},
     })[e.who]
     if extra and e.loot then
         for _, x in ipairs(extra) do e.loot[#e.loot + 1] = x end

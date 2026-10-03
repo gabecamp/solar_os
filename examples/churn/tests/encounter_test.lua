@@ -368,4 +368,86 @@ g2:scavenge()
 assert(p2.health == E.MAX_HEALTH - 3)
 print("   OK")
 
+print("20. armed people: shoot from range while the rounds last, drop the gun; a bluff")
+local function armed(name, seed)
+    local g3 = fresh(); g3.seed = seed or 1
+    g3:start_encounter(def_named(name))
+    for _ = 1, 50 do
+        if g3.enc.gun then break end
+        g3:start_encounter(def_named(name))
+    end
+    return g3
+end
+g2 = armed("Rival Churners")
+assert(g2.enc.gun and g2.enc.gun.item == "tokarev", "rivals always carry")
+local rounds0 = g2.enc.gun.rounds
+assert(g2:enemy_gun_name() == "Tokarev")
+g2.enc.demanding, g2.enc.range = false, "far"
+g2.player.health, g2.noise_until = 1000, nil
+local shots = 0
+for _ = 1, rounds0 do
+    local before = g2.enc.gun.rounds
+    g2:enemy_turn()
+    assert(g2.enc.range == "far", "a gunman doesn't need to close in")
+    shots = shots + (before - g2.enc.gun.rounds)
+end
+assert(shots == rounds0 and g2.enc.gun.rounds == 0 and g2.noise_until > g2.player.hours)
+g2:enemy_turn()                                          -- the click
+g2:enemy_turn(); g2:enemy_turn(); g2:enemy_turn(); g2:enemy_turn()
+assert(g2.enc.range ~= "far" or g2.enc.over, "empty: it closes in")
+-- hits land often enough at near, and hurt
+local hits = 0
+for s = 1, 200 do
+    g2 = fresh(); g2.seed = s
+    g2:start_encounter(def_named("Rival Churners"))
+    g2.enc.demanding, g2.enc.range = false, "near"
+    g2.player.health = E.MAX_HEALTH
+    g2:enemy_turn()
+    if g2.player.health < E.MAX_HEALTH then hits = hits + 1 end
+end
+print(("   rival hits at near: %d%%"):format(hits // 2))
+assert(hits > 50 and hits < 150)
+-- the gun and its unfired rounds drop
+g2 = armed("Rival Churners")
+local left = g2.enc.gun.rounds
+g2.enc.demanding = false
+g2.enc.hp = 1
+g2:enc_hit(5, 0, "test")
+assert(g2.enc.over and ground_has(g2, "tokarev") and ground_has(g2, "r762t"))
+assert(left > 0)
+-- road bandits carry about 40% of the time
+local carried = 0
+for s = 1, 400 do
+    g2 = fresh(); g2.seed = s * 7
+    g2:start_encounter(def_named("Road Bandits"))
+    if g2.enc.gun then carried = carried + 1; assert(g2.enc.gun.item == "pm_pistol") end
+end
+print(("   road bandits armed: %d%%"):format(carried // 4))
+assert(carried > 120 and carried < 200)
+-- a bluff: only with a loaded gun, once; ends it or starts the fight
+g2 = fresh()
+g2:start_encounter(def_named("Toll Man"))
+local function has_opt(g3, act_id)
+    for _, o in ipairs(g3:encounter_options()) do if o[2] == act_id then return true end end
+end
+assert(not has_opt(g2, "bluff"))
+g2.player.equipped.rhand = "nagant"
+g2.player.inventory[#g2.player.inventory + 1] = {item = "r762n", qty = 3}
+assert(has_opt(g2, "bluff"))
+local backed = 0
+for s = 1, 200 do
+    g2.seed = s
+    g2:start_encounter(def_named("Toll Man"))
+    g2.player.health = E.MAX_HEALTH
+    act(g2, "bluff")
+    if g2.enc.over then backed = backed + 1 else assert(not g2.enc.demanding and not has_opt(g2, "bluff")) end
+end
+print(("   bluffs that worked: %d%%"):format(backed // 2))
+assert(backed > 80 and backed < 180)
+-- the fight screen names the gun
+g2 = armed("Rival Churners")
+g2:draw_encounter(400, 300)
+assert(#("Range Near  You 100 HP bleeding  It: badly hurt (Tokarev)") * 7 <= 400)
+print("   OK")
+
 print("\nENCOUNTER TESTS PASSED")

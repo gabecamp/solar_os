@@ -256,12 +256,18 @@ Two rare kind faces on the road (encounters, not radio voices).
   about the Checkpoint or the trader's town. *"Stay off the roads at
   night."*
 
-### Road Bandits and the Toll Man
+### Road Bandits, the Toll Man and Rival Churners
 - **Role:** people who want what you carry, met on the road. **Road Bandits** step out from
   behind a wrecked car: *"Nobody has to get hurt. That part is up to
   you."* The **Toll Man**, in a welding mask, taps a lead pipe against his
   leg: *"Toll road. Pay up or bleed."* Give them some food, fight, or
-  run.
+  run. Some carry a gun (the bandits a PM, 40%; the Toll Man a Nagant,
+  30%): they shoot from Near and Far while their rounds last, and the
+  fight screen shows it, e.g. "It: ? (PM)". Hold a loaded gun of your own
+  and you can **show it** while they're still demanding: they may back
+  off. Kill one and its gun and unfired rounds are yours.
+- **Rival Churners** (rarer): two diggers in gas masks with a Tokarev,
+  always loaded, after the same ground you are.
 - **Lore:** the Churn's own economy. Everyone out here came for the
   artifacts, and some found it easier to take them from the ones who
   survived the finding.

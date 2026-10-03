@@ -41,7 +41,9 @@ function Game:pick_encounter()
     local kind
     self.seed, kind = weighted_pick(self.seed, kinds)
     local list = ENCOUNTERS_BY_KIND[kind]
-    return list[self:rand(#list) + 1]
+    local def = list[self:rand(#list) + 1]
+    if def.rare and not self:roll(def.rare) then return list[1] end
+    return def
 end
 
 function Game:start_encounter(def)
@@ -49,6 +51,7 @@ function Game:start_encounter(def)
                 intro = wrap(def.intro, ENC_INTRO_COLS), cursor = 1, aim = 0,
                 demanding = def.kind == "bandit"}
     if def.kind == "bandit" then self:enc_say(def.demand) end
+    self:arm_enemy()
     if self:placed_here("can_rattle") and self.enc.range ~= "far" then   -- the cans rang
         self.enc.range = "far"
         self:enc_say("The cans you strung up clatter. You're ready for it.")
@@ -130,6 +133,7 @@ function Game:encounter_options()
     if e.demanding then
         local o = {}
         if self:food_index() then o[#o + 1] = {"Give them some food", "give"} end
+        if self:shooter() and not e.bluffed then o[#o + 1] = {"Show them your gun", "bluff"} end
         o[#o + 1] = {"Refuse", "refuse"}
         o[#o + 1] = {"Run for it", "flee"}
         return o
@@ -168,6 +172,7 @@ function Game:enemy_dies()
             found[#found + 1] = ITEM_DB[item].name
         end
     end
+    self:drop_enemy_gun(found)
     self:sfx("kill")
     self:skill_xp("fight", SKILLS.xp.kill)
     self:stat("kills")
@@ -191,6 +196,7 @@ function Game:enemy_turn()
         return self:end_encounter("The " .. d.who .. " fled.")
     end
     if self:little_turn() or self:dog_turn() or self:dark_flees() then return end
+    if self:enemy_shoots() then return end
     if e.range ~= "close" then
         if self:roll(FIGHT.ADVANCE_CHANCE + 10 * (d.speed - p.attrs.Speed)) then
             e.range = CLOSER[e.range]
@@ -204,13 +210,20 @@ function Game:enemy_turn()
         self:enc_say("The " .. d.who .. " lunges and misses.")
         return
     end
-    local dmg = d.dmg[1] + self:rand(d.dmg[2] - d.dmg[1] + 1)
+    self:enemy_hits(d.dmg, d.bleed, "The " .. d.who .. " hits you")
+end
+
+-- Damage from {lo, hi} (unless the dog takes it): a bleed % and a wound
+-- when it's deep, and maybe death.
+function Game:enemy_hits(range, bleed, how)
+    local p, d = self.player, self.enc.def
+    local dmg = range[1] + self:rand(range[2] - range[1] + 1)
     if self:dog_guard(dmg) then return end
     p.health = clamp(p.health - dmg)
     self:wear_hit()
     self:sfx("hurt")
-    local text = "The " .. d.who .. " hits you (-" .. dmg .. " HP)."
-    if d.bleed and d.bleed > 0 and not p.injuries.bleeding and self:roll(d.bleed) then
+    local text = how .. " (-" .. dmg .. " HP)."
+    if bleed and bleed > 0 and not p.injuries.bleeding and self:roll(bleed) then
         p.injuries.bleeding = true
         text = text .. " You're bleeding."
     end
@@ -294,6 +307,8 @@ function Game:encounter_action(action)
         if stack.qty <= 0 then table.remove(p.inventory, i) end
         self:enc_say("They take the " .. name:lower() .. " and back off into the ruins.")
         return self:end_encounter("You paid the " .. e.def.who .. " off.")
+    elseif action == "bluff" then
+        if self:bluff() then return end
     elseif action == "refuse" then
         e.demanding = false
         self:enc_say("'Wrong answer.'")

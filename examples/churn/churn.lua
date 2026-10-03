@@ -872,6 +872,15 @@ local ENCOUNTERS = {
      demand = "'Something to eat. That's the toll.'",
      hp = 30, dmg = {7, 14}, hit = 55, speed = 3, bleed = 5, flees_at = 6, start = "near",
      loot = {{"pipe", 3}, {"canned_beans", 2}, {"sunglasses", 1}}, loot_rolls = 2},
+    -- rare = % the pick stands (else it's the Road Bandits); armed: CHURN.armed
+    {kind = "bandit", name = "Rival Churners", art = "bandits", who = "rival churner", rare = 40,
+     intro = "Two churners in patched gas masks, packs heavy with the day's digging. "
+          .. "One lifts a Tokarev, not quite at you. 'Same ground, same luck,' she "
+          .. "says. 'Only one of us walks home with it.'",
+     demand = "'Food for the road, and you go back the way you came.'",
+     hp = 40, dmg = {6, 12}, hit = 55, speed = 4, bleed = 20, flees_at = 10, start = "far",
+     loot = {{"canned_beans", 2}, {"water_bottle", 2}, {"cloth_scrap", 2}, {"usb_drive", 1},
+             {"blank_tape", 1}, {"r762t", 2}}, loot_rolls = 2},
     {kind = "helper", name = "Old Medic", art = "medic", who = "medic", help = "medic",
      intro = "An old woman with a red cross painted on her pack waves you over. Her "
           .. "eyes are clear and her hands are steady. 'You look like you could use "
@@ -1351,6 +1360,17 @@ CHURN.crate_loot = {{"book_lab", 2}, {"book_gunsmith", 2}, {"tape_lab", 2}, {"gu
                     {"inst_sidearm", 1}, {"usb_drive", 3}, {"medkit", 2}, {"antirad", 3}}
 CHURN.crate_chance = 35   -- % a ruin hex has a locked crate to pick
 
+-- People who carry a gun (by who): the % chance they have it, rounds {lo, hi}
+-- loaded, a shot's damage and hit %. They shoot from near and far while the
+-- rounds last; the gun and what's left in it always drop. Show your own
+-- loaded gun while they demand food: bluff % they back off (more if unarmed).
+CHURN.armed = {
+    bandit = {item = "pm_pistol", chance = 40, rounds = {2, 5}, dmg = {10, 18}, hit = 45},
+    ["toll man"] = {item = "nagant", chance = 30, rounds = {2, 4}, dmg = {12, 20}, hit = 40},
+    ["rival churner"] = {item = "tokarev", chance = 100, rounds = {3, 6}, dmg = {12, 22}, hit = 50},
+    far_penalty = 15, fog = 15, bluff = 45, bluff_unarmed = 75,
+}
+
 -- Enemies leave more: hides, sinew and bone from beasts, guns from people.
 for _, e in ipairs(ENCOUNTERS) do
     local extra = ({
@@ -1363,6 +1383,7 @@ for _, e in ipairs(ENCOUNTERS) do
         bloom = {{"ichor", 1}, {"pale_eye", 1}},
         bandit = {{"brass", 2}, {"r9x18", 1}, {"pm_pistol", 1}, {"gun_spring", 1}, {"lighter", 1}},
         ["toll man"] = {{"brass", 1}, {"r762n", 1}, {"frame_pm", 1}, {"matches", 1}},
+        ["rival churner"] = {{"brass", 2}, {"gun_spring", 1}, {"firing_pin", 1}, {"book_gunsmith", 1}},
     })[e.who]
     if extra and e.loot then
         for _, x in ipairs(extra) do e.loot[#e.loot + 1] = x end
@@ -6116,7 +6137,9 @@ function Game:pick_encounter()
     local kind
     self.seed, kind = weighted_pick(self.seed, kinds)
     local list = ENCOUNTERS_BY_KIND[kind]
-    return list[self:rand(#list) + 1]
+    local def = list[self:rand(#list) + 1]
+    if def.rare and not self:roll(def.rare) then return list[1] end
+    return def
 end
 
 function Game:start_encounter(def)
@@ -6124,6 +6147,7 @@ function Game:start_encounter(def)
                 intro = wrap(def.intro, ENC_INTRO_COLS), cursor = 1, aim = 0,
                 demanding = def.kind == "bandit"}
     if def.kind == "bandit" then self:enc_say(def.demand) end
+    self:arm_enemy()
     if self:placed_here("can_rattle") and self.enc.range ~= "far" then   -- the cans rang
         self.enc.range = "far"
         self:enc_say("The cans you strung up clatter. You're ready for it.")
@@ -6205,6 +6229,7 @@ function Game:encounter_options()
     if e.demanding then
         local o = {}
         if self:food_index() then o[#o + 1] = {"Give them some food", "give"} end
+        if self:shooter() and not e.bluffed then o[#o + 1] = {"Show them your gun", "bluff"} end
         o[#o + 1] = {"Refuse", "refuse"}
         o[#o + 1] = {"Run for it", "flee"}
         return o
@@ -6243,6 +6268,7 @@ function Game:enemy_dies()
             found[#found + 1] = ITEM_DB[item].name
         end
     end
+    self:drop_enemy_gun(found)
     self:sfx("kill")
     self:skill_xp("fight", SKILLS.xp.kill)
     self:stat("kills")
@@ -6266,6 +6292,7 @@ function Game:enemy_turn()
         return self:end_encounter("The " .. d.who .. " fled.")
     end
     if self:little_turn() or self:dog_turn() or self:dark_flees() then return end
+    if self:enemy_shoots() then return end
     if e.range ~= "close" then
         if self:roll(FIGHT.ADVANCE_CHANCE + 10 * (d.speed - p.attrs.Speed)) then
             e.range = CLOSER[e.range]
@@ -6279,13 +6306,20 @@ function Game:enemy_turn()
         self:enc_say("The " .. d.who .. " lunges and misses.")
         return
     end
-    local dmg = d.dmg[1] + self:rand(d.dmg[2] - d.dmg[1] + 1)
+    self:enemy_hits(d.dmg, d.bleed, "The " .. d.who .. " hits you")
+end
+
+-- Damage from {lo, hi} (unless the dog takes it): a bleed % and a wound
+-- when it's deep, and maybe death.
+function Game:enemy_hits(range, bleed, how)
+    local p, d = self.player, self.enc.def
+    local dmg = range[1] + self:rand(range[2] - range[1] + 1)
     if self:dog_guard(dmg) then return end
     p.health = clamp(p.health - dmg)
     self:wear_hit()
     self:sfx("hurt")
-    local text = "The " .. d.who .. " hits you (-" .. dmg .. " HP)."
-    if d.bleed and d.bleed > 0 and not p.injuries.bleeding and self:roll(d.bleed) then
+    local text = how .. " (-" .. dmg .. " HP)."
+    if bleed and bleed > 0 and not p.injuries.bleeding and self:roll(bleed) then
         p.injuries.bleeding = true
         text = text .. " You're bleeding."
     end
@@ -6369,6 +6403,8 @@ function Game:encounter_action(action)
         if stack.qty <= 0 then table.remove(p.inventory, i) end
         self:enc_say("They take the " .. name:lower() .. " and back off into the ruins.")
         return self:end_encounter("You paid the " .. e.def.who .. " off.")
+    elseif action == "bluff" then
+        if self:bluff() then return end
     elseif action == "refuse" then
         e.demanding = false
         self:enc_say("'Wrong answer.'")
@@ -10882,6 +10918,79 @@ function Game:noise_mult()
     if self.noise_until and self.player.hours < self.noise_until then return CHURN.guns.noise_mult end
     return 1
 end
+
+-- -- armed enemies (CHURN.armed) -------------------------------------------
+
+-- Some people carry a gun: e.gun = {item, rounds}.
+function Game:arm_enemy()
+    local e = self.enc
+    local a = CHURN.armed[e.def.who]
+    if not a or not self:roll(a.chance) then return end
+    e.gun = {item = a.item, rounds = a.rounds[1] + self:rand(a.rounds[2] - a.rounds[1] + 1)}
+    self:enc_say("The " .. e.def.who .. " carries a " .. ITEM_DB[a.item].name .. ".")
+end
+
+-- "PM", "Nagant", "Tokarev": for the fight's status line.
+function Game:enemy_gun_name()
+    local g = self.enc.gun
+    return g and g.rounds > 0 and ITEM_DB[g.item].name:match("^%S+")
+end
+
+-- An armed enemy short of arm's reach shoots instead of closing in, while
+-- its rounds last. Loud, like yours. True when it took its turn.
+function Game:enemy_shoots()
+    local e, p, A = self.enc, self.player, CHURN.armed
+    local g = e.gun
+    if not g or e.range == "close" or e.demanding then return false end
+    if g.rounds <= 0 then
+        if not g.empty then
+            g.empty = true
+            self:enc_say("The " .. e.def.who .. "'s gun clicks empty. It comes for you instead.")
+            return true
+        end
+        return false
+    end
+    local a = A[e.def.who]
+    g.rounds = g.rounds - 1
+    self.noise_until = p.hours + CHURN.guns.noise_hours
+    local hit = a.hit - FIGHT.ENEMY_DODGE * (p.attrs.Speed - 3)
+        - (e.range == "far" and A.far_penalty or 0) - (e.fog and A.fog or 0)
+    local gun = ITEM_DB[g.item].name
+    if not self:roll(hit) then
+        self:sfx("miss")
+        self:enc_say("The " .. e.def.who .. "'s " .. gun .. " cracks. The shot goes past you.")
+        return true
+    end
+    self:enemy_hits(a.dmg, CHURN.guns.bleed, "The " .. e.def.who .. " shoots you")
+    return true
+end
+
+-- Your loaded gun against their demand: they back off (an end), or call it.
+function Game:bluff()
+    local e, A = self.enc, CHURN.armed
+    e.bluffed = true
+    if self:roll(e.gun and A.bluff or A.bluff_unarmed) then
+        self:enc_say("You let them see the gun. A long look, then they back away into the ruins.")
+        e.outcome = "fled"
+        self:end_encounter("The " .. e.def.who .. " backed off from your gun.")
+        return true
+    end
+    e.demanding = false
+    self:enc_say("'You won't,' they say, and spread out.")
+end
+
+-- On a kill: its gun, and whatever it hadn't fired.
+function Game:drop_enemy_gun(found)
+    local g = self.enc.gun
+    if not g then return end
+    self:put_stack("ground", nil, {item = g.item, qty = 1})
+    found[#found + 1] = ITEM_DB[g.item].name
+    if g.rounds > 0 then
+        local ammo = ITEM_DB[g.item].shoot.ammo
+        self:put_stack("ground", nil, {item = ammo, qty = g.rounds})
+        found[#found + 1] = g.rounds .. " " .. ITEM_DB[ammo].name:lower()
+    end
+end
 -- GENERATED by tools/paint_portraits.py - do not edit; repaint instead.
 -- Encounter portraits: per subject, near (96x96), far (48x48) and close
 -- (96x96 zoom on the face) 1-bit views as raw-byte 32x32 sprite tiles
@@ -11658,8 +11767,11 @@ function Game:draw_encounter(w, h)
     local status = "You " .. math.floor(p.health) .. " HP"
     if p.injuries.bleeding then status = status .. " bleeding" end
     if e.def.hp then
-        status = "Range " .. RANGE_NAME[e.range] .. "   " .. status
-            .. "   It: " .. (e.seen and self:enemy_condition() or "?")
+        local gun, sep = self:enemy_gun_name(), "   "
+        if gun then sep = "  " end   -- (room for the gun on one line)
+        status = "Range " .. RANGE_NAME[e.range] .. sep .. status
+            .. sep .. "It: " .. (e.seen and self:enemy_condition() or "?")
+            .. (gun and " (" .. gun .. ")" or "")
     end
     gfx.text(6, 186, status)
     gfx.line(6, 192, w - 6, 192)
