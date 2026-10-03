@@ -530,8 +530,8 @@ function Game:doll_cache()
 end
 
 -- The whole doll as 1-bit bitmap tiles, one set per color: {color, x, y,
--- w, h, data}. draw_silhouette's ~500-800 rects are replayed once into a
--- pixel grid and cut into 32x32 tiles (128 bytes, gfx.bitmap's limit); the
+-- w, h, data}. draw_silhouette's ~500-800 rects are replayed once into bit
+-- planes and cut into 32x32 tiles (128 bytes, gfx.bitmap's limit); the
 -- firmware dithers a bitmap exactly like a fill_rect of the same color, so
 -- ~60-80 calls draw the same picture.
 function Game:doll_tiles()
@@ -543,40 +543,61 @@ function Game:doll_tiles()
             x0, x1 = math.min(x0, sp[1] - 1), math.max(x1, sp[2] + 1)
         end
     end
-    local bw = x1 - x0
-    local grid, colors = {}, {}
+    local bw, rows = x1 - x0, y1 - y0
+    -- The doll is painted into one bit plane per color: per row, (bw + 63)
+    -- // 64 integers of 64 pixels (bit 0 = leftmost). A later color clears
+    -- the others' bits, as paint would. A few KB, where a table per pixel
+    -- made ~0.6 MB of garbage on every change of clothes.
+    local words = (bw + 63) // 64
+    local planes = {}
     local real_color, real_fill, pen = gfx.color, gfx.fill_rect, gfx.WHITE
     gfx.color = function(c) pen = c end
     gfx.fill_rect = function(x, y, w, h)
-        colors[pen] = true
-        for yy = math.max(y, y0), math.min(y + h, y1) - 1 do
-            local row = (yy - y0) * bw - x0
-            for xx = math.max(x, x0), math.min(x + w, x1) - 1 do grid[row + xx] = pen end
+        local a, z = math.max(x, x0) - x0, math.min(x + w, x1) - x0   -- columns [a, z)
+        local top, bottom = math.max(y, y0) - y0, math.min(y + h, y1) - y0
+        if z <= a or bottom <= top then return end
+        if pen ~= gfx.WHITE and not planes[pen] then
+            local p = {}
+            for i = 1, rows * words do p[i] = 0 end
+            planes[pen] = p
+        end
+        for k = a // 64, (z - 1) // 64 do
+            local lo, hi = math.max(a, k * 64) - k * 64, math.min(z, k * 64 + 64) - k * 64
+            local mask = (hi - lo == 64) and -1 or (((1 << (hi - lo)) - 1) << lo)
+            for r = top, bottom - 1 do
+                local i = r * words + k + 1
+                for c, p in pairs(planes) do
+                    if c == pen then p[i] = p[i] | mask else p[i] = p[i] & ~mask end
+                end
+            end
         end
     end
     local ok, err = pcall(self.draw_silhouette, self)
     gfx.color, gfx.fill_rect = real_color, real_fill
     if not ok then error(err) end
-    local tiles = {}
+    local tiles, bytes = {}, {}   -- (one byte buffer for every tile)
     for _, c in ipairs({gfx.BLACK, gfx.DARK, gfx.LIGHT}) do
-        if colors[c] then
+        local p = planes[c]
+        if p then
             for ty = y0, y1 - 1, 32 do
                 for tx = x0, x1 - 1, 32 do
                     local w, h = math.min(32, x1 - tx), math.min(32, y1 - ty)
-                    local bytes, any = {}, false
+                    local n, any = 0, false
                     for yy = ty, ty + h - 1 do
-                        local row = (yy - y0) * bw - x0
+                        local base = (yy - y0) * words + 1
                         for bx = 0, (w + 7) // 8 - 1 do
-                            local v = 0
-                            for bit = 0, 7 do
-                                local xx = tx + bx * 8 + bit
-                                if bx * 8 + bit < w and grid[row + xx] == c then v = v | (1 << bit) end
-                            end
+                            local b = tx - x0 + bx * 8          -- first column of this byte
+                            local k, off = b // 64, b % 64
+                            local v = (p[base + k] >> off) & 0xFF
+                            if off > 56 and k + 1 < words then v = v | ((p[base + k + 1] << (64 - off)) & 0xFF) end
+                            local left = w - bx * 8               -- columns of the tile still in this byte
+                            if left < 8 then v = v & ((1 << left) - 1) end
                             if v ~= 0 then any = true end
-                            bytes[#bytes + 1] = string.char(v)
+                            n = n + 1
+                            bytes[n] = v
                         end
                     end
-                    if any then tiles[#tiles + 1] = {c, tx, ty, w, h, table.concat(bytes)} end
+                    if any then tiles[#tiles + 1] = {c, tx, ty, w, h, string.char(table.unpack(bytes, 1, n))} end
                 end
             end
         end

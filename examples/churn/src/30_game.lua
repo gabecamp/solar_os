@@ -88,6 +88,7 @@ function Game:start_game()
         return false
     end
     local p = self.player
+    Game.ART_TILES = {}   -- (the title screens' pictures, cut into tiles: not needed in play)
     recompute_stats(p)
     p.mp = p.max_mp
     p.explored = {}

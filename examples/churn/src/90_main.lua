@@ -2,6 +2,10 @@
 -- Main loop
 -- ---------------------------------------------------------------------
 
+-- Everything built at load is in place: clear out the garbage the build left
+-- (the collector setting is at the top of the file, 00_header).
+collectgarbage("collect")
+
 gfx.begin()
 
 local ok, err = pcall(function()

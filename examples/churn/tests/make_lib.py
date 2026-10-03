@@ -65,7 +65,7 @@ lib = src[:cut]
           "RUNE_N = RUNE_N, recompute_stats = recompute_stats, "
           "ENC_INTRO_COLS = ENC_INTRO_COLS, PORTRAIT_DATA = PORTRAIT_DATA, "
           "PORTRAIT_CACHE = PORTRAIT_CACHE, portrait_view = portrait_view, "
-          "b64_decode = b64_decode, PORTRAIT_SIZE = PORTRAIT_SIZE}\n")
+          "PORTRAIT_SIZE = PORTRAIT_SIZE}\n")
 (here / "lib_crafting.lua").write_text(
     lib + "\nreturn Game, {RECIPES = RECIPES, ITEM_DB = ITEM_DB, SPRITES = SPRITES, "
           "SCAVENGE_LOOT = SCAVENGE_LOOT, KEY = KEY, KARL = KARL, TECH = TECH, CHURN = CHURN}\n")

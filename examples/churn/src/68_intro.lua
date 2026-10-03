@@ -84,7 +84,7 @@ function Game.art_tiles(name)
     if Game.ART_TILES[name] then return Game.ART_TILES[name] end
     local A, tiles = Game[name], {}
     if A then
-        local bytes, empty = b64_decode(A.data), string.rep("\0", 128)
+        local bytes, empty = A.data, string.rep("\0", 128)
         for ty = 0, A.th - 1 do
             for tx = 0, A.tw - 1 do
                 local k = (ty * A.tw + tx) * 128

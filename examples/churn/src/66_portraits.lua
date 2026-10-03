@@ -2,8 +2,8 @@
 -- Encounter portraits
 --
 -- Painted by tools/paint_portraits.py and baked into PORTRAIT_DATA (the
--- part before this one) as 1-bit 32x32 sprite tiles, base64 text. Only the
--- creature on screen is decoded, and only once: PORTRAIT_CACHE holds one
+-- part before this one) as 1-bit 32x32 sprite tiles, raw bytes. Only the
+-- creature on screen is cut into tiles, and only once: PORTRAIT_CACHE holds one
 -- subject, so memory stays at a few KB whatever the roster grows to.
 --
 -- The picture reacts to the fight: far away it is small, near it fills the
@@ -12,26 +12,6 @@
 -- ---------------------------------------------------------------------
 
 local PORTRAIT_SIZE = 96
-
-local B64_VAL = {}   -- base64 digit -> value
-do
-    local digits = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-    for i = 1, #digits do B64_VAL[digits:byte(i)] = i - 1 end
-end
-
-local function b64_decode(text)
-    local out, n = {}, 0
-    for i = 1, #text, 4 do
-        local a, b = B64_VAL[text:byte(i)], B64_VAL[text:byte(i + 1)]
-        local c3, d4 = text:byte(i + 2), text:byte(i + 3)
-        local c, d = B64_VAL[c3], B64_VAL[d4]
-        local v = (a << 18) | (b << 12) | ((c or 0) << 6) | (d or 0)
-        n = n + 1; out[n] = string.char((v >> 16) & 0xff)
-        if c then n = n + 1; out[n] = string.char((v >> 8) & 0xff) end
-        if d then n = n + 1; out[n] = string.char(v & 0xff) end
-    end
-    return table.concat(out)
-end
 
 local PORTRAIT_CACHE = {who = nil, views = {}, empty = string.rep("\0", 128)}
 
@@ -46,7 +26,7 @@ local function portrait_view(who, view)
     local cached = PORTRAIT_CACHE.views[view]
     if cached then return cached end
     local v = entry[view]
-    local bytes = b64_decode(v.data)
+    local bytes = v.data
     local tiles = {}
     for ty = 0, v.th - 1 do
         for tx = 0, v.tw - 1 do

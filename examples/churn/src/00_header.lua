@@ -17,6 +17,11 @@ single self-contained script, as SolarOS Playground apps are - no
 require()s beyond the built-in `solaros` module.
 ]]
 
+-- Collect sooner (from the very start, while the game builds its tables): a
+-- cycle starts when the heap reaches 120% of what was live after the last
+-- one. Lua's default, 200%, lets it grow to about twice the live data.
+collectgarbage("incremental", 120, 200)
+
 local solaros = require("solaros")
 local gfx = solaros.gfx
 local audio = solaros.audio

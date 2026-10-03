@@ -25,7 +25,7 @@ print("2. the baked data decodes to whole 32x32 tiles (128 bytes each)")
 local tiles_total = 0
 for who, entry in pairs(E.PORTRAIT_DATA) do
     for view, v in pairs(entry) do
-        local bytes = E.b64_decode(v.data)
+        local bytes = v.data
         assert(#bytes == v.tw * v.th * 128, who .. "." .. view .. ": " .. #bytes .. " bytes")
         assert(v.w <= v.tw * 32 and v.h <= v.th * 32 and v.w <= SIZE and v.h <= SIZE)
         assert(#v.marks % 2 == 0 and #v.marks >= 10, who .. "." .. view .. " needs wound marks")
