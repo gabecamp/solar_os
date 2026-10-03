@@ -1,18 +1,18 @@
 # The Lore of the Churn: How Everyone and Everything Connects
 
 Oct 2, 2026 · @Gabe  
-_A copy of the shared doc "The Lore of the World: How Everything Connects", with the Zone renamed to the Churn as in the game._
+_A copy of the shared doc "The Lore of the World: How Everything Connects"._
 
 ## The Churn in brief
 
 The Churn is a fenced-off stretch of fields, forest, hills and river around an old quarry, where something the Institute opened is still breathing. Everyone and everything in it connects back to that one night, when the sky over the quarry turned purple.
 
-- **What it is:** the land left behind after the town was evacuated. A military Checkpoint lets no one out without paper.
+- **What it is:** the land left behind after the town was evacuated. A military Checkpoint lets no one out without paper. The land itself turns over in its sleep: hills fold, rivers drift a field to one side, and what was buried comes up again (tins, tapes, guns, bones). That is why the soldiers call it the Churn.
 - **What happens there:** every few days the sky breaks open in an **emission**. The ground is hot in places, strange **anomalies** bend the rules, and they leave behind **artifacts** that are worth a fortune.
 - **Who is left:** a handful of people who stayed (a trader, a ferrywoman, a fisherman, a medic on the radio), people who came back for the money, the things the Churn made of people and animals, and the children who never left.
 - **Who you are:** a survivor who wakes in wet grass with nothing, not even shoes, and has to find a way out.
 
-Everything here comes from the game itself: its encounter texts, radio lines, quest dialogue and the twelve **torn pages**. Sections 2 to 8 are safe to read. **Sections 9 to 11 spoil the story**: what the Signal counts, what is behind the Institute's gate, and how it ends.
+Everything here comes from the game itself: its encounter texts, radio lines, quest dialogue and the twelve **torn pages**. Sections 2 to 10 are safe to read. **Sections 11 to 13 spoil the story**: what the Signal counts, what is behind the Institute's gate, and how it ends.
 
 ## The web
 
@@ -125,7 +125,7 @@ The Churn was made in one night, but it was years in the making and years in the
                                                                    on them; the Trader sets up shop
                                                                  |
                                                                  Institute memo, day 400
-                                                                   (see Section 9)
+                                                                   (see Section 11)
                                                                  |
                                                                  NOW: you wake in wet grass
                                                                    with nothing, late Autumn
@@ -181,7 +181,7 @@ Five forces run the Churn, and they form a loop: emissions feed the hot fields, 
 | Hollow Star | better finds when searching | 3 HP every search |
 | Quiet Shell | half the encounters | 1 less sight |
 
-The traders pay well for them, bandits want them, and the sergeant at the Checkpoint takes three as a bribe. The guards' orders say to hold none longer than necessary (Section 9 explains why).
+The traders pay well for them, bandits want them, and the sergeant at the Checkpoint takes three as a bribe. The guards' orders say to hold none longer than necessary (Section 11 explains why).
 
 **Night.** From 20:00 to 06:00 your sight shrinks without a torch or headlamp, encounters rise, and the **night horrors** come out. A fire or a light halves their chance; a camp with a bedroll keeps them away completely.
 
@@ -229,7 +229,7 @@ Every run grows a new map, but its landmarks always keep the same relationships:
 
 | Place | What it is | Where it always is |
 | --- | --- | --- |
-| Where you wake | The centre of the map; a pile with a rock, sticks, cloth, a can and water | Hex 0,0 |
+| Where you wake | The centre of the map; a pile with a rock, sticks, cloth, a can, water and a box of matches | Hex 0,0 |
 | The town | Nine ruined hexes around the Trader's barricaded stall | Anywhere; the Checkpoint is set against it |
 | The Checkpoint | Guard tower, razor wire, searchlight, the sergeant | The edge hex farthest from the town, never water |
 | The Ferry Post | A few ruined huts and a jetty; Mother Okun | Beside water, 9 or more hexes from the town |
@@ -370,6 +370,87 @@ The Churn changed whatever was outside on the first night and whatever has lived
 - **The Long Man:** look away and he is gone. Speak to it, and half the time it leaves you an artifact, and half the time something happens you can't explain.
 - **The Crawler:** without light your blows barely land; hold a torch close and it may flee.
 - **The Whisperers:** cover your ears, or follow the voice into the water and see what is there.
+
+## What the dead knew
+
+You wake knowing only how to get through the first day: a torch, a fire, a bandage, rags to wear, a bindle to carry things in. Everything else has to be learned from the people the Churn already took, through what they left behind.
+
+```
+   STUDY by a fire or at your camp ----+
+   (3 h, Perception, the topic's book  |
+    in reach doubles it)                |
+                                        |
+   BOOKS (read: the first time teaches) +       +------------------------+
+                                        +-----> |  SEVEN TOPICS          |
+   TAPES on a charged cassette player --+       |  each taught in order, |
+   (the logs of dead stalkers; once)    |       |  simplest first        |
+                                        |       +------------------------+
+   USB DRIVES read by the LoRa radio ---+
+   (a charge each; some are corrupt;    |
+    a cracked phone becomes one)        |
+                                        |
+   SCRAWLED NOTES (a random recipe) ----+
+```
+
+| Topic | Its book | What it teaches |
+| --- | --- | --- |
+| Tailoring | Seamstress's Almanac | string and rope, rag gear, rag shoes, a foil poncho, hide gloves, tunic and pack, a coat from a jawhound's pelt |
+| Bushcraft | Field Manual | stone knife, glass shiv, spear, snares, fishing, bark tea and cured hides, charcoal, smoked meat, a sling, a bow and arrows, a can rattle, a tarp lean-to, a travois |
+| Medicine | Surgeon's Notes | filtered water, splints, sutures, herb tinctures, a medkit |
+| Tinkering | Radio Ham Handbook | shivs and machetes, rain barrels, lockpicks, cracking phones, the Choir Cell, a hand cart |
+| Chemistry | Institute Lab Book | painkillers, gunpowder, flares, sedatives, gun oil, Rad Purge |
+| Gunsmithing | Gunsmith's Ledger | cleaning guns, reloading rounds, assembling pistols from parts |
+| Warding | The Choir Hymnal | salt circles, the Elder Sign, black candles, glow jars, the choir charm |
+
+**The tapes.** Six cassettes lie in the ruins and the hills. Each is somebody's last log, and each teaches one thing:
+
+- **Day Forty:** a tired man. "Bark tea for the gut, smoke the meat or lose it. The ground moved again last night. Our hut is a field further east than it was."
+- **The Medic:** a calm woman. "Boil the thread. Stitch toward you. If the wound sings, don't close it."
+- **Count Rounds:** someone chewing. "Brass, powder, lead. Count your rounds. Out here the dark counts them too."
+- **The Choir:** many voices singing on one breath, and a man whispering under them: "Salt the ground. Wax and black water. Draw the sign. They can't cross what they can't read."
+- **Institute 7:** a clipped voice. "The quarry samples react to us. Recommend we stop listening to them."
+- **I Went North:** a teenager, about the Choir Cell. "Mum, if you find this - I went north."
+
+**What things are made of.** Recipes ask for a kind of thing, not one item: any sharp edge (a glass shard goes before your knife), any thread, any fireproof pot (a plastic bottle melts), any heat source. A fire needs matches, a lighter or a fire drill, and boiling or cooking needs a tin; the can from your first beans is your first pot.
+
+**Wards.** Warding is learned from *them*: you can only study it with black ichor or a pale eye in reach, or the Hymnal, and every session takes something out of you. What it teaches keeps the night horrors back:
+
+- **Salt circle:** poured on a hex, the horrors come a quarter as often there.
+- **Black candle:** a light that also makes them hang back.
+- **Glow jar:** a cold light in a bottle.
+- **Choir charm:** worn at the neck, fewer meetings of every kind, at the cost of a constant thirst.
+- **Elder Sign:** scratched on bone with ichor. Raise it at a horror and it is simply not there any more; the bone crumbles to salt.
+
+**Locked crates.** With lockpicks, some ruins give up a sealed crate: lab books, ledgers, gunsmith kits, gun frames, rounds, now and then a whole pistol.
+
+## Guns in the Churn
+
+Guns are rare, loud and they wear out. Most are pieced together from parts the land turns up; the ones that come whole come off dead bandits, out of locked crates, or, once in each world, out of the marsh.
+
+| Gun | Rounds | Where it comes from | What sets it apart |
+| --- | --- | --- | --- |
+| PM Pistol | 9x18 | bandits; a frame from ruins or the Toll Man | the commonest; forgiving |
+| Nagant Revolver | 7.62N | frame and cylinder from the hills | never jams, a little less accurate |
+| Tokarev TT | 7.62x25 | frame from locked crates | hits hardest of the pistols |
+| Institute Sidearm | 9x18 | an "odd frame" with no maker's mark, from locked crates | precise, rarely jams; only a Gunsmith Kit will put it together |
+| The Marsh Revolver | .38 | one per world, lying somewhere; never made | hits like nothing else, and every shot costs you rest. "Something in the dark counts the shot." |
+
+```
+   a FRAME (decides the gun)                     +-------------------+
+   + slide, barrel, recoil spring,  -- assemble  |  a working pistol |
+     firing pin, magazine            (Gunsmithing,|  wears with every |
+     (a cylinder for the Nagant)      gun tools,  |  shot; a worn gun |
+                                      can fail:   |  jams more        |
+                                      a part      +---------+---------+
+                                      breaks)               |
+   brass casings + gunpowder + lead  -- reload -->  ROUNDS   |  gun oil + a rag
+   (.38s want black ichor too)                              v  -- Clean Guns
+                                                  every shot is heard:
+                                                  for hours, more things
+                                                  come looking
+```
+
+A gun shoots at any range, near or far, one round a shot. The noise carries: for hours afterwards more things find you, though an animal may bolt at the crack. The **bow** (arrows of stick, bone and feathers) and the **sling** (rocks) shoot quietly, if weaker.
 
 ## The full story (spoilers)
 
