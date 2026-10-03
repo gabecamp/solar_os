@@ -1,0 +1,6 @@
+tests/lib_*.lua
+tests/churn_run.lua
+tests/ops_*.txt
+tests/preview_*.png
+__pycache__/
+savegame.json
