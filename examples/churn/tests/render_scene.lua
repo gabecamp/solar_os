@@ -250,6 +250,16 @@ for _ = 1, 5000 do if g:maybe_dog() then break end end   -- (the game's own dog 
 g:draw_encounter(400, 300)
 solaros.dump("ops_encounter_dog.txt")
 
+-- Scene 7d: inside the Institute, the archive, the count read (Vesna found)
+g = fresh(); g:start_game()
+g.player.inventory = {{item = "institute_pass", qty = 1}}
+g:open_institute()
+g:encounter_action("deeper_institute"); g:encounter_action("deeper_institute")
+g.vesna = "found"
+g:encounter_action("read_institute")
+g:draw_encounter(400, 300)
+solaros.dump("ops_institute_archive.txt")
+
 -- Scene 8: mid-fight at Near with a spear and a rock: the most options at once
 g = fresh(); g:start_game()
 g.player.equipped.rhand, g.player.equipped.lhand = "spear", "rock"

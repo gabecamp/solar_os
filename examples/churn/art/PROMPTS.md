@@ -216,6 +216,34 @@ plain pale backdrop.
 
 Karl is never generated here: `karl.png` is the user's own picture (2026-10-03).
 
+## Story moments (2026-10-03): in the game as soon as the picture exists
+
+Same shared style as the night things (aged silver-gelatin print, square,
+one big subject). Save as `art/<name>.png` or `.jpg`; until then the scene or
+ending shows its text alone.
+
+**vesna.jpg** (finding Vesna, the churner from the tape):
+The top of a ruined school stairwell, a dead woman in a patched churner's
+coat and gas mask sitting slumped against the wall, lockpicks still in her
+hand, beside her a door standing open just a crack with darkness behind it,
+dust in a shaft of light. Quiet, sad, still.
+
+**ending_permit.jpg** (out through the Checkpoint with the permit):
+A Soviet border checkpoint at dusk, the striped barrier raised, a soldier in
+a gas mask turning away, a lone figure with a backpack walking out onto an
+ordinary empty road, behind them over the treeline a vast faint shape in
+the clouds, like something watching.
+
+**ending_bribe.jpg** (out by bribing the guards with three artifacts):
+Two soldiers in gas masks at a checkpoint, one holding a small glowing
+strange object in gloved hands, the other with tears running from under his
+mask, the striped barrier coming down behind a figure walking away.
+
+**ending_quiet.jpg** (the Institute shut down, the Quiet):
+An abandoned checkpoint at dawn, the barrier up, no one there, a field
+radio on an empty desk, the grass and wires perfectly still, a figure small
+in the distance walking out. Silence you can see.
+
 ## After adding a picture
 
 If the picture differs from the game's description (like the Jawhound's eyes

@@ -325,6 +325,7 @@ end
 -- The churner from the tape: what she took up the stairs.
 function Game:find_vesna(key)
     self.vesna = "found"
+    self:queue_scene("vesna")
     local names = {}
     for _, it in ipairs(CHURN.vesna.loot) do
         self:put_stack("ground", nil, {item = it[1], qty = it[2]})

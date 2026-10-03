@@ -127,6 +127,40 @@ g4:encounter_action("listen_institute")
 assert(g4.screen == "dead" and g4.death_cause == "You joined the count.")
 assert(g4:lore_count() == #LORE.pages)
 
+print("8b. inside: the stair, the lab (searched once), the archive (the count), the source")
+local g5
+repeat g5 = fresh() until g5.sites.quarry
+g5.story.step, g5.story.pass = "source", true
+g5.player.inventory = {{item = "institute_pass", qty = 1}}
+stand(g5, g5.sites.quarry)
+g5:site_action()
+local function has(opts, act) for _, o in ipairs(opts) do if o[2] == act then return true end end end
+assert(g5.enc.room == 1 and g5.enc.def.name == "The stair")
+assert(has(g5:encounter_options(), "deeper_institute") and not has(g5:encounter_options(), "shut_institute"))
+local r0 = g5.player.rads or 0
+g5:encounter_action("deeper_institute")
+assert(g5.enc.room == 2 and g5.enc.def.name == "The lab" and (g5.player.rads or 0) > r0)
+g5:encounter_action("search_institute")
+assert(g5.story.lab_searched and not has(g5:encounter_options(), "search_institute"))
+local said = table.concat(g5.enc.msg, " ")
+assert(said:find("for Anna", 1, true), said)
+g5:encounter_action("deeper_institute")
+assert(g5.enc.def.name == "The archive")
+g5.vesna = "found"
+local warding = (g5.research or {}).warding or 0
+g5:encounter_action("read_institute")
+assert(table.concat(g5.enc.msg, " "):find("VESNA", 1, true) and g5.research.warding > warding)
+g5:draw_encounter(400, 300)
+g5:encounter_action("deeper_institute")
+assert(g5.enc.def.name == "The source" and has(g5:encounter_options(), "shut_institute"))
+assert(has(g5:encounter_options(), "listen_institute"))
+g5:encounter_action("leave_quietly")
+assert(g5.screen == "map")
+g5:site_action()
+assert(g5.enc.room == 1, "back at the stair next time")
+g5:encounter_action("deeper_institute")
+assert(not has(g5:encounter_options(), "search_institute"), "the lab once a run")
+
 print("9. saved")
 local g5
 repeat g5 = fresh() until g5.sites.quarry

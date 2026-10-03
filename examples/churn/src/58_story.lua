@@ -1,7 +1,8 @@
 -- ---------------------------------------------------------------------
 -- The storyline: what the Signal counts (numbers and texts in QUESTS.story)
 --
--- self.story = {step, calls, anna, warned, pass, retry_at} (saved).
+-- self.story = {step, calls, anna, warned, pass, retry_at, lab_searched,
+-- read_count} (saved). Inside: QUESTS.story.rooms, walked in order (enc.room).
 --   step nil      -> "quarry": read QUESTS.story.pages torn pages, or call the
 --                    Signal signal_calls times. The quarry (sites.quarry,
 --                    from Game.place_extras) goes in the journal.
@@ -113,6 +114,16 @@ function Game:open_institute()
     end
     self:start_encounter({kind = "institute", name = "The Institute", art = "institute",
                           who = "institute", intro = QUESTS.story.intro, start = "close", speed = 0})
+    self:institute_room(1)
+end
+
+-- Into room i (QUESTS.story.rooms): its name and text replace the screen's.
+function Game:institute_room(i)
+    local e, room = self.enc, QUESTS.story.rooms[i]
+    e.room = i
+    e.def.name = room.name
+    e.intro = wrap(room.text, ENC_INTRO_COLS)
+    e.msg, e.cursor = {}, 1
 end
 
 function Game:shutdown_chance()
@@ -121,6 +132,15 @@ function Game:shutdown_chance()
 end
 
 function Game:institute_options()
+    local rooms, e = QUESTS.story.rooms, self.enc
+    local i = e.room or #rooms
+    if i < #rooms then
+        local o = {{i == 1 and "Go down" or "Go deeper", "deeper_institute"}}
+        if rooms[i].loot and not self.story.lab_searched then o[#o + 1] = {"Search the lab", "search_institute"} end
+        if rooms[i].read and not e.read then o[#o + 1] = {"Read the count", "read_institute"} end
+        o[#o + 1] = {"Leave", "leave_quietly"}
+        return o
+    end
     local tool = self:carrying(TECH.tool)
     return {{tool and ("Shut it down (" .. self:shutdown_chance() .. "%)") or "Shut it down (needs a Multitool)",
              "shut_institute"},
@@ -130,7 +150,30 @@ end
 
 function Game:institute_action(action)
     local p, st = self.player, self.story
-    if action == "shut_institute" then
+    local rooms, e = QUESTS.story.rooms, self.enc
+    if action == "deeper_institute" then
+        self:institute_room((e.room or 1) + 1)
+        p.rads = math.min(RAD.max, (p.rads or 0) + QUESTS.story.room_rads)
+        return
+    elseif action == "search_institute" then
+        local room = rooms[e.room]
+        st.lab_searched = true
+        for _, it in ipairs(room.loot) do self:put_stack("ground", nil, {item = it[1], qty = it[2]}) end
+        self:enc_say(room.search)
+        self:enc_say("(On the floor: a lab book, chemicals, Anti-Rad. I to pick up, after.)")
+        return
+    elseif action == "read_institute" then
+        local room = rooms[e.room]
+        e.read = true
+        p.needs.rest = math.max(0, p.needs.rest - room.cost)
+        self:enc_say(room.read .. (self.vesna == "found" and room.vesna or ""))
+        if not st.read_count then
+            st.read_count = true
+            self.research = self.research or {}
+            self.research.warding = (self.research.warding or 0) + CHURN.study.base * 2
+        end
+        return
+    elseif action == "shut_institute" then
         if not self:carrying(TECH.tool) then
             self:enc_say("The panel is all screws and fused wire. Not with your bare hands.")
             return

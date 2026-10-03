@@ -457,6 +457,35 @@ QUESTS.deep_crate = {journal = "a CLEARANCE crate by the old quarry.", near = 1,
     found = "Under the tray, a second map: a crate by the old quarry, stamped CLEARANCE.",
     pass = "In a sealed sleeve under the tray: an Institute Pass, the photo scratched out."}
 
+-- Inside the Institute (58_story): rooms walked in order, each step down
+-- costs `rads`. The lab can be searched once a run, the archive read; the
+-- old choices (shut it down, listen, leave) are in the last room.
+QUESTS.story.rooms = {
+    {name = "The stair", text = QUESTS.story.intro},
+    {name = "The lab", text = "Benches under dust, sample jars in rows, every one humming a "
+        .. "different note. A lab coat still hangs by the door, a badge clipped to it.",
+     loot = {{"book_lab", 1}, {"chemicals", 2}, {"antirad", 1}},
+     search = "In the coat: a badge, the name rubbed off, and under it in pen: 'for Anna, if "
+        .. "she asks.' Her brother's. In the jars, things turn to watch you."},
+    {name = "The archive", text = "Shelves of ledgers to the ceiling, every page columns of "
+        .. "tally marks. The count. The newest line is still wet.",
+     read = "You turn the pages. Every mark is a person who came for the money. Near the end "
+        .. "the hand changes to yours. It hasn't written your name yet.",
+     vesna = " One line, fresh ink: VESNA. Then a gap, the length of a name.",
+     cost = 10},
+    {name = "The source", text = "A doorway of slow violet light. The hum is in your fillings, "
+        .. "your teeth, the backs of your eyes. The Signal is not on the radio here. It is in the walls."},
+}
+QUESTS.story.room_rads = 4
+
+-- Story moments with a picture of their own when the user supplies one
+-- (art/<key>; 67_scenes and draw_ending skip the picture until then).
+QUESTS.scenes.vesna = {title = "Vesna", art = "vesna",
+    text = "At the top of the second stair, against the wall, a woman in a churner's coat. "
+        .. "The voice from the tape. Her picks are still in her hand, and the door she was "
+        .. "picking stands open now, just a crack. Whatever was behind it, she saw it first."}
+CHURN.ending_art = {permit = "ending_permit", bribe = "ending_bribe", quiet = "ending_quiet"}
+
 -- Standing with the people who give you work (52_quests): +1 for a job done,
 -- -1 for one let lapse, kept in min..max. Each point takes `price` off the
 -- trader's and Mother Okun's markup (never below `floor`), `anna_hours` off

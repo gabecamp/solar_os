@@ -101,9 +101,15 @@ function Game:draw_ending(w, h)
     gfx.font(gfx.FONT_BOLD_14)
     gfx.text(6, 30, "You left the Churn.")
     gfx.font(gfx.FONT_MONO_12)
-    local y = 60
+    local y, cols = 60, 54
+    local art = CHURN.ending_art[e.how]
+    if art and PORTRAIT_DATA[art] then   -- (a picture for this ending, once there is one)
+        self:draw_portrait({def = {art = art}}, w - PORTRAIT_SIZE - 6, 18)
+        gfx.color(gfx.BLACK)
+        cols = (w - PORTRAIT_SIZE - 24) // 7
+    end
     local text = (TRADE_UI.ending[e.how] or "") .. (e.lore and (" " .. e.lore) or "")
-    for _, line in ipairs(wrap(text, 54)) do
+    for _, line in ipairs(wrap(text, cols)) do
         gfx.text(6, y, line)
         y = y + 14
     end

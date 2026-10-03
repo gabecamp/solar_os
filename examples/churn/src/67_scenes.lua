@@ -44,7 +44,7 @@ function Game:draw_scene(w, h)
     gfx.text(10, 24, sc.title)
     gfx.font(gfx.FONT_MONO_12)
     local cols = 54
-    if sc.art and draw_sprite then
+    if sc.art and PORTRAIT_DATA[sc.art] and draw_sprite then   -- (no picture yet: text only)
         self:draw_portrait({def = {art = sc.art}}, w - PORTRAIT_SIZE - 10, 34)
         gfx.color(gfx.BLACK)
         gfx.rect(w - PORTRAIT_SIZE - 11, 33, PORTRAIT_SIZE + 2, PORTRAIT_SIZE + 2)

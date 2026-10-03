@@ -351,7 +351,7 @@ local QUESTS = {
            journal = "find his dog by the river", near = 4, far = 8},
     -- story moments (src/67_scenes.lua): shown once a run, art = a portrait
     scenes = {
-        order = {"wake", "first_night", "first_emission", "little_ones", "the_gate"},
+        order = {"wake", "first_night", "first_emission", "little_ones", "the_gate", "vesna"},
         wake = {title = "The Churn",
                 text = "You wake in wet grass with nothing. No shoes, no coat, no name you "
                     .. "can hold on to. Somewhere a dog barks, and stops. There's a pile of "
@@ -1393,6 +1393,35 @@ CHURN.parley = {chance = 35, say = "The other one: 'Or we trade. Fair's fair out
 QUESTS.deep_crate = {journal = "a CLEARANCE crate by the old quarry.", near = 1, far = 3,
     found = "Under the tray, a second map: a crate by the old quarry, stamped CLEARANCE.",
     pass = "In a sealed sleeve under the tray: an Institute Pass, the photo scratched out."}
+
+-- Inside the Institute (58_story): rooms walked in order, each step down
+-- costs `rads`. The lab can be searched once a run, the archive read; the
+-- old choices (shut it down, listen, leave) are in the last room.
+QUESTS.story.rooms = {
+    {name = "The stair", text = QUESTS.story.intro},
+    {name = "The lab", text = "Benches under dust, sample jars in rows, every one humming a "
+        .. "different note. A lab coat still hangs by the door, a badge clipped to it.",
+     loot = {{"book_lab", 1}, {"chemicals", 2}, {"antirad", 1}},
+     search = "In the coat: a badge, the name rubbed off, and under it in pen: 'for Anna, if "
+        .. "she asks.' Her brother's. In the jars, things turn to watch you."},
+    {name = "The archive", text = "Shelves of ledgers to the ceiling, every page columns of "
+        .. "tally marks. The count. The newest line is still wet.",
+     read = "You turn the pages. Every mark is a person who came for the money. Near the end "
+        .. "the hand changes to yours. It hasn't written your name yet.",
+     vesna = " One line, fresh ink: VESNA. Then a gap, the length of a name.",
+     cost = 10},
+    {name = "The source", text = "A doorway of slow violet light. The hum is in your fillings, "
+        .. "your teeth, the backs of your eyes. The Signal is not on the radio here. It is in the walls."},
+}
+QUESTS.story.room_rads = 4
+
+-- Story moments with a picture of their own when the user supplies one
+-- (art/<key>; 67_scenes and draw_ending skip the picture until then).
+QUESTS.scenes.vesna = {title = "Vesna", art = "vesna",
+    text = "At the top of the second stair, against the wall, a woman in a churner's coat. "
+        .. "The voice from the tape. Her picks are still in her hand, and the door she was "
+        .. "picking stands open now, just a crack. Whatever was behind it, she saw it first."}
+CHURN.ending_art = {permit = "ending_permit", bribe = "ending_bribe", quiet = "ending_quiet"}
 
 -- Standing with the people who give you work (52_quests): +1 for a job done,
 -- -1 for one let lapse, kept in min..max. Each point takes `price` off the
@@ -11153,7 +11182,8 @@ end
 -- ---------------------------------------------------------------------
 -- The storyline: what the Signal counts (numbers and texts in QUESTS.story)
 --
--- self.story = {step, calls, anna, warned, pass, retry_at} (saved).
+-- self.story = {step, calls, anna, warned, pass, retry_at, lab_searched,
+-- read_count} (saved). Inside: QUESTS.story.rooms, walked in order (enc.room).
 --   step nil      -> "quarry": read QUESTS.story.pages torn pages, or call the
 --                    Signal signal_calls times. The quarry (sites.quarry,
 --                    from Game.place_extras) goes in the journal.
@@ -11265,6 +11295,16 @@ function Game:open_institute()
     end
     self:start_encounter({kind = "institute", name = "The Institute", art = "institute",
                           who = "institute", intro = QUESTS.story.intro, start = "close", speed = 0})
+    self:institute_room(1)
+end
+
+-- Into room i (QUESTS.story.rooms): its name and text replace the screen's.
+function Game:institute_room(i)
+    local e, room = self.enc, QUESTS.story.rooms[i]
+    e.room = i
+    e.def.name = room.name
+    e.intro = wrap(room.text, ENC_INTRO_COLS)
+    e.msg, e.cursor = {}, 1
 end
 
 function Game:shutdown_chance()
@@ -11273,6 +11313,15 @@ function Game:shutdown_chance()
 end
 
 function Game:institute_options()
+    local rooms, e = QUESTS.story.rooms, self.enc
+    local i = e.room or #rooms
+    if i < #rooms then
+        local o = {{i == 1 and "Go down" or "Go deeper", "deeper_institute"}}
+        if rooms[i].loot and not self.story.lab_searched then o[#o + 1] = {"Search the lab", "search_institute"} end
+        if rooms[i].read and not e.read then o[#o + 1] = {"Read the count", "read_institute"} end
+        o[#o + 1] = {"Leave", "leave_quietly"}
+        return o
+    end
     local tool = self:carrying(TECH.tool)
     return {{tool and ("Shut it down (" .. self:shutdown_chance() .. "%)") or "Shut it down (needs a Multitool)",
              "shut_institute"},
@@ -11282,7 +11331,30 @@ end
 
 function Game:institute_action(action)
     local p, st = self.player, self.story
-    if action == "shut_institute" then
+    local rooms, e = QUESTS.story.rooms, self.enc
+    if action == "deeper_institute" then
+        self:institute_room((e.room or 1) + 1)
+        p.rads = math.min(RAD.max, (p.rads or 0) + QUESTS.story.room_rads)
+        return
+    elseif action == "search_institute" then
+        local room = rooms[e.room]
+        st.lab_searched = true
+        for _, it in ipairs(room.loot) do self:put_stack("ground", nil, {item = it[1], qty = it[2]}) end
+        self:enc_say(room.search)
+        self:enc_say("(On the floor: a lab book, chemicals, Anti-Rad. I to pick up, after.)")
+        return
+    elseif action == "read_institute" then
+        local room = rooms[e.room]
+        e.read = true
+        p.needs.rest = math.max(0, p.needs.rest - room.cost)
+        self:enc_say(room.read .. (self.vesna == "found" and room.vesna or ""))
+        if not st.read_count then
+            st.read_count = true
+            self.research = self.research or {}
+            self.research.warding = (self.research.warding or 0) + CHURN.study.base * 2
+        end
+        return
+    elseif action == "shut_institute" then
         if not self:carrying(TECH.tool) then
             self:enc_say("The panel is all screws and fused wire. Not with your bare hands.")
             return
@@ -11645,6 +11717,7 @@ end
 -- The churner from the tape: what she took up the stairs.
 function Game:find_vesna(key)
     self.vesna = "found"
+    self:queue_scene("vesna")
     local names = {}
     for _, it in ipairs(CHURN.vesna.loot) do
         self:put_stack("ground", nil, {item = it[1], qty = it[2]})
@@ -13206,7 +13279,7 @@ function Game:draw_scene(w, h)
     gfx.text(10, 24, sc.title)
     gfx.font(gfx.FONT_MONO_12)
     local cols = 54
-    if sc.art and draw_sprite then
+    if sc.art and PORTRAIT_DATA[sc.art] and draw_sprite then   -- (no picture yet: text only)
         self:draw_portrait({def = {art = sc.art}}, w - PORTRAIT_SIZE - 10, 34)
         gfx.color(gfx.BLACK)
         gfx.rect(w - PORTRAIT_SIZE - 11, 33, PORTRAIT_SIZE + 2, PORTRAIT_SIZE + 2)
@@ -13975,9 +14048,15 @@ function Game:draw_ending(w, h)
     gfx.font(gfx.FONT_BOLD_14)
     gfx.text(6, 30, "You left the Churn.")
     gfx.font(gfx.FONT_MONO_12)
-    local y = 60
+    local y, cols = 60, 54
+    local art = CHURN.ending_art[e.how]
+    if art and PORTRAIT_DATA[art] then   -- (a picture for this ending, once there is one)
+        self:draw_portrait({def = {art = art}}, w - PORTRAIT_SIZE - 6, 18)
+        gfx.color(gfx.BLACK)
+        cols = (w - PORTRAIT_SIZE - 24) // 7
+    end
     local text = (TRADE_UI.ending[e.how] or "") .. (e.lore and (" " .. e.lore) or "")
-    for _, line in ipairs(wrap(text, 54)) do
+    for _, line in ipairs(wrap(text, cols)) do
         gfx.text(6, y, line)
         y = y + 14
     end

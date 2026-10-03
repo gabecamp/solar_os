@@ -321,7 +321,7 @@ local QUESTS = {
            journal = "find his dog by the river", near = 4, far = 8},
     -- story moments (src/67_scenes.lua): shown once a run, art = a portrait
     scenes = {
-        order = {"wake", "first_night", "first_emission", "little_ones", "the_gate"},
+        order = {"wake", "first_night", "first_emission", "little_ones", "the_gate", "vesna"},
         wake = {title = "The Churn",
                 text = "You wake in wet grass with nothing. No shoes, no coat, no name you "
                     .. "can hold on to. Somewhere a dog barks, and stops. There's a pile of "

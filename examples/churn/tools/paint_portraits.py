@@ -208,6 +208,11 @@ PHOTO = {
 }
 
 
+# Story moments (src/67_scenes.lua, draw_ending): no painted fallback, so
+# each is baked only when art/<name>.png|jpg exists.
+PHOTO_ONLY = ("vesna", "ending_permit", "ending_bribe", "ending_quiet")
+
+
 def find_art(name):
     for ext in ("png", "jpg", "jpeg"):
         path = ART / f"{name}.{ext}"
@@ -297,7 +302,11 @@ def main():
     PREVIEWS.mkdir(parents=True, exist_ok=True)
     entries = []
     sheet_rows = []
-    for name, fn in portraits.SUBJECTS.items():
+    subjects = dict(portraits.SUBJECTS)
+    for name in PHOTO_ONLY:   # (story pictures: in the game only once the user supplies them)
+        if find_art(name):
+            subjects[name] = None
+    for name, fn in subjects.items():
         if only and name not in only:
             continue
         override = find_art(name)
