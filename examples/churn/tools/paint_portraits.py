@@ -176,6 +176,11 @@ PHOTO = {
     # hung with root-like strands, two glowing eyes, on a pale ground
     "crawler": {"far": (36, 30, 740, 734), "near": (70, 10, 710, 650),
                 "close": (270, 40, 490, 260), "gamma": 0.7, "edge": 0.5, "bg": 0.80},
+    # the user's own picture (2026-10-03, 512x768): the Rival Churners, two
+    # in full gas masks with packs and guns, on a pale print
+    "rivals": {"far": (0, 60, 512, 572), "near": (16, 36, 496, 516),
+               "close": (90, 40, 490, 440), "gamma": 1.0, "edge": 0.8,
+               "levels": (0.18, 0.72), "bg": 0.82},
     # the user's own picture (2026-10-03, 768x768): a gaunt, bowed figure in a
     # pale shaft of light, the print's edges burnt orange: a negative rust
     # turns the orange white so the burns don't dither into black blotches

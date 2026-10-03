@@ -93,7 +93,7 @@ local ENCOUNTERS = {
      hp = 30, dmg = {7, 14}, hit = 55, speed = 3, bleed = 5, flees_at = 6, start = "near",
      loot = {{"pipe", 3}, {"canned_beans", 2}, {"sunglasses", 1}}, loot_rolls = 2},
     -- rare = % the pick stands (else it's the Road Bandits); armed: CHURN.armed
-    {kind = "bandit", name = "Rival Churners", art = "bandits", who = "rival churner", rare = 40,
+    {kind = "bandit", name = "Rival Churners", art = "rivals", who = "rival churner", rare = 40,
      intro = "Two churners in patched gas masks, packs heavy with the day's digging. "
           .. "One lifts a Tokarev, not quite at you. 'Same ground, same luck,' she "
           .. "says. 'Only one of us walks home with it.'",

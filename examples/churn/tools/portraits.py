@@ -684,7 +684,7 @@ def institute():
 SUBJECTS = {
     "jawhound": jawhound, "boar": boar, "crows": crows, "stag": stag,
     "fused": fused, "mouthless": mouthless, "bloom": bloom,
-    "bandits": bandits, "tollman": tollman, "medic": medic, "wanderer": wanderer,
+    "bandits": bandits, "rivals": bandits, "tollman": tollman, "medic": medic, "wanderer": wanderer,
     "karl": karl, "stray": stray, "little": little, "institute": institute,
     "long_man": long_man, "crawler": crawler, "whisper": whisper,
     "hollow": hollow, "bell": bell, "stars": stars, "stillness": stillness, "door": door,
