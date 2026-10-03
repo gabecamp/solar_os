@@ -8,7 +8,9 @@
 -- holds its best weapon, fights only when armed well enough (else hides or
 -- runs), pays bandits when it can, shelters from emissions in ruins, sells
 -- its finds for a permit (or keeps 3 artifacts) and walks out the
--- Checkpoint once it knows where it is. It skips anomaly puzzles.
+-- Checkpoint once it knows where it is. It skips anomaly puzzles. It reads
+-- books, plays tapes and pairs drives, studies once before a rest at a fire
+-- it makes (NO_STUDY=1 turns all that off), and crafts what it learns.
 package.path = "./?.lua;" .. package.path
 local fake = require("solaros")
 fake.gfx.begin()
@@ -17,7 +19,7 @@ local src = io.open(os.getenv("CHURN_FILE") or "../churn.lua"):read("a")   -- (t
 local lib = src:sub(1, src:find("-- Main loop", 1, true) - 1) .. [[
 return Game, {ITEM_DB = ITEM_DB, KEY = KEY, TERRAIN = TERRAIN, AXIAL_DIRS = AXIAL_DIRS,
               TRADE = TRADE, GOAL = GOAL, RECIPES = RECIPES, RAD = RAD, WORLD = WORLD,
-              apply_awake_hours = apply_awake_hours}
+              apply_awake_hours = apply_awake_hours, CHURN = CHURN}
 ]]
 local Game, D = load(lib, "=churn")()
 local ITEM_DB, KEY, TERRAIN = D.ITEM_DB, D.KEY, D.TERRAIN
@@ -26,6 +28,7 @@ local RUNS = tonumber(arg[1]) or 200
 local FIRST = tonumber(arg[2]) or 1
 local LEVEL = arg[3] or "normal"   -- easy / normal / hard
 local MAX_HOURS = 24 * 30
+local NO_STUDY = os.getenv("NO_STUDY")   -- (set: the bot never studies, reads or plays tapes)
 
 local function key(q, r) return q .. "," .. r end
 -- an hour that passes with nothing done still costs food, water and rest
@@ -89,11 +92,54 @@ local function try_craft(g, id)
     if r and g.known[id] and not g:craft_blocker(r) then return g:craft(r) end
 end
 
+-- Learning: the first read of each book, a tape while the player has
+-- charge, a drive while the radio does; and at a fire (made if need be)
+-- before resting, one study session: the useful topics first, gunsmithing
+-- once there's something to study it from.
+local STUDY_ORDER = {"bushcraft", "medicine", "rags", "gunsmithing", "tinkering", "chemistry"}
+local function learn(g, stats)
+    if NO_STUDY then return end
+    local p = g.player
+    for _, s in ipairs(p.inventory) do
+        if ITEM_DB[s.item].book and not (g.books_read or {})[s.item] then use(g, s.item); break end
+    end
+    if count(g, "cassette_player") > 0 then
+        if not (g.tapedeck and g.tapedeck.charge > 0) and count(g, "battery_cell") > 0 then
+            use(g, "battery_cell")
+        end
+        if g.tapedeck and g.tapedeck.charge > 0 then
+            for tape in pairs(D.CHURN.tapes) do
+                if count(g, tape) > 0 then use(g, tape); break end
+            end
+        end
+    end
+    if count(g, "usb_drive") > 0 and g:carrying("lora_radio") and g.radio and g.radio.charge > 1 then
+        use(g, "usb_drive")
+    end
+end
+local function study(g, stats)
+    if NO_STUDY then return end
+    local p = g.player
+    if p.needs.hunger < 35 or p.needs.thirst < 35 or p.health < 40 then return end
+    if not (g:fire_here() or g:at_base()) then
+        if g:count_item("@heat") == 0 then try_craft(g, "fire_drill") end
+        local _ = try_craft(g, "small_fire") or try_craft(g, "campfire")
+    end
+    for _, t in ipairs(STUDY_ORDER) do
+        if g:topic_next(t) and not g:study_blocker(t) then
+            g:study(t)
+            stats.studied = stats.studied + 1
+            return true
+        end
+    end
+end
+
 -- Keep alive and kitted out.
 local KEEP = {water_bottle = true, dirty_water = true, empty_bottle = true, canned_beans = true,
               jerky = true, cooked_meat = true, berries = true, strange_meat = true,
               bandage = true, cloth_scrap = true, antirad = true, splint = true, permit = true,
-              stick = true, rock = true, geiger = true}
+              stick = true, rock = true, geiger = true,
+              fire_drill = true, matches = true, lighter = true, newspaper = true}
 -- How good a piece of clothing is (warmth and room): the real thing beats
 -- its makeshift version.
 local function wear_score(item)
@@ -118,7 +164,7 @@ local function worth(g, item)
     local def = ITEM_DB[item]
     if item == "rotten_meat" then return false end
     if item == "rock" then return count(g, "rock") == 0 end
-    if item == "stick" then return count(g, "stick") < 3 end
+    if item == "stick" then return count(g, "stick") < (NO_STUDY and 3 or 5) end
     if def.slot then return count(g, item) == 0 and better_than_worn(g, item) end
     -- tech and its parts only while there's room to spare (food comes first)
     if Game.item_value(item) >= 5 and not (def.consumable or def.artifact or def.weapon)
@@ -134,6 +180,11 @@ end
 
 local function upkeep(g, stats)
     local p = g.player
+    learn(g, stats)
+    if p.injuries.bleeding or p.injuries.wounded_hours > 12 then
+        if count(g, "stitches") == 0 then try_craft(g, "stitches") end
+        use(g, "stitches")
+    end
     if p.injuries.bleeding then
         local _ = use(g, "bandage") or use(g, "cloth_scrap") or try_craft(g, "bandage")
     end
@@ -220,7 +271,11 @@ local function upkeep(g, stats)
         if w and w.dmg > best then best, best_i = w.dmg, i end
     end
     if best_i then g:try_transfer({"inventory", best_i}, {"equip", "rhand"}) end
-    if g:weapon().dmg < 9 then try_craft(g, "shiv") end
+    for _, w in ipairs({"spear", "stone_knife", "glass_shiv", "shiv"}) do
+        if g:weapon().dmg < 9 then try_craft(g, w) end
+    end
+    if not p.equipped.feet or p.equipped.feet == "foot_wraps" then try_craft(g, "rag_shoes") end
+    if g:fire_here() and count(g, "cooked_meat") >= 2 then try_craft(g, "smoked_meat") end
     if count(g, "scrawled_notes") > 0 then use(g, "scrawled_notes") end
     if count(g, "rope") > 0 and not p.equipped.belt then try_craft(g, "rope_belt") end
     -- cold at night: a fire
@@ -248,10 +303,11 @@ local function encounter(g, stats)
         elseif kind == "little" then act = have.offer_little and "offer_little" or "watch_little"
         elseif have.give then act = "give"
         else
-            local armed = g:weapon().dmg >= 12
+            local armed = g:weapon().dmg >= 12 or have.shoot
             local fight = (armed or e.def.hp <= 25) and g.player.health > 35
             if fight then
-                act = have.attack and "attack" or have.approach and "approach" or "flee"
+                act = have.shoot and "shoot" or have.attack and "attack"
+                    or have.approach and "approach" or "flee"
             else
                 act = have.hide and "hide" or "flee"
             end
@@ -313,7 +369,8 @@ local function play(seed)
     g:set_difficulty(LEVEL)
     g:start_game()
     local p = g.player
-    local stats = {enc = {}, enc_hp = 0, artifacts = 0, max_rads = 0, traded = false}
+    local stats = {enc = {}, enc_hp = 0, artifacts = 0, max_rads = 0, traded = false,
+                   studied = 0, known_at = {}}
     for _ = 1, 4000 do
         if g.screen == "dead" or g.screen == "ending" or p.hours > MAX_HOURS then break end
         if g.screen == "encounter" then encounter(g, stats)
@@ -381,6 +438,7 @@ local function play(seed)
                     if p.hours == h then wait_hour(g) end
                 elseif p.mp <= 0 then
                     local h = p.hours
+                    study(g, stats)
                     g:rest()
                     if p.hours == h then wait_hour(g) end
                 elseif g:scavenge_left() > 0   -- finds land on the ground: a full bag doesn't stop you
@@ -400,6 +458,13 @@ local function play(seed)
             end
             local rads_before = p.rads or 0
             if g.screen ~= "dead" then g:tick() end
+            for _, d in ipairs({3, 7, 14}) do
+                if not stats.known_at[d] and p.hours >= d * 24 then
+                    local n = 0
+                    for _ in pairs(g.known) do n = n + 1 end
+                    stats.known_at[d] = n
+                end
+            end
             if (p.rads or 0) > rads_before then FELT[key(p.q, p.r)] = true end
         end
         stats.max_rads = math.max(stats.max_rads, p.rads or 0)
@@ -414,6 +479,7 @@ end
 
 -- run them
 local results, hours, enc, enc_hp, arts, rads, traders = {}, {}, {}, 0, 0, 0, 0
+local known_sum, known_n, studied = {}, {}, 0
 for i = 0, RUNS - 1 do
     local s = play((FIRST + i * 7919) % 32768)
     results[s.result] = (results[s.result] or 0) + 1
@@ -421,6 +487,10 @@ for i = 0, RUNS - 1 do
     for k, v in pairs(s.enc) do enc[k] = (enc[k] or 0) + v end
     enc_hp, arts, rads = enc_hp + s.enc_hp, arts + s.artifacts, rads + s.max_rads
     if s.found_trader then traders = traders + 1 end
+    studied = studied + s.studied
+    for d, n in pairs(s.known_at) do
+        known_sum[d], known_n[d] = (known_sum[d] or 0) + n, (known_n[d] or 0) + 1
+    end
 end
 table.sort(hours)
 local function pct(n) return ("%5.1f%%"):format(100 * n / RUNS) end
@@ -439,3 +509,6 @@ print(("encounters per run %.1f (per day %.2f); HP lost to them per run %.0f"):f
 for k, v in pairs(enc) do print(("  %-8s %.1f per run"):format(k, v / RUNS)) end
 print(("artifacts picked up per run %.1f; peak rads per run %.0f; found the trader %s"):format(
     arts / RUNS, rads / RUNS, pct(traders)))
+local function known(d) return known_n[d] and known_sum[d] / known_n[d] or 0 end
+print(("recipes known (of the living): day 3 %.1f, day 7 %.1f, day 14 %.1f; study sessions per run %.1f"):format(
+    known(3), known(7), known(14), studied / RUNS))

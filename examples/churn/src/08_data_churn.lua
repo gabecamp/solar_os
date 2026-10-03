@@ -49,7 +49,7 @@ local CHURN = {
         {id = "warding", name = "Warding", book = "book_hymnal", cost = 15,
          needs = {"ichor", "pale_eye", "book_hymnal", "elder_sign"}},
     },
-    study = {hours = 3, base = 4, per_point = 1, book_mult = 2, need = 8, need_step = 2,
+    study = {hours = 3, base = 5, per_point = 1, book_mult = 2, need = 6, need_step = 1,
              read_hours = 2, tape_hours = 1, tape_max = 4, usb_hours = 1, usb_fail = 25},
 
     -- Cassettes: the logs of the dead. Each teaches from its topic once.
