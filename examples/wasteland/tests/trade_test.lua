@@ -89,7 +89,7 @@ for i = 1, 30 do   -- encounters never start on a site
     assert(g.screen == "map", "encounter on the trader's hex")
     if i == 1 then
         assert(g.sites_known.trader and g.sites_known.checkpoint)
-        assert(has_log(g, "T to trade") and has_log(g, "checkpoint out of the Zone"))
+        assert(has_log(g, "T to trade") and has_log(g, "checkpoint out of the Churn"))
     end
 end
 assert(g:goal_text():match("^Exit %u+ %d+$"), g:goal_text())

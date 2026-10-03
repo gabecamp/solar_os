@@ -57,6 +57,7 @@ function gfx.size() return 400, 300 end
 -- I=105 inventory toggle, Enter=10 confirm (SolarOS sends '\n'), E=101 eat/drink,
 -- Q=113 quit. nil entries are idle getch timeouts (must not trigger redraws).
 local KEY_QUEUE = {
+    10, 10, 27,          -- intro splash, title "New survivor", skip the story crawl
     10,                  -- start with the default build (character creator)
     100, nil, nil,       -- move right (D)
     119, nil, nil,       -- move up (W)

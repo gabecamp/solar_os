@@ -1,4 +1,4 @@
-# Wasteland Survivor on a PC or Raspberry Pi
+# The Churn on a PC or Raspberry Pi
 
 A pygame window that runs the real game, `../wasteland.lua`, unchanged.
 

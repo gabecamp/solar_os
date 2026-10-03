@@ -35,7 +35,7 @@ g.radio = {charge = 4, next = {}}
 t = text_of(g)
 for _, want in ipairs({"Checkpoint: ", "Trader: ", "Stash: ", "Snare: ", "Hot hexes known: 1",
                        "Radiation: 42", "Your dog: 20/30 HP, hungry 1d", "Radio: 4/5",
-                       "Zone Permit", "Artifacts: 2 of 3"}) do
+                       "Churn Permit", "Artifacts: 2 of 3"}) do
     assert(t:find(want, 1, true), "missing: " .. want)
 end
 

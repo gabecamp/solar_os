@@ -331,7 +331,7 @@ g.player.q, g.player.r = tonumber(tq) + 1, tonumber(tr)
 g:learn_site("trader")
 g:learn_site("checkpoint")
 g:refresh_view()
-g.log = {"Moved to Ruins (1 MP)", "Trader: a checkpoint out of the Zone, NE 17."}
+g.log = {"Moved to Ruins (1 MP)", "Trader: a checkpoint out of the Churn, NE 17."}
 g:draw_map(400, 300)
 solaros.dump("ops_map_trader.txt")
 g.player.q, g.player.r = tonumber(tq), tonumber(tr)
@@ -560,3 +560,16 @@ for _, id in ipairs({"wake", "the_gate"}) do
     g:draw_scene(400, 300)
     solaros.dump("ops_scene_" .. id .. ".txt")
 end
+
+-- Scene: the intro splash, the title menu, the first page of the story
+g = Game.new()
+g:begin_intro(nil)
+g.intro_phase = 2
+g:draw_intro(400, 300)
+solaros.dump("ops_intro.txt")
+g.screen = "title"
+g:draw_title(400, 300)
+solaros.dump("ops_title.txt")
+g.crawl_page = 3
+g:draw_crawl(400, 300)
+solaros.dump("ops_crawl.txt")

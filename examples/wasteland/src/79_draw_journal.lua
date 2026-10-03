@@ -11,7 +11,7 @@ function Game:journal_lines()
     local p, lines = self.player, {}
     local function add(s) lines[#lines + 1] = s end
     local day, hour = self:clock()
-    add(("Day %d, %02d:00. %d hours in the Zone. %s."):format(day, hour, p.hours,
+    add(("Day %d, %02d:00. %d hours in the Churn. %s."):format(day, hour, p.hours,
         DIFFICULTY[self.difficulty or "normal"].name))
     add(self:skills_line())
     local worn, c = self:most_worn(100)
@@ -50,7 +50,7 @@ function Game:journal_lines()
     if camp then add(camp) end
     local permit = self:count_item("permit") > 0
     add(("Artifacts: %d of %d.%s"):format(self:artifact_count(), GOAL.bribe,
-        permit and " You have a Zone Permit." or ""))
+        permit and " You have a Churn Permit." or ""))
     -- places
     for key in pairs(self.stashes) do add("Stash: " .. self:bearing_to(key) .. ".") end
     for key, snare in pairs(self.snares) do

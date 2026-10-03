@@ -83,18 +83,18 @@ def main():
         print("   OK")
 
         print("5. a scripted game: creator, wake scene, a diagonal, the bag, crafting")
-        h, shots = run([10, 32, UP, RIGHT, ord("i"), ord("i"), ord("c"), ord("c")], tmp)
+        h, shots = run([10, 10, 27, 10, 32, UP, RIGHT, ord("i"), ord("i"), ord("c"), ord("c")], tmp)
         assert h.frames >= 6 and len(shots) == h.frames
         assert os.path.isfile(os.path.join(tmp, "wasteland", "save.lua")), "saved on quit"
         print("   OK (%d frames)" % h.frames)
 
         print("6. a second start finds the save: the title offers Continue")
-        h2, shots2 = run([10], tmp)   # Enter on the title = Continue
+        h2, shots2 = run([10, 10], tmp)   # past the intro; Enter on the title = Continue
         text = []
         old = host_mod.Host.text
         host_mod.Host.text = lambda self, x, y, s: (text.append(host_mod._text(s)), old(self, x, y, s))
         try:
-            run([], tmp)
+            run([10], tmp)   # (any key past the intro)
         finally:
             host_mod.Host.text = old
         assert any("Continue" in t for t in text), "the title screen"
@@ -102,15 +102,15 @@ def main():
 
         print("7. screenshots for the README")
         prev = os.path.join(ROOT, "previews")
-        h, shots = run([10, 32], os.path.join(tmp, "fresh"))
+        h, shots = run([10, 10, 27, 10, 32], os.path.join(tmp, "fresh"))
         pygame.image.save(pygame.transform.scale(shots[-1], (800, 600)),
                           os.path.join(prev, "pygame_map.png"))
-        h, shots = run([10, 32], os.path.join(tmp, "fresh2"), look="device")
+        h, shots = run([10, 10, 27, 10, 32], os.path.join(tmp, "fresh2"), look="device")
         hd = host_mod.Host(look="device", mute=True, data_dir=tmp)
         hd.canvas = shots[-1]
         pygame.image.save(pygame.transform.scale(hd._shown(), (800, 600)),
                           os.path.join(prev, "pygame_map_device.png"))
-        h, shots = run([10, 32, ord("i")], os.path.join(tmp, "fresh3"), look="amber")
+        h, shots = run([10, 10, 27, 10, 32, ord("i")], os.path.join(tmp, "fresh3"), look="amber")
         ha = host_mod.Host(look="amber", mute=True, data_dir=tmp)
         ha.canvas = shots[-1]
         pygame.image.save(pygame.transform.scale(ha._shown(), (800, 600)),

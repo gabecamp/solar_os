@@ -61,7 +61,7 @@ print("   OK")
 
 print("3. the real main loop: after Up the hint line asks for Left or Right")
 local texts = {}
-local keys = {10, 32, UP}   -- creator, past the wake scene, then Up
+local keys = {10, 10, 27, 10, 32, UP}   -- creator, past the wake scene, then Up
 local i = 0
 local saved_getch, saved_exit, saved_text = gfx.getch, fake.should_exit, gfx.text
 gfx.getch = function() i = i + 1; if i > #keys then return 113 end; return keys[i] end

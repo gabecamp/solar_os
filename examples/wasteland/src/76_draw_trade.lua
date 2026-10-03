@@ -5,13 +5,13 @@
 local TRADE_UI = {rows = 12, row_h = 14, top = 50, col_x = {mine = 6, theirs = 204}, col_w = 190,
                   gate_intro = "Concrete blocks, razor wire, a tower whose searchlight never "
                       .. "switches off. A sergeant in a gas mask watches you come. 'Nobody "
-                      .. "leaves the Zone without paper. Or without paying.'",
+                      .. "leaves the Churn without paper. Or without paying.'",
                   ending = {
                       permit = "The sergeant reads the permit twice, stamps it without looking "
                           .. "at you and lifts the barrier. On the far side the grass is only "
                           .. "grass. Behind you something vast and patient hums, and you know "
                           .. "you will dream of it every night.",
-                      quiet = "The hum stops. For the first time since you came, the Zone is "
+                      quiet = "The hum stops. For the first time since you came, the Churn is "
                           .. "silent: no wind in the wires, no birds, no count. You walk out the "
                           .. "way you came. The Checkpoint is empty, the barrier up, a radio on "
                           .. "the sergeant's desk hissing nothing at all.",
@@ -88,7 +88,7 @@ function Game:draw_gate(w, h)
         y = y + 20
     end
     if #u.opts == 1 then
-        gfx.text(6, y + 10, ("You need a Zone Permit or %d artifacts."):format(GOAL.bribe))
+        gfx.text(6, y + 10, ("You need a Churn Permit or %d artifacts."):format(GOAL.bribe))
     end
     gfx.text(6, h - 8, "Up/Dn pick  Enter choose  Q back")
     gfx.refresh()
@@ -99,7 +99,7 @@ function Game:draw_ending(w, h)
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
     gfx.font(gfx.FONT_BOLD_14)
-    gfx.text(6, 30, "You left the Zone.")
+    gfx.text(6, 30, "You left the Churn.")
     gfx.font(gfx.FONT_MONO_12)
     local y = 60
     local text = (TRADE_UI.ending[e.how] or "") .. (e.lore and (" " .. e.lore) or "")

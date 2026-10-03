@@ -21,9 +21,11 @@ end
 -- and every string drawn with gfx.text. An Enter is sent first to get past
 -- the character creator with the default build, then a key past the wake scene.
 local function run_loop(keys, n)
-    local shifted = {10, 32}   -- (Enter past the creator, any key past the wake scene)
-    for k = 1, n do shifted[k + 2] = keys[k] end
-    keys, n = shifted, n + 2
+    -- (intro, title "New survivor", skip the story, Enter past the creator,
+    -- any key past the wake scene)
+    local shifted = {10, 10, 27, 10, 32}
+    for k = 1, n do shifted[k + 5] = keys[k] end
+    keys, n = shifted, n + 5
     local i, handled, texts = 0, 0, {}
     local saved_getch, saved_exit, saved_text = gfx.getch, fake.should_exit, gfx.text
     gfx.getch = function()
@@ -36,6 +38,7 @@ local function run_loop(keys, n)
     fake.should_exit = function() return i > n + 5 end
     gfx.text = function(x, y, s) texts[#texts + 1] = s end
     REFRESH_COUNT = 0
+    FAKE_FILES, FAKE_DIRS = {}, {}   -- (no save from a run before: start fresh)
     dofile("wasteland_run.lua")
     gfx.getch, fake.should_exit, gfx.text = saved_getch, saved_exit, saved_text
     return REFRESH_COUNT, handled, texts

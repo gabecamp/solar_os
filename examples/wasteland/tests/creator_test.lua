@@ -75,7 +75,7 @@ print("   OK")
 
 print("6. the real main loop: creator first, Enter starts, the map follows")
 local i, texts = 0, {}
-local keys = {DOWN, DOWN, RIGHT, ENTER}           -- try raising Perception, then start
+local keys = {10, 10, 27, DOWN, DOWN, RIGHT, ENTER}   -- intro, New, skip story; raise Perception, start
 local saved_getch, saved_exit, saved_text = gfx.getch, fake.should_exit, gfx.text
 gfx.getch = function() i = i + 1; if i > #keys then return 113 end; return keys[i] end
 fake.should_exit = function() return i > #keys + 5 end

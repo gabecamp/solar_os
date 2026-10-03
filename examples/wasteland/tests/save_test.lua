@@ -130,22 +130,22 @@ local function run(keys)
     return table.concat(texts, "\n")
 end
 FAKE_FILES, FAKE_DIRS = {}, {}
-run({10, 100, 100, 32, 113})              -- creator, move, move, rest, quit
+run({10, 10, 27, 10, 100, 100, 32, 113})  -- intro, New, skip story, creator, move, move, rest, quit
 local first = FAKE_FILES[PATH]
 assert(first, "quit saved the run")
-local shown = run({113})                  -- start again: title screen, quit
+local shown = run({10, 113})              -- start again: intro, title screen, quit
 assert(shown:find("Continue", 1, true), "title offers Continue")
 assert(FAKE_FILES[PATH] == first, "quitting from the title leaves the save alone")
-shown = run({10, 113})                    -- Continue, then quit
+shown = run({10, 10, 113})                -- intro, Continue, then quit
 assert(shown:find("Welcome back", 1, true), "continued")
 local again = Game.read_save()
 same(again.player.q, Game.read_save().player.q, "q")
 assert(again.player.hours == load("return " .. first, "=f", "t", {})().player.hours,
        "same run carried on")
-shown = run({115, 10, 113})               -- New survivor: the creator
+shown = run({10, 115, 10, 113})           -- New survivor: the story, then the creator
 assert(shown:find("Continue", 1, true))
 FAKE_FILES, FAKE_DIRS = {}, {}
-shown = run({113})
+shown = run({10, 113})
 assert(not shown:find("Continue", 1, true), "no save, no title")
 
 print("SAVE TESTS PASSED")

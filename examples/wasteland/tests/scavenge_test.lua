@@ -102,7 +102,7 @@ print("   OK")
 
 print("5. F on the map screen scavenges (real main loop)")
 local i, texts = 0, {}
-local keys = {10, 32, 102}   -- Enter: start with the default build, past the wake scene, then F
+local keys = {10, 10, 27, 10, 32, 102}   -- Enter: start with the default build, past the wake scene, then F
 local saved_getch, saved_exit, saved_text = gfx.getch, fake.should_exit, gfx.text
 gfx.getch = function() i = i + 1; if i > #keys then return 113 end; return keys[i] end
 fake.should_exit = function() return i > #keys + 5 end

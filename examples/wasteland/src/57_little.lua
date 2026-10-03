@@ -1,7 +1,7 @@
 -- ---------------------------------------------------------------------
 -- The Little Ones (numbers in LITTLE, 05_data_world)
 --
--- The Zone's children, grown small and grey and grinning. They live in
+-- The Churn's children, grown small and grey and grinning. They live in
 -- warrens in the woods and hills and are never hostile, only mischievous.
 -- Trinkets (toys, crayons, buttons: worth nothing to anyone else) left at
 -- their cairns befriend them; with enough gifts a troupe follows you from
@@ -149,7 +149,7 @@ function Game:little_find(hour)
 end
 
 -- Hide one small thing: only odds and ends - never what you eat or drink,
--- wear, heal with, work with, or what gets you out of the Zone.
+-- wear, heal with, work with, or what gets you out of the Churn.
 function Game:little_mischief(hour)
     local p, l = self.player, self.little
     local options = {}

@@ -1,8 +1,8 @@
-# Wasteland Survivor
+# The Churn (file: wasteland.lua)
 
 A NEO Scavenger-style survival game for SolarOS, made for the Waveshare
 ESP32-S3 RLCD 4.2 (400x300, 1-bit). Make a survivor, cross a fogged hex map
-of the Zone, stay fed, warm and out of the radiation, and get out through
+of the Churn, stay fed, warm and out of the radiation, and get out through
 the Checkpoint alive.
 
 - **Install:** copy `wasteland.lua` to the device and run it with the `lua`
@@ -35,7 +35,7 @@ the Checkpoint alive.
 
 ---
 
-## The Zone
+## The Churn
 
 Years ago there was an Institute out by the old quarry. The town around it
 was told the hum from the quarry was a transformer fault, and not to talk
@@ -49,10 +49,10 @@ came back wrong. That was the **first emission**. The town was evacuated:
 assemble at the school, bring nothing, no pets, *nothing that is warm to
 the touch*.
 
-What was left became **the Zone**, fenced off behind a military
+What was left became **the Churn**, fenced off behind a military
 **Checkpoint** that lets no one out without paper.
 
-What the Zone is like now:
+What the Churn is like now:
 
 - **Emissions.** The sky still breaks open every few days (the first about
   two days in, then every 60-110 hours). You get about ten hours' warning;
@@ -74,18 +74,18 @@ What the Zone is like now:
   open plains or a ford wears you down hour by hour: get into ruins, hills
   or trees and wait it out.
 - **The way out.** Find the **Trader** in the ruined town; he'll tell you
-  where the **Checkpoint** is. Bring a **Zone Permit**, or 3 artifacts.
+  where the **Checkpoint** is. Bring a **Churn Permit**, or 3 artifacts.
 
 ---
 
-## People of the Zone
+## People of the Churn
 
 ### The Trader
 - **Role:** keeps a stall behind a barricade at the center of the ruined
   town (always a ruins hex). **T** on his hex opens barter. He asks 1.5x
   what your goods are worth and restocks every 48 hours. He sells
   Anti-Rad, food and water, a Geiger counter, a gas mask, a Multitool and
-  the one **Zone Permit** in the Zone (it's expensive). The first time you
+  the one **Churn Permit** in the Churn (it's expensive). The first time you
   reach him he tells you where the Checkpoint is.
   - **Work (O on the trade screen):** *"Bring me an artifact"* (paid in
     Anti-Rad, food and a Battery Cell), or *"Something's denned up out
@@ -94,8 +94,8 @@ What the Zone is like now:
     machete).
   - **On the radio ("Trader's net"):** points you at the way out and
     leaves supply parcels. Once every 3 days.
-- **Lore:** he calls everyone "friend", keeps the only Zone Permit for
-  sale behind his counter, and has runners out in the Zone, some of whom
+- **Lore:** he calls everyone "friend", keeps the only Churn Permit for
+  sale behind his counter, and has runners out in the Churn, some of whom
   don't come back (that's the den job).
 
 ### Mother Okun, at the Ferry Post
@@ -111,9 +111,9 @@ What the Zone is like now:
 
 ### The Peddler
 - **Role:** a man pushing a rattling handcart on a round of seven stops
-  around the Zone, half a day at each. When you see him he goes in your
+  around the Churn, half a day at each. When you see him he goes in your
   journal (where and when). **T** on his hex to trade: odd things the
-  Zone gives up, batteries, wire, the occasional torn page or broken
+  Churn gives up, batteries, wire, the occasional torn page or broken
   device. He doesn't take work.
 - **Lore:** nobody has seen where he sleeps. The cart never seems to get
   emptier or fuller, and he always knows which way the next storm is
@@ -122,7 +122,7 @@ What the Zone is like now:
 ### The sergeant at the Checkpoint
 - **Role:** the end of the game. The Checkpoint is a guard tower on the
   edge of the map, as far from the town as it gets. **T** there: show a
-  Zone Permit, or hand over 3 artifacts, and you're out. With neither you
+  Churn Permit, or hand over 3 artifacts, and you're out. With neither you
   can only walk away.
 - **Lore:** concrete blocks, razor wire, a searchlight that never goes
   off, and a sergeant in a gas mask. The standing orders say no one leaves
@@ -183,7 +183,7 @@ Two rare kind faces on the road (encounters, not radio voices).
   you."* The **Toll Man**, in a welding mask, taps a lead pipe against his
   leg: *"Toll road. Pay up or bleed."* Give them some food, fight, or
   run.
-- **Lore:** the Zone's own economy. Everyone out here came for the
+- **Lore:** the Churn's own economy. Everyone out here came for the
   artifacts, and some found it easier to take them from the ones who
   survived the finding.
 
@@ -232,7 +232,7 @@ Two rare kind faces on the road (encounters, not radio voices).
   numbers. Lately it reads names. (What it is counting is in the spoiler
   section below.)
 
-### What the Zone made of people
+### What the Churn made of people
 - **The Fused:** two people walking as one, joined at the ribs by a bridge
   of bare bone that creaks when they breathe. They whisper to each other
   about you, agree on something, and turn.
@@ -243,7 +243,7 @@ Two rare kind faces on the road (encounters, not radio voices).
   swell and shrink as she breathes. She smiles through them, then comes
   closer far too quickly.
 
-### What the Zone made of animals
+### What the Churn made of animals
 - **The Jawhound:** a dog with eyes crowding its flanks and wet tendrils
   above it, its mouth split back past the ears.
 - **The Skinless Boar:** a boar with no hide at all, only shining muscle
@@ -320,9 +320,9 @@ Signal reads you one the first time you call it. **E** on a page reads it;
 10. **Institute memo, day 400:** the broadcast on the military band isn't
     theirs. It reads numbers. Lately it reads names.
 11. **The numbers:** they decoded it. It isn't coordinates, it's a
-    **count**. It counts the people still in the Zone, and every time it
+    **count**. It counts the people still in the Churn, and every time it
     reads the list, the list is shorter.
-12. **Unsigned, in the Checkpoint's tower:** *"The Zone isn't a wound.
+12. **Unsigned, in the Checkpoint's tower:** *"The Churn isn't a wound.
     It's an eye opening. Everything we take out of it is something it lets
     us carry, so it can see where we go."*
 
@@ -342,7 +342,7 @@ or **Anna** sends her brother's by runner if you did her bandage job. Down
 the stair is a doorway of violet light and the hum: the Signal isn't on
 the radio here, it's in the walls. With a Multitool you can try to **shut
 it down** (a Tinkering and Perception roll; a failure throws you out with
-a dose of rads). Succeed and you walk out into **the Quiet**: the Zone
+a dose of rads). Succeed and you walk out into **the Quiet**: the Churn
 falls silent, the Checkpoint stands empty, and that's a fourth way out
 (and its own achievement). Or **listen to it**: you understand all of it
 at once, and then you hear your own name.

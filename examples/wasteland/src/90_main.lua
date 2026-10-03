@@ -7,12 +7,7 @@ gfx.begin()
 local ok, err = pcall(function()
     local game = Game.new()
     local w, h = gfx.size()
-    local saved = Game.read_save()
-    if saved then
-        game.screen = "title"
-        game.title_save = saved
-        game.title_cursor = 1
-    end
+    game:begin_intro(Game.read_save())   -- the splash, then the title menu
 
     local function handle_map_key(key)
         if game:map_dir_key(key) then
@@ -95,8 +90,12 @@ local ok, err = pcall(function()
             if game.screen ~= "inventory" then game.inv_drawn = nil end
             if game.screen ~= "map" then game.move_lean = nil end   -- (no stale Up/Down)
             Game.draw_pump(true)
-            if game.screen == "title" then
+            if game.screen == "intro" then
+                game:draw_intro(w, h)
+            elseif game.screen == "title" then
                 game:draw_title(w, h)
+            elseif game.screen == "crawl" then
+                game:draw_crawl(w, h)
             elseif game.screen == "creator" then
                 game:draw_creator(w, h)
             elseif game.screen == "dead" then
@@ -137,12 +136,17 @@ local ok, err = pcall(function()
         end
 
         local key = gfx.getch(POLL_MS)
+        if key == nil and game.screen == "intro" then game:intro_tick(w, h) end   -- (the eye turns)
         if key ~= nil then
             if game.screen == "records" then
                 game:records_key(key)
             elseif key == KEY.R and (game.screen == "title" or game.screen == "creator"
                                      or game.screen == "dead" or game.screen == "ending") then
                 game:open_records()
+            elseif game.screen == "intro" then
+                game:intro_key(key)
+            elseif game.screen == "crawl" then
+                game:crawl_key(key)
             elseif game.screen == "title" then
                 if key == gfx.KEY_ESCAPE or key == KEY.Q then
                     game.quit = true
@@ -187,6 +191,7 @@ local ok, err = pcall(function()
             -- time may have passed (moving, resting, crafting...): apply cold,
             -- night and light before the next frame
             if game.screen ~= "creator" and game.screen ~= "dead" and game.screen ~= "title"
+                and game.screen ~= "intro" and game.screen ~= "crawl"
                 and game.screen ~= "ending" and game.screen ~= "records" then
                 game:tick()
             end

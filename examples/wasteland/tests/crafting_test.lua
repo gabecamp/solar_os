@@ -123,6 +123,8 @@ keys[16] = 32                    -- past the wake scene
 keys[17] = C.KEY.C               -- map: crafting
 keys[18] = 10                    -- make the first recipe (Torch)
 keys[19] = C.KEY.C               -- back to the map
+for _ = 1, 3 do table.insert(keys, 1, 10) end
+keys[3] = 27                     -- (intro, title "New survivor", skip the story)
 local i, texts = 0, {}
 local saved_getch, saved_exit, saved_text = gfx.getch, fake.should_exit, gfx.text
 gfx.getch = function() i = i + 1; if i > #keys then return 113 end; return keys[i] end

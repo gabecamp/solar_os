@@ -1,5 +1,5 @@
 -- ---------------------------------------------------------------------
--- Quests: small jobs from the people of the Zone (texts and numbers in
+-- Quests: small jobs from the people of the Churn (texts and numbers in
 -- QUESTS). One at a time: self.quest = {kind, giver, target, ...} (saved).
 --   fetch  (the trader, O on the trade screen): bring an artifact back.
 --   den    (the trader): kill the beast in a den a few hexes away.

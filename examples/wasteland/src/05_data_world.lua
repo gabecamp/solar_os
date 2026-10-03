@@ -139,7 +139,7 @@ local SURVIVE = {
 
 -- Traders and the way out. A trader keeps a stall on the town's center hex
 -- (sites.trader); the Checkpoint (sites.checkpoint) sits on the far edge of
--- the map, the only way out of the Zone. Barter: every item is worth
+-- the map, the only way out of the Churn. Barter: every item is worth
 -- value[item] (default 1); the trader gives full value for what you bring
 -- and asks markup x the value of what you take. Stock restocks every
 -- restock_hours with a couple of `restock` items.
@@ -192,7 +192,7 @@ local TRADE = {
     -- the Peddler's round: route_n stops around the map, stay hours at each
     route_n = 7, stay = 12,
 }
--- The guards let you through with a Zone Permit, or for `bribe` artifacts.
+-- The guards let you through with a Churn Permit, or for `bribe` artifacts.
 local GOAL = {bribe = 3}
 
 -- Hunting and fishing (G on the map). Fishing: by open water or on a ford
@@ -241,7 +241,7 @@ local DIFFICULTY = {
     order = {"easy", "normal", "hard"},
     easy   = {name = "Easy", short = "Easy",          food = 2.0, encounter = 0.5, rad = 0.5, emission = 0.5, drain = 0.65},
     normal = {name = "Normal", short = "Normal",        food = 1.4, encounter = 0.85, rad = 1, emission = 1, drain = 0.85},
-    hard   = {name = "Zone-Hardened", short = "Hard", food = 1.0, encounter = 1.2, rad = 1.25, emission = 1.25, drain = 1.05},
+    hard   = {name = "Churn-Hardened", short = "Hard", food = 1.0, encounter = 1.2, rad = 1.25, emission = 1.25, drain = 1.05},
 }
 
 -- A dog companion (src/48_dog.lua). chance: % per move on `terrain` while
@@ -321,7 +321,7 @@ local QUESTS = {
     -- story moments (src/67_scenes.lua): shown once a run, art = a portrait
     scenes = {
         order = {"wake", "first_night", "first_emission", "little_ones", "the_gate"},
-        wake = {title = "The Zone",
+        wake = {title = "The Churn",
                 text = "You wake in wet grass with nothing. No shoes, no coat, no name you "
                     .. "can hold on to. Somewhere a dog barks, and stops. There's a pile of "
                     .. "rags and a rusted can beside you, as if someone left them for you. "
@@ -333,7 +333,7 @@ local QUESTS = {
                     .. "look away."},
         first_emission = {title = "The sky",
                 text = "The sky bruises purple and the birds drop out of it. Every radio "
-                    .. "in the Zone hisses the same note. An emission is coming. Get into "
+                    .. "in the Churn hisses the same note. An emission is coming. Get into "
                     .. "ruins or up into the hills, and stay there until it passes."},
         little_ones = {title = "The Little Ones", art = "little",
                 text = "Under a mound, a burrow, and small grey faces watching you from "
@@ -368,7 +368,7 @@ local NIGHT = {
     },
 }
 
--- The Little Ones (src/57_little.lua): the Zone's children, grown small,
+-- The Little Ones (src/57_little.lua): the Churn's children, grown small,
 -- grey and grinning. Never hostile. Trinkets left at their cairns befriend
 -- them: at join_at gifts a troupe follows you from a warren (1 more per
 -- per_extra gifts, up to max). Their mood falls 1 per decay_hours without

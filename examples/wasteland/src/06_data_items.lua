@@ -111,7 +111,7 @@ local ITEM_DB = {
                     desc = "E: -20 rads, dulls you", vague_desc = "E: settles the stomach"},
     geiger       = {name = "Geiger Counter", slot = nil, consumable = nil,
                     desc = "Carry it: reads radiation"},
-    permit       = {name = "Zone Permit",  slot = nil, consumable = nil,
+    permit       = {name = "Churn Permit",  slot = nil, consumable = nil,
                     desc = "Gets you past the Checkpoint"},
     bolts        = {name = "Bolts",        slot = nil, consumable = nil,
                     desc = "Anomalies: +2 bolt throws"},

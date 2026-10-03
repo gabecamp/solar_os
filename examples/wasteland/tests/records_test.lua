@@ -88,7 +88,7 @@ g:draw_ending(400, 300)
 s = screen_text()
 assert(s:find("New record: longest run", 1, true) and s:find("Achievements this run", 1, true), s)
 
-print("6. Bribed and Zone-Hardened")
+print("6. Bribed and Churn-Hardened")
 g = fresh()
 g.difficulty = "hard"
 g.player.inventory = {{item = "weeping_stone", qty = 3}}

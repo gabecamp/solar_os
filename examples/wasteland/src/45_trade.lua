@@ -6,8 +6,8 @@
 -- trader (who tells you about the Checkpoint), the wanderer, scrawled notes
 -- or by walking there (sites_known, saved); the panel then points the way.
 -- T on the trader's hex opens barter (self.trader, saved); T at the
--- Checkpoint opens the gate: a Zone Permit or GOAL.bribe artifacts get you
--- out of the Zone, which ends the run.
+-- Checkpoint opens the gate: a Churn Permit or GOAL.bribe artifacts get you
+-- out of the Churn, which ends the run.
 -- ---------------------------------------------------------------------
 
 function Game:site_here()
@@ -50,7 +50,7 @@ end
 -- Someone (or something) tells you where the way out is.
 function Game:hear_of_exit(who)
     if self:learn_site("checkpoint") then
-        self:push_log(who .. ": a checkpoint out of the Zone, " .. self:site_bearing("checkpoint") .. ".")
+        self:push_log(who .. ": a checkpoint out of the Churn, " .. self:site_bearing("checkpoint") .. ".")
         return true
     end
     return false
@@ -276,7 +276,7 @@ end
 
 function Game:open_gate()
     local opts = {}
-    if self:count_item("permit") > 0 then opts[#opts + 1] = {"Show the Zone Permit", "permit"} end
+    if self:count_item("permit") > 0 then opts[#opts + 1] = {"Show the Churn Permit", "permit"} end
     if self:artifact_count() >= GOAL.bribe then
         opts[#opts + 1] = {("Offer %d artifacts"):format(GOAL.bribe), "bribe"}
     end
@@ -331,7 +331,7 @@ function Game:gate_key(key)
     end
 end
 
--- Out of the Zone: the run is over (and so is its save).
+-- Out of the Churn: the run is over (and so is its save).
 function Game:finish_run(how)
     self.ending = {how = how, day = (self:clock()), hours = self.player.hours,
                    artifacts = self:artifact_count(),

@@ -42,7 +42,7 @@ LORE = {
          text = "We decoded it. They aren't coordinates. They're a count. It counts us, the "
              .. "ones still here, and every time it reads the list, it is shorter."},
         {title = "Unsigned, in the Checkpoint's tower",
-         text = "The Zone isn't a wound. It's an eye opening. Everything we take out of it "
+         text = "The Churn isn't a wound. It's an eye opening. Everything we take out of it "
              .. "is something it lets us carry, so it can see where we go."},
     },
     -- the ending's last line, by pages read (first match from the top)

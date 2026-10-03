@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Wasteland Survivor for a PC or a Raspberry Pi: a pygame window that runs the
+The Churn for a PC or a Raspberry Pi: a pygame window that runs the
 real game, ../wasteland.lua, unchanged.
 
 The game is written for SolarOS, which gives Lua apps a `solaros` module
@@ -83,7 +83,7 @@ class Host:
     """The `solaros` module for the game, drawn with pygame."""
 
     def __init__(self, scale=2, fullscreen=False, look="gray", mute=False, data_dir=None,
-                 keys=None, on_frame=None, caption="Wasteland Survivor"):
+                 keys=None, on_frame=None, caption="The Churn"):
         self.scale, self.fullscreen, self.look = scale, fullscreen, look
         self.data_dir = os.path.abspath(data_dir or default_data_dir())
         self.script = list(keys) if keys is not None else None   # tests: keys to send, then quit
@@ -452,7 +452,7 @@ def run(game_path=DEFAULT_GAME, **options):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="Wasteland Survivor on a PC or Raspberry Pi.")
+    ap = argparse.ArgumentParser(description="The Churn on a PC or Raspberry Pi.")
     ap.add_argument("--scale", type=int, default=2, help="window size: 400x300 times this (default 2)")
     ap.add_argument("--fullscreen", action="store_true", help="fill the screen (largest whole scale)")
     ap.add_argument("--look", choices=("gray", "device", "amber", "green"), default="gray",
