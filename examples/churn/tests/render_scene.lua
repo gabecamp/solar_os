@@ -85,6 +85,36 @@ g.log = {"Consumed Water Bottle.", "Backpack full.", "Moved Rock."}
 g:draw_inventory(400, 300)
 solaros.dump("ops_inventory_full.txt")
 
+-- Scene 2b2/2b3: the Churn's items with their own icons (tools/paint_icons.py),
+-- 31 a screen: the bag and the ground
+for n, ids2 in ipairs({
+    {"book_tailor", "book_surgeon", "book_radio", "book_lab", "book_gunsmith", "book_hymnal",
+     "tape_medic", "tape_gun", "tape_choir", "tape_lab", "tape_tinker", "blank_tape",
+     "r762n", "r762t", "r38", "brass", "frame_pm", "frame_tt", "frame_inst", "frame_nagant",
+     "gun_slide", "gun_spring", "firing_pin", "magazine", "cylinder", "tokarev", "inst_sidearm",
+     "marsh_revolver", "gunsmith_kit", "gun_oil", "lockpicks"},
+    {"sinew", "choir_wire", "metal_pot", "lighter", "raw_hide", "jawhound_pelt", "newspaper",
+     "duct_tape", "pale_eye", "charcoal", "lead_scrap", "screws", "mech_parts", "foil",
+     "laptop_battery", "locked_phone", "pliers", "screwdriver", "hacksaw", "scalpel",
+     "kitchen_knife", "hunting_knife", "stone_knife", "glass_shiv", "broad_spear", "bone_needle",
+     "smoked_meat", "tincture", "painkillers", "sedative", "rad_purge"},
+    {"choir_cell", "glow_jar", "salt_circle", "bark_tea", "stitches", "hide_gloves", "hide_tunic",
+     "hide_pack", "pelt_coat", "travois", "hand_cart"},
+}) do
+    g = fresh()
+    g.player.inventory = {}
+    local ground = g:ground_list()
+    for k = #ground, 1, -1 do ground[k] = nil end
+    for k, id in ipairs(ids2) do
+        if k <= 16 then g.player.inventory[k] = {item = id, qty = 1}
+        else ground[k - 16] = {item = id, qty = 1} end
+    end
+    g.inv_cursor = 1
+    g.log = {"(icons " .. n .. "/3)"}
+    g:draw_inventory(400, 300)
+    solaros.dump("ops_inventory_icons" .. n .. ".txt")
+end
+
 -- Scene 2c: every slot worn, cursor on the jacket
 g = fresh()
 local worn = {head = "cap", ears = "earmuffs", eyes = "sunglasses", neck = "scarf",
@@ -587,7 +617,7 @@ g.research = {bushcraft = 5}
 table.insert(g.player.inventory, {item = "book_field", qty = 1})
 g.screen = "craft"
 for i, r in ipairs(g:known_recipes()) do if r.study == "bushcraft" then g.craft_ui.cursor = i end end
-g.log = {"You study bushcraft for 3h. (5/8)"}
+g.log = {"You study bushcraft for 3h. (5/6)"}
 g:draw_craft(400, 300)
 solaros.dump("ops_craft_study.txt")
 

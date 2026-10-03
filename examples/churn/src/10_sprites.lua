@@ -1599,6 +1599,10 @@ local SPRITES = {}
 for item_id, rows in pairs(SPRITE_ART) do
     SPRITES[item_id] = pack_bitmap(item_id, rows, SPRITE_W, SPRITE_H)
 end
+-- The packed sprites are all the game draws: let the source rows go (they'd
+-- live as long as the main loop otherwise). sprite_test keeps them.
+CHURN.art = nil
+if not KEEP_SPRITE_ART then SPRITE_ART = nil end
 
 -- gfx.sprite is documented as an alias of gfx.bitmap; use whichever exists
 -- so an older firmware without the alias still gets icons.

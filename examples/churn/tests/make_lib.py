@@ -28,8 +28,8 @@ src = (here.parent / "churn.lua").read_text()
 cut = src.index("-- Main loop")
 lib = src[:cut]
 
-(here / "lib_only.lua").write_text(
-    lib + "\nreturn Game, ITEM_DB, EQUIP_SLOTS, TERRAIN, SPRITES, SPRITE_ART\n")
+(here / "lib_only.lua").write_text(   # (keeps the sprites' source rows: 10_sprites)
+    "KEEP_SPRITE_ART = true\n" + lib + "\nreturn Game, ITEM_DB, EQUIP_SLOTS, TERRAIN, SPRITES, SPRITE_ART\n")
 (here / "lib_map.lua").write_text(
     lib + "\nreturn Game, TERRAIN, GLYPHS, GLYPH_ART, GLYPH_W, GLYPH_H, "
           "LEGEND_ORDER, LEGEND_Y, MAP_TOP, HEX_SIZE, MAP_W, MAP_BOTTOM, PANEL_X\n")

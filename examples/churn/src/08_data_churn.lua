@@ -231,30 +231,9 @@ for id, def in pairs({
     magazine     = {name = "Magazine",     desc = "Gun part: pistols"},
     cylinder     = {name = "Cylinder",     desc = "Gun part: revolvers"},
 }) do ITEM_DB[id] = def end
--- sprites borrowed from a look-alike (the rest have art in CHURN.art below)
-for id, look in pairs({
-    sinew = "string", choir_wire = "string", metal_pot = "tin_can", lighter = "matches",
-    raw_hide = "hide", jawhound_pelt = "hide", newspaper = "lore_page", duct_tape = "rope",
-    pale_eye = "ichor", charcoal = "rock", lead_scrap = "scrap_metal", screws = "bolts",
-    mech_parts = "scrap_metal", foil = "cloth_scrap", gun_oil = "water_bottle",
-    laptop_battery = "battery_cell", locked_phone = "usb_drive", pliers = "multitool",
-    screwdriver = "shiv", hacksaw = "machete", scalpel = "shiv", kitchen_knife = "knife",
-    hunting_knife = "knife", gunsmith_kit = "multitool", stone_knife = "shiv",
-    glass_shiv = "shiv", broad_spear = "spear", bone_needle = "bone", hide_gloves = "gloves",
-    hide_tunic = "tshirt", hide_pack = "backpack", pelt_coat = "jacket", travois = "sack_pack",
-    hand_cart = "backpack", lockpicks = "bolts", smoked_meat = "jerky", tincture = "antirad",
-    painkillers = "antirad", sedative = "antirad", rad_purge = "antirad", choir_cell = "battery_cell",
-    glow_jar = "water_bottle", salt_circle = "salt", bark_tea = "water_bottle", stitches = "bandage",
-    book_tailor = "book_field", book_surgeon = "book_field", book_radio = "book_field",
-    book_lab = "book_field", book_gunsmith = "book_field", book_hymnal = "book_field",
-    tape_medic = "tape_cook", tape_gun = "tape_cook", tape_choir = "tape_cook",
-    tape_lab = "tape_cook", tape_tinker = "tape_cook", blank_tape = "tape_cook",
-    marsh_revolver = "nagant", tokarev = "pm_pistol", inst_sidearm = "pm_pistol",
-    r762n = "r9x18", r762t = "r9x18", r38 = "r9x18", brass = "r9x18",
-    frame_pm = "pm_pistol", frame_nagant = "nagant", frame_tt = "pm_pistol", frame_inst = "pm_pistol",
-    gun_slide = "gun_barrel", gun_spring = "mech_parts", firing_pin = "gun_barrel",
-    magazine = "r9x18", cylinder = "mech_parts",
-}) do ITEM_DB[id].look = look end
+-- Every new item has its own art (CHURN.art: 09_art_churn, and 09_art_icons made by
+-- tools/paint_icons.py). An item can still borrow one: ITEM_DB[..].look = "other"
+-- (10_sprites resolves it).
 ITEM_DB.canned_beans.empty = "tin_can"   -- the can is your first pot
 
 -- -- recipes ------------------------------------------------------------
