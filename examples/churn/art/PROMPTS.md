@@ -167,6 +167,55 @@ shaft of light, a hand reaching into the frame toward them.
 A lone wooden door frame standing in an empty field, no walls; through it you
 see the same field at night, with a dark figure standing there waiting.
 
+## Still to do (2026-10-03): the night things and the Institute
+
+The user's own pictures (`fused.jpg`, `stray.jpg`) set the look for these:
+an old silver-gelatin photograph on a worn, yellowed print. Paste this after
+each prompt:
+
+> Aged black-and-white silver gelatin photograph, 1980s Soviet exclusion
+> zone, worn yellowed print with chipped edges and dust specks, harsh
+> on-camera flash, deep black shadows, high contrast, grainy, one large
+> subject filling the middle of a square frame, unsettling and quiet,
+> no text, no watermark.
+
+**institute.jpg** (the quarry gate, and the Institute itself):
+A massive rusted steel blast door set into the raw rock face of an abandoned
+quarry, chained shut, a small card-reader slot beside it, an old stencilled
+word above it faded to illegible, cracked concrete apron, a single bare bulb
+burning over the door though there is no power anywhere, the rock around
+the door stained in rings like ripples, the air in front of it faintly
+warped. Square, the door filling the middle.
+
+**whisper.jpg** (The Whisperers, from black water at night):
+Night, a flash photograph of the black still surface of a pond in reeds,
+three pale human faces just beneath the surface looking up, eyes open,
+mouths parted as if speaking, their features slightly too smooth, the water
+over them perfectly flat and glossy, black all around. The faces large and
+close to the camera.
+
+**long_man.jpg** (The Long Man, at the edge of your light):
+Night, the edge of a flashlight beam in tall dry grass, a figure standing
+far too tall and thin, arms hanging down past its knees, long coat or
+something like one, no visible face, impossible to tell if it faces toward
+or away, the light falling off before it reaches its head, black sky.
+Full figure, centered, pale against black.
+
+**crawler.jpg** (The Crawler, low in the grass):
+Night, flash photograph close to the ground in flattened grass, a low wide
+creature like a man-sized tick or crab made of pale wet human flesh, far
+too many jointed legs, a cluster of many small human eyes catching the
+flash, mandibles of finger bones, glistening. Three-quarter view, filling
+the frame, black behind it.
+
+**rivals.jpg** (optional: the Rival Churners, who borrow the bandits' picture):
+Two exclusion-zone scavengers standing side by side, patched gas masks
+pushed up on their heads, heavy canvas packs, a woman in front holding a
+Tokarev pistol low and casual, both watching the camera warily. Waist up,
+plain pale backdrop.
+
+Karl is never generated: his picture is the user's own photo.
+
 ## After adding a picture
 
 If the picture differs from the game's description (like the Jawhound's eyes
