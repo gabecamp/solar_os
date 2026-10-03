@@ -245,7 +245,14 @@ g = fresh()
 local sq, sr = parse(g.sites.trader)
 g.player.q, g.player.r = sq + 1, sr
 g.player.hours = g.player.hours + 1
+-- (every line this tick: the log keeps only 3, and on some worlds the
+-- Peddler or a Little Ones' burrow in sight push the trader's line out)
+local said = {}
+local real_push = g.push_log
+g.push_log = function(self, text) said[#said + 1] = text; return real_push(self, text) end
 g:tick()
-assert(g.sites_known.trader and has_log(g, "trader's stall in the ruins"))
+local heard = false
+for _, l in ipairs(said) do heard = heard or l:find("trader's stall in the ruins", 1, true) ~= nil end
+assert(g.sites_known.trader and heard)
 
 print("TRADE TESTS PASSED")
