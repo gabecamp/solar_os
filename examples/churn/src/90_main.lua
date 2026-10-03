@@ -144,7 +144,10 @@ local ok, err = pcall(function()
 
         local key = gfx.getch(POLL_MS)
         if key == nil and game.screen == "intro" then game:intro_tick(w, h) end   -- (the eye turns)
-        if key ~= nil and game.confirm_quit then
+        if key == KEY.CLOSE then
+            game:close_requested()
+            dirty = true
+        elseif key ~= nil and game.confirm_quit then
             game:quit_confirm_key(key)   -- (no time passes while it asks)
             dirty = true
         elseif key ~= nil then

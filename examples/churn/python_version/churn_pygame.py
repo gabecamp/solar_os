@@ -65,6 +65,11 @@ SCALES = (0, 1, 2, 3, 4, 5)          # 0 = fit: the biggest whole scale the scre
 PAD_BUTTONS = {0: 10, 1: KEY_ESCAPE, 2: ord("e"), 3: ord("i"), 4: ord("c"), 5: ord("j"),
                6: ord("h"), 7: ord(" ")}
 PAD_BACK, PAD_START = 6, 7
+# Closing the window is a key for the game (KEY.CLOSE in the Lua): mid-run it
+# asks first, like Q. A game that doesn't know the key still closes, on the
+# third try.
+KEY_CLOSE, CLOSE_TRIES = 0xF0, 3
+CLOSE_GAP = 0.25   # s: a close that comes before the game redrew, or sooner, is an echo
 STICK_DEADZONE = 0.5
 REPEAT_DELAY, REPEAT_EVERY = 0.30, 0.15   # held D-pad / stick, in seconds
 
@@ -131,6 +136,9 @@ class Host:
         self.script = list(keys) if keys is not None else None   # tests: keys to send, then quit
         self.on_frame = on_frame                                    # tests: called after each refresh
         self.closed = False
+        self.close_tries = 0
+        self.close_at = None      # (frames, time) of the last close sent to the game
+        self.pending = []         # events read but not handled yet
         self.color, self.font_id = BLACK, FONT_MONO_12
         self.frames = 0
         self.notes = []          # tone_async queue: (freq, ms, vol)
@@ -536,12 +544,25 @@ class Host:
         deadline = None if timeout_ms is None else time.monotonic() + int(timeout_ms) / 1000.0
         while True:
             self._pump_audio()
-            for ev in pygame.event.get():
+            # (one event at a time: the rest wait for the next call, not lost)
+            self.pending.extend(pygame.event.get())
+            while self.pending:
+                ev = self.pending.pop(0)
                 if ev.type == pygame.QUIT:
-                    self.closed = True
-                    return None
+                    # (SDL can repeat a close: one click must not also answer the prompt)
+                    now = time.monotonic()
+                    if self.close_at and (self.frames == self.close_at[0]
+                                          or now - self.close_at[1] < CLOSE_GAP):
+                        continue
+                    self.close_at = (self.frames, now)
+                    self.close_tries += 1
+                    if self.close_tries >= CLOSE_TRIES:
+                        self.closed = True
+                        return None
+                    return KEY_CLOSE
                 code = self.event_key(ev)
                 if code is not None:
+                    self.close_tries = 0   # (only closes in a row count)
                     return code
             if self.menu is None:
                 code = self._repeat_key(time.monotonic())

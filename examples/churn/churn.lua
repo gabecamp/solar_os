@@ -56,7 +56,8 @@ local POLL_MS = 250
 -- SolarOS sends Enter as '\n' (LF); CR is kept just in case.
 local KEY = {SPACE = 32, ENTER = 13, LF = 10, ESC = 27,
              A = 97, C = 99, D = 100, E = 101, F = 102, I = 105, Q = 113,
-             S = 115, T = 116, W = 119, H = 104, V = 118, G = 103, M = 109, J = 106, R = 114, O = 111, L = 108, K = 107, Y = 121}
+             S = 115, T = 116, W = 119, H = 104, V = 118, G = 103, M = 109, J = 106, R = 114, O = 111, L = 108, K = 107, Y = 121,
+             CLOSE = 0xF0}   -- (the PC window's close button; the device never sends it)
 
 -- Terrain: id -> {name, cost (MP + hours), passable, shade}
 -- shade is one of gfx.WHITE / gfx.LIGHT / gfx.DARK / gfx.BLACK, used as
@@ -13348,6 +13349,20 @@ function Game:ask_quit()
     self.inv_drawn = nil   -- (the bag redraws whole under and after it)
 end
 
+-- Screens with no run under way (or one that's over): quitting there is free.
+Game.OFF_RUN = {intro = true, title = true, crawl = true, creator = true, dead = true,
+                ending = true, records = true}
+
+-- The window's close button (KEY.CLOSE, PC only): asks mid-run, like Q; a
+-- second close while it asks, or off a run, quits.
+function Game:close_requested()
+    if self.confirm_quit or Game.OFF_RUN[self.screen] then
+        self.quit = true
+    else
+        self:ask_quit()
+    end
+end
+
 -- Q, Y or Enter quits (so Q, Q is quick); any other key stays.
 function Game:quit_confirm_key(key)
     if key == KEY.Q or key == KEY.Y or key == KEY.ENTER or key == KEY.LF then
@@ -13994,7 +14009,10 @@ local ok, err = pcall(function()
 
         local key = gfx.getch(POLL_MS)
         if key == nil and game.screen == "intro" then game:intro_tick(w, h) end   -- (the eye turns)
-        if key ~= nil and game.confirm_quit then
+        if key == KEY.CLOSE then
+            game:close_requested()
+            dirty = true
+        elseif key ~= nil and game.confirm_quit then
             game:quit_confirm_key(key)   -- (no time passes while it asks)
             dirty = true
         elseif key ~= nil then

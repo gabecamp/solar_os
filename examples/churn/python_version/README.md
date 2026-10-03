@@ -99,7 +99,8 @@ The same as on the device; **H** in the game lists them all.
 
 - **Moving:** Left/Right step west or east. Up or Down, then Left/Right, takes a diagonal. WASD works the same.
 - **Actions:** Space rests, F searches, E uses or drinks, I opens the bag, C crafts, J opens the journal, T trades.
-- **Quit:** Q on the map, or close the window.
+- **Quit:** Q on the map, or close the window. During a run both ask first (Q or Enter, or
+  closing again, quits; any other key stays).
 - **Window:** F1 settings, F11 fullscreen.
 
 ### Gamepad

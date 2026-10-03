@@ -177,6 +177,24 @@ def main():
         assert btn(0) is None and h.scale == 2, "A changes the row (scale 1 -> 2)"
         assert btn(1) is None and h.menu is None, "B closes"
         print("   OK")
+
+        print("10. the window's close button is a key for the game; the third in a row closes")
+        h = host_mod.Host(mute=True, data_dir=os.path.join(tmp, "close"))
+        quit_ev = lambda: pygame.event.post(pygame.event.Event(pygame.QUIT))
+        quit_ev()
+        assert h.getch(0) == host_mod.KEY_CLOSE and not h.closed
+        quit_ev()
+        assert h.getch(0) is None and h.close_tries == 1, "an echo before a redraw is ignored"
+        h.close_at = None                  # (as after a redraw and a moment)
+        pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_i, unicode="i", mod=0))
+        assert h.getch(0) == ord("i") and h.close_tries == 0, "another key: the count starts over"
+        for _ in range(host_mod.CLOSE_TRIES - 1):
+            quit_ev()
+            assert h.getch(0) == host_mod.KEY_CLOSE
+            h.close_at = None
+        quit_ev()
+        assert h.getch(0) is None and h.closed, "a game that ignores it still closes"
+        print("   OK")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     print("\nPYGAME HOST TESTS PASSED")

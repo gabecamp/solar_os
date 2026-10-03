@@ -254,6 +254,20 @@ function Game:ask_quit()
     self.inv_drawn = nil   -- (the bag redraws whole under and after it)
 end
 
+-- Screens with no run under way (or one that's over): quitting there is free.
+Game.OFF_RUN = {intro = true, title = true, crawl = true, creator = true, dead = true,
+                ending = true, records = true}
+
+-- The window's close button (KEY.CLOSE, PC only): asks mid-run, like Q; a
+-- second close while it asks, or off a run, quits.
+function Game:close_requested()
+    if self.confirm_quit or Game.OFF_RUN[self.screen] then
+        self.quit = true
+    else
+        self:ask_quit()
+    end
+end
+
 -- Q, Y or Enter quits (so Q, Q is quick); any other key stays.
 function Game:quit_confirm_key(key)
     if key == KEY.Q or key == KEY.Y or key == KEY.ENTER or key == KEY.LF then

@@ -64,6 +64,18 @@ assert(g.quit)
 g:draw_quit_confirm(400, 300)
 print("   OK")
 
+print("3b. the PC window's close button (KEY.CLOSE): asks mid-run; twice, or off a run, quits")
+taken = run_loop({0xF0, 32, I, I, 0xF0, 0xF0, I, I})
+assert(taken == 6, "close, stay, play on, close, close (took " .. taken .. ")")
+taken = run_loop({0xF0, Q, I})
+assert(taken == 2, "close then Q (took " .. taken .. ")")
+g = Game.new()
+g:start_game()
+g.screen = "dead"
+g:close_requested()
+assert(g.quit, "off a run it just closes")
+print("   OK")
+
 print("4. off a run, Q quits at once (the splash)")
 local taken0 = 0
 do
