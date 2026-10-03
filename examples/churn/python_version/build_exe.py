@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Build a one-file, no-install version of the PC game with PyInstaller:
-dist/TheChurn.exe on Windows (TheChurn on Linux or macOS). It carries the
+dist/TheChurn.exe on Windows, dist/TheChurn on Linux or macOS. It carries the
 Lua game (../churn.lua) and the DejaVu Sans Mono fonts, so the player needs
 nothing else. A churn.lua put next to the .exe is used instead of the one
 inside, so the game can be updated without a new build.
@@ -66,7 +66,6 @@ def main(argv=None):
         str(HERE / "churn_pygame.py"),
         "--name", "TheChurn",
         "--onefile",
-        "--windowed",                      # (no console window behind the game)
         "--noconfirm",
         "--clean",
         "--distpath", str(HERE / "dist"),
@@ -77,6 +76,8 @@ def main(argv=None):
     ]
     for f in FONTS:
         args += ["--add-data", "%s%s." % (fonts / f, sep)]
+    if sys.platform.startswith("win"):
+        args.append("--windowed")   # (no console window behind the game; on a Mac it'd make an .app instead)
     PyInstaller.__main__.run(args)
     exe = HERE / "dist" / ("TheChurn.exe" if sys.platform.startswith("win") else "TheChurn")
     if not exe.is_file():

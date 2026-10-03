@@ -11,18 +11,25 @@ here with no Python work.
 
 ![The map](../previews/pygame_map.png)
 
-## Windows: just download it
+## Just download it
 
-**[TheChurn.exe](https://github.com/gabecamp/solar_os/releases/download/churn-latest/TheChurn.exe)**:
-one file, nothing to install (no Python). Double-click it. Windows may say the
-app is unrecognized (it isn't signed): **More info**, then **Run anyway**.
-Saves go to `%APPDATA%\TheChurn`. The same options work from a command prompt
-(`TheChurn.exe --fullscreen`), and a `churn.lua` put next to the .exe is used
-instead of the one inside it.
+One file, nothing to install (no Python):
 
-It's rebuilt by GitHub whenever the game changes on `main`
-(`.github/workflows/churn-windows.yml`, which runs `build_exe.py` on Windows and
-plays a few keys with `TheChurn.exe --selftest` before publishing). To build one
+- **Windows:** [TheChurn.exe](https://github.com/gabecamp/solar_os/releases/download/churn-latest/TheChurn.exe).
+  Double-click it. If Windows says the app is unrecognized (it isn't signed):
+  **More info**, then **Run anyway**. Saves go to `%APPDATA%\TheChurn`.
+- **Linux:** [TheChurn-linux.tar.gz](https://github.com/gabecamp/solar_os/releases/download/churn-latest/TheChurn-linux.tar.gz).
+  `tar xzf TheChurn-linux.tar.gz && ./TheChurn`. Saves go to `~/.local/share/the-churn`.
+- **Mac:** [TheChurn-mac.zip](https://github.com/gabecamp/solar_os/releases/download/churn-latest/TheChurn-mac.zip)
+  (Apple silicon). Unzip it; the first time, right-click **TheChurn** and choose
+  **Open** (it isn't signed), or run `xattr -d com.apple.quarantine TheChurn`.
+
+The same options work from a terminal (`TheChurn --fullscreen`), and a `churn.lua`
+put next to the file is used instead of the one inside it.
+
+GitHub rebuilds all three whenever the game changes on `main`
+(`.github/workflows/churn-windows.yml` runs `build_exe.py` on each system and
+plays a few keys with `TheChurn --selftest` before publishing). To build one
 yourself: `pip install pygame-ce lupa pyinstaller`, then `python build_exe.py`
 (the file lands in `dist/`).
 
