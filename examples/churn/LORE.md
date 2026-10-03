@@ -1,7 +1,7 @@
 # The Lore of the Churn: How Everyone and Everything Connects
 
 Oct 2, 2026 · @Gabe  
-_A copy of the shared doc "The Lore of the World: How Everything Connects"._
+_A copy of the shared doc "The Lore of the Churn"._
 
 ## The Churn in brief
 
