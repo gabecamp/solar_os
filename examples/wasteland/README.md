@@ -28,8 +28,9 @@ the Checkpoint alive.
   "(torn)" under the cursor) gives no warmth and holds half as much until
   you patch it: **Patch clothes** on the crafting screen, 1 cloth scrap.
 - **On a PC or Raspberry Pi:** `python_version/` runs this same game in a
-  pygame window (`pip install pygame lupa`, then
-  `python3 python_version/wasteland_pygame.py`). See its README.
+  pygame window. One command installs it: `install.sh` on Linux or a Pi,
+  `install.ps1` on Windows (see its README), or by hand `pip install pygame lupa`,
+  then `python3 python_version/wasteland_pygame.py`.
 - **More:** `DEVICE_TEST.md` is a 10-minute check on the board;
   `HANDOFF.md` is the developer guide (code map, tests, tools).
 
