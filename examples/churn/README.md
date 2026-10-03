@@ -34,7 +34,8 @@ the Checkpoint alive.
   pygame window. One command installs it: `install.sh` on Linux or a Pi,
   `install.ps1` on Windows (see its README), or by hand `pip install pygame lupa`,
   then `python3 python_version/churn_pygame.py`.
-- **More:** `DEVICE_TEST.md` is a 10-minute check on the board;
+- **More:** `LORE.md` is the world's lore and how everyone and everything
+  connects (spoilers from its section 9); `DEVICE_TEST.md` is a 10-minute check on the board;
   `HANDOFF.md` is the developer guide (code map, tests, tools).
 
 ---
