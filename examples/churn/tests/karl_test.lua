@@ -65,13 +65,13 @@ for _ = 1, 300 do
 end
 assert(again, "back after the cooldown")
 
-print("3. he's clearly KARL, with a placeholder portrait and the riddle shown")
+print("3. he's clearly KARL, with his portrait and the riddle shown")
 g = fresh()
 place(g, true)
 local e = meet(g)
 assert(g.screen == "encounter" and e.def.name == "Karl" and e.def.kind == "riddle")
 assert(KARL.intro:find("KARL", 1, true) and KARL.intro:find("Karl. With a K", 1, true))
-assert(H.PORTRAIT_DATA.karl, "a portrait (placeholder) exists")
+assert(H.PORTRAIT_DATA.karl, "his portrait exists")
 assert(table.concat(e.msg, " "):find("Karl: '", 1, true))
 local opts = g:encounter_options()
 assert(#opts == 4 and opts[4][2] == "leave_quietly")

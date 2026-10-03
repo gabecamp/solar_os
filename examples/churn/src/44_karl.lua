@@ -5,7 +5,7 @@
 -- and after fishing. He asks a riddle he hasn't asked yet (karl_asked);
 -- a right answer gets one of KARL.rewards, worn/lure gear only once
 -- (karl_gave). Either way he's gone for KARL.cooldown hours (karl_next).
--- His portrait is a placeholder smiley until art/karl.jpg is supplied.
+-- His portrait is the user's own picture (art/karl.png).
 -- ---------------------------------------------------------------------
 
 function Game:maybe_karl(how)

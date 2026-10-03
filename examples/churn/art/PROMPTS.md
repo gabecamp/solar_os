@@ -214,7 +214,7 @@ pushed up on their heads, heavy canvas packs, a woman in front holding a
 Tokarev pistol low and casual, both watching the camera warily. Waist up,
 plain pale backdrop.
 
-Karl is never generated: his picture is the user's own photo.
+Karl is never generated here: `karl.png` is the user's own picture (2026-10-03).
 
 ## After adding a picture
 

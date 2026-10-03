@@ -214,9 +214,9 @@ local HUNT = {
 -- right and he gives you one of `rewards` (worn gear only once).
 local KARL = {
     chance = 3, fish_chance = 10, cooldown = 96,
-    intro = "A man in rubber waders stands knee-deep in the river, rod bent. "
-         .. "Stencilled on his tackle box: KARL. 'Name's Karl. With a K. "
-         .. "Answer me a riddle, friend.'",
+    intro = "A man in muddy waders and a bucket hat hung with lures comes up out of "
+         .. "the river, a string of fish with too many eyes across his chest. KARL is "
+         .. "scratched on his tackle box. 'Name's Karl. With a K. Riddle, friend?'",
     riddles = {
         {q = "What has a mouth but never eats, and a bed but never sleeps?",
          a = {"A river", "A fish", "A grave"}},

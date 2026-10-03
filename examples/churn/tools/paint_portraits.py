@@ -176,6 +176,12 @@ PHOTO = {
     # hung with root-like strands, two glowing eyes, on a pale ground
     "crawler": {"far": (36, 30, 740, 734), "near": (70, 10, 710, 650),
                 "close": (270, 40, 490, 260), "gamma": 0.7, "edge": 0.5, "bg": 0.80},
+    # Karl: the user's own picture (2026-10-03, 1024x1536, never generated):
+    # bucket hat with lures, waders, rod, a string of many-eyed fish, a river
+    # at dusk behind; square crops on the man, the scene kept pale behind him
+    "karl": {"far": (60, 40, 1000, 980), "near": (260, 50, 740, 530),
+             "close": (340, 90, 610, 360), "gamma": 0.9, "edge": 0.9,
+             "levels": (0.14, 0.68), "bg": 0.99},
     # the user's own picture (2026-10-03, 512x768): the Rival Churners, two
     # in full gas masks with packs and guns, on a pale print
     "rivals": {"far": (0, 60, 512, 572), "near": (16, 36, 496, 516),
