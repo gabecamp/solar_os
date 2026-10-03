@@ -275,15 +275,16 @@ The Churn's people fall into three kinds: those who **stayed** when the town emp
 
 | Who | Where you meet them | What they are to you | Their story |
 | --- | --- | --- | --- |
-| **The Trader** | His barricaded stall in the ruined town | Barter (at 1.5x value), the only Churn Permit, the way to the Checkpoint, work: bring an artifact, or clear the beast denned up and killing his runners | Calls everyone "friend". Keeps the permit behind the counter. His runners go out into the Churn, and some don't come back. |
+| **The Trader** | His barricaded stall in the ruined town | Barter (at 1.5x value), the only Churn Permit, the way to the Checkpoint, work: bring an artifact, clear the beast denned up and killing his runners, or bring him a USB drive (he has a buyer who reads them) | Calls everyone "friend". Keeps the permit behind the counter. His runners go out into the Churn, and some don't come back. |
 | **Mother Okun** | The Ferry Post, a jetty on the river | Kinder prices (1.3x), fishing gear, snares, rope; work: "Bring me three fish." | Ran the ferry before the evacuation and never left. The boat hasn't crossed in years, but she still feeds the men who sleep on it. "Ferry's not running. Trading is." |
-| **The Peddler** | On his round, seven stops, half a day at each | Odd things the Churn gives up: batteries, wire, toys, now and then a torn page | Nobody has seen where he sleeps. The cart never empties or fills, and he always knows which way the next storm is coming from. "Everything rattles. Everything's for sale." |
+| **The Peddler** | On his round, seven stops, half a day at each | Odd things the Churn gives up: batteries, wire, toys, now and then a torn page. One thing isn't for sale: he swaps an Elder Sign for a tape with a voice on it, once a stop | Nobody has seen where he sleeps. The cart never empties or fills, and he always knows which way the next storm is coming from. "Everything rattles. Everything's for sale." |
 | **Karl** (K-A-R-L) | Knee-deep in a river, rarely; on the radio at 433 MHz | A riddle; a right answer earns Pilk, a rod, a lure, his waders or bucket hat; asks you to find his old dog | Forty years on this river. The fish came back with too many eyes and still bite at dusk. "A river doesn't care what happened. That's the comfort of it." |
-| **Anna** | A voice on the LoRa radio | First aid over the air; asks for two bandages for children near her | Stayed when the doctors were ordered out: "Somebody has to sew up the fools who come back for the money." Keeps a candle in the window. Nobody asks why. |
+| **Anna** | A voice on the LoRa radio | First aid over the air; asks for two bandages for children near her, or for the Surgeon's Notes, in a dead doctor's hand she knew | Stayed when the doctors were ordered out: "Somebody has to sew up the fools who come back for the money." Keeps a candle in the window. Nobody asks why. |
 | **The Old Medic** | On the road, rarely | Binds your wounds without a word, leaves clean cloth | An old woman with a red cross painted on her pack. |
 | **The Wanderer** | By a small fire, rarely | Draws the land around you in the dirt, gives water, tells you the way | Hat, beard, a walking stick, a gas mask on his chest. "Sit a minute. I don't bite. Not like the rest of them out there." |
-| **Road Bandits** | Behind a wrecked car | Pay in food, fight, or run | "Nobody has to get hurt. That part is up to you." |
-| **The Toll Man** | On the road | Pay, fight, or run | A welding mask, a lead pipe tapping his leg. "Toll road. Pay up or bleed." |
+| **Road Bandits** | Behind a wrecked car | Pay in food, fight, or run. Some carry a PM pistol and shoot from a distance | "Nobody has to get hurt. That part is up to you." |
+| **The Toll Man** | On the road | Pay, fight, or run. Now and then there's a Nagant under his coat | A welding mask, a lead pipe tapping his leg. "Toll road. Pay up or bleed." |
+| **Rival Churners** | Ruins and open ground, rarely | Two diggers after the same ground, with a loaded Tokarev: pay, fight, run, or show them a gun of your own | Patched gas masks, packs heavy with the day's digging. "Same ground, same luck. Only one of us walks home with it." |
 | **The sergeant** | The Checkpoint | The way out: a Churn Permit, or three artifacts | A gas mask, standing orders, and a searchlight that never goes off. Take the bribe route and one of his guards starts to cry without knowing why. |
 | **The stray dog** | Watching you from the grass | Feed it and it follows: warns you, bites, guards you | Most dogs here came back wrong. This one didn't, or not yet. |
 
@@ -421,7 +422,9 @@ You wake knowing only how to get through the first day: a torch, a fire, a banda
 - **Choir charm:** worn at the neck, fewer meetings of every kind, at the cost of a constant thirst.
 - **Elder Sign:** scratched on bone with ichor. Raise it at a horror and it is simply not there any more; the bone crumbles to salt.
 
-**Locked crates.** With lockpicks, some ruins give up a sealed crate: lab books, ledgers, gunsmith kits, gun frames, rounds, now and then a whole pistol.
+**Locked crates.** With lockpicks, some ruins give up a sealed crate: lab books, ledgers, gunsmith kits, gun frames, rounds, now and then a whole pistol. A USB drive sometimes holds a map to a sealed Institute crate a few hexes off; only lockpicks open it, and it holds three times as much.
+
+**Dead churners.** Now and then a ruin holds a churner who didn't make it home. It's rare, and never twice in one place. What they carried for the Churn is still on them: a tape, a book, a drive, gun parts, rounds, a cassette player. They tell you how it went without a word: *"A churner in a gas mask, still holding a bolt."* *"A churner sitting against the wall. Their notebook is just one word, over and over."*
 
 ## Guns in the Churn
 
@@ -429,9 +432,9 @@ Guns are rare, loud and they wear out. Most are pieced together from parts the l
 
 | Gun | Rounds | Where it comes from | What sets it apart |
 | --- | --- | --- | --- |
-| PM Pistol | 9x18 | bandits; a frame from ruins or the Toll Man | the commonest; forgiving |
+| PM Pistol | 9x18 | carried by some bandits; a frame from ruins or the Toll Man | the commonest; forgiving |
 | Nagant Revolver | 7.62N | frame and cylinder from the hills | never jams, a little less accurate |
-| Tokarev TT | 7.62x25 | frame from locked crates | hits hardest of the pistols |
+| Tokarev TT | 7.62x25 | frame from locked crates; Rival Churners carry one | hits hardest of the pistols |
 | Institute Sidearm | 9x18 | an "odd frame" with no maker's mark, from locked crates | precise, rarely jams; only a Gunsmith Kit will put it together |
 | The Marsh Revolver | .38 | one per world, lying somewhere; never made | hits like nothing else, and every shot costs you rest. "Something in the dark counts the shot." |
 
@@ -451,6 +454,8 @@ Guns are rare, loud and they wear out. Most are pieced together from parts the l
 ```
 
 A gun shoots at any range, near or far, one round a shot. The noise carries: for hours afterwards more things find you, though an animal may bolt at the crack. The **bow** (arrows of stick, bone and feathers) and the **sling** (rocks) shoot quietly, if weaker.
+
+**Who shoots back.** Road Bandits sometimes carry a PM, the Toll Man now and then a Nagant, and Rival Churners always have a Tokarev. An armed one doesn't close in: it fires from where it stands until its rounds run out, and every shot tells the Churn where you both are. While they're still talking, a loaded gun of your own can stare them down; often they back off. Kill one, and its gun and whatever it didn't fire are yours.
 
 ## The full story (spoilers)
 

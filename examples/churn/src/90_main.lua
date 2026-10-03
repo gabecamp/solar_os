@@ -17,7 +17,7 @@ local ok, err = pcall(function()
         if game:map_dir_key(key) then
             return   -- (a step, or Up/Down leaning for the next one)
         elseif key == gfx.KEY_ESCAPE or key == KEY.Q then
-            game.quit = true
+            game:ask_quit()   -- (asks first: a run is under way)
         elseif key == KEY.SPACE then
             game:rest()
         elseif key == KEY.F then
@@ -47,7 +47,7 @@ local ok, err = pcall(function()
 
     local function handle_inventory_key(key)
         if key == gfx.KEY_ESCAPE or key == KEY.Q then
-            game.quit = true
+            game:ask_quit()
         elseif key == KEY.I then
             game.screen = "map"
         elseif key == KEY.H then
@@ -137,13 +137,17 @@ local ok, err = pcall(function()
             else
                 game:draw_inventory(w, h)
             end
+            if game.confirm_quit then game:draw_quit_confirm(w, h) end
             Game.draw_pump(false)
             dirty = false
         end
 
         local key = gfx.getch(POLL_MS)
         if key == nil and game.screen == "intro" then game:intro_tick(w, h) end   -- (the eye turns)
-        if key ~= nil then
+        if key ~= nil and game.confirm_quit then
+            game:quit_confirm_key(key)   -- (no time passes while it asks)
+            dirty = true
+        elseif key ~= nil then
             if game.screen == "records" then
                 game:records_key(key)
             elseif key == KEY.R and (game.screen == "title" or game.screen == "creator"
@@ -170,7 +174,7 @@ local ok, err = pcall(function()
             elseif game.screen == "puzzle" then
                 game:puzzle_key(key)
             elseif game.screen == "craft" then
-                if key == KEY.Q then game.quit = true else game:craft_key(key) end
+                if key == KEY.Q then game:ask_quit() else game:craft_key(key) end
             elseif game.screen == "trade" then
                 game:trade_key(key)
             elseif game.screen == "help" or game.screen == "info" or game.screen == "journal" then

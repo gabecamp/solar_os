@@ -245,3 +245,36 @@ function Game:draw_dead(w, h)
     gfx.refresh()
 end
 
+
+-- -- quitting mid-run: ask first ---------------------------------------------
+
+-- Q or Esc on the map or in the bag, Q in crafting: a prompt over the screen.
+function Game:ask_quit()
+    self.confirm_quit = true
+    self.inv_drawn = nil   -- (the bag redraws whole under and after it)
+end
+
+-- Q, Y or Enter quits (so Q, Q is quick); any other key stays.
+function Game:quit_confirm_key(key)
+    if key == KEY.Q or key == KEY.Y or key == KEY.ENTER or key == KEY.LF then
+        self.quit = true
+    end
+    self.confirm_quit = nil
+    self.inv_drawn = nil
+end
+
+function Game:draw_quit_confirm(w, h)
+    local bw, bh = 250, 66
+    local x, y = (w - bw) // 2, (h - bh) // 2
+    gfx.color(gfx.WHITE)
+    gfx.fill_rect(x, y, bw, bh)
+    gfx.color(gfx.BLACK)
+    gfx.rect(x, y, bw, bh)
+    gfx.rect(x + 1, y + 1, bw - 2, bh - 2)
+    gfx.font(gfx.FONT_BOLD_14)
+    gfx.text(x + 10, y + 19, "Quit the game?")
+    gfx.font(gfx.FONT_MONO_12)
+    gfx.text(x + 10, y + 37, "Your run is saved.")
+    gfx.text(x + 10, y + 55, "Q/Enter: quit   other keys: stay")
+    gfx.refresh()
+end

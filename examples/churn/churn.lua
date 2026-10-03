@@ -12,7 +12,7 @@ out through the Checkpoint with a Churn Permit or a bribe of artifacts.
 Every key is listed in game: press H on the map or in the bag (V there
 shows device info). In short: arrows/WASD move, Space rests, F searches,
 I bag, C craft, E use, G hunt or fish, T trade, J journal, R radio,
-M mute, Q quit.
+M mute, Q quit (asks first during a run).
 
 This file is GENERATED from src/*.lua by tools/build.py; it is still a
 single self-contained script, as SolarOS Playground apps are - no
@@ -56,7 +56,7 @@ local POLL_MS = 250
 -- SolarOS sends Enter as '\n' (LF); CR is kept just in case.
 local KEY = {SPACE = 32, ENTER = 13, LF = 10, ESC = 27,
              A = 97, C = 99, D = 100, E = 101, F = 102, I = 105, Q = 113,
-             S = 115, T = 116, W = 119, H = 104, V = 118, G = 103, M = 109, J = 106, R = 114, O = 111, L = 108, K = 107}
+             S = 115, T = 116, W = 119, H = 104, V = 118, G = 103, M = 109, J = 106, R = 114, O = 111, L = 108, K = 107, Y = 121}
 
 -- Terrain: id -> {name, cost (MP + hours), passable, shade}
 -- shade is one of gfx.WHITE / gfx.LIGHT / gfx.DARK / gfx.BLACK, used as
@@ -13339,6 +13339,39 @@ function Game:draw_dead(w, h)
     gfx.refresh()
 end
 
+
+-- -- quitting mid-run: ask first ---------------------------------------------
+
+-- Q or Esc on the map or in the bag, Q in crafting: a prompt over the screen.
+function Game:ask_quit()
+    self.confirm_quit = true
+    self.inv_drawn = nil   -- (the bag redraws whole under and after it)
+end
+
+-- Q, Y or Enter quits (so Q, Q is quick); any other key stays.
+function Game:quit_confirm_key(key)
+    if key == KEY.Q or key == KEY.Y or key == KEY.ENTER or key == KEY.LF then
+        self.quit = true
+    end
+    self.confirm_quit = nil
+    self.inv_drawn = nil
+end
+
+function Game:draw_quit_confirm(w, h)
+    local bw, bh = 250, 66
+    local x, y = (w - bw) // 2, (h - bh) // 2
+    gfx.color(gfx.WHITE)
+    gfx.fill_rect(x, y, bw, bh)
+    gfx.color(gfx.BLACK)
+    gfx.rect(x, y, bw, bh)
+    gfx.rect(x + 1, y + 1, bw - 2, bh - 2)
+    gfx.font(gfx.FONT_BOLD_14)
+    gfx.text(x + 10, y + 19, "Quit the game?")
+    gfx.font(gfx.FONT_MONO_12)
+    gfx.text(x + 10, y + 37, "Your run is saved.")
+    gfx.text(x + 10, y + 55, "Q/Enter: quit   other keys: stay")
+    gfx.refresh()
+end
 -- ---------------------------------------------------------------------
 -- Crafting screen (400x300): known recipes on the left, the selected one's
 -- needs on the right (have/need for each input), then the log and keys.
@@ -13834,7 +13867,7 @@ local ok, err = pcall(function()
         if game:map_dir_key(key) then
             return   -- (a step, or Up/Down leaning for the next one)
         elseif key == gfx.KEY_ESCAPE or key == KEY.Q then
-            game.quit = true
+            game:ask_quit()   -- (asks first: a run is under way)
         elseif key == KEY.SPACE then
             game:rest()
         elseif key == KEY.F then
@@ -13864,7 +13897,7 @@ local ok, err = pcall(function()
 
     local function handle_inventory_key(key)
         if key == gfx.KEY_ESCAPE or key == KEY.Q then
-            game.quit = true
+            game:ask_quit()
         elseif key == KEY.I then
             game.screen = "map"
         elseif key == KEY.H then
@@ -13954,13 +13987,17 @@ local ok, err = pcall(function()
             else
                 game:draw_inventory(w, h)
             end
+            if game.confirm_quit then game:draw_quit_confirm(w, h) end
             Game.draw_pump(false)
             dirty = false
         end
 
         local key = gfx.getch(POLL_MS)
         if key == nil and game.screen == "intro" then game:intro_tick(w, h) end   -- (the eye turns)
-        if key ~= nil then
+        if key ~= nil and game.confirm_quit then
+            game:quit_confirm_key(key)   -- (no time passes while it asks)
+            dirty = true
+        elseif key ~= nil then
             if game.screen == "records" then
                 game:records_key(key)
             elseif key == KEY.R and (game.screen == "title" or game.screen == "creator"
@@ -13987,7 +14024,7 @@ local ok, err = pcall(function()
             elseif game.screen == "puzzle" then
                 game:puzzle_key(key)
             elseif game.screen == "craft" then
-                if key == KEY.Q then game.quit = true else game:craft_key(key) end
+                if key == KEY.Q then game:ask_quit() else game:craft_key(key) end
             elseif game.screen == "trade" then
                 game:trade_key(key)
             elseif game.screen == "help" or game.screen == "info" or game.screen == "journal" then

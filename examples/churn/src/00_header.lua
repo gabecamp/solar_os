@@ -10,7 +10,7 @@ out through the Checkpoint with a Churn Permit or a bribe of artifacts.
 Every key is listed in game: press H on the map or in the bag (V there
 shows device info). In short: arrows/WASD move, Space rests, F searches,
 I bag, C craft, E use, G hunt or fish, T trade, J journal, R radio,
-M mute, Q quit.
+M mute, Q quit (asks first during a run).
 
 This file is GENERATED from src/*.lua by tools/build.py; it is still a
 single self-contained script, as SolarOS Playground apps are - no

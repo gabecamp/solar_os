@@ -115,6 +115,14 @@ for n, ids2 in ipairs({
     solaros.dump("ops_inventory_icons" .. n .. ".txt")
 end
 
+-- Scene: Q on the map asks before quitting
+g = fresh()
+g.screen = "map"
+g:draw_map(400, 300)
+g:ask_quit()
+g:draw_quit_confirm(400, 300)
+solaros.dump("ops_quit_confirm.txt")
+
 -- Scene 2c: every slot worn, cursor on the jacket
 g = fresh()
 local worn = {head = "cap", ears = "earmuffs", eyes = "sunglasses", neck = "scarf",
