@@ -234,7 +234,7 @@ Every run grows a new map, but its landmarks always keep the same relationships:
 | The Checkpoint | Guard tower, razor wire, searchlight, the sergeant | The edge hex farthest from the town, never water |
 | The Ferry Post | A few ruined huts and a jetty; Mother Okun | Beside water, 9 or more hexes from the town |
 | The river and fords | Two rivers cross the Churn; fords are the shallow crossings | Wherever the land falls; at least one ford always leads to the start |
-| The quarry | A rusted gate stencilled INSTITUTE, sealed | A hills hex, 8 or more hexes from both trading posts |
+| The quarry | A chained steel door in the rock, INSTITUTE stencilled on the rust, a card slot for the pass, a bulb burning with no power | A hills hex, 8 or more hexes from both trading posts |
 | Hot fields | Five anomaly fields, an artifact at each centre | Away from the start and the towns |
 | Warrens | Burrows of the Little Ones | Three, in forest or hills, at least 5 hexes apart |
 | Cairns | Little piles of stones with a shell on top | Seven, 2 to 5 hexes from a warren |

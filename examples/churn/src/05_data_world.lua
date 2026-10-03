@@ -342,9 +342,10 @@ local QUESTS = {
                     .. "They wear strings of buttons and bottle caps. They like toys: "
                     .. "leave one on a little cairn of stones and see what happens."},
         the_gate = {title = "The quarry", art = "institute",
-                text = "A rusted gate in the quarry wall, and a word in old paint: "
-                    .. "INSTITUTE. Behind it something hums, low, in your teeth. Whatever "
-                    .. "the Signal is counting, it started here."},
+                text = "A riveted steel door set into the quarry wall, chained shut, a card "
+                    .. "slot beside it and INSTITUTE stencilled small on the rust. A bare bulb "
+                    .. "burns over it, though nothing out here has power. Behind it something "
+                    .. "hums, low, in your teeth. Whatever the Signal is counting, it started here."},
     },
 }
 

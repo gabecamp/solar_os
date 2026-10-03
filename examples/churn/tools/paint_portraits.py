@@ -166,6 +166,12 @@ PHOTO = {
     "little": {"far": (0, 20, 512, 768), "near": (60, 30, 470, 500),
                "close": (150, 90, 400, 340), "gamma": 1.0, "edge": 0.9,
                "levels": (0.15, 0.70), "bg": 0.72},
+    # the user's own picture (2026-10-03, 512x768, from the PROMPTS prompt):
+    # the chained steel door in the quarry wall with its bulb and card slot; a
+    # painting in browns and grays, so levels spread it; square crops
+    "institute": {"far": (0, 60, 512, 572), "near": (10, 100, 502, 592),
+                  "close": (70, 180, 430, 540), "gamma": 1.0, "edge": 0.6, "rust": 2.0,
+                  "levels": (0.11, 0.26), "bg": 0.99},
     # the user's own picture (2026-10-03, 512x768): the stray in dry scrub,
     # inside a yellowed print border; a scene, not a backdrop, so levels keep
     # the scrub and a dark dog gets its mid-tones lifted
@@ -215,9 +221,21 @@ def photo_view(gray, box, size, gamma, edge, bg_level=0.86, levels=(0.08, 0.80))
     return small, bits
 
 
+def rust_gray(img, k):
+    """Grayscale where rust (red over blue) reads darker by k per level of
+    red-minus-blue: for pictures whose subject and ground are the same
+    brightness but not the same colour (the Institute's door on its rock)."""
+    r, _, b = img.convert("RGB").split()
+    gray = np.asarray(img.convert("L"), dtype=np.float32)
+    rust = np.clip(np.asarray(r, dtype=np.float32) - np.asarray(b, dtype=np.float32), 0, 255)
+    return Image.fromarray(np.clip(gray - k * rust, 0, 255).astype(np.uint8))
+
+
 def photo_views(path, name):
-    gray = Image.open(path).convert("L")
     cfg = PHOTO.get(name, {})
+    gray = Image.open(path).convert("L")
+    if cfg.get("rust"):
+        gray = rust_gray(Image.open(path), cfg["rust"])
     whole = subject_bbox(gray)
     x0, y0, x1, y1 = whole
     guess_close = (x0, y0, x0 + (x1 - x0) // 2, y0 + (x1 - x0) // 2)

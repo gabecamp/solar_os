@@ -41,9 +41,9 @@ function Game:quarry_arrive()
     if st.step == "source" then
         self:push_log("The Institute's gate. Your pass fits the slot. T.")
     elseif st.step == "gate" then
-        self:push_log("A rusted gate in the quarry wall: INSTITUTE. Sealed. It wants a pass.")
+        self:push_log("Chained steel door: INSTITUTE. A card slot. Wants a pass.")
     else
-        self:push_log("A rusted gate in the quarry wall, sealed. Something hums behind it.")
+        self:push_log("A chained steel door in the quarry wall. It hums.")
     end
     return true
 end
