@@ -39,6 +39,16 @@ except ImportError:  # pragma: no cover - explained to the user below
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_GAME = os.path.join(HERE, os.pardir, "churn.lua")
+# A frozen build (TheChurn.exe, build_exe.py) carries the game and the fonts
+# inside it; a churn.lua put next to the .exe wins, so the game can be updated
+# without a new build.
+if getattr(sys, "frozen", False):
+    BUNDLE = getattr(sys, "_MEIPASS", HERE)
+    EXE_DIR = os.path.dirname(os.path.abspath(sys.executable))
+    DEFAULT_GAME = next((p for p in (os.path.join(EXE_DIR, "churn.lua"), os.path.join(BUNDLE, "churn.lua"))
+                         if os.path.isfile(p)), os.path.join(BUNDLE, "churn.lua"))
+else:
+    BUNDLE = EXE_DIR = HERE
 
 W, H = 400, 300
 # SolarOS color ids, in the firmware's order (src/services/solar_os_gfx.h)
@@ -85,6 +95,8 @@ FONT_DIRS = (
     os.path.expanduser("~/Library/Fonts"),
     "C:/Windows/Fonts",
     HERE,
+    BUNDLE,
+    EXE_DIR,
 )
 
 
@@ -765,6 +777,26 @@ def options_from(args, saved):
             "mute": bool(args.mute) if args.mute is not None else not saved.get("sound", True)}
 
 
+def selftest(game_path):
+    """Play a few scripted keys in a throwaway data folder (for a frozen
+    build: does it start, find its fonts and play?). 0 if it did."""
+    import tempfile
+    fonts_ok = all(any(os.path.exists(os.path.join(d, FONT_FILES[f][0])) for d in FONT_DIRS)
+                   for f in FONT_FILES)
+    data = tempfile.mkdtemp(prefix="churn_selftest_")
+    host = run(game_path, keys=[10, 10, 27, 10, 32, ord("i"), ord("i"), ord("q"), ord("q")],
+               data_dir=data, mute=True)
+    saved = os.path.isfile(os.path.join(data, "churn", "save.lua"))
+    ok = host.error is None and host.frames >= 5 and saved and fonts_ok
+    with open(os.path.join(os.path.dirname(data), "churn_selftest.txt"), "w") as f:
+        f.write("game %s\nframes %d, saved %s, fonts %s, error %s\n%s\n" % (
+            game_path, host.frames, saved, fonts_ok, host.error, "OK" if ok else "FAILED"))
+    print("selftest: frames %d, saved %s, fonts %s, error %s -> %s" % (
+        host.frames, saved, fonts_ok, host.error, "OK" if ok else "FAILED"))
+    pygame.quit()
+    return 0 if ok else 1
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="The Churn on a PC or Raspberry Pi.")
     ap.add_argument("--scale", type=int, help="window size: 400x300 times this, 0 = fit (default 2)")
@@ -776,7 +808,10 @@ def main(argv=None):
     ap.add_argument("--mute", action="store_true", default=None, help="no sound")
     ap.add_argument("--data", help="where saves and records go (default: %s)" % default_data_dir())
     ap.add_argument("--game", default=DEFAULT_GAME, help="the game file (default: ../churn.lua)")
+    ap.add_argument("--selftest", action="store_true", help=argparse.SUPPRESS)
     a = ap.parse_args(argv)
+    if a.selftest:
+        return selftest(a.game)
     host = run(a.game, data_dir=a.data, **options_from(a, load_settings(a.data or default_data_dir())))
     pygame.quit()
     return 1 if host.error else 0

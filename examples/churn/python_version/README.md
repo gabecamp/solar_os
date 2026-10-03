@@ -11,6 +11,21 @@ here with no Python work.
 
 ![The map](../previews/pygame_map.png)
 
+## Windows: just download it
+
+**[TheChurn.exe](https://github.com/gabecamp/solar_os/releases/download/churn-latest/TheChurn.exe)**:
+one file, nothing to install (no Python). Double-click it. Windows may say the
+app is unrecognized (it isn't signed): **More info**, then **Run anyway**.
+Saves go to `%APPDATA%\TheChurn`. The same options work from a command prompt
+(`TheChurn.exe --fullscreen`), and a `churn.lua` put next to the .exe is used
+instead of the one inside it.
+
+It's rebuilt by GitHub whenever the game changes on `main`
+(`.github/workflows/churn-windows.yml`, which runs `build_exe.py` on Windows and
+plays a few keys with `TheChurn.exe --selftest` before publishing). To build one
+yourself: `pip install pygame-ce lupa pyinstaller`, then `python build_exe.py`
+(the file lands in `dist/`).
+
 ## Install with one command
 
 The installers clone the game, check for Git and Python 3.8+ (and offer to

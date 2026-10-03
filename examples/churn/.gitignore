@@ -4,3 +4,5 @@ tests/ops_*.txt
 tests/preview_*.png
 __pycache__/
 savegame.json
+python_version/build/
+python_version/dist/
