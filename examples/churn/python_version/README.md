@@ -47,7 +47,10 @@ From a downloaded copy instead: `bash install.sh` or
 ## Install by hand
 
 You need Python 3.8 or newer, pygame and lupa. The DejaVu fonts make the text
-line up like on the device.
+line up like on the device. `requirements.txt` asks for **pygame-ce**, the
+community edition of pygame: the same `import pygame`, and it has ready-made
+builds for the newest Pythons (classic pygame 2.6.1 stops at 3.13; on 3.14
+pip tries to compile it and fails on Windows). Classic pygame works too.
 
 **Windows, macOS, Linux:**
 

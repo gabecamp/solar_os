@@ -9,7 +9,7 @@ lupa runs the Lua 5.4 game, and every gfx call draws into a 400x300 canvas
 that is shown scaled up in a window. So this plays exactly like the device,
 and any change to the Lua game shows up here with no Python work.
 
-    pip install pygame lupa
+    pip install pygame-ce lupa      # (or pygame; pygame-ce has builds for the newest Pythons)
     python3 churn_pygame.py [--scale 2] [--fullscreen] [--look gray]
 
 Looks: gray (four flat grays), device (the reflective LCD's 1-bit dither),

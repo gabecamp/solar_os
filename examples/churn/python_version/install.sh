@@ -204,6 +204,15 @@ make_venv() {   # make_venv [--system-site-packages]
     "$PY" -m venv "$@" "$VENV"
     "$VENV/bin/python" -m pip install --quiet --upgrade pip
 }
+# ready-made wheels first: pygame-ce (a drop-in pygame with wheels for the
+# newest Pythons), then classic pygame; the fallbacks below may build
+wheels_install() {
+    for game in pygame-ce pygame; do
+        "$VENV/bin/python" -m pip uninstall --quiet --yes pygame pygame-ce >/dev/null 2>&1 || true
+        "$VENV/bin/python" -m pip install --quiet --only-binary :all: "$game" lupa && return 0
+    done
+    return 1
+}
 pip_install() { "$VENV/bin/python" -m pip install --quiet --prefer-binary -r "$HOST/requirements.txt"; }
 deps_ok() { "$VENV/bin/python" -c 'import pygame; from lupa import lua54' >/dev/null 2>&1; }
 
@@ -211,7 +220,7 @@ if [ -x "$VENV/bin/python" ] && deps_ok; then
     ok "already installed"
 else
     make_venv
-    if ! pip_install; then
+    if ! { wheels_install && deps_ok; } && ! pip_install; then
         # No ready-made wheel for this machine (32-bit Pi OS, an unusual
         # distribution or a very new Python): build from source.
         warn "no ready-made packages for $(uname -m); building from source (several minutes on a Pi)"

@@ -18,7 +18,7 @@ or, with a downloaded copy:
 
 It checks for and installs (with winget, built into Windows 10 and 11):
 Git and Python 3.8+; then the DejaVu fonts (next to the game, no admin
-needed) and pygame and lupa in a private virtual environment.
+needed) and pygame (pygame-ce) and lupa in a private virtual environment.
 #>
 param(
     [string]$Dir = (Join-Path $HOME "the-churn"),
@@ -192,18 +192,45 @@ function Deps-Ok {
     & $vp -c "import pygame; from lupa import lua54" 2>$null | Out-Null
     return ($LASTEXITCODE -eq 0)
 }
+# Wheels only, never a compile: pygame-ce (a drop-in pygame with wheels for the
+# newest Pythons) first, then classic pygame; then an older Python if the
+# py launcher has one.
+function Install-Deps($python) {
+    if (Test-Path $venv) { Remove-Item -Recurse -Force $venv }
+    # (| Out-Host: a function returns everything its commands print)
+    & $python -m venv $venv | Out-Host
+    if ($LASTEXITCODE -ne 0) { Warn "couldn't make a virtual environment with $python"; return $false }
+    $vp = Venv-Python
+    & $vp -m pip install --quiet --upgrade pip | Out-Host
+    foreach ($game in @("pygame-ce", "pygame")) {
+        # (they can't share a venv; pip warns on stderr when one isn't there,
+        # which -ErrorAction Stop would turn into an error, hence the try)
+        try { & $vp -m pip uninstall --quiet --yes pygame pygame-ce 2>$null | Out-Null } catch { }
+        & $vp -m pip install --quiet --only-binary ":all:" $game lupa | Out-Host
+        if ($LASTEXITCODE -eq 0 -and (Deps-Ok)) { return $true }
+        Warn "$game and lupa have no ready-made build for this Python"
+    }
+    return $false
+}
 if (Deps-Ok) {
     Ok "already installed"
 } else {
-    if (Test-Path $venv) { Remove-Item -Recurse -Force $venv }
-    Run $py -m venv $venv
-    $vp = Venv-Python
-    Run $vp -m pip install --quiet --upgrade pip
-    & $vp -m pip install --quiet --prefer-binary -r (Join-Path $HostDir "requirements.txt")
-    if ($LASTEXITCODE -ne 0) {
-        Die "pygame or lupa failed to install. A very new Python may not have them yet: install Python 3.12 (winget install Python.Python.3.12) and run this again."
+    $done = Install-Deps $py
+    if (-not $done -and (Have "py")) {
+        foreach ($ver in @("3.13", "3.12", "3.11")) {
+            $older = $null
+            try { $older = & py "-$ver" -c "import sys; print(sys.executable)" 2>$null } catch { }
+            if ($LASTEXITCODE -eq 0 -and $older) {
+                Warn "trying Python $ver instead"
+                $done = Install-Deps ([string]$older).Trim()
+                if ($done) { break }
+            }
+        }
     }
-    if (-not (Deps-Ok)) { Die "pygame or lupa installed but won't load; see the messages above" }
+    if (-not $done) {
+        Die "pygame and lupa have no ready-made build for $(& $py --version). Install Python 3.12 (winget install Python.Python.3.12) and run this again."
+    }
+    $vp = Venv-Python
     Ok (& $vp -c "import pygame, lupa; print('pygame', pygame.version.ver, '- lupa', lupa.__version__)" 2>$null | Select-Object -Last 1)
 }
 $vp = Venv-Python

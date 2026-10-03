@@ -32,7 +32,7 @@ the Checkpoint alive.
   you patch it: **Patch clothes** on the crafting screen, 1 cloth scrap.
 - **On a PC or Raspberry Pi:** `python_version/` runs this same game in a
   pygame window. One command installs it: `install.sh` on Linux or a Pi,
-  `install.ps1` on Windows (see its README), or by hand `pip install pygame lupa`,
+  `install.ps1` on Windows (see its README), or by hand `pip install pygame-ce lupa`,
   then `python3 python_version/churn_pygame.py`.
 - **More:** `LORE.md` is the world's lore and how everyone and everything
   connects (spoilers from its section 11); `DEVICE_TEST.md` is a 10-minute check on the board;
