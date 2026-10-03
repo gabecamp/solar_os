@@ -6,9 +6,9 @@ of the Churn, stay fed, warm and out of the radiation, and get out through
 the Checkpoint alive.
 
 - **Install:** copy `churn.lua` to the device and run it with the `lua`
-  app. Saving needs the `write_file` firmware patch (`firmware/`, and the
-  request to the SolarOS author in `firmware/UPSTREAM_REQUEST.md`); without
-  it the game runs but can't save.
+  app. Saving (Continue, and the records) needs SolarOS 4.15.17 or newer,
+  which added `solaros.storage.write_file`; on older firmware the game runs
+  but can't save.
 - **Keys:** Left/Right step west/east; Up or Down then Left/Right takes
   a diagonal (Up, Right = up-right; the hexes have six sides); WASD works
   the same. Space rests, F searches, I opens the bag,
@@ -31,8 +31,9 @@ the Checkpoint alive.
   "(torn)" under the cursor) gives no warmth and holds half as much until
   you patch it: **Patch clothes** on the crafting screen, 1 cloth scrap.
 - **On a PC or Raspberry Pi:** `python_version/` runs this same game in a
-  pygame window (`pip install pygame lupa`, then
-  `python3 python_version/churn_pygame.py`). See its README.
+  pygame window. One command installs it: `install.sh` on Linux or a Pi,
+  `install.ps1` on Windows (see its README), or by hand `pip install pygame lupa`,
+  then `python3 python_version/churn_pygame.py`.
 - **More:** `DEVICE_TEST.md` is a 10-minute check on the board;
   `HANDOFF.md` is the developer guide (code map, tests, tools).
 
@@ -272,8 +273,9 @@ Two rare kind faces on the road (encounters, not radio voices).
 - **Lore:** most dogs here *came back wrong*. This one didn't, or not yet.
 
 ### The Little Ones
-- **Role:** small, grey, grinning creatures that live in burrows (warrens)
-  in the woods and hills. They're never hostile, only mischievous.
+- **Role:** small, pale, huge-eyed children, blotched by the Churn and dressed
+  in rags, who live in burrows (warrens) in the woods and hills. They wear
+  strings of buttons and bottle caps. They're never hostile, only mischievous.
   - **Befriending them:** you'll find little **cairns** of stones near
     their warrens. Leave a **trinket** there (**E** on it, or **T** on the
     cairn). Trinkets are toys and junk a toddler would play with: a plastic
@@ -296,7 +298,7 @@ Two rare kind faces on the road (encounters, not radio voices).
 - **Lore:** when the town was evacuated, not every child made it to the
   school. The ones who stayed in the cellars were small when the first
   emission came, and they stayed small. They don't talk, or don't want
-  to. They remember toys.
+  to. They remember toys, and wear the ones they're given.
 
 ### The Signal
 - **Role:** the fourth channel on the radio. The first call gives you a
@@ -311,9 +313,9 @@ Two rare kind faces on the road (encounters, not radio voices).
 - **The Fused:** two people walking as one, joined at the ribs by a bridge
   of bare bone that creaks when they breathe. They whisper to each other
   about you, agree on something, and turn.
-- **The Mouthless Man:** a man in a rotted raincoat whose mouth has healed
-  over smooth. He breathes through wet slits in his neck, faster once he
-  has seen you.
+- **The Mouthless Man:** a hooded man in a torn raincoat whose mouth is sewn
+  shut, the stitches long healed in, with a second seam down his throat. He
+  breathes through it, faster once he has seen you.
 - **The Bloom:** a woman covered head to chest in soft pink growths that
   swell and shrink as she breathes. She smiles through them, then comes
   closer far too quickly.
@@ -353,12 +355,14 @@ solve it and it may leave an artifact, fail it and it hurts in odd ways.
 - **The Humming Hollow:** a dip where the grass lies in a perfect spiral
   and the air hums in your teeth. A crow lands at the edge and is folded
   into nothing.
-- **The Drowned Bell:** a bell tolling under your feet, miles from any
-  church. The ground ripples like water, and something below answers.
-- **Wrong Stars:** at midday a patch of sky goes black and fills with
-  stars in shapes no one has named. Something up there notices you looking.
-- **The Stillness:** birds hang motionless mid-flight. Reach toward it and
-  every sound stops, even your own heartbeat.
+- **The Drowned Bell:** a great bronze bell hanging over a new pool with
+  nothing holding it up, miles from any church. It tolls by itself, the water
+  ripples in rings, and something below answers.
+- **Wrong Stars:** at midday a patch of sky goes black in the shape of an
+  eye and fills with stars no one has named. Something up there notices you looking.
+- **The Stillness:** birds hang motionless mid-flight, and a hand reaches up
+  out of the earth toward them. Step closer and every sound stops, even your
+  own heartbeat.
 - **The Door in the Field:** a door frame standing alone. Through it, this
   same field at night, and someone standing in it, waiting for you.
 

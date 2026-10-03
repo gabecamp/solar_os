@@ -65,10 +65,10 @@ local ENCOUNTERS = {
      hp = 50, dmg = {8, 14}, hit = 50, speed = 2, bleed = 10, start = "far",
      loot = {{"cloth_scrap", 3}, {"canned_beans", 1}, {"nothing", 2}}, loot_rolls = 2},
     {kind = "mutant", name = "Mouthless Man", art = "mouthless", who = "mouthless man",
-     intro = "A man in a rotted raincoat. Where his mouth should be the skin has "
-          .. "healed over smooth. He breathes through wet slits in his neck, faster "
-          .. "now that he has seen you.",
-     talk = "He tries to answer. The slits in his neck flutter uselessly.",
+     intro = "A hooded man in a torn raincoat. His mouth is sewn shut corner to "
+          .. "corner, the stitches long since healed in, and a second seam runs down "
+          .. "his throat. He breathes through it, wet and fast now he has seen you.",
+     talk = "He tries to answer. The seam in his throat flutters uselessly.",
      hp = 35, dmg = {6, 12}, hit = 60, speed = 4, bleed = 15, start = "far",
      loot = {{"knife", 1}, {"cloth_scrap", 2}, {"nothing", 2}}, loot_rolls = 1},
     {kind = "mutant", name = "The Bloom", art = "bloom", who = "bloom",
@@ -111,17 +111,17 @@ local ANOMALIES = {
           .. "it hums at a pitch you feel in your teeth. A crow lands at the edge and "
           .. "is folded into nothing without a sound."},
     {kind = "anomaly", name = "The Drowned Bell", art = "bell", who = "drowned bell",
-     intro = "A bell tolls somewhere beneath your feet, though there is no church for "
-          .. "miles. With every stroke the ground ripples like water, and something "
-          .. "far below answers it."},
+     intro = "A great bronze bell hangs over a pool that wasn't here yesterday, and "
+          .. "nothing holds it up. It tolls with no one to ring it; the water ripples "
+          .. "in rings, and something far below answers."},
     {kind = "anomaly", name = "Wrong Stars", art = "stars", who = "wrong stars",
-     intro = "At midday a patch of sky above you goes black and fills with stars in "
-          .. "shapes no one has named. You have the strong feeling that something up "
-          .. "there has noticed you looking."},
+     intro = "At midday a patch of sky above you goes black, in the shape of an eye, "
+          .. "and fills with stars no one has named. You have the strong feeling that "
+          .. "something up there has noticed you looking."},
     {kind = "anomaly", name = "The Stillness", art = "stillness", who = "stillness",
-     intro = "Ahead, birds hang motionless in mid-flight and dust floats unmoving in "
-          .. "the light. When you reach toward it, every sound stops, even your own "
-          .. "heartbeat."},
+     intro = "Ahead, birds hang motionless in mid-flight, and in a shaft of light a "
+          .. "hand reaches up out of the earth toward them. When you step closer, every "
+          .. "sound stops, even your own heartbeat."},
     {kind = "anomaly", name = "The Door in the Field", art = "door", who = "door",
      intro = "A door frame stands alone in the field, no walls around it. Through it "
           .. "you see this same field, but at night, and someone standing in it, "

@@ -106,7 +106,7 @@ function M.tick_interval(ms)
 end
 
 -- In-memory storage with the real API's shape (read_file raises on a missing
--- file, like the device). write_file is the new call from firmware/; tests set
+-- file, like the device). write_file is in SolarOS 4.15.17+; tests set
 -- M.storage.write_file = nil to play an older SolarOS that can't save.
 FAKE_FILES, FAKE_DIRS = {}, {}
 M.storage = {}
@@ -121,6 +121,11 @@ function M.storage.read_file(path, max)
     local data = FAKE_FILES[path]
     if data == nil then error("no such file: " .. path) end
     return data:sub(1, max or 4096)
+end
+function M.storage.rename(from, to)
+    if FAKE_FILES[from] == nil then error("no such file: " .. from) end
+    if FAKE_FILES[to] ~= nil then error("file exists: " .. to) end
+    FAKE_FILES[to], FAKE_FILES[from] = FAKE_FILES[from], nil
 end
 function M.storage.write_file(path, data, append)
     assert(type(data) == "string", "write_file data must be a string")

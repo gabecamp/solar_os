@@ -93,7 +93,7 @@ function Game:device_lines()
     else
         lines[#lines + 1] = "Storage: no solaros.storage"
     end
-    lines[#lines + 1] = "Can save: " .. (SAVE.can_write() and "yes (write_file)" or "no (needs the firmware patch)")
+    lines[#lines + 1] = "Can save: " .. (SAVE.can_write() and "yes (write_file)" or "no (needs SolarOS 4.15.17+)")
     local _, path = SAVE.path()
     if path and st and st.exists then
         local ok, there = pcall(st.exists, path)

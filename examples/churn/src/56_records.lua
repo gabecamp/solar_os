@@ -66,7 +66,8 @@ function Game.records()
     local storage = solaros.storage
     local _, path = records_path()
     if path and storage and storage.read_file then
-        local text = SAVE.read(RECORDS.file, 16384)   -- (or the old folder's)
+        -- (or the old folder's, or the `.new` copy a cut-short save left)
+        local text = SAVE.read_any(RECORDS.file, 16384, function(t) return t end)
         local ok = text ~= nil
         local chunk = ok and type(text) == "string" and text ~= "" and load("return " .. text, "=records", "t", {})
         local good, data = false, nil
@@ -128,7 +129,7 @@ function Game.write_records()
             solaros.storage.write_file(dir .. "/records.bad.lua", RECORDS.bad_text)
             RECORDS.bad_text = nil
         end
-        solaros.storage.write_file(path, table.concat(SAVE.serialize(Game.records(), {})))
+        SAVE.write(path, table.concat(SAVE.serialize(Game.records(), {})))
     end)
 end
 

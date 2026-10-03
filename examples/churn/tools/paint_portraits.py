@@ -143,6 +143,28 @@ PHOTO = {
               "close": (360, 80, 720, 580), "gamma": 1.3, "edge": 0.8},
     "bandits": {"far": (0, 95, 1024, 1024), "near": (220, 80, 860, 760),
                 "close": (440, 90, 740, 390), "gamma": 0.5, "edge": 0.5, "bg": 0.78},
+    # 2026-10-02, seeds 2110/2111 (wanderer, mouthless) and the anomalies
+    # 2112/2113/2115/2116/2118 (hollow, bell, stars, stillness, door). Helpers
+    # and anomalies only show "near". Scenes have grass and sky, not a white
+    # backdrop: `levels` narrows the tone range so the grass pattern (the
+    # hollow's spiral) survives the dither.
+    "wanderer": {"far": (100, 40, 920, 1024), "near": (120, 40, 900, 820),
+                 "close": (380, 60, 680, 360), "gamma": 1.0, "edge": 0.6},
+    "mouthless": {"far": (0, 40, 1024, 1024), "near": (200, 40, 820, 760),
+                  "close": (330, 170, 700, 560), "gamma": 1.0, "edge": 0.6},
+    "hollow": {"near": (170, 470, 850, 800), "gamma": 0.8, "edge": 0.4,
+               "levels": (0.30, 0.75), "bg": 0.95},
+    "bell": {"near": (120, 200, 960, 900), "gamma": 1.0, "edge": 0.6},
+    "stars": {"near": (140, 160, 880, 740), "gamma": 1.0, "edge": 0.6},
+    "stillness": {"near": (260, 170, 800, 800), "gamma": 0.8, "edge": 0.9,
+                  "levels": (0.20, 0.75), "bg": 0.90},
+    "door": {"near": (240, 100, 780, 960), "gamma": 0.8, "edge": 0.8,
+             "levels": (0.05, 0.70)},
+    # the user's own picture (2026-10-02): a pale child on a mid-gray backdrop
+    # (~0.75), so a low bg cutoff; her face is nearly as pale, the eyes carry it
+    "little": {"far": (0, 20, 512, 768), "near": (60, 30, 470, 500),
+               "close": (150, 90, 400, 340), "gamma": 1.0, "edge": 0.9,
+               "levels": (0.15, 0.70), "bg": 0.72},
 }
 
 
@@ -162,7 +184,7 @@ def subject_bbox(gray, bg=0.86):
     return (int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1)
 
 
-def photo_view(gray, box, size, gamma, edge, bg_level=0.86):
+def photo_view(gray, box, size, gamma, edge, bg_level=0.86, levels=(0.08, 0.80)):
     """One view of a supplied picture: square crop on white, smoothed (a
     median filter flattens fine texture that would dither into noise),
     levels + gamma, dark edges, background forced white, then Floyd-Steinberg
@@ -176,7 +198,8 @@ def photo_view(gray, box, size, gamma, edge, bg_level=0.86):
     src = sq.resize((size * 3, size * 3), Image.LANCZOS).filter(ImageFilter.MedianFilter(5))
     a = np.asarray(src, np.float32) / 255
     bg = a > bg_level   # anything this light counts as background (forced white)
-    t = np.clip((a - 0.08) / (0.80 - 0.08), 0, 1) ** gamma
+    lo, hi = levels   # the tone range stretched to black..white (scenes: narrower)
+    t = np.clip((a - lo) / (hi - lo), 0, 1) ** gamma
     e = np.asarray(src.filter(ImageFilter.FIND_EDGES), np.float32) / 255
     t = np.clip(t - edge * e * 2.0, 0, 1)
     t[bg] = 1
@@ -195,7 +218,7 @@ def photo_views(path, name):
     grays, bits = {}, {}
     for v, size, default in (("near", 96, whole), ("far", 48, whole), ("close", 96, guess_close)):
         grays[v], bits[v] = photo_view(gray, cfg.get(v, default), size, gamma, edge,
-                                       cfg.get("bg", 0.86))
+                                       cfg.get("bg", 0.86), cfg.get("levels", (0.08, 0.80)))
     master = Image.new("L", (192, 192), 255)
     fit = gray.crop(cfg.get("far", whole))
     fit.thumbnail((192, 192), Image.LANCZOS)

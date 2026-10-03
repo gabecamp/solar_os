@@ -354,6 +354,13 @@ class Host:
         os.replace(tmp, path)
         return True
 
+    def rename(self, old, new):
+        src, dst = self._path(old), self._path(new)
+        if not os.path.isfile(src):
+            raise FileNotFoundError(_text(old))
+        os.replace(src, dst)
+        return True
+
     def remove(self, p):
         path = self._path(p)
         if os.path.isfile(path):
@@ -392,7 +399,8 @@ def build_runtime(host):
                 audio = {tone = wrap("tone"), tone_async = wrap("tone_async")},
                 storage = {mount_point = wrap("mount_point"), exists = wrap("exists"),
                            makedirs = wrap("makedirs"), read_file = wrap("read_file"),
-                           write_file = wrap("write_file"), remove = wrap("remove")},
+                           write_file = wrap("write_file"), remove = wrap("remove"),
+                           rename = wrap("rename")},
                 time = {uptime_ms = wrap("uptime_ms")},
                 tick_interval = wrap("tick_interval"),
                 should_exit = wrap("should_exit"),
@@ -406,7 +414,7 @@ def build_runtime(host):
         "clear", "text", "line", "rect", "fill_rect", "circle", "fill_circle", "pixel",
         "sprite", "refresh", "size", "getch", "gfx_begin", "gfx_end", "set_color", "set_font",
         "tone", "tone_async", "mount_point", "exists", "makedirs", "read_file", "write_file",
-        "remove", "uptime_ms", "tick_interval", "should_exit")}
+        "remove", "rename", "uptime_ms", "tick_interval", "should_exit")}
     make(lua.table_from({k.encode(): v for k, v in calls.items()}))
     return lua
 

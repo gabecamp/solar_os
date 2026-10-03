@@ -11,7 +11,40 @@ here with no Python work.
 
 ![The map](../previews/pygame_map.png)
 
-## Install and run
+## Install with one command
+
+The installers clone the game, check for Git and Python 3.8+ (and offer to
+install them), get the DejaVu fonts, set up pygame and lupa in their own
+folder, start a quick test game without a window, and make a launcher.
+Run one again any time to update the game.
+
+**Linux and Raspberry Pi OS** (uses apt, dnf, pacman or zypper with sudo when something is missing):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/gabecamp/solar_os/main/examples/churn/python_version/install.sh | bash
+~/the-churn/play.sh
+```
+
+**Windows** (PowerShell; uses winget when Git or Python is missing):
+
+```powershell
+irm https://raw.githubusercontent.com/gabecamp/solar_os/main/examples/churn/python_version/install.ps1 | iex
+```
+
+Then use the **The Churn** shortcut on the desktop or in the Start menu,
+or `~\the-churn\play.bat`.
+
+From a downloaded copy instead: `bash install.sh` or
+`powershell -ExecutionPolicy Bypass -File install.ps1`. Options:
+
+| install.sh | install.ps1 | What it does |
+|---|---|---|
+| `--dir DIR` | `-Dir DIR` | Where the game goes. The default is `~/the-churn`. |
+| `--branch NAME` | `-Branch NAME` | Which branch to install. The default is `main`. |
+| `--no-system` | `-NoSystem` | Never install system packages; just say what's missing. |
+| `--yes` | `-Yes` | Don't ask before installing anything. |
+
+## Install by hand
 
 You need Python 3.8 or newer, pygame and lupa. The DejaVu fonts make the text
 line up like on the device.

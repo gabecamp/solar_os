@@ -1,0 +1,5 @@
+# Made by install.sh / install.ps1
+.venv/
+DejaVuSansMono.ttf
+DejaVuSansMono-Bold.ttf
+__pycache__/
