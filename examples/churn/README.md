@@ -66,7 +66,7 @@ simplest first:
 - **Books** (E): the first read teaches the next recipe in the topic; a
   reread only helps.
 - **Cassettes** (E): a Cassette Player with charge (a Battery Cell, E) plays
-  the logs of dead stalkers. Each tape teaches once, and some mention a stash.
+  the logs of dead churners. Each tape teaches once, and some mention a stash.
 - **USB drives** (E): with a LoRa Radio, a charge reads a drive: one or two
   recipes, sometimes a map to the Checkpoint or a stash. Corrupt drives fail
   and can be tried again. Locked phones crack open (Tinkering) into a drive.
@@ -396,7 +396,7 @@ Signal reads you one the first time you call it. **E** on a page reads it;
    doesn't care what happened.
 8. **The Checkpoint's standing orders:** confiscate all objects; *if an
    object speaks, report to the sergeant*.
-9. **A stalker's last note:** artifacts are easy if you don't mind the
+9. **A churner's last note:** artifacts are easy if you don't mind the
    dreams. *"I dream of a door in a field. Every night it's open a little
    wider."*
 10. **Institute memo, day 400:** the broadcast on the military band isn't
@@ -411,7 +411,7 @@ Signal reads you one the first time you call it. **E** on a page reads it;
 **How it fits together.** Whatever the Institute was doing at the quarry,
 it opened something. The emissions are that something breathing. The
 anomalies are where it touches the world (the Door in the Field is the
-door the stalker dreamed about), and the artifacts aren't treasure: they
+door the churner dreamed about), and the artifacts aren't treasure: they
 are how it sees. The Signal has been counting the living since the first
 night, and the guards who confiscate every object are, without quite
 knowing it, trying not to be looked through.

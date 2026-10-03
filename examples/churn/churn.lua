@@ -8620,7 +8620,7 @@ LORE = {
         {title = "The Checkpoint's standing orders",
          text = "No one leaves without paper. Confiscate all objects. Do not hold any object "
              .. "longer than necessary. If an object speaks, report to the sergeant."},
-        {title = "A stalker's last note",
+        {title = "A churner's last note",
          text = "Third artifact today. They're easy if you don't mind the dreams. I dream "
              .. "of a door in a field. Every night it's open a little wider."},
         {title = "Institute memo, day 400",
@@ -9642,7 +9642,7 @@ end
 --     hours for points, more with the topic's book in reach;
 --   * reading a book (E): its topic's next recipe, the first time;
 --   * playing a cassette (E, with a charged Cassette Player): one recipe
---     and a dead stalker's voice;
+--     and a dead churner's voice;
 --   * pairing a USB drive with the LoRa Radio (E): one or two recipes from
 --     what's on it, sometimes a stash or the way out;
 --   * Scrawled Notes, as before: a random recipe.

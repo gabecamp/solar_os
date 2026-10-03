@@ -8,7 +8,7 @@
 --     hours for points, more with the topic's book in reach;
 --   * reading a book (E): its topic's next recipe, the first time;
 --   * playing a cassette (E, with a charged Cassette Player): one recipe
---     and a dead stalker's voice;
+--     and a dead churner's voice;
 --   * pairing a USB drive with the LoRa Radio (E): one or two recipes from
 --     what's on it, sometimes a stash or the way out;
 --   * Scrawled Notes, as before: a random recipe.

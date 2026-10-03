@@ -120,7 +120,7 @@ The Churn was made in one night, but it was years in the making and years in the
                                                                    "confiscate all objects"
                                                                  |
                                                                  The artifact rush
-                                                                   stalkers come back for the money
+                                                                   churners come back for the money
                                                                    bandits and the Toll Man prey
                                                                    on them; the Trader sets up shop
                                                                  |
@@ -158,7 +158,7 @@ Five forces run the Churn, and they form a loop: emissions feed the hot fields, 
                                                          | draw people in
                                                          v
    +-----------------+                         +-------------------+
-   |  NIGHT          |---- thins them out ---->|  STALKERS, YOU,   |
+   |  NIGHT          |---- thins them out ---->|  CHURNERS, YOU,   |
    |  20:00 - 06:00  |                         |  BANDITS, TRADERS |
    +-----------------+                         +---------+---------+
    +-----------------+                                   ^
@@ -252,7 +252,7 @@ The Churn's people fall into three kinds: those who **stayed** when the town emp
    +-----------------------------+        +------------------------------+
    | Karl        the river       |        | the Trader   buys and sells  |
    | Anna        the sick        |        |   + his runners (some lost)  |
-   | Mother Okun the ferry       |        | the stalkers (mostly dead)   |
+   | Mother Okun the ferry       |        | the churners (mostly dead)   |
    | the Old Medic  the road     |        | Road Bandits  take from them |
    +--------------+--------------+        | the Toll Man  takes a toll   |
                   |                       +---------------+--------------+
@@ -383,7 +383,7 @@ You wake knowing only how to get through the first day: a torch, a fire, a banda
    BOOKS (read: the first time teaches) +       +------------------------+
                                         +-----> |  SEVEN TOPICS          |
    TAPES on a charged cassette player --+       |  each taught in order, |
-   (the logs of dead stalkers; once)    |       |  simplest first        |
+   (the logs of dead churners; once)    |       |  simplest first        |
                                         |       +------------------------+
    USB DRIVES read by the LoRa radio ---+
    (a charge each; some are corrupt;    |
@@ -468,7 +468,7 @@ The Churn is not a wound; it is an eye opening, and the Signal is counting the p
 | 6 | Anna's diary | She stayed when the doctors were told to go. A candle in the window. |
 | 7 | Karl, on a tackle box lid | Forty years on the river. "A river doesn't care what happened." |
 | 8 | The Checkpoint's standing orders | Confiscate all objects; hold none longer than necessary; "if an object speaks, report to the sergeant." |
-| 9 | A stalker's last note | Artifacts are easy "if you don't mind the dreams. I dream of a door in a field. Every night it's open a little wider." |
+| 9 | A churner's last note | Artifacts are easy "if you don't mind the dreams. I dream of a door in a field. Every night it's open a little wider." |
 | 10 | Institute memo, day 400 | The broadcast on the military band is not theirs. It began the night of the first emission. "It reads numbers. Lately it reads names." |
 | 11 | The numbers | Decoded: not coordinates but a **count** of the people still in the Churn. Every time it reads the list, the list is shorter. |
 | 12 | Unsigned, in the Checkpoint's tower | "The Churn isn't a wound. It's an eye opening. Everything we take out of it is something it lets us carry, so it can see where we go." |
@@ -493,7 +493,7 @@ The Churn is not a wound; it is an eye opening, and the Signal is counting the p
       |        |               none longer than necessary)
       |        |
       |        +--> ANOMALIES: where it touches the world. The Door in the
-      |             Field is the door from the stalker's dreams, opening wider
+      |             Field is the door from the churner's dreams, opening wider
       |
       +--> EMISSIONS: it breathing. Each breath regrows the artifacts.
 ```
