@@ -70,6 +70,10 @@ local CHURN = {
         tape_tinker = {topic = "tinkering", voice = "A teenager: 'If you're hearing this, the "
             .. "Choir Cell works. Phone memory, screwdriver, patience. Mum, if you find "
             .. "this - I went north.'"},
+        tape_vesna = {topic = "tinkering", voice = "A woman, out of breath: 'Vesna. Day nine. Bolt, "
+            .. "bolt, step. The old school's full of it: drives, books, a crate nobody opened. Nobody "
+            .. "comes down from the second floor. Picks in my hand, I'm going up. If you're hearing "
+            .. "this, the tape's still here and I'm not.'"},
     },
     usb_topics = {"gunsmithing", "chemistry", "tinkering", "warding"},
 
@@ -196,6 +200,7 @@ for id, def in pairs({
     tape_choir   = {name = "Tape: The Choir", desc = "E: play it"},
     tape_lab     = {name = "Tape: Institute 7", desc = "E: play it"},
     tape_tinker  = {name = "Tape: I Went North", desc = "E: play it"},
+    tape_vesna   = {name = "Tape: Vesna, Day 9", desc = "E: play it"},
     blank_tape   = {name = "Blank Tape",   desc = "Played out"},
     usb_drive    = {name = "USB Drive",    desc = "E: pair it with the LoRa Radio"},
     -- handguns: weapon = pistol-whip at arm's length; shoot = the shot (CHURN.guns)
@@ -380,7 +385,7 @@ for terrain, adds in pairs({
               {"lighter", 1}, {"newspaper", 2}, {"foil", 2}, {"screws", 2}, {"mech_parts", 1},
               {"duct_tape", 1}, {"salt", 2}, {"chemicals", 1}, {"pliers", 1}, {"screwdriver", 1},
               {"kitchen_knife", 1}, {"crowbar", 1}, {"laptop_battery", 1}, {"locked_phone", 1},
-              {"usb_drive", 1}, {"cassette_player", 1}, {"tape_medic", 1}, {"tape_tinker", 1},
+              {"usb_drive", 1}, {"cassette_player", 1}, {"tape_medic", 1}, {"tape_tinker", 1}, {"tape_vesna", 1},
               {"tape_gun", 1}, {"book_tailor", 1}, {"book_surgeon", 1}, {"book_radio", 1},
               {"brass", 2}, {"lead_scrap", 1}, {"r9x18", 1}, {"r762t", 1}, {"gun_spring", 1},
               {"magazine", 1}, {"frame_pm", 1}, {"gun_barrel", 1}, {"firing_pin", 1}, {"gun_slide", 1}},
@@ -433,6 +438,48 @@ CHURN.corpse = {chance = 3, prefix = "corpse:",
                 "A churner with a radio still on, hissing, the battery almost gone.",
                 "A churner, face down. The floor around them has grown soft and warm."}}
 
+-- Vesna (59_research): once you've heard her tape, dead churners turn up
+-- `mult` times as often until you find her, at the top of a stair, with
+-- what she took up there.
+CHURN.vesna = {mult = 4,
+    epitaph = "Vesna. The voice from the tape, at the top of the stairs. Her picks are still in her hand.",
+    loot = {{"lockpicks", 1}, {"usb_drive", 1}, {"book_radio", 1}}}
+-- Rival Churners who'd rather trade (62_guns): `chance` %, when you carry
+-- something they want; one of theirs for one of yours, and they go.
+CHURN.parley = {chance = 35, say = "The other one: 'Or we trade. Fair's fair out here.'",
+    want = {"canned_beans", "water_bottle", "jerky", "bandage", "antirad"},
+    give = {{"r762t", 2}, {"usb_drive", 2}, {"book_gunsmith", 1}, {"gun_spring", 1}, {"battery_cell", 2},
+            {"tape_vesna", 1}, {"firing_pin", 1}},
+    rounds = 3, done = "They take it, hand theirs over and back away. 'Luck to you. Not too much.'"}
+-- The second Institute crate (52_quests): the first one you open holds a map
+-- to a CLEARANCE crate by the old quarry; that one holds an Institute Pass.
+QUESTS.deep_crate = {journal = "a CLEARANCE crate by the old quarry.", near = 1, far = 3,
+    found = "Under the tray, a second map: a crate by the old quarry, stamped CLEARANCE.",
+    pass = "In a sealed sleeve under the tray: an Institute Pass, the photo scratched out."}
+
+-- Standing with the people who give you work (52_quests): +1 for a job done,
+-- -1 for one let lapse, kept in min..max. Each point takes `price` off the
+-- trader's and Mother Okun's markup (never below `floor`), `anna_hours` off
+-- Anna's wait between calls (never under half), and from `karl_wink` Karl
+-- always winks at the right answer.
+QUESTS.rep = {giver = {Trader = "trader", ["Mother Okun"] = "okun", Anna = "anna", Karl = "karl"},
+    order = {"trader", "okun", "anna", "karl"},
+    names = {trader = "Trader", okun = "Okun", anna = "Anna", karl = "Karl"},
+    min = -3, max = 5, price = 0.04, floor = 1.05, anna_hours = 12, karl_wink = 2,
+    trade = {town = "trader", ferry = "okun"}}
+-- Hours you have for a job (kinds not listed have no deadline), and what
+-- the giver says when it lapses.
+QUESTS.due = {fetch = 96, drive = 96, den = 72, fish = 96, smoked = 120}
+QUESTS.lapsed = {Trader = "Word on the net: the trader gave your job to someone else.",
+                 ["Mother Okun"] = "The ferry men caught their own. Mother Okun won't wait on you twice."}
+QUESTS.smoked = {offer = "Mother Okun: 'Smoked meat keeps on the boat. Bring me two.'",
+                 journal = "bring 2 smoked meat to the Ferry Post.", need = {"smoked_meat", 2},
+                 reward = {{"rope", 2}, {"fishing_rod", 1}}}
+QUESTS.sinew = {offer = "Karl: 'My lines keep snapping, son. Two lengths of sinew? Call me when you've got them.'",
+                journal = "find 2 sinew, then call him on 433 MHz.", need = {"sinew", 2},
+                reward = {{"lucky_lure", 1}}, again = {{"jerky", 3}},
+                thanks = "Karl: 'That'll hold a pike. A runner's coming with something for you.'"}
+
 -- People who carry a gun (by who): the % chance they have it, rounds {lo, hi}
 -- loaded, a shot's damage and hit %. They shoot from near and far while the
 -- rounds last; the gun and what's left in it always drop. Show your own
@@ -480,7 +527,7 @@ for id, v in pairs({
     choir_charm = 30, elder_sign = 25,
     book_tailor = 10, book_field = 10, book_surgeon = 14, book_radio = 14, book_lab = 20,
     book_gunsmith = 25, book_hymnal = 30, cassette_player = 15, blank_tape = 1, usb_drive = 15,
-    tape_cook = 6, tape_medic = 6, tape_gun = 6, tape_choir = 6, tape_lab = 6, tape_tinker = 6,
+    tape_cook = 6, tape_medic = 6, tape_gun = 6, tape_choir = 6, tape_lab = 6, tape_tinker = 6, tape_vesna = 6,
     pm_pistol = 60, nagant = 65, tokarev = 75, inst_sidearm = 100, marsh_revolver = 120,
     bow = 15, sling = 3, arrow = 2, r9x18 = 4, r762n = 4, r762t = 5, r38 = 8,
     frame_pm = 15, frame_nagant = 15, frame_tt = 18, frame_inst = 30, gun_slide = 8, gun_barrel = 10,

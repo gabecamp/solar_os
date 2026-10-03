@@ -184,7 +184,27 @@ local n0 = #g:ground_list()
 assert(not g:quest_arrive() and g.quest, "locked: the job stays")
 g.player.inventory = {{item = "lockpicks", qty = 1}}
 g:quest_arrive()
-assert(not g.quest and #g:ground_list() >= n0 + 1, "opened")
+assert(#g:ground_list() >= n0 + 1, "opened")
+-- the first one holds a map to a CLEARANCE crate by the quarry; that one, the pass
+assert(g.quest and g.quest.kind == "deep_crate" and g.inst_chain == 1, "a second map")
+local dk = g.quest.target
+local qq, qr = parse(g.sites.quarry)
+local dq, dr = parse(dk)
+assert((math.abs(dq - qq) + math.abs(dr - qr) + math.abs(dq + dr - qq - qr)) // 2 <= QUESTS.deep_crate.far)
+assert(g:quest_text():find("CLEARANCE"))
+g.player.q, g.player.r = dq, dr
+g:quest_arrive()
+assert(not g.quest and g.inst_chain == 2 and count(g, "institute_pass") == 1, "the pass")
+assert(g.story.pass, "the story knows")
+-- a pass already in hand: the crate has something else instead
+g.story.pass, g.inst_chain = true, 1
+g.quest = {kind = "deep_crate", giver = "A second map", target = dk}
+g:quest_arrive()
+assert(count(g, "institute_pass") == 1 and count(g, "antirad") >= 2)
+-- and a later Institute crate doesn't start the chain again
+g.quest = {kind = "crate", giver = "A USB drive", target = dk}
+g:quest_arrive()
+assert(not g.quest, "once a run")
 
 print("10. dead churners: rare (~3% of ruins searches), once a hex, saved")
 local found, tries = 0, 0
@@ -221,5 +241,194 @@ assert(g:save())
 g2 = Game.new()
 g2:load_state(Game.read_save())
 assert(g2.crates[CHURN.corpse.prefix .. "1,1"] and g2.peddler.swapped == 7)
+
+print("11. Vesna: her tape, then her body (dead churners likelier till you find her)")
+g = fresh()
+g.player.inventory = {{item = "cassette_player", qty = 1}, {item = "tape_vesna", qty = 1}}
+g.tapedeck = {charge = 2}
+g:use_item("inventory", 2)
+assert(g.vesna == "heard" and count(g, "blank_tape") == 1)
+local ruin
+for k, t in pairs(g.tiles) do if t == "ruins" then ruin = k break end end
+g.player.q, g.player.r = parse(ruin)
+local hits = 0
+for sd = 1, 400 do
+    g.seed, g.crates, g.vesna = sd * 13, {}, "heard"
+    g.ground = {}
+    g:find_corpse(ruin)
+    if g.vesna == "found" then hits = hits + 1 end
+end
+print(("   found her in %.1f%% of searches (dead churners: %d%% x %d)"):format(
+    hits / 4, CHURN.corpse.chance, CHURN.vesna.mult))
+assert(hits > 400 * 0.06 and hits < 400 * 0.2)
+g.seed, g.crates, g.vesna, g.ground = 1, {}, "heard", {}
+for sd = 1, 500 do
+    g.seed, g.crates = sd, {}
+    g:find_corpse(ruin)
+    if g.vesna == "found" then break end
+end
+assert(g.vesna == "found" and count(g, "lockpicks") == 1)
+local said = false
+for _, l in ipairs(g.log) do said = said or l:find("Vesna", 1, true) ~= nil end
+assert(said, "her epitaph")
+FAKE_FILES, FAKE_DIRS = {}, {}
+g.player.hours = g.player.hours + 1
+assert(g:save())
+g2 = Game.new()
+g2:load_state(Game.read_save())
+assert(g2.vesna == "found")
+
+print("12. Rival Churners sometimes trade: one of yours for one of theirs, and they go")
+local rival
+for _, d in ipairs(H.ENCOUNTERS) do if d.who == "rival churner" then rival = d end end
+local offered, n = 0, 300
+for sd = 1, n do
+    g = fresh()
+    g.seed = sd * 29
+    g.player.inventory = {{item = "canned_beans", qty = 2}}
+    g:start_encounter(rival)
+    if g.enc.parley then offered = offered + 1 end
+end
+print(("   offered in %d%% of meetings"):format(offered * 100 // n))
+assert(offered > n * 0.25 and offered < n * 0.45)
+g = fresh()
+g.player.inventory, g.ground = {}, {}   -- (the start pile is in reach too)
+for sd = 1, 50 do g.seed = sd; g:start_encounter(rival); assert(not g.enc.parley, "nothing they want: no offer") end
+g.player.inventory = {{item = "canned_beans", qty = 2}}
+for sd = 1, 200 do
+    g.seed = sd
+    g:start_encounter(rival)
+    if g.enc.parley then break end
+end
+local give = g.enc.parley.give
+local swap
+for _, o in ipairs(g:encounter_options()) do if o[2] == "swap" then swap = o[1] end end
+assert(swap and swap:find("canned beans"), tostring(swap))
+g:encounter_action("swap")
+assert(g.enc.over and count(g, "canned_beans") == 1 and count(g, give) >= 1)
+
+print("13. deadlines: trader and ferry jobs lapse, and the giver remembers")
+g = fresh()
+at_trader(g)
+job(g, "fetch")
+assert(g.quest.due == g.player.hours + QUESTS.due.fetch and g:quest_text():find("4d left"), g:quest_text())
+g.player.hours = g.quest.due + 1
+g:tick()
+assert(not g.quest and g:rep_of("trader") == -1, "lapsed")
+local lapsed = false
+for _, l in ipairs(g.log) do lapsed = lapsed or l:find("someone else", 1, true) ~= nil end
+assert(lapsed)
+g.quest = nil
+at_trader(g)
+job(g, "drive")
+g.player.inventory = {{item = "usb_drive", qty = 1}}
+g:trade_key(KEY.O)
+assert(not g.quest and g:rep_of("trader") == 0, "a job done: back to even")
+assert(g:rep_text() == nil, "nothing to show at 0")
+
+print("14. standing: cheaper trades, Anna answers sooner, Karl winks")
+g = fresh()
+at_trader(g)
+g.trade_ui.get = {antirad = 1}
+local _, ask0 = g:trade_totals()
+g.rep = {trader = 5, anna = 3, karl = 2}
+local _, ask5 = g:trade_totals()
+assert(ask5 < ask0, ("%d < %d"):format(ask5, ask0))
+assert(g:markup_for("town", 1.5) >= QUESTS.rep.floor and g:markup_for("peddler", 1.4) == 1.4)
+assert(g:rep_text() == "Standing: Trader +5  Anna +3  Karl +2", g:rep_text())
+local anna
+for _, ch in ipairs(H.TECH.channels) do if ch.id == "anna" then anna = ch end end
+assert(g:channel_wait(anna) == anna.cooldown // 2 and g:channel_wait({id = "trader", cooldown = 72}) == 72)
+g.karl_next = 0
+g:start_karl()
+local winked = false
+for _, o in ipairs(g:encounter_options()) do winked = winked or o[1]:find("winks", 1, true) ~= nil end
+assert(winked, "Karl winks at a friend")
+g.rep = {trader = 99}
+g:rep_change("Trader", 1)
+assert(g:rep_of("trader") == QUESTS.rep.max)
+
+print("15. Mother Okun wants smoked meat; Karl wants sinew (on the radio)")
+g = fresh()
+g.player.q, g.player.r = parse(g.sites.ferry)
+local got
+for i = 1, 40 do
+    g.quest, g.seed = nil, i * 53
+    g:open_trade("ferry")
+    g:trade_key(KEY.O)
+    if g.quest.kind == "smoked" then got = true break end
+end
+assert(got and g.quest.due)
+g:trade_key(KEY.O)
+assert(g.quest and g.trade_ui.msg:find("got 0"))
+g.player.inventory = {{item = "smoked_meat", qty = 2}}
+g:trade_key(KEY.O)
+assert(not g.quest and count(g, "fishing_rod") == 1 and g:rep_of("okun") == 1)
+g = fresh()
+g.player.inventory = {{item = "lora_radio", qty = 1}}
+g:open_radio()
+local offered_k
+for i = 1, 40 do
+    g.quest, g.seed, g.radio.next.karl, g.radio.charge = nil, i * 7, nil, 3
+    g:radio_call(3)
+    if g.quest and g.quest.kind == "sinew" then offered_k = true break end
+end
+assert(offered_k and g:quest_text():find("433"))
+g.radio.next.karl = g.player.hours + 40
+g.player.inventory[#g.player.inventory + 1] = {item = "sinew", qty = 2}
+g:radio_call(3)
+assert(not g.quest and count(g, "lucky_lure") == 1 and g:rep_of("karl") == 1, "handed in while he's busy")
+FAKE_FILES, FAKE_DIRS = {}, {}
+g.player.hours = g.player.hours + 1
+assert(g:save())
+g2 = Game.new()
+g2:load_state(Game.read_save())
+assert(g2.rep.karl == 1 and g2.karl_lure)
+
+print("16. finds: dead churners and opened crates go on the map and the Finds page")
+g = fresh()
+assert(g:finds_lines()[1]:find("Nothing yet"))
+local ruin2
+for k, t in pairs(g.tiles) do if t == "ruins" then ruin2 = k break end end
+g.player.q, g.player.r = parse(ruin2)
+for sd = 1, 600 do
+    g.seed, g.crates = sd, {}
+    g:find_corpse(ruin2)
+    if g.finds and g.finds[ruin2] then break end
+end
+assert(g.finds[ruin2].kind == "corpse" and g.finds[ruin2].what ~= "")
+g.player.inventory = {{item = "lockpicks", qty = 1}}
+local cq, cr = parse(ruin2)
+local crate_key
+for _, d in ipairs({{1, 0}, {0, 1}, {-1, 1}, {-1, 0}, {0, -1}, {1, -1}}) do
+    local k = (cq + d[1]) .. "," .. (cr + d[2])
+    if g.tiles[k] then crate_key = k break end
+end
+g.tiles[crate_key] = "ruins"
+g.player.q, g.player.r = parse(crate_key)
+for sd = 1, 200 do
+    g.seed, g.crates = sd, {}
+    g:pick_crate(crate_key)
+    if g.finds[crate_key] then break end
+end
+assert(g.finds[crate_key] and g.finds[crate_key].kind == "crate")
+local lines = g:finds_lines()
+assert(lines[1]:find("^Day %d+  ") and #lines >= 3, table.concat(lines, "|"))
+g.screen = "journal"
+g:help_key(KEY.F)
+assert(g.screen == "skills" and g.page == "finds")
+g:draw_skills(400, 300)
+g:help_key(KEY.ENTER); g.screen = "journal"
+g:help_key(KEY.K)
+assert(g.page == nil, "K is the skills page again")
+g.player.explored[ruin2], g.player.explored[crate_key] = true, true
+g.screen = "map"
+g:draw_map(400, 300)
+FAKE_FILES, FAKE_DIRS = {}, {}
+g.player.hours = g.player.hours + 1
+assert(g:save())
+g2 = Game.new()
+g2:load_state(Game.read_save())
+assert(g2.finds[ruin2].kind == "corpse" and g2.finds[crate_key].kind == "crate")
 
 print("QUEST TESTS PASSED")

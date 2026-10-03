@@ -50,6 +50,8 @@ function Game:journal_lines()
     if story then add(story) end
     local quest = self:quest_text()
     if quest then add("Quest - " .. quest) end
+    local standing = self:rep_text()
+    if standing then add(standing) end
     local camp = self:base_text()
     if camp then add(camp) end
     local permit = self:count_item("permit") > 0
@@ -111,6 +113,6 @@ function Game:draw_journal(w, h)
         gfx.text(6, y, line)
         y = y + 14
     end
-    gfx.text(6, h - 8, (self:lore_count() > 0 and "L: read pages  " or "") .. "K: skills  any key: back")
+    gfx.text(6, h - 8, (self:lore_count() > 0 and "L: read pages  " or "") .. "K: skills  F: finds  any key: back")
     gfx.refresh()
 end

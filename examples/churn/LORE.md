@@ -284,7 +284,7 @@ The Churn's people fall into three kinds: those who **stayed** when the town emp
 | **The Wanderer** | By a small fire, rarely | Draws the land around you in the dirt, gives water, tells you the way | Hat, beard, a walking stick, a gas mask on his chest. "Sit a minute. I don't bite. Not like the rest of them out there." |
 | **Road Bandits** | Behind a wrecked car | Pay in food, fight, or run. Some carry a PM pistol and shoot from a distance | "Nobody has to get hurt. That part is up to you." |
 | **The Toll Man** | On the road | Pay, fight, or run. Now and then there's a Nagant under his coat | A welding mask, a lead pipe tapping his leg. "Toll road. Pay up or bleed." |
-| **Rival Churners** | Ruins and open ground, rarely | Two diggers after the same ground, with a loaded Tokarev: pay, fight, run, or show them a gun of your own | Patched gas masks, packs heavy with the day's digging. "Same ground, same luck. Only one of us walks home with it." |
+| **Rival Churners** | Ruins and open ground, rarely | Two diggers after the same ground, with a loaded Tokarev: pay, fight, run, or show them a gun of your own. Sometimes they'd rather trade: "Fair's fair out here." | Patched gas masks, packs heavy with the day's digging. "Same ground, same luck. Only one of us walks home with it." |
 | **The sergeant** | The Checkpoint | The way out: a Churn Permit, or three artifacts | A gas mask, standing orders, and a searchlight that never goes off. Take the bribe route and one of his guards starts to cry without knowing why. |
 | **The stray dog** | Watching you from the grass | Feed it and it follows: warns you, bites, guards you | Most dogs here came back wrong. This one didn't, or not yet. |
 
@@ -422,9 +422,9 @@ You wake knowing only how to get through the first day: a torch, a fire, a banda
 - **Choir charm:** worn at the neck, fewer meetings of every kind, at the cost of a constant thirst.
 - **Elder Sign:** scratched on bone with ichor. Raise it at a horror and it is simply not there any more; the bone crumbles to salt.
 
-**Locked crates.** With lockpicks, some ruins give up a sealed crate: lab books, ledgers, gunsmith kits, gun frames, rounds, now and then a whole pistol. A USB drive sometimes holds a map to a sealed Institute crate a few hexes off; only lockpicks open it, and it holds three times as much.
+**Locked crates.** With lockpicks, some ruins give up a sealed crate: lab books, ledgers, gunsmith kits, gun frames, rounds, now and then a whole pistol. A USB drive sometimes holds a map to a sealed Institute crate a few hexes off; only lockpicks open it, and it holds three times as much. Under the tray of the first one lies a second map: a crate by the old quarry, stamped CLEARANCE. In a sealed sleeve inside it, an Institute Pass with the photo scratched out.
 
-**Dead churners.** Now and then a ruin holds a churner who didn't make it home. It's rare, and never twice in one place. What they carried for the Churn is still on them: a tape, a book, a drive, gun parts, rounds, a cassette player. They tell you how it went without a word: *"A churner in a gas mask, still holding a bolt."* *"A churner sitting against the wall. Their notebook is just one word, over and over."*
+**Dead churners.** Now and then a ruin holds a churner who didn't make it home. It's rare, and never twice in one place. What they carried for the Churn is still on them: a tape, a book, a drive, gun parts, rounds, a cassette player. They tell you how it went without a word: *"A churner in a gas mask, still holding a bolt."* *"A churner sitting against the wall. Their notebook is just one word, over and over."* One of them has a name. On a tape called Day 9, a woman out of breath: *"Vesna. Bolt, bolt, step. The old school's full of it. Nobody comes down from the second floor. Picks in my hand, I'm going up. If you're hearing this, the tape's still here and I'm not."* Once you've heard her, you keep finding the dead, until one of them is her: at the top of the stairs, her picks still in her hand.
 
 ## Guns in the Churn
 

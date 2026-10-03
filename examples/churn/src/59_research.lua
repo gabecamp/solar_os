@@ -150,6 +150,7 @@ function Game:play_tape(item)
         return false
     end
     self.tapedeck.charge = self.tapedeck.charge - 1
+    if item == "tape_vesna" and not self.vesna then self.vesna = "heard" end   -- (find_corpse)
     local p = self.player
     p.hours = p.hours + CHURN.study.tape_hours
     apply_awake_hours(p, CHURN.study.tape_hours)
@@ -293,6 +294,7 @@ function Game:pick_crate(key)
     self:skill_xp("tinker", SKILLS.xp.repair)
     self:sfx("gift")
     self:push_log("You pick a locked crate: " .. table.concat(found, ", ") .. ".")
+    self:note_find(key, "crate", "A locked crate", found)
 end
 
 -- F in ruins: now and then (CHURN.corpse.chance %, once a hex) a dead churner,
@@ -303,8 +305,10 @@ function Game:find_corpse(key)
     self.crates = self.crates or {}
     local mark = C.prefix .. key
     if self.crates[mark] then return end
-    if not self:roll(C.chance) then return end
+    local seeking = self.vesna == "heard"   -- (her tape: she's out there, up some stair)
+    if not self:roll(C.chance * (seeking and CHURN.vesna.mult or 1)) then return end
     self.crates[mark] = true
+    if seeking then return self:find_vesna(key) end
     local found = {}
     for _ = 1, 1 + self:rand(2) do
         local item
@@ -315,4 +319,51 @@ function Game:find_corpse(key)
     end
     self:push_log(C.epitaphs[self:rand(#C.epitaphs) + 1])
     self:push_log("On them: " .. table.concat(found, ", ") .. ".")
+    self:note_find(key, "corpse", "A dead churner", found)
+end
+
+-- The churner from the tape: what she took up the stairs.
+function Game:find_vesna(key)
+    self.vesna = "found"
+    local names = {}
+    for _, it in ipairs(CHURN.vesna.loot) do
+        self:put_stack("ground", nil, {item = it[1], qty = it[2]})
+        names[#names + 1] = ITEM_DB[it[1]].name
+    end
+    self:push_log(CHURN.vesna.epitaph)
+    self:push_log("On her: " .. table.concat(names, ", ") .. ".")
+    self:note_find(key, "corpse", "Vesna, from the tape", names)
+end
+
+-- -- finds: dead churners and opened crates, on the map and the Finds page --
+-- self.finds = {key -> {kind = "corpse"/"crate", label, day, what}} (saved).
+
+function Game:note_find(key, kind, label, what)
+    self.finds = self.finds or {}
+    self.finds[key] = {kind = kind, label = label, day = (self:clock(self.player.hours)),
+                       what = table.concat(what or {}, ", ")}
+end
+
+-- The Finds page (F in the journal): oldest first, where, and what was there.
+function Game:finds_lines()
+    local list = {}
+    for key, f in pairs(self.finds or {}) do list[#list + 1] = {key = key, f = f} end
+    table.sort(list, function(a, b)
+        if a.f.day ~= b.f.day then return a.f.day < b.f.day end
+        return a.key < b.key
+    end)
+    if #list == 0 then return {"Nothing yet. Dead churners and the crates you open go here."} end
+    local lines = {}
+    for _, e in ipairs(list) do
+        lines[#lines + 1] = ("Day %d  %s, %s"):format(e.f.day, e.f.label, self:bearing_to(e.key))
+        if e.f.what ~= "" then
+            for _, l in ipairs(wrap(e.f.what, 52)) do lines[#lines + 1] = "   " .. l end
+        end
+    end
+    return lines
+end
+
+function Game:open_finds()
+    self.skills_off, self.page = 0, "finds"
+    self.screen = "skills"   -- (the same scrolling page)
 end

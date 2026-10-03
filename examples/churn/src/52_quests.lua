@@ -7,6 +7,10 @@
 --   supply (Anna, on the radio): have bandages on you when you call her.
 --   notes  (Anna): the Surgeon's Notes, the same way.
 --   crate  (a USB drive's map): an Institute crate; Lockpicks open it.
+--   smoked (Mother Okun), sinew (Karl, on the radio): the new loot.
+-- Some jobs have a deadline (QUESTS.due); each job done or lapsed moves your
+-- standing with its giver (self.rep, QUESTS.rep), which changes prices,
+-- Anna's wait and Karl's riddles.
 --   dog    (Karl, after a right answer): find his lost dog by the river.
 -- Targets get a "!" on the map and a line in the journal.
 -- ---------------------------------------------------------------------
@@ -20,18 +24,22 @@ function Game:give_reward(list, why)
     end
     self:sfx("gift")
     self:push_log(why .. " " .. table.concat(names, ", ") .. ".")
+    self:rep_change(self.quest and self.quest.giver, 1)
     self.quest = nil
     self.quests_done = (self.quests_done or 0) + 1
 end
 
--- A passable, non-site hex at distance near..far from you (optionally by water).
-function Game:quest_spot(near, far, by_water)
+-- A passable, non-site hex at distance near..far from you (or from the hex
+-- `around`), optionally by water.
+function Game:quest_spot(near, far, by_water, around)
     local p, taken, spots = self.player, {}, {}
+    local oq, orr = p.q, p.r
+    if around then oq, orr = Game.key_qr(around) end
     for _, k in pairs(self.sites) do taken[k] = true end
     if self.base then taken[self.base.key] = true end
     for key, t in pairs(self.tiles) do
         local q, r = Game.key_qr(key)
-        local d = axial_distance(p.q, p.r, q, r)
+        local d = axial_distance(oq, orr, q, r)
         if TERRAIN[t].passable and d >= near and d <= far and not taken[key]
             and (self.rad[key] or 0) == 0 then
             if not by_water then
@@ -79,15 +87,15 @@ function Game:trader_work()
     end
     local pick = self:rand(3)
     if pick == 0 then
-        self.quest = {kind = "fetch", giver = "Trader"}
+        self:set_quest({kind = "fetch", giver = "Trader"})
         u.msg = QUESTS.fetch.offer
     elseif pick == 1 then
-        self.quest = {kind = "drive", giver = "Trader"}
+        self:set_quest({kind = "drive", giver = "Trader"})
         u.msg = QUESTS.drive.offer
     else
         local key = self:quest_spot(QUESTS.den.near, QUESTS.den.far)
         if not key then u.msg = "'Nothing today.'"; return end
-        self.quest = {kind = "den", giver = "Trader", target = key}
+        self:set_quest({kind = "den", giver = "Trader", target = key})
         self.player.explored[key] = true
         u.msg = QUESTS.den.offer .. " (" .. self:bearing_to(key) .. ")"
     end
@@ -160,7 +168,7 @@ function Game:quest_arrive()
             .. "Karl will be glad. Tied to its collar:")
         return false
     end
-    if q.kind == "crate" then return self:open_quest_crate() end
+    if q.kind == "crate" or q.kind == "deep_crate" then return self:open_quest_crate() end
     if q.kind == "den" then
         local animals = ENCOUNTERS_BY_KIND.animal
         local base = animals[self:rand(#animals) + 1]
@@ -193,7 +201,90 @@ function Game:quest_text()
     local q = self.quest
     if not q then return nil end
     local where = q.target and (" " .. self:bearing_to(q.target) .. ".") or ""
-    return q.giver .. ": " .. QUESTS[q.kind].journal .. where
+    local due = ""
+    if q.due then
+        local left = math.max(0, q.due - self.player.hours)
+        due = left >= 24 and (" (%dd left)"):format(left // 24) or (" (%dh left)"):format(left)
+    end
+    return q.giver .. ": " .. QUESTS[q.kind].journal .. where .. due
+end
+
+-- A new job, with its deadline if the kind has one.
+function Game:set_quest(q)
+    local hours = QUESTS.due[q.kind]
+    if hours then q.due = self.player.hours + hours end
+    self.quest = q
+    return q
+end
+
+-- From tick: a job past its deadline lapses (and the giver remembers).
+function Game:quest_tick()
+    local q = self.quest
+    if not (q and q.due and self.player.hours > q.due) then return end
+    self.quest = nil
+    self:rep_change(q.giver, -1)
+    self:push_log(QUESTS.lapsed[q.giver] or (q.giver .. " stopped waiting for you."))
+end
+
+-- -- standing --------------------------------------------------------------
+
+function Game:rep_of(id)
+    return (self.rep or {})[id] or 0
+end
+
+function Game:rep_change(giver, d)
+    local R = QUESTS.rep
+    local id = giver and R.giver[giver]
+    if not id then return end
+    self.rep = self.rep or {}
+    self.rep[id] = math.max(R.min, math.min(R.max, self:rep_of(id) + d))
+end
+
+-- A trader's markup after your standing with them (who: "town", "ferry"...).
+function Game:markup_for(who, markup)
+    local R = QUESTS.rep
+    local id = R.trade[who]
+    if not id then return markup end
+    return math.max(R.floor, markup * (1 - R.price * self:rep_of(id)))
+end
+
+-- "Standing: Trader +2  Okun -1" for the journal (nil while all are 0).
+function Game:rep_text()
+    local R, parts = QUESTS.rep, {}
+    for _, id in ipairs(R.order) do
+        local n = self:rep_of(id)
+        if n ~= 0 then parts[#parts + 1] = ("%s %+d"):format(R.names[id], n) end
+    end
+    return #parts > 0 and ("Standing: " .. table.concat(parts, "  ")) or nil
+end
+
+-- -- Karl's job, on the radio ----------------------------------------------
+
+-- His sinew is in your bag (he answers even before his wait is up).
+function Game:karl_ready()
+    local q, need = self.quest, QUESTS.sinew.need
+    return q ~= nil and q.kind == "sinew" and self:count_item(need[1]) >= need[2]
+end
+
+-- A call to Karl: hands in his job, or now and then offers it. True if
+-- that was the call (the forecast is skipped).
+function Game:karl_radio_work()
+    local S = QUESTS.sinew
+    if self:karl_ready() then
+        self:take_items(S.need[1], S.need[2])
+        local first = not self.karl_lure
+        self.karl_lure = true
+        self:give_reward(first and S.reward or S.again, "A runner from Karl:")
+        self:radio_say(S.thanks)
+        return true
+    end
+    if not self.quest and self:rand(2) == 0 then
+        self:set_quest({kind = "sinew", giver = "Karl"})
+        self:radio_say(S.offer)
+        self:push_log("Quest: " .. self:quest_text())
+        return true
+    end
+    return false
 end
 
 -- A drive's map (pair_usb): a locked Institute crate a few hexes off.
@@ -209,8 +300,10 @@ function Game:mark_crate()
 end
 
 -- Standing on the marked crate: Lockpicks open it (the job stays till then).
+-- The first one holds a map to a CLEARANCE crate by the quarry; that one an
+-- Institute Pass (self.inst_chain: 1 = map found, 2 = opened).
 function Game:open_quest_crate()
-    local C = QUESTS.crate
+    local C, kind = QUESTS.crate, self.quest.kind
     if self:count_item("lockpicks") == 0 then
         self:push_log(C.locked)
         return false
@@ -227,5 +320,22 @@ function Game:open_quest_crate()
     self.quests_done = (self.quests_done or 0) + 1
     self:sfx("gift")
     self:push_log("The lock gives. Inside: " .. table.concat(found, ", ") .. ". (I to pick up)")
+    self:note_find(hex_key(self.player.q, self.player.r), "crate",
+                   kind == "deep_crate" and "The CLEARANCE crate" or "An Institute crate", found)
+    if kind == "deep_crate" then
+        self.inst_chain = 2
+        if not self:give_pass(nil, QUESTS.deep_crate.pass) then
+            self:put_stack("ground", nil, {item = "antirad", qty = 2})
+        end
+    elseif (self.inst_chain or 0) == 0 and self.sites.quarry then
+        local D = QUESTS.deep_crate
+        local key = self:quest_spot(D.near, D.far, false, self.sites.quarry)
+        if key then
+            self.inst_chain = 1
+            self.quest = {kind = "deep_crate", giver = "A second map", target = key}
+            self.player.explored[key] = true
+            self:push_log(D.found .. " (" .. self:bearing_to(key) .. ")")
+        end
+    end
     return false
 end

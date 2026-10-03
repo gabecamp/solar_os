@@ -28,9 +28,9 @@ jobs:
       run:
         working-directory: examples/churn/python_version
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -50,7 +50,7 @@ jobs:
           Get-Content (Join-Path $env:TEMP "churn_selftest.txt")
           if ($p.ExitCode -ne 0) { throw "selftest failed ($($p.ExitCode))" }
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: TheChurn-windows
           path: examples/churn/python_version/dist/TheChurn.exe

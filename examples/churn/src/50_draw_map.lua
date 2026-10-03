@@ -227,6 +227,28 @@ function Game:draw_map(w, h)
                 gfx.color(hot >= 3 and gfx.WHITE or gfx.BLACK)
                 draw_sprite(rx, ry, 7, 7, GLYPHS.rad)
             end
+            local find = self.finds and self.finds[key]
+            if find and (p.visible[key] or p.explored[key]) then
+                -- a find (F in the journal): upper right; a grave cross for a
+                -- dead churner, an open box for a crate
+                -- (the crate is solid black with its lid open, unlike the other boxes)
+                local fx, fy = rnd(px) + 4, rnd(py) - 11
+                local crate = find.kind ~= "corpse"
+                gfx.color(gfx.WHITE)
+                gfx.rect(fx - 2, fy - 2, 11, 11)   -- (a white rim: it shows on dark hexes too)
+                gfx.color(crate and gfx.BLACK or gfx.WHITE)
+                gfx.fill_rect(fx - 1, fy - 1, 9, 9)
+                gfx.color(gfx.BLACK)
+                gfx.rect(fx - 1, fy - 1, 9, 9)
+                if crate then
+                    gfx.color(gfx.WHITE)
+                    gfx.fill_rect(fx + 1, fy + 4, 5, 1)
+                    gfx.line(fx + 1, fy + 2, fx + 5, fy)
+                else
+                    gfx.fill_rect(fx + 3, fy + 1, 1, 6)
+                    gfx.fill_rect(fx + 1, fy + 2, 5, 1)
+                end
+            end
             local camp = self.camps[key]
             if camp and p.hours < camp.until_hour and (p.visible[key] or p.explored[key]) then
                 -- a burning campfire, in the hex's lower left, on a white patch

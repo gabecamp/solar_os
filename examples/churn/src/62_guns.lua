@@ -187,3 +187,31 @@ function Game:drop_enemy_gun(found)
         found[#found + 1] = g.rounds .. " " .. ITEM_DB[ammo].name:lower()
     end
 end
+
+-- Rival Churners who'd rather trade (CHURN.parley): one thing you carry that
+-- they want, for one of theirs.
+function Game:maybe_parley()
+    local e, P = self.enc, CHURN.parley
+    if e.def.who ~= "rival churner" or not self:roll(P.chance) then return end
+    local want
+    for _, id in ipairs(P.want) do
+        if not want and self:count_item(id) > 0 then want = id end
+    end
+    if not want then return end
+    local give
+    self.seed, give = weighted_pick(self.seed, P.give)
+    e.parley = {want = want, give = give}
+    self:enc_say(P.say)
+end
+
+function Game:parley_swap()
+    local e, P = self.enc, CHURN.parley
+    local pa = e.parley
+    self:take_items(pa.want, 1)
+    local qty = (ITEM_DB[pa.give].desc or ""):find("^Ammo") and P.rounds or 1   -- (rounds come by the handful)
+    self:put_stack("ground", nil, {item = pa.give, qty = qty})
+    self:enc_say(P.done)
+    e.outcome = "fled"
+    return self:end_encounter("You traded with the rival churners: their "
+        .. ITEM_DB[pa.give].name:lower() .. " is on the ground.")
+end

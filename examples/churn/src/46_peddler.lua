@@ -212,9 +212,21 @@ function Game.starting_stock(who)
     return {stock = out, restocked = 0}
 end
 
--- Mother Okun's job (O on her screen): three fish, any kind.
+-- Mother Okun's job (O on her screen): three fish, any kind, or two smoked meat.
 function Game:ferry_work()
     local u, q = self.trade_ui, self.quest
+    if q and q.kind == "smoked" then
+        local S = QUESTS.smoked
+        local have = self:count_item(S.need[1])
+        if have < S.need[2] then
+            u.msg = ("'Two smoked. You've got %d.'"):format(have)
+            return
+        end
+        self:take_items(S.need[1], S.need[2])
+        self:give_reward(S.reward, "Mother Okun wraps them in sacking:")
+        u.msg = "'That'll keep them through the week. Take these.'"
+        return
+    end
     local fish = self:count_item("raw_fish") + self:count_item("cooked_fish")
     if q and q.kind == "fish" then
         if fish < QUESTS.fish.need then
@@ -234,8 +246,9 @@ function Game:ferry_work()
         u.msg = "'You've work already. Finish it.'"
         return
     end
-    self.quest = {kind = "fish", giver = "Mother Okun"}
-    u.msg = QUESTS.fish.offer
+    local kind = self:rand(2) == 0 and "smoked" or "fish"
+    self:set_quest({kind = kind, giver = "Mother Okun"})
+    u.msg = QUESTS[kind].offer
     self:push_log("Quest: " .. self:quest_text())
 end
 

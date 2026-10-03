@@ -52,6 +52,7 @@ function Game:start_encounter(def)
                 demanding = def.kind == "bandit"}
     if def.kind == "bandit" then self:enc_say(def.demand) end
     self:arm_enemy()
+    self:maybe_parley()
     if self:placed_here("can_rattle") and self.enc.range ~= "far" then   -- the cans rang
         self.enc.range = "far"
         self:enc_say("The cans you strung up clatter. You're ready for it.")
@@ -124,7 +125,8 @@ function Game:encounter_options()
     if kind == "riddle" then
         local o = {}
         for i, answer in ipairs(e.riddle.answers) do
-            local hint = self.karl_hint and i == e.riddle.right and "  (Karl winks)" or ""
+            local wink = self.karl_hint or self:rep_of("karl") >= QUESTS.rep.karl_wink
+            local hint = wink and i == e.riddle.right and "  (Karl winks)" or ""
             o[i] = {answer .. hint, "answer_" .. i}
         end
         o[#o + 1] = {"Walk away", "leave_quietly"}
@@ -134,6 +136,11 @@ function Game:encounter_options()
         local o = {}
         if self:food_index() then o[#o + 1] = {"Give them some food", "give"} end
         if self:shooter() and not e.bluffed then o[#o + 1] = {"Show them your gun", "bluff"} end
+        local pa = e.parley
+        if pa and self:count_item(pa.want) > 0 then
+            o[#o + 1] = {("Swap your %s for their %s"):format(ITEM_DB[pa.want].name:lower(),
+                                                            ITEM_DB[pa.give].name:lower()), "swap"}
+        end
         o[#o + 1] = {"Refuse", "refuse"}
         o[#o + 1] = {"Run for it", "flee"}
         return o
@@ -307,6 +314,8 @@ function Game:encounter_action(action)
         if stack.qty <= 0 then table.remove(p.inventory, i) end
         self:enc_say("They take the " .. name:lower() .. " and back off into the ruins.")
         return self:end_encounter("You paid the " .. e.def.who .. " off.")
+    elseif action == "swap" then
+        return self:parley_swap()
     elseif action == "bluff" then
         if self:bluff() then return end
     elseif action == "refuse" then

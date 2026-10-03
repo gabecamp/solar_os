@@ -13,7 +13,7 @@ the Checkpoint alive.
   a diagonal (Up, Right = up-right; the hexes have six sides); WASD works
   the same. Space rests, F searches, I opens the bag,
   C crafts, E uses, G hunts or fishes, T trades, J opens the journal
-  (K there shows your skills and the recipes you know),
+  (K there shows your skills and the recipes you know, F your finds),
   R calls on the radio, M mutes, Q quits (during a run it asks first: Q or
   Enter again to quit). **H** in game lists every key.
   The bag (I) shows your HP, hunger, thirst, rest and warmth.
@@ -91,11 +91,26 @@ pours a Salt Circle (night horrors keep away from the hex).
 They hold the rare things: lab books, ledgers, gunsmith kits, frames, rounds
 and the odd whole gun. A USB drive's map sometimes marks an **Institute
 crate** a few hexes off (a "!" on the map and a journal line): Lockpicks
-open it for three finds.
+open it for three finds. The first one you open has a second map under the
+tray: a **CLEARANCE crate** by the old quarry, which holds an Institute Pass
+(another way through the Institute's gate, once a run).
 
 **Dead churners:** about one ruins search in thirty turns up a churner who
 didn't make it home (once a hex at most), with a tape, a book, a drive, gun
-parts, rounds or a cassette player on them.
+parts, rounds or a cassette player on them. One tape, **Vesna, Day 9**, is a
+churner going up a school's stairs with her picks; once you've heard it, dead
+churners turn up four times as often until you find her.
+
+**Finds:** every dead churner and every crate you open gets a mark on the map
+(a cross, or a black box with its lid open) and a line on the journal's
+**Finds** page (F in the journal): the day, where, and what was there.
+
+**Jobs and standing:** the trader's and Mother Okun's jobs have a deadline
+(3-5 days; the journal counts it down). Every job you finish raises your
+standing with whoever gave it, and every one you let lapse lowers it (the
+journal shows it once it isn't zero). Standing makes the trader and Mother
+Okun cheaper (4% a point), Anna answer sooner (12 hours a point, down to
+half), and from +2 Karl always winks at the right answer.
 
 ## Handguns
 
@@ -191,7 +206,8 @@ What the Churn is like now:
   stocks what the town trader doesn't: a fishing rod, snares, rope,
   fish, copper wire, a battery cell. She knows the way out too.
   - **Work (O on her screen):** *"Bring me three fish."* Paid with two
-    snares and a Lucky Lure.
+    snares and a Lucky Lure. Or *"Smoked meat keeps on the boat. Bring me
+    two."*, paid with rope and a fishing rod.
 - **Lore:** she ran the ferry before the evacuation and never left. The
   boat hasn't crossed in years, but she still feeds the men who sleep on
   it, and she trades so they can eat. *"Ferry's not running. Trading is."*
@@ -234,6 +250,9 @@ What the Churn is like now:
   - After a right answer he may ask you to find his **old dog**, lost
     somewhere along the river 4-8 hexes away. She pays you back with
     whichever of his waders or hat you don't have, or two Pilks.
+  - On the radio he sometimes asks for **two lengths of sinew** for his
+    lines; call him with them in your bag (he answers even before his wait
+    is up) and a runner brings a Lucky Lure (jerky after that).
   - **On the radio ("Karl, 433 MHz"):** fishing tips, when the next
     emission is due, and a hint for his next riddle. Every 2 days.
 - **Lore:** he has fished this river for forty years. The fish came back
@@ -278,7 +297,9 @@ Two rare kind faces on the road (encounters, not radio voices).
   and you can **show it** while they're still demanding: they may back
   off. Kill one and its gun and unfired rounds are yours.
 - **Rival Churners** (rarer): two diggers in gas masks with a Tokarev,
-  always loaded, after the same ground you are.
+  always loaded, after the same ground you are. About a third of the time
+  they'd rather trade: one thing of yours they want (food, water, a bandage,
+  Anti-Rad) for one of theirs (rounds, a drive, a gun part, a book, a tape).
 - **Lore:** the Churn's own economy. Everyone out here came for the
   artifacts, and some found it easier to take them from the ones who
   survived the finding.

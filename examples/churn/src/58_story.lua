@@ -48,8 +48,8 @@ function Game:quarry_arrive()
     return true
 end
 
--- Karl or Anna hands over the pass (once).
-function Game:give_pass(who)
+-- Karl or Anna hands over the pass (once); or `text` says where it was found.
+function Game:give_pass(who, text)
     local st = self.story
     if st.pass then return false end
     st.pass = true
@@ -58,7 +58,7 @@ function Game:give_pass(who)
     end
     if st.step == "gate" then st.step = "source" end
     self:sfx("gift")
-    self:push_log(who .. " gave you an Institute Pass.")
+    self:push_log(text or (who .. " gave you an Institute Pass."))
     return true
 end
 

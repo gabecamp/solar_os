@@ -123,6 +123,24 @@ g:ask_quit()
 g:draw_quit_confirm(400, 300)
 solaros.dump("ops_quit_confirm.txt")
 
+-- Scene: finds on the map (a dead churner, a crate) and the Finds page
+g = fresh()
+g.screen = "map"
+g.player.q, g.player.r = 0, 0
+g.finds = {["1,0"] = {kind = "corpse", label = "Vesna, from the tape", day = 3,
+                      what = "Lockpicks, USB Drive, Radio Ham Handbook"},
+           ["-1,1"] = {kind = "crate", label = "An Institute crate", day = 5,
+                       what = "Institute Lab Book, 7.62x25 Rounds, Gunsmith Kit"},
+           ["0,-1"] = {kind = "corpse", label = "A dead churner", day = 6, what = "Tape: Count Rounds"}}
+for k in pairs(g.finds) do g.player.explored[k] = true end
+g.tiles["-1,1"] = "water"   -- (the crate mark on the darkest hex)
+g:refresh_view()
+g:draw_map(400, 300)
+solaros.dump("ops_map_finds.txt")
+g:open_finds()
+g:draw_skills(400, 300)
+solaros.dump("ops_finds.txt")
+
 -- Scene 2c: every slot worn, cursor on the jacket
 g = fresh()
 local worn = {head = "cap", ears = "earmuffs", eyes = "sunglasses", neck = "scarf",

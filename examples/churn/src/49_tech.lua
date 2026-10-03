@@ -144,6 +144,7 @@ function RADIO.anna_help(self)
     return true
 end
 function RADIO.karl(self)
+    if self:karl_radio_work() then return true end
     local hours = (self.next_emission or 0) - self.player.hours
     local when = hours > 0 and ("Next blowout in about " .. hours .. "h.") or "Blowout's overdue."
     self.karl_hint = true
@@ -172,11 +173,18 @@ function RADIO.signal(self)
     return true
 end
 
+-- Hours before a voice answers again: Anna sooner the more you've helped her.
+function Game:channel_wait(ch)
+    if ch.id ~= "anna" then return ch.cooldown end
+    return math.max(ch.cooldown // 2, ch.cooldown - QUESTS.rep.anna_hours * self:rep_of("anna"))
+end
+
 function Game:radio_call(i)
     local ch, r = TECH.channels[i], self.radio
     if not ch then return end
     local wait = (r.next[ch.id] or 0) - self.player.hours
     if ch.id == "anna" and self:anna_ready() then wait = 0 end   -- she always takes the bandages
+    if ch.id == "karl" and self:karl_ready() then wait = 0 end
     if wait > 0 then
         self:radio_say(ch.name .. ": no answer. Try again in " .. wait .. "h.")
     elseif r.charge <= 0 then
@@ -186,7 +194,7 @@ function Game:radio_call(i)
         if answered then
             r.charge = r.charge - 1
             -- "open": the voice stays reachable (Anna after you bring her bandages)
-            r.next[ch.id] = answered ~= "open" and (self.player.hours + ch.cooldown) or nil
+            r.next[ch.id] = answered ~= "open" and (self.player.hours + self:channel_wait(ch)) or nil
         end
     end
 end

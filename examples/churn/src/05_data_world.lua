@@ -186,7 +186,7 @@ local TRADE = {
                    stock = {{"battery_cell", 1}, {"jerky", 2}, {"antenna", 1}, {"lore_page", 1},
                             {"broken_headlamp", 1}, {"rope", 1}, {"crayons", 1}, {"rubber_duck", 1}},
                    restock = {"jerky", "battery_cell", "copper_wire", "circuit_board", "lore_page",
-                              "bandage", "antenna", "toy_car", "marble", "jingle_bell"}},
+                              "bandage", "antenna", "toy_car", "marble", "jingle_bell", "tape_vesna"}},
     },
     -- the Ferry Post: a little cluster of ruins by the water, far from the town
     ferry = {ruins = 4, min_from_town = 9, min_from_start = 4},

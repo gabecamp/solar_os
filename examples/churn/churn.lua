@@ -216,7 +216,7 @@ local TRADE = {
                    stock = {{"battery_cell", 1}, {"jerky", 2}, {"antenna", 1}, {"lore_page", 1},
                             {"broken_headlamp", 1}, {"rope", 1}, {"crayons", 1}, {"rubber_duck", 1}},
                    restock = {"jerky", "battery_cell", "copper_wire", "circuit_board", "lore_page",
-                              "bandage", "antenna", "toy_car", "marble", "jingle_bell"}},
+                              "bandage", "antenna", "toy_car", "marble", "jingle_bell", "tape_vesna"}},
     },
     -- the Ferry Post: a little cluster of ruins by the water, far from the town
     ferry = {ruins = 4, min_from_town = 9, min_from_start = 4},
@@ -1004,6 +1004,10 @@ local CHURN = {
         tape_tinker = {topic = "tinkering", voice = "A teenager: 'If you're hearing this, the "
             .. "Choir Cell works. Phone memory, screwdriver, patience. Mum, if you find "
             .. "this - I went north.'"},
+        tape_vesna = {topic = "tinkering", voice = "A woman, out of breath: 'Vesna. Day nine. Bolt, "
+            .. "bolt, step. The old school's full of it: drives, books, a crate nobody opened. Nobody "
+            .. "comes down from the second floor. Picks in my hand, I'm going up. If you're hearing "
+            .. "this, the tape's still here and I'm not.'"},
     },
     usb_topics = {"gunsmithing", "chemistry", "tinkering", "warding"},
 
@@ -1130,6 +1134,7 @@ for id, def in pairs({
     tape_choir   = {name = "Tape: The Choir", desc = "E: play it"},
     tape_lab     = {name = "Tape: Institute 7", desc = "E: play it"},
     tape_tinker  = {name = "Tape: I Went North", desc = "E: play it"},
+    tape_vesna   = {name = "Tape: Vesna, Day 9", desc = "E: play it"},
     blank_tape   = {name = "Blank Tape",   desc = "Played out"},
     usb_drive    = {name = "USB Drive",    desc = "E: pair it with the LoRa Radio"},
     -- handguns: weapon = pistol-whip at arm's length; shoot = the shot (CHURN.guns)
@@ -1314,7 +1319,7 @@ for terrain, adds in pairs({
               {"lighter", 1}, {"newspaper", 2}, {"foil", 2}, {"screws", 2}, {"mech_parts", 1},
               {"duct_tape", 1}, {"salt", 2}, {"chemicals", 1}, {"pliers", 1}, {"screwdriver", 1},
               {"kitchen_knife", 1}, {"crowbar", 1}, {"laptop_battery", 1}, {"locked_phone", 1},
-              {"usb_drive", 1}, {"cassette_player", 1}, {"tape_medic", 1}, {"tape_tinker", 1},
+              {"usb_drive", 1}, {"cassette_player", 1}, {"tape_medic", 1}, {"tape_tinker", 1}, {"tape_vesna", 1},
               {"tape_gun", 1}, {"book_tailor", 1}, {"book_surgeon", 1}, {"book_radio", 1},
               {"brass", 2}, {"lead_scrap", 1}, {"r9x18", 1}, {"r762t", 1}, {"gun_spring", 1},
               {"magazine", 1}, {"frame_pm", 1}, {"gun_barrel", 1}, {"firing_pin", 1}, {"gun_slide", 1}},
@@ -1367,6 +1372,48 @@ CHURN.corpse = {chance = 3, prefix = "corpse:",
                 "A churner with a radio still on, hissing, the battery almost gone.",
                 "A churner, face down. The floor around them has grown soft and warm."}}
 
+-- Vesna (59_research): once you've heard her tape, dead churners turn up
+-- `mult` times as often until you find her, at the top of a stair, with
+-- what she took up there.
+CHURN.vesna = {mult = 4,
+    epitaph = "Vesna. The voice from the tape, at the top of the stairs. Her picks are still in her hand.",
+    loot = {{"lockpicks", 1}, {"usb_drive", 1}, {"book_radio", 1}}}
+-- Rival Churners who'd rather trade (62_guns): `chance` %, when you carry
+-- something they want; one of theirs for one of yours, and they go.
+CHURN.parley = {chance = 35, say = "The other one: 'Or we trade. Fair's fair out here.'",
+    want = {"canned_beans", "water_bottle", "jerky", "bandage", "antirad"},
+    give = {{"r762t", 2}, {"usb_drive", 2}, {"book_gunsmith", 1}, {"gun_spring", 1}, {"battery_cell", 2},
+            {"tape_vesna", 1}, {"firing_pin", 1}},
+    rounds = 3, done = "They take it, hand theirs over and back away. 'Luck to you. Not too much.'"}
+-- The second Institute crate (52_quests): the first one you open holds a map
+-- to a CLEARANCE crate by the old quarry; that one holds an Institute Pass.
+QUESTS.deep_crate = {journal = "a CLEARANCE crate by the old quarry.", near = 1, far = 3,
+    found = "Under the tray, a second map: a crate by the old quarry, stamped CLEARANCE.",
+    pass = "In a sealed sleeve under the tray: an Institute Pass, the photo scratched out."}
+
+-- Standing with the people who give you work (52_quests): +1 for a job done,
+-- -1 for one let lapse, kept in min..max. Each point takes `price` off the
+-- trader's and Mother Okun's markup (never below `floor`), `anna_hours` off
+-- Anna's wait between calls (never under half), and from `karl_wink` Karl
+-- always winks at the right answer.
+QUESTS.rep = {giver = {Trader = "trader", ["Mother Okun"] = "okun", Anna = "anna", Karl = "karl"},
+    order = {"trader", "okun", "anna", "karl"},
+    names = {trader = "Trader", okun = "Okun", anna = "Anna", karl = "Karl"},
+    min = -3, max = 5, price = 0.04, floor = 1.05, anna_hours = 12, karl_wink = 2,
+    trade = {town = "trader", ferry = "okun"}}
+-- Hours you have for a job (kinds not listed have no deadline), and what
+-- the giver says when it lapses.
+QUESTS.due = {fetch = 96, drive = 96, den = 72, fish = 96, smoked = 120}
+QUESTS.lapsed = {Trader = "Word on the net: the trader gave your job to someone else.",
+                 ["Mother Okun"] = "The ferry men caught their own. Mother Okun won't wait on you twice."}
+QUESTS.smoked = {offer = "Mother Okun: 'Smoked meat keeps on the boat. Bring me two.'",
+                 journal = "bring 2 smoked meat to the Ferry Post.", need = {"smoked_meat", 2},
+                 reward = {{"rope", 2}, {"fishing_rod", 1}}}
+QUESTS.sinew = {offer = "Karl: 'My lines keep snapping, son. Two lengths of sinew? Call me when you've got them.'",
+                journal = "find 2 sinew, then call him on 433 MHz.", need = {"sinew", 2},
+                reward = {{"lucky_lure", 1}}, again = {{"jerky", 3}},
+                thanks = "Karl: 'That'll hold a pike. A runner's coming with something for you.'"}
+
 -- People who carry a gun (by who): the % chance they have it, rounds {lo, hi}
 -- loaded, a shot's damage and hit %. They shoot from near and far while the
 -- rounds last; the gun and what's left in it always drop. Show your own
@@ -1414,7 +1461,7 @@ for id, v in pairs({
     choir_charm = 30, elder_sign = 25,
     book_tailor = 10, book_field = 10, book_surgeon = 14, book_radio = 14, book_lab = 20,
     book_gunsmith = 25, book_hymnal = 30, cassette_player = 15, blank_tape = 1, usb_drive = 15,
-    tape_cook = 6, tape_medic = 6, tape_gun = 6, tape_choir = 6, tape_lab = 6, tape_tinker = 6,
+    tape_cook = 6, tape_medic = 6, tape_gun = 6, tape_choir = 6, tape_lab = 6, tape_tinker = 6, tape_vesna = 6,
     pm_pistol = 60, nagant = 65, tokarev = 75, inst_sidearm = 100, marsh_revolver = 120,
     bow = 15, sling = 3, arrow = 2, r9x18 = 4, r762n = 4, r762t = 5, r38 = 8,
     frame_pm = 15, frame_nagant = 15, frame_tt = 18, frame_inst = 30, gun_slide = 8, gun_barrel = 10,
@@ -3325,6 +3372,24 @@ for id, rows in pairs({
         ".#.##########.#.",
         ".#.##..#..#.#.#.",
         ".#.##########.#.",
+        ".#.##########.#.",
+        ".#............#.",
+        ".#..##....##..#.",
+        ".#.#..#..#..#.#.",
+        ".#..##....##..#.",
+        ".#...######...#.",
+        ".##############.",
+        "................",
+        "................",
+    },
+    tape_vesna = {
+        "................",
+        "................",
+        ".##############.",
+        ".#............#.",
+        ".#.##########.#.",
+        ".#.##.##.#.##.#.",
+        ".#.##......##.#.",
         ".#.##########.#.",
         ".#............#.",
         ".#..##....##..#.",
@@ -7048,6 +7113,7 @@ function Game:tick()
     self:refresh_view()
     self:spot_sites()
     self:story_check()
+    self:quest_tick()
     if not self:check_death(self:death_reason()) then self:check_achievements() end
 end
 -- ---------------------------------------------------------------------
@@ -7077,7 +7143,7 @@ local SAVE = {version = 1, dir = "churn", old_dir = "wasteland", file = "save.lu
                         "lore_read", "signal_page", "skills", "stats",
                         "ferry_trader", "peddler", "little", "story", "run_id", "scenes_seen",
                         "research", "books_read", "tapedeck", "gun_wear", "noise_until",
-                        "placed", "crates"}}
+                        "placed", "crates", "vesna", "inst_chain", "rep", "karl_lure", "finds"}}
 
 -- Where the save lives: <preferred storage>/churn/save.lua (dir: another folder)
 function SAVE.path(dir)
@@ -7478,6 +7544,7 @@ function Game:start_encounter(def)
                 demanding = def.kind == "bandit"}
     if def.kind == "bandit" then self:enc_say(def.demand) end
     self:arm_enemy()
+    self:maybe_parley()
     if self:placed_here("can_rattle") and self.enc.range ~= "far" then   -- the cans rang
         self.enc.range = "far"
         self:enc_say("The cans you strung up clatter. You're ready for it.")
@@ -7550,7 +7617,8 @@ function Game:encounter_options()
     if kind == "riddle" then
         local o = {}
         for i, answer in ipairs(e.riddle.answers) do
-            local hint = self.karl_hint and i == e.riddle.right and "  (Karl winks)" or ""
+            local wink = self.karl_hint or self:rep_of("karl") >= QUESTS.rep.karl_wink
+            local hint = wink and i == e.riddle.right and "  (Karl winks)" or ""
             o[i] = {answer .. hint, "answer_" .. i}
         end
         o[#o + 1] = {"Walk away", "leave_quietly"}
@@ -7560,6 +7628,11 @@ function Game:encounter_options()
         local o = {}
         if self:food_index() then o[#o + 1] = {"Give them some food", "give"} end
         if self:shooter() and not e.bluffed then o[#o + 1] = {"Show them your gun", "bluff"} end
+        local pa = e.parley
+        if pa and self:count_item(pa.want) > 0 then
+            o[#o + 1] = {("Swap your %s for their %s"):format(ITEM_DB[pa.want].name:lower(),
+                                                            ITEM_DB[pa.give].name:lower()), "swap"}
+        end
         o[#o + 1] = {"Refuse", "refuse"}
         o[#o + 1] = {"Run for it", "flee"}
         return o
@@ -7733,6 +7806,8 @@ function Game:encounter_action(action)
         if stack.qty <= 0 then table.remove(p.inventory, i) end
         self:enc_say("They take the " .. name:lower() .. " and back off into the ruins.")
         return self:end_encounter("You paid the " .. e.def.who .. " off.")
+    elseif action == "swap" then
+        return self:parley_swap()
     elseif action == "bluff" then
         if self:bluff() then return end
     elseif action == "refuse" then
@@ -8489,7 +8564,7 @@ function Game:trade_totals()
     -- (what you take costs at least 1 a unit: trinkets are worthless to sell)
     for item, n in pairs(u.get) do get = get + math.max(1, Game.item_value(item)) * n end
     local _, cfg = self:trade_partner()
-    return give, math.ceil(get * cfg.markup)
+    return give, math.ceil(get * self:markup_for(u.who or "town", cfg.markup))
 end
 
 -- Take n units of item out of a stack list (across stacks, most worn first).
@@ -8867,9 +8942,21 @@ function Game.starting_stock(who)
     return {stock = out, restocked = 0}
 end
 
--- Mother Okun's job (O on her screen): three fish, any kind.
+-- Mother Okun's job (O on her screen): three fish, any kind, or two smoked meat.
 function Game:ferry_work()
     local u, q = self.trade_ui, self.quest
+    if q and q.kind == "smoked" then
+        local S = QUESTS.smoked
+        local have = self:count_item(S.need[1])
+        if have < S.need[2] then
+            u.msg = ("'Two smoked. You've got %d.'"):format(have)
+            return
+        end
+        self:take_items(S.need[1], S.need[2])
+        self:give_reward(S.reward, "Mother Okun wraps them in sacking:")
+        u.msg = "'That'll keep them through the week. Take these.'"
+        return
+    end
     local fish = self:count_item("raw_fish") + self:count_item("cooked_fish")
     if q and q.kind == "fish" then
         if fish < QUESTS.fish.need then
@@ -8889,8 +8976,9 @@ function Game:ferry_work()
         u.msg = "'You've work already. Finish it.'"
         return
     end
-    self.quest = {kind = "fish", giver = "Mother Okun"}
-    u.msg = QUESTS.fish.offer
+    local kind = self:rand(2) == 0 and "smoked" or "fish"
+    self:set_quest({kind = kind, giver = "Mother Okun"})
+    u.msg = QUESTS[kind].offer
     self:push_log("Quest: " .. self:quest_text())
 end
 
@@ -9218,6 +9306,7 @@ function RADIO.anna_help(self)
     return true
 end
 function RADIO.karl(self)
+    if self:karl_radio_work() then return true end
     local hours = (self.next_emission or 0) - self.player.hours
     local when = hours > 0 and ("Next blowout in about " .. hours .. "h.") or "Blowout's overdue."
     self.karl_hint = true
@@ -9246,11 +9335,18 @@ function RADIO.signal(self)
     return true
 end
 
+-- Hours before a voice answers again: Anna sooner the more you've helped her.
+function Game:channel_wait(ch)
+    if ch.id ~= "anna" then return ch.cooldown end
+    return math.max(ch.cooldown // 2, ch.cooldown - QUESTS.rep.anna_hours * self:rep_of("anna"))
+end
+
 function Game:radio_call(i)
     local ch, r = TECH.channels[i], self.radio
     if not ch then return end
     local wait = (r.next[ch.id] or 0) - self.player.hours
     if ch.id == "anna" and self:anna_ready() then wait = 0 end   -- she always takes the bandages
+    if ch.id == "karl" and self:karl_ready() then wait = 0 end
     if wait > 0 then
         self:radio_say(ch.name .. ": no answer. Try again in " .. wait .. "h.")
     elseif r.charge <= 0 then
@@ -9260,7 +9356,7 @@ function Game:radio_call(i)
         if answered then
             r.charge = r.charge - 1
             -- "open": the voice stays reachable (Anna after you bring her bandages)
-            r.next[ch.id] = answered ~= "open" and (self.player.hours + ch.cooldown) or nil
+            r.next[ch.id] = answered ~= "open" and (self.player.hours + self:channel_wait(ch)) or nil
         end
     end
 end
@@ -9532,6 +9628,28 @@ function Game:draw_map(w, h)
                 gfx.rect(rx - 1, ry - 1, 9, 9)
                 gfx.color(hot >= 3 and gfx.WHITE or gfx.BLACK)
                 draw_sprite(rx, ry, 7, 7, GLYPHS.rad)
+            end
+            local find = self.finds and self.finds[key]
+            if find and (p.visible[key] or p.explored[key]) then
+                -- a find (F in the journal): upper right; a grave cross for a
+                -- dead churner, an open box for a crate
+                -- (the crate is solid black with its lid open, unlike the other boxes)
+                local fx, fy = rnd(px) + 4, rnd(py) - 11
+                local crate = find.kind ~= "corpse"
+                gfx.color(gfx.WHITE)
+                gfx.rect(fx - 2, fy - 2, 11, 11)   -- (a white rim: it shows on dark hexes too)
+                gfx.color(crate and gfx.BLACK or gfx.WHITE)
+                gfx.fill_rect(fx - 1, fy - 1, 9, 9)
+                gfx.color(gfx.BLACK)
+                gfx.rect(fx - 1, fy - 1, 9, 9)
+                if crate then
+                    gfx.color(gfx.WHITE)
+                    gfx.fill_rect(fx + 1, fy + 4, 5, 1)
+                    gfx.line(fx + 1, fy + 2, fx + 5, fy)
+                else
+                    gfx.fill_rect(fx + 3, fy + 1, 1, 6)
+                    gfx.fill_rect(fx + 1, fy + 2, 5, 1)
+                end
             end
             local camp = self.camps[key]
             if camp and p.hours < camp.until_hour and (p.visible[key] or p.explored[key]) then
@@ -9817,6 +9935,10 @@ end
 --   supply (Anna, on the radio): have bandages on you when you call her.
 --   notes  (Anna): the Surgeon's Notes, the same way.
 --   crate  (a USB drive's map): an Institute crate; Lockpicks open it.
+--   smoked (Mother Okun), sinew (Karl, on the radio): the new loot.
+-- Some jobs have a deadline (QUESTS.due); each job done or lapsed moves your
+-- standing with its giver (self.rep, QUESTS.rep), which changes prices,
+-- Anna's wait and Karl's riddles.
 --   dog    (Karl, after a right answer): find his lost dog by the river.
 -- Targets get a "!" on the map and a line in the journal.
 -- ---------------------------------------------------------------------
@@ -9830,18 +9952,22 @@ function Game:give_reward(list, why)
     end
     self:sfx("gift")
     self:push_log(why .. " " .. table.concat(names, ", ") .. ".")
+    self:rep_change(self.quest and self.quest.giver, 1)
     self.quest = nil
     self.quests_done = (self.quests_done or 0) + 1
 end
 
--- A passable, non-site hex at distance near..far from you (optionally by water).
-function Game:quest_spot(near, far, by_water)
+-- A passable, non-site hex at distance near..far from you (or from the hex
+-- `around`), optionally by water.
+function Game:quest_spot(near, far, by_water, around)
     local p, taken, spots = self.player, {}, {}
+    local oq, orr = p.q, p.r
+    if around then oq, orr = Game.key_qr(around) end
     for _, k in pairs(self.sites) do taken[k] = true end
     if self.base then taken[self.base.key] = true end
     for key, t in pairs(self.tiles) do
         local q, r = Game.key_qr(key)
-        local d = axial_distance(p.q, p.r, q, r)
+        local d = axial_distance(oq, orr, q, r)
         if TERRAIN[t].passable and d >= near and d <= far and not taken[key]
             and (self.rad[key] or 0) == 0 then
             if not by_water then
@@ -9889,15 +10015,15 @@ function Game:trader_work()
     end
     local pick = self:rand(3)
     if pick == 0 then
-        self.quest = {kind = "fetch", giver = "Trader"}
+        self:set_quest({kind = "fetch", giver = "Trader"})
         u.msg = QUESTS.fetch.offer
     elseif pick == 1 then
-        self.quest = {kind = "drive", giver = "Trader"}
+        self:set_quest({kind = "drive", giver = "Trader"})
         u.msg = QUESTS.drive.offer
     else
         local key = self:quest_spot(QUESTS.den.near, QUESTS.den.far)
         if not key then u.msg = "'Nothing today.'"; return end
-        self.quest = {kind = "den", giver = "Trader", target = key}
+        self:set_quest({kind = "den", giver = "Trader", target = key})
         self.player.explored[key] = true
         u.msg = QUESTS.den.offer .. " (" .. self:bearing_to(key) .. ")"
     end
@@ -9970,7 +10096,7 @@ function Game:quest_arrive()
             .. "Karl will be glad. Tied to its collar:")
         return false
     end
-    if q.kind == "crate" then return self:open_quest_crate() end
+    if q.kind == "crate" or q.kind == "deep_crate" then return self:open_quest_crate() end
     if q.kind == "den" then
         local animals = ENCOUNTERS_BY_KIND.animal
         local base = animals[self:rand(#animals) + 1]
@@ -10003,7 +10129,90 @@ function Game:quest_text()
     local q = self.quest
     if not q then return nil end
     local where = q.target and (" " .. self:bearing_to(q.target) .. ".") or ""
-    return q.giver .. ": " .. QUESTS[q.kind].journal .. where
+    local due = ""
+    if q.due then
+        local left = math.max(0, q.due - self.player.hours)
+        due = left >= 24 and (" (%dd left)"):format(left // 24) or (" (%dh left)"):format(left)
+    end
+    return q.giver .. ": " .. QUESTS[q.kind].journal .. where .. due
+end
+
+-- A new job, with its deadline if the kind has one.
+function Game:set_quest(q)
+    local hours = QUESTS.due[q.kind]
+    if hours then q.due = self.player.hours + hours end
+    self.quest = q
+    return q
+end
+
+-- From tick: a job past its deadline lapses (and the giver remembers).
+function Game:quest_tick()
+    local q = self.quest
+    if not (q and q.due and self.player.hours > q.due) then return end
+    self.quest = nil
+    self:rep_change(q.giver, -1)
+    self:push_log(QUESTS.lapsed[q.giver] or (q.giver .. " stopped waiting for you."))
+end
+
+-- -- standing --------------------------------------------------------------
+
+function Game:rep_of(id)
+    return (self.rep or {})[id] or 0
+end
+
+function Game:rep_change(giver, d)
+    local R = QUESTS.rep
+    local id = giver and R.giver[giver]
+    if not id then return end
+    self.rep = self.rep or {}
+    self.rep[id] = math.max(R.min, math.min(R.max, self:rep_of(id) + d))
+end
+
+-- A trader's markup after your standing with them (who: "town", "ferry"...).
+function Game:markup_for(who, markup)
+    local R = QUESTS.rep
+    local id = R.trade[who]
+    if not id then return markup end
+    return math.max(R.floor, markup * (1 - R.price * self:rep_of(id)))
+end
+
+-- "Standing: Trader +2  Okun -1" for the journal (nil while all are 0).
+function Game:rep_text()
+    local R, parts = QUESTS.rep, {}
+    for _, id in ipairs(R.order) do
+        local n = self:rep_of(id)
+        if n ~= 0 then parts[#parts + 1] = ("%s %+d"):format(R.names[id], n) end
+    end
+    return #parts > 0 and ("Standing: " .. table.concat(parts, "  ")) or nil
+end
+
+-- -- Karl's job, on the radio ----------------------------------------------
+
+-- His sinew is in your bag (he answers even before his wait is up).
+function Game:karl_ready()
+    local q, need = self.quest, QUESTS.sinew.need
+    return q ~= nil and q.kind == "sinew" and self:count_item(need[1]) >= need[2]
+end
+
+-- A call to Karl: hands in his job, or now and then offers it. True if
+-- that was the call (the forecast is skipped).
+function Game:karl_radio_work()
+    local S = QUESTS.sinew
+    if self:karl_ready() then
+        self:take_items(S.need[1], S.need[2])
+        local first = not self.karl_lure
+        self.karl_lure = true
+        self:give_reward(first and S.reward or S.again, "A runner from Karl:")
+        self:radio_say(S.thanks)
+        return true
+    end
+    if not self.quest and self:rand(2) == 0 then
+        self:set_quest({kind = "sinew", giver = "Karl"})
+        self:radio_say(S.offer)
+        self:push_log("Quest: " .. self:quest_text())
+        return true
+    end
+    return false
 end
 
 -- A drive's map (pair_usb): a locked Institute crate a few hexes off.
@@ -10019,8 +10228,10 @@ function Game:mark_crate()
 end
 
 -- Standing on the marked crate: Lockpicks open it (the job stays till then).
+-- The first one holds a map to a CLEARANCE crate by the quarry; that one an
+-- Institute Pass (self.inst_chain: 1 = map found, 2 = opened).
 function Game:open_quest_crate()
-    local C = QUESTS.crate
+    local C, kind = QUESTS.crate, self.quest.kind
     if self:count_item("lockpicks") == 0 then
         self:push_log(C.locked)
         return false
@@ -10037,6 +10248,23 @@ function Game:open_quest_crate()
     self.quests_done = (self.quests_done or 0) + 1
     self:sfx("gift")
     self:push_log("The lock gives. Inside: " .. table.concat(found, ", ") .. ". (I to pick up)")
+    self:note_find(hex_key(self.player.q, self.player.r), "crate",
+                   kind == "deep_crate" and "The CLEARANCE crate" or "An Institute crate", found)
+    if kind == "deep_crate" then
+        self.inst_chain = 2
+        if not self:give_pass(nil, QUESTS.deep_crate.pass) then
+            self:put_stack("ground", nil, {item = "antirad", qty = 2})
+        end
+    elseif (self.inst_chain or 0) == 0 and self.sites.quarry then
+        local D = QUESTS.deep_crate
+        local key = self:quest_spot(D.near, D.far, false, self.sites.quarry)
+        if key then
+            self.inst_chain = 1
+            self.quest = {kind = "deep_crate", giver = "A second map", target = key}
+            self.player.explored[key] = true
+            self:push_log(D.found .. " (" .. self:bearing_to(key) .. ")")
+        end
+    end
     return false
 end
 -- ---------------------------------------------------------------------
@@ -10311,6 +10539,7 @@ end
 -- ---------------------------------------------------------------------
 
 function Game:skills_page_lines()
+    if self.page == "finds" then return self:finds_lines() end
     local lines = {"Skill               Lv  XP       Bonus"}
     for _, name in ipairs(SKILLS.order) do
         local level, xp = self:skill_level(name), (self.skills or {})[name] or 0
@@ -10336,7 +10565,7 @@ function Game:skills_page_lines()
 end
 
 function Game:open_skills()
-    self.skills_off = 0
+    self.skills_off, self.page = 0, nil
     self.screen = "skills"
 end
 
@@ -10357,7 +10586,7 @@ function Game:draw_skills(w, h)
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
     gfx.font(gfx.FONT_BOLD_14)
-    gfx.text(6, 16, "Skills and recipes")
+    gfx.text(6, 16, self.page == "finds" and "Finds" or "Skills and recipes")
     gfx.font(gfx.FONT_MONO_12)
     local lines, fit = self:skills_page_lines(), Game.skills_fit(h)
     local off = math.max(0, math.min(self.skills_off or 0, #lines - fit))
@@ -10967,8 +11196,8 @@ function Game:quarry_arrive()
     return true
 end
 
--- Karl or Anna hands over the pass (once).
-function Game:give_pass(who)
+-- Karl or Anna hands over the pass (once); or `text` says where it was found.
+function Game:give_pass(who, text)
     local st = self.story
     if st.pass then return false end
     st.pass = true
@@ -10977,7 +11206,7 @@ function Game:give_pass(who)
     end
     if st.step == "gate" then st.step = "source" end
     self:sfx("gift")
-    self:push_log(who .. " gave you an Institute Pass.")
+    self:push_log(text or (who .. " gave you an Institute Pass."))
     return true
 end
 
@@ -11237,6 +11466,7 @@ function Game:play_tape(item)
         return false
     end
     self.tapedeck.charge = self.tapedeck.charge - 1
+    if item == "tape_vesna" and not self.vesna then self.vesna = "heard" end   -- (find_corpse)
     local p = self.player
     p.hours = p.hours + CHURN.study.tape_hours
     apply_awake_hours(p, CHURN.study.tape_hours)
@@ -11380,6 +11610,7 @@ function Game:pick_crate(key)
     self:skill_xp("tinker", SKILLS.xp.repair)
     self:sfx("gift")
     self:push_log("You pick a locked crate: " .. table.concat(found, ", ") .. ".")
+    self:note_find(key, "crate", "A locked crate", found)
 end
 
 -- F in ruins: now and then (CHURN.corpse.chance %, once a hex) a dead churner,
@@ -11390,8 +11621,10 @@ function Game:find_corpse(key)
     self.crates = self.crates or {}
     local mark = C.prefix .. key
     if self.crates[mark] then return end
-    if not self:roll(C.chance) then return end
+    local seeking = self.vesna == "heard"   -- (her tape: she's out there, up some stair)
+    if not self:roll(C.chance * (seeking and CHURN.vesna.mult or 1)) then return end
     self.crates[mark] = true
+    if seeking then return self:find_vesna(key) end
     local found = {}
     for _ = 1, 1 + self:rand(2) do
         local item
@@ -11402,6 +11635,53 @@ function Game:find_corpse(key)
     end
     self:push_log(C.epitaphs[self:rand(#C.epitaphs) + 1])
     self:push_log("On them: " .. table.concat(found, ", ") .. ".")
+    self:note_find(key, "corpse", "A dead churner", found)
+end
+
+-- The churner from the tape: what she took up the stairs.
+function Game:find_vesna(key)
+    self.vesna = "found"
+    local names = {}
+    for _, it in ipairs(CHURN.vesna.loot) do
+        self:put_stack("ground", nil, {item = it[1], qty = it[2]})
+        names[#names + 1] = ITEM_DB[it[1]].name
+    end
+    self:push_log(CHURN.vesna.epitaph)
+    self:push_log("On her: " .. table.concat(names, ", ") .. ".")
+    self:note_find(key, "corpse", "Vesna, from the tape", names)
+end
+
+-- -- finds: dead churners and opened crates, on the map and the Finds page --
+-- self.finds = {key -> {kind = "corpse"/"crate", label, day, what}} (saved).
+
+function Game:note_find(key, kind, label, what)
+    self.finds = self.finds or {}
+    self.finds[key] = {kind = kind, label = label, day = (self:clock(self.player.hours)),
+                       what = table.concat(what or {}, ", ")}
+end
+
+-- The Finds page (F in the journal): oldest first, where, and what was there.
+function Game:finds_lines()
+    local list = {}
+    for key, f in pairs(self.finds or {}) do list[#list + 1] = {key = key, f = f} end
+    table.sort(list, function(a, b)
+        if a.f.day ~= b.f.day then return a.f.day < b.f.day end
+        return a.key < b.key
+    end)
+    if #list == 0 then return {"Nothing yet. Dead churners and the crates you open go here."} end
+    local lines = {}
+    for _, e in ipairs(list) do
+        lines[#lines + 1] = ("Day %d  %s, %s"):format(e.f.day, e.f.label, self:bearing_to(e.key))
+        if e.f.what ~= "" then
+            for _, l in ipairs(wrap(e.f.what, 52)) do lines[#lines + 1] = "   " .. l end
+        end
+    end
+    return lines
+end
+
+function Game:open_finds()
+    self.skills_off, self.page = 0, "finds"
+    self.screen = "skills"   -- (the same scrolling page)
 end
 
 -- Equip slots sit ON the body part they dress, NEO Scavenger style: a box over
@@ -12431,6 +12711,34 @@ function Game:drop_enemy_gun(found)
         self:put_stack("ground", nil, {item = ammo, qty = g.rounds})
         found[#found + 1] = g.rounds .. " " .. ITEM_DB[ammo].name:lower()
     end
+end
+
+-- Rival Churners who'd rather trade (CHURN.parley): one thing you carry that
+-- they want, for one of theirs.
+function Game:maybe_parley()
+    local e, P = self.enc, CHURN.parley
+    if e.def.who ~= "rival churner" or not self:roll(P.chance) then return end
+    local want
+    for _, id in ipairs(P.want) do
+        if not want and self:count_item(id) > 0 then want = id end
+    end
+    if not want then return end
+    local give
+    self.seed, give = weighted_pick(self.seed, P.give)
+    e.parley = {want = want, give = give}
+    self:enc_say(P.say)
+end
+
+function Game:parley_swap()
+    local e, P = self.enc, CHURN.parley
+    local pa = e.parley
+    self:take_items(pa.want, 1)
+    local qty = (ITEM_DB[pa.give].desc or ""):find("^Ammo") and P.rounds or 1   -- (rounds come by the handful)
+    self:put_stack("ground", nil, {item = pa.give, qty = qty})
+    self:enc_say(P.done)
+    e.outcome = "fled"
+    return self:end_encounter("You traded with the rival churners: their "
+        .. ITEM_DB[pa.give].name:lower() .. " is on the ground.")
 end
 -- GENERATED by tools/paint_portraits.py - do not edit; repaint instead.
 -- Encounter portraits: per subject, near (96x96), far (48x48) and close
@@ -13666,6 +13974,7 @@ function Game:help_key(key)   -- help, info and journal: any key goes back
         return self:open_lore()
     end
     if self.screen == "journal" and key == KEY.K then return self:open_skills() end
+    if self.screen == "journal" and key == KEY.F then return self:open_finds() end
     if self.screen == "help" and key == KEY.V then
         self.screen = "info"
     else
@@ -13799,6 +14108,8 @@ function Game:journal_lines()
     if story then add(story) end
     local quest = self:quest_text()
     if quest then add("Quest - " .. quest) end
+    local standing = self:rep_text()
+    if standing then add(standing) end
     local camp = self:base_text()
     if camp then add(camp) end
     local permit = self:count_item("permit") > 0
@@ -13860,7 +14171,7 @@ function Game:draw_journal(w, h)
         gfx.text(6, y, line)
         y = y + 14
     end
-    gfx.text(6, h - 8, (self:lore_count() > 0 and "L: read pages  " or "") .. "K: skills  any key: back")
+    gfx.text(6, h - 8, (self:lore_count() > 0 and "L: read pages  " or "") .. "K: skills  F: finds  any key: back")
     gfx.refresh()
 end
 -- ---------------------------------------------------------------------

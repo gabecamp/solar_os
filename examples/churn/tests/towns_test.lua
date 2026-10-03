@@ -83,7 +83,11 @@ for _, s in ipairs(g.trader.stock) do if s.item == "antirad" and s.qty > 3 then 
 assert(not town_has_rope, "the town's stock didn't change")
 
 print("5. her fish job: O asks, three fish hand it in")
-g:trade_key(KEY.O)
+for i = 1, 40 do   -- (she asks for fish or smoked meat: ask till it's fish)
+    g.quest, g.seed = nil, i * 61
+    g:trade_key(KEY.O)
+    if g.quest.kind == "fish" then break end
+end
 assert(g.quest and g.quest.kind == "fish")
 g.player.inventory = {{item = "raw_fish", qty = 2}, {item = "cooked_fish", qty = 2}}
 g:trade_key(KEY.O)

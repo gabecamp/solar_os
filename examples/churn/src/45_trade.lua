@@ -178,7 +178,7 @@ function Game:trade_totals()
     -- (what you take costs at least 1 a unit: trinkets are worthless to sell)
     for item, n in pairs(u.get) do get = get + math.max(1, Game.item_value(item)) * n end
     local _, cfg = self:trade_partner()
-    return give, math.ceil(get * cfg.markup)
+    return give, math.ceil(get * self:markup_for(u.who or "town", cfg.markup))
 end
 
 -- Take n units of item out of a stack list (across stacks, most worn first).
