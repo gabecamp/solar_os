@@ -9,6 +9,10 @@ the Checkpoint alive.
   app. Saving (Continue, and the records) needs SolarOS 4.15.17 or newer,
   which added `solaros.storage.write_file`; on older firmware the game runs
   but can't save.
+- **Update on the device:** copy `churn_update.lua` next to the game once,
+  then `lua churn_update.lua` downloads the newest `churn.lua` from GitHub
+  over Wi-Fi (a saved network), checks it, and swaps it in (the old one
+  becomes `churn.lua.bak`; your save is kept).
 - **Keys:** Left/Right step west/east; Up or Down then Left/Right takes
   a diagonal (Up, Right = up-right; the hexes have six sides); WASD works
   the same. Space rests, F searches, I opens the bag,
