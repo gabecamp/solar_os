@@ -28,7 +28,7 @@ function Game:draw_trade(w, h)
     local _, cfg = self:trade_partner()
     gfx.text(6, 16, cfg.name)
     gfx.font(gfx.FONT_MONO_12)
-    gfx.text(200, 16, ("They ask x%.1f value"):format(cfg.markup))
+    gfx.text(200, 16, ("Prices x%.1f, in rubles"):format(cfg.markup))
     for _, col in ipairs({"mine", "theirs"}) do
         local x = L.col_x[col]
         local rows = self:trade_rows(col)
@@ -41,7 +41,8 @@ function Game:draw_trade(w, h)
             local s = rows[i]
             local y = L.top + (i - first) * L.row_h
             local n = pick[s.item]
-            local text = ("%-13s x%-2d %3d%s"):format(ITEM_DB[s.item].name:sub(1, 13), s.qty,
+            local def = ITEM_DB[s.item]
+            local text = ("%-13s x%-3d%3d%s"):format((def.short or def.name):sub(1, 13), s.qty,
                                                     Game.item_value(s.item), n and (" +" .. n) or "")
             if i == c and col == u.col then
                 gfx.color(gfx.BLACK)
@@ -59,7 +60,7 @@ function Game:draw_trade(w, h)
     gfx.color(gfx.BLACK)
     gfx.line(200, 26, 200, L.top + L.rows * L.row_h - 10)
     local give, ask = self:trade_totals()
-    gfx.text(6, 234, ("You give %d   They ask %d"):format(give, ask))
+    gfx.text(6, 234, ("You give %d   They ask %d   (in rubles)"):format(give, ask))
     gfx.text(6, 252, u.msg or "")
     gfx.text(6, h - 8, "Arrows Enter:+1 E:-1 T:deal O:work Q:leave")
     gfx.refresh()

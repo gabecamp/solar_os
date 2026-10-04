@@ -47,6 +47,11 @@ local function game_on(level)
         if l == level and g.tiles[k] ~= "water" then
             g.player.q, g.player.r = parse(k)
             g.ticked_hour = g.player.hours
+            -- every log line, not just the last three (a cairn or a tip
+            -- seen on the way can push the one looked for off the end)
+            g.all_log = {}
+            local push = g.push_log
+            g.push_log = function(self, text) self.all_log[#self.all_log + 1] = text; push(self, text) end
             return g
         end
     end
@@ -57,7 +62,7 @@ local function pass_hours(g, n)
     g:tick()
 end
 local function has_log(g, pat)
-    for _, line in ipairs(g.log) do if line:find(pat) then return true end end
+    for _, line in ipairs(g.all_log or g.log) do if line:find(pat) then return true end end
     return false
 end
 

@@ -255,11 +255,20 @@ function Game:draw_records(w, h)
     gfx.text(6, y, ("Achievements %d/%d"):format(got, #RECORDS.list))
     gfx.font(gfx.FONT_MONO_12)
     y = y + 18
+    -- only the ones you've earned: the rest stay a surprise
     for _, a in ipairs(RECORDS.list) do
-        local done = rec.achieved[a[1]]
-        gfx.text(6, y, (done and "[x] " or "[ ] ") .. a[2])
-        gfx.text(170, y, a[3])
+        if rec.achieved[a[1]] then
+            gfx.text(6, y, a[2])
+            gfx.text(170, y, a[3])
+            y = y + 12
+        end
+    end
+    if got == 0 then
+        gfx.text(6, y, "None yet.")
         y = y + 12
+    end
+    if got < #RECORDS.list then
+        gfx.text(6, y + 2, ("%d more to find."):format(#RECORDS.list - got))
     end
     if not SAVE.can_write() then gfx.text(6, h - 22, "(not saved: this SolarOS can't write files)") end
     gfx.text(6, h - 8, "Any key: back")

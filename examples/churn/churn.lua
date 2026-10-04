@@ -56,7 +56,7 @@ local POLL_MS = 250
 -- SolarOS sends Enter as '\n' (LF); CR is kept just in case.
 local KEY = {SPACE = 32, ENTER = 13, LF = 10, ESC = 27,
              A = 97, C = 99, D = 100, E = 101, F = 102, I = 105, Q = 113,
-             S = 115, T = 116, W = 119, H = 104, V = 118, G = 103, M = 109, J = 106, R = 114, O = 111, L = 108, K = 107, Y = 121,
+             S = 115, T = 116, W = 119, H = 104, V = 118, G = 103, M = 109, J = 106, R = 114, O = 111, L = 108, K = 107, Y = 121, X = 120, BACKSPACE = 8,
              CLOSE = 0xF0}   -- (the PC window's close button; the device never sends it)
 
 -- Terrain: id -> {name, cost (MP + hours), passable, shade}
@@ -187,7 +187,7 @@ local TRADE = {
         rag_shirt = 1, rag_trousers = 1, foot_wraps = 1, rag_hood = 1, hand_wraps = 1, ear_wraps = 1,
         slit_goggles = 1, rag_scarf = 1, patch_coat = 4, scrap_bracers = 2, bindle = 3, sack_pack = 5, rag_mask = 2,
         weeping_stone = 35, drowned_eye = 35, flesh_knot = 35, hollow_star = 35,
-        quiet_shell = 35, permit = 80,
+        quiet_shell = 35, permit = 150,
         leather_belt = 10, rope_belt = 4, scrap_metal = 3, jerky = 6,
         shiv = 6, machete = 18, spiked_club = 12, pipe_spear = 15, splint = 5,
         fishing_rod = 8, snare = 4, raw_fish = 3, cooked_fish = 6,
@@ -1131,14 +1131,17 @@ for id, def in pairs({
     book_gunsmith = {name = "Gunsmith's Ledger", book = "gunsmithing", desc = "E: read (Gunsmithing)"},
     book_hymnal  = {name = "The Choir Hymnal", book = "warding", desc = "E: read (Warding). Costs you"},
     cassette_player = {name = "Cassette Player", desc = "Plays tapes; Battery Cell: E"},
-    tape_cook    = {name = "Tape: Day Forty", desc = "E: play it"},
-    tape_medic   = {name = "Tape: The Medic", desc = "E: play it"},
-    tape_gun     = {name = "Tape: Count Rounds", desc = "E: play it"},
-    tape_choir   = {name = "Tape: The Choir", desc = "E: play it"},
-    tape_lab     = {name = "Tape: Institute 7", desc = "E: play it"},
-    tape_tinker  = {name = "Tape: I Went North", desc = "E: play it"},
-    tape_vesna   = {name = "Tape: Vesna, Day 9", desc = "E: play it"},
-    blank_tape   = {name = "Blank Tape",   desc = "Played out"},
+    tape_cook    = {name = "Cassette Tape: Day Forty", short = "Tape: Day Forty", desc = "E: play it"},
+    tape_medic   = {name = "Cassette Tape: The Medic", short = "Tape: The Medic", desc = "E: play it"},
+    tape_gun     = {name = "Cassette Tape: Count Rounds", short = "Tape: Count Rounds", desc = "E: play it"},
+    tape_choir   = {name = "Cassette Tape: The Choir", short = "Tape: The Choir", desc = "E: play it"},
+    tape_lab     = {name = "Cassette Tape: Institute 7", short = "Tape: Institute 7", desc = "E: play it"},
+    tape_tinker  = {name = "Cassette Tape: I Went North", short = "Tape: I Went North", desc = "E: play it"},
+    tape_vesna   = {name = "Cassette Tape: Vesna, Day 9", short = "Tape: Vesna, Day 9", desc = "E: play it"},
+    blank_tape   = {name = "Blank Cassette Tape", short = "Blank Tape", desc = "Played out"},
+    -- money: traders pay it for what you sell and take it for what they sell
+    -- (TRADE.value 1 each); found in piles of pile = {lo, hi} (Game:drop_found)
+    rubles       = {name = "Rubles",       pile = {5, 25}, desc = "Money. Every trader takes it"},
     usb_drive    = {name = "USB Drive",    desc = "E: pair it with the LoRa Radio"},
     -- handguns: weapon = pistol-whip at arm's length; shoot = the shot (CHURN.guns)
     pm_pistol    = {name = "PM Pistol",    weapon = {dmg = 5, reach = "close"},
@@ -1315,7 +1318,8 @@ for _, r in ipairs({
 -- stingy) but what it does turn up is more varied.
 for terrain, adds in pairs({
     plains = {{"glass_shard", 2}, {"string", 2}, {"newspaper", 2}, {"tin_can", 2}, {"matches", 1},
-              {"foil", 1}, {"screws", 1}, {"tarp", 1}, {"brass", 1}, {"usb_drive", 1}, {"book_field", 1}},
+              {"foil", 1}, {"screws", 1}, {"tarp", 1}, {"brass", 1}, {"usb_drive", 1}, {"book_field", 1},
+              {"rubles", 1}},
     forest = {{"large_branch", 4}, {"bark", 4}, {"feathers", 2}, {"bone", 2}, {"string", 1},
               {"tape_cook", 1}},
     ruins  = {{"glass_shard", 3}, {"string", 2}, {"tin_can", 3}, {"metal_pot", 1}, {"matches", 2},
@@ -1325,7 +1329,8 @@ for terrain, adds in pairs({
               {"usb_drive", 1}, {"cassette_player", 1}, {"tape_medic", 1}, {"tape_tinker", 1}, {"tape_vesna", 1},
               {"tape_gun", 1}, {"book_tailor", 1}, {"book_surgeon", 1}, {"book_radio", 1},
               {"brass", 2}, {"lead_scrap", 1}, {"r9x18", 1}, {"r762t", 1}, {"gun_spring", 1},
-              {"magazine", 1}, {"frame_pm", 1}, {"gun_barrel", 1}, {"firing_pin", 1}, {"gun_slide", 1}},
+              {"magazine", 1}, {"frame_pm", 1}, {"gun_barrel", 1}, {"firing_pin", 1}, {"gun_slide", 1},
+              {"rubles", 3}},
     hills  = {{"bone", 3}, {"large_branch", 2}, {"salt", 1}, {"hunting_knife", 1}, {"r762n", 1},
               {"frame_nagant", 1}, {"cylinder", 1}, {"tape_choir", 1}, {"book_hymnal", 1}, {"pale_wax", 1}},
     ford   = {{"glass_shard", 2}, {"bone", 1}, {"tin_can", 1}, {"choir_wire", 1}},
@@ -1345,7 +1350,7 @@ end
 CHURN.crate_loot = {{"book_lab", 2}, {"book_gunsmith", 2}, {"tape_lab", 2}, {"gunsmith_kit", 2},
                     {"frame_tt", 2}, {"frame_inst", 1}, {"chemicals", 4}, {"gunpowder", 3},
                     {"r9x18", 4}, {"r762t", 2}, {"pm_pistol", 1}, {"tokarev", 1}, {"nagant", 1},
-                    {"inst_sidearm", 1}, {"usb_drive", 3}, {"medkit", 2}, {"antirad", 3}}
+                    {"inst_sidearm", 1}, {"usb_drive", 3}, {"medkit", 2}, {"antirad", 3}, {"rubles", 3}}
 CHURN.crate_chance = 35   -- % a ruin hex has a locked crate to pick
 
 -- Jobs for the new loot (src/52_quests.lua, 46_peddler) and the rare dead
@@ -1366,7 +1371,7 @@ CHURN.corpse = {chance = 3, prefix = "corpse:",
     loot = {{"tape_cook", 2}, {"tape_gun", 2}, {"tape_choir", 1}, {"tape_lab", 1}, {"tape_tinker", 2},
             {"book_field", 2}, {"book_gunsmith", 1}, {"book_tailor", 1}, {"usb_drive", 3},
             {"gun_spring", 1}, {"firing_pin", 1}, {"gun_barrel", 1}, {"r9x18", 2}, {"r762t", 1},
-            {"cassette_player", 1}},
+            {"cassette_player", 1}, {"rubles", 3}},
     rounds = {r9x18 = 3, r762t = 3},   -- (+0..2)
     epitaphs = {"A churner in a gas mask, still holding a bolt.",
                 "A churner under a collapsed stair, one boot off, as if they meant to run.",
@@ -1467,9 +1472,9 @@ for _, e in ipairs(ENCOUNTERS) do
         ["fused pair"] = {{"ichor", 2}, {"bone", 1}},
         ["mouthless man"] = {{"ichor", 1}, {"locked_phone", 1}},
         bloom = {{"ichor", 1}, {"pale_eye", 1}},
-        bandit = {{"brass", 2}, {"r9x18", 1}, {"pm_pistol", 1}, {"gun_spring", 1}, {"lighter", 1}},
-        ["toll man"] = {{"brass", 1}, {"r762n", 1}, {"frame_pm", 1}, {"matches", 1}},
-        ["rival churner"] = {{"brass", 2}, {"gun_spring", 1}, {"firing_pin", 1}, {"book_gunsmith", 1}},
+        bandit = {{"brass", 2}, {"r9x18", 1}, {"pm_pistol", 1}, {"gun_spring", 1}, {"lighter", 1}, {"rubles", 3}},
+        ["toll man"] = {{"brass", 1}, {"r762n", 1}, {"frame_pm", 1}, {"matches", 1}, {"rubles", 4}},
+        ["rival churner"] = {{"brass", 2}, {"gun_spring", 1}, {"firing_pin", 1}, {"book_gunsmith", 1}, {"rubles", 3}},
     })[e.who]
     if extra and e.loot then
         for _, x in ipairs(extra) do e.loot[#e.loot + 1] = x end
@@ -1492,7 +1497,7 @@ for id, v in pairs({
     rad_purge = 30, flare = 6, choir_cell = 40, salt_circle = 8, black_candle = 20, glow_jar = 15,
     choir_charm = 30, elder_sign = 25,
     book_tailor = 10, book_field = 10, book_surgeon = 14, book_radio = 14, book_lab = 20,
-    book_gunsmith = 25, book_hymnal = 30, cassette_player = 15, blank_tape = 1, usb_drive = 15,
+    book_gunsmith = 25, book_hymnal = 30, cassette_player = 15, blank_tape = 1, rubles = 1, usb_drive = 15,
     tape_cook = 6, tape_medic = 6, tape_gun = 6, tape_choir = 6, tape_lab = 6, tape_tinker = 6, tape_vesna = 6,
     pm_pistol = 60, nagant = 65, tokarev = 75, inst_sidearm = 100, marsh_revolver = 120,
     bow = 15, sling = 3, arrow = 2, r9x18 = 4, r762n = 4, r762t = 5, r38 = 8,
@@ -1517,6 +1522,14 @@ end
 end
 -- one Marsh Revolver lies somewhere in each world (a relic: never made)
 TECH.world_items[#TECH.world_items + 1] = "marsh_revolver"
+
+-- Cutting clothes up for cloth (35_crafting: a "Cut up" recipe shows for each
+-- piece you have off your body, with a sharp edge as the tool): how many
+-- Cloth Scraps each gives. A torn piece gives half (at least 1).
+CHURN.cut = {hours = 1, scraps = {
+    tshirt = 2, jeans = 3, scarf = 1, cap = 1, gloves = 1, earmuffs = 1, rag_shirt = 1, rag_trousers = 1,
+    foot_wraps = 1, rag_hood = 1, hand_wraps = 1, ear_wraps = 1, rag_scarf = 1, patch_coat = 3,
+    bindle = 2, sack_pack = 3, rag_mask = 1, satchel = 2, rag_shoes = 1, backpack = 3}}
 -- GENERATED from scratch art (16x16, '#' = ink): sprites for the
 -- Churn's new items. Items without art borrow a look-alike's (ITEM_DB[..].look).
 CHURN.art = {
@@ -3160,6 +3173,24 @@ for id, rows in pairs({
         "...#........#...",
         "................",
         "................",
+        "................",
+    },
+    rubles = {
+        "................",
+        "....##########..",
+        "...#..........#.",
+        "..##########..#.",
+        ".#..........#.#.",
+        "###########.#.#.",
+        "#.........#.#.#.",
+        "#..####...#.#.#.",
+        "#..#..#...#.#.#.",
+        "#..####...#.#.#.",
+        "#..#......#.#.#.",
+        "#.####....#.##..",
+        "#..#......#.#...",
+        "#.........##....",
+        "###########.....",
         "................",
     },
     salt_circle = {
@@ -6175,10 +6206,7 @@ function Game:scavenge()
     for _ = 1, p.scav_rolls do
         local item
         self.seed, item = weighted_pick(self.seed, table_)
-        if item ~= "nothing" then
-            self:put_stack("ground", nil, {item = item, qty = 1})
-            found[#found + 1] = ITEM_DB[item].name
-        end
+        if item ~= "nothing" then found[#found + 1] = self:drop_found(item) end
     end
     self:skill_xp("scav", SKILLS.xp.search + SKILLS.xp.find * #found)
     self:stat("searches")
@@ -6351,6 +6379,32 @@ function Game:try_transfer(source, dest)
     for slot, c in pairs(p.wear or {}) do saved_wear[slot] = c end
     local cap_before = self:bag_capacity()
 
+    -- onto a bag cell that holds something else: they trade places (the one
+    -- there goes where this came from: the ground, its bag cell, or the bag)
+    local there, moving = d_kind == "inventory" and d_key and p.inventory[d_key], self:get_stack(s_kind, s_key)
+    if there and moving and not (there.item == moving.item and there.cond == moving.cond) then
+        if s_kind == "inventory" then
+            p.inventory[s_key], p.inventory[d_key] = there, moving
+            self:push_log("Moved " .. ITEM_DB[moving.item].name .. ".")
+            return true
+        end
+        local ok = self:remove_stack(s_kind, s_key) ~= nil
+        p.inventory[d_key] = moving
+        if s_kind == "ground" or not add_to_list(p.inventory, there, self:bag_capacity()) then
+            add_to_list(self:ground_list(), there)
+        end
+        local cap = self:bag_capacity()
+        if #p.inventory > cap and cap < cap_before then ok = false end
+        if not ok then
+            p.inventory, p.equipped, p.wear = saved_inv, saved_eq, saved_wear
+            self.ground[hex_key(p.q, p.r)] = saved_ground
+            self:push_log("Bag too small - empty it first.")
+            return false
+        end
+        recompute_stats(p)
+        self:push_log("Swapped out " .. ITEM_DB[there.item].name .. ".")
+        return true
+    end
     local stack = self:remove_stack(s_kind, s_key)
     if not stack then return false end
     local ok = self:put_stack(d_kind, d_key, stack)
@@ -6400,6 +6454,15 @@ end
 function Game:use_one(kind, k, stack)
     stack.qty = stack.qty - 1
     if stack.qty <= 0 then self:remove_stack(kind, k) end
+end
+
+-- Something found (a search, a body, a crate) onto the ground here; its name
+-- for the log. qty: how many (else 1, or a pile's roll: ITEM_DB[..].pile).
+function Game:drop_found(item, qty)
+    local pile = ITEM_DB[item].pile
+    qty = qty or (pile and pile[1] + self:rand(pile[2] - pile[1] + 1)) or 1
+    self:put_stack("ground", nil, {item = item, qty = qty})
+    return ITEM_DB[item].name .. (qty > 1 and (" x" .. qty) or "")
 end
 
 -- E on the inventory screen: the obvious thing for the item under the cursor.
@@ -6591,7 +6654,7 @@ end
 
 -- nil if you can make it now, else the reason you can't.
 function Game:craft_blocker(r)
-    if not (r.repair or r.study or self.known[r.id]) then return "You don't know how to make that." end
+    if not (r.repair or r.study or r.cut or self.known[r.id]) then return "You don't know how to make that." end
     if r.study then return self:study_blocker(r.study) end
     if r.base then
         local why = self:base_blocker(r)
@@ -6700,14 +6763,45 @@ function Game:read_notes()
     return true
 end
 
-function Game:known_recipes()
-    local list = {}
-    for _, r in ipairs(RECIPES) do
-        if self.known[r.id] then list[#list + 1] = r end
+-- "Cut up" recipes for the clothes in reach (not on your body): Cloth
+-- Scraps, with any sharp edge (CHURN.cut).
+function Game:cut_recipes()
+    local list, seen = {}, {}
+    local function add(item)
+        local n = CHURN.cut.scraps[item]
+        if n and not seen[item] then
+            seen[item] = true
+            list[#list + 1] = {id = "cut_" .. item, name = "Cut Up " .. ITEM_DB[item].name,
+                               inputs = {[item] = 1}, tools = {"@sharp"}, hours = CHURN.cut.hours,
+                               out = {"cloth_scrap", n}, cut = true}
+        end
     end
-    for _, r in ipairs(self:repair_recipes()) do list[#list + 1] = r end   -- broken tech you carry
-    for _, r in ipairs(self:study_recipes()) do list[#list + 1] = r end    -- research (59_research)
+    for _, s in ipairs(self.player.inventory) do add(s.item) end
+    for _, s in ipairs(self:ground_list()) do add(s.item) end
+    for _, slot in ipairs({"rhand", "lhand"}) do
+        if self.player.equipped[slot] then add(self.player.equipped[slot]) end
+    end
+    table.sort(list, function(a, b) return a.name < b.name end)
     return list
+end
+
+-- What the crafting screen lists: what you can make right now first, then
+-- the rest (each part in its usual order).
+function Game:known_recipes()
+    local all = {}
+    for _, r in ipairs(RECIPES) do
+        if self.known[r.id] then all[#all + 1] = r end
+    end
+    for _, r in ipairs(self:repair_recipes()) do all[#all + 1] = r end   -- broken tech you carry
+    for _, r in ipairs(self:study_recipes()) do all[#all + 1] = r end    -- research (59_research)
+    for _, r in ipairs(self:cut_recipes()) do all[#all + 1] = r end      -- clothes into cloth
+    local ready, rest = {}, {}
+    for _, r in ipairs(all) do
+        local list = self:craft_blocker(r) == nil and ready or rest
+        list[#list + 1] = r
+    end
+    for _, r in ipairs(rest) do ready[#ready + 1] = r end
+    return ready
 end
 
 function Game:open_crafting()
@@ -6724,7 +6818,13 @@ function Game:craft_key(key)
     elseif key == gfx.KEY_DOWN or key == KEY.S then
         c.cursor = math.min(#list, c.cursor + 1)
     elseif key == KEY.ENTER or key == KEY.LF or key == KEY.SPACE then
-        if list[c.cursor] then self:craft(list[c.cursor]) end
+        local r = list[c.cursor]
+        if r and self:craft(r) then
+            -- the list reorders (ready first): stay on the same recipe
+            for i, r2 in ipairs(self:known_recipes()) do
+                if r2.id == r.id then c.cursor = i end
+            end
+        end
     elseif key == KEY.C or key == gfx.KEY_ESCAPE or key == KEY.I then
         self.screen = c.back == "craft" and "map" or c.back
     end
@@ -7699,10 +7799,7 @@ function Game:enemy_dies()
     for _ = 1, e.def.loot_rolls or 1 do
         local item
         self.seed, item = weighted_pick(self.seed, e.def.loot)
-        if item ~= "nothing" then
-            self:put_stack("ground", nil, {item = item, qty = 1})
-            found[#found + 1] = ITEM_DB[item].name
-        end
+        if item ~= "nothing" then found[#found + 1] = self:drop_found(item) end
     end
     self:drop_enemy_gun(found)
     self:sfx("kill")
@@ -8165,7 +8262,9 @@ function Game:emission_log()
     self.emission_caught = n and n.caught
     if not n then return end
     if n.warn then self:sfx("siren"); self:queue_scene("first_emission") end
-    if n.caught then self:sfx("emission") end
+    if n.caught then self:sfx("emission")
+    elseif n.sheltered then self:sfx("emission_cover") end
+    if n.ended then self:sfx("emission_end") end
     if n.warn then
         self:push_log(("The sky bruises purple. Emission in %dh! Ruins/hills!"):format(RAD.emission.warn))
     end
@@ -8239,7 +8338,7 @@ function Game:gather()
         self:push_log("Too tired. Rest first.")
         return
     end
-    if self:near_water() and self:carrying("fishing_rod") then return self:fish() end
+    if self:near_water() and self:count_item("fishing_rod") > 0 then return self:fish() end
     local terrain = self.tiles[hex_key(p.q, p.r)]
     if not HUNT.snare_chance[terrain] then
         self:push_log(self:near_water() and "No rod to fish with. (C to make one)" or "No game here.")
@@ -8615,13 +8714,22 @@ end
 function Game:make_deal()
     local u, t = self.trade_ui, self:trade_partner()
     local give, ask = self:trade_totals()
-    if next(u.get) == nil then
-        u.msg = "Pick something to take (Right, Enter)."
+    if next(u.get) == nil and next(u.give) == nil then
+        u.msg = "Pick what to sell or take (Enter)."
         return false
     end
-    if give < ask then
-        u.msg = ("Not enough. They want %d, you offer %d."):format(ask, give)
-        return false
+    if give < ask then   -- rubles in the bag make up the rest
+        local spare = 0
+        for _, s in ipairs(self.player.inventory) do
+            if s.item == "rubles" then spare = spare + s.qty end
+        end
+        spare = spare - (u.give.rubles or 0)
+        if spare < ask - give then
+            u.msg = ("Not enough. They want %d, you have %d."):format(ask, give + spare)
+            return false
+        end
+        u.give.rubles = (u.give.rubles or 0) + ask - give
+        give = ask
     end
     for item, n in pairs(u.give) do
         take_units(self.player.inventory, item, n)
@@ -8635,8 +8743,15 @@ function Game:make_deal()
             dropped = true
         end
     end
+    -- what they owe you back, in rubles
+    local change = give - ask
+    if change > 0 and not self:put_stack("inventory", nil, {item = "rubles", qty = change}) then
+        self:put_stack("ground", nil, {item = "rubles", qty = change})
+        dropped = true
+    end
     u.give, u.get = {}, {}
-    u.msg = dropped and "Deal. Your bag is full: some is on the ground." or "Deal."
+    u.msg = (change > 0 and ("Deal. " .. change .. " rubles back.") or "Deal.")
+        .. (dropped and " Bag full: some is on the ground." or "")
     self:push_log("You traded with " .. (u.who == "town" and "the trader" or TRADE.people[u.who].name) .. ".")
     for col, c in pairs(u.cursor) do
         u.cursor[col] = math.max(1, math.min(c, #self:trade_rows(col)))
@@ -8664,7 +8779,9 @@ function Game:trade_key(key)
     elseif key == KEY.ENTER or key == KEY.LF or key == KEY.SPACE then
         local have = 0   -- (worn and new pieces of one item are separate rows)
         for _, s in ipairs(row and rows or {}) do if s.item == row.item then have = have + s.qty end end
-        if row and (pick[row.item] or 0) < have then pick[row.item] = (pick[row.item] or 0) + 1 end
+        -- (money goes ten at a time)
+        local step = row and row.item == "rubles" and 10 or 1
+        if row and (pick[row.item] or 0) < have then pick[row.item] = math.min(have, (pick[row.item] or 0) + step) end
     elseif key == KEY.E then
         if row and pick[row.item] then
             pick[row.item] = pick[row.item] > 1 and pick[row.item] - 1 or nil
@@ -9056,7 +9173,13 @@ local SFX = {
     kill     = {{660, 60}, {880, 60}, {1320, 90}},
     geiger   = {{1800, 12}, {0, 25}, {1800, 12}},
     siren    = {{600, 150}, {900, 150}, {600, 150}, {900, 150}},
-    emission = {{120, 300}, {90, 400}},
+    -- (low, but not so low a small speaker can't play it)
+    emission = {{196, 160}, {165, 160}, {139, 220}, {0, 60}, {196, 160}, {131, 500}},
+    emission_cover = {{165, 200}, {147, 200}, {131, 400}},   -- it howls over your shelter
+    emission_end = {{330, 90}, {392, 90}, {523, 160}},
+    -- the title: a slow, wrong-sounding tune, once at start-up (begin_intro)
+    title    = {{220, 400}, {0, 80}, {262, 300}, {330, 300}, {311, 500}, {0, 120}, {294, 300},
+                {262, 300}, {247, 700}, {0, 150}, {220, 250}, {208, 900}},
     chime    = {{1047, 60}, {1568, 90}},
     gift     = {{784, 70}, {988, 70}, {1175, 120}},
     death    = {{392, 200}, {330, 200}, {262, 400}},
@@ -10273,8 +10396,7 @@ function Game:open_quest_crate()
     for _ = 1, C.rolls do
         local item
         self.seed, item = weighted_pick(self.seed, CHURN.crate_loot)
-        self:put_stack("ground", nil, {item = item, qty = 1})
-        found[#found + 1] = ITEM_DB[item].name
+        found[#found + 1] = self:drop_found(item)
     end
     self:skill_xp("tinker", SKILLS.xp.repair)
     self.quest = nil
@@ -10888,11 +11010,20 @@ function Game:draw_records(w, h)
     gfx.text(6, y, ("Achievements %d/%d"):format(got, #RECORDS.list))
     gfx.font(gfx.FONT_MONO_12)
     y = y + 18
+    -- only the ones you've earned: the rest stay a surprise
     for _, a in ipairs(RECORDS.list) do
-        local done = rec.achieved[a[1]]
-        gfx.text(6, y, (done and "[x] " or "[ ] ") .. a[2])
-        gfx.text(170, y, a[3])
+        if rec.achieved[a[1]] then
+            gfx.text(6, y, a[2])
+            gfx.text(170, y, a[3])
+            y = y + 12
+        end
+    end
+    if got == 0 then
+        gfx.text(6, y, "None yet.")
         y = y + 12
+    end
+    if got < #RECORDS.list then
+        gfx.text(6, y + 2, ("%d more to find."):format(#RECORDS.list - got))
     end
     if not SAVE.can_write() then gfx.text(6, h - 22, "(not saved: this SolarOS can't write files)") end
     gfx.text(6, h - 8, "Any key: back")
@@ -11680,8 +11811,7 @@ function Game:pick_crate(key)
     for _ = 1, 2 do
         local item
         self.seed, item = weighted_pick(self.seed, CHURN.crate_loot)
-        self:put_stack("ground", nil, {item = item, qty = 1})
-        found[#found + 1] = ITEM_DB[item].name
+        found[#found + 1] = self:drop_found(item)
     end
     self:skill_xp("tinker", SKILLS.xp.repair)
     self:sfx("gift")
@@ -11705,9 +11835,7 @@ function Game:find_corpse(key)
     for _ = 1, 1 + self:rand(2) do
         local item
         self.seed, item = weighted_pick(self.seed, C.loot)
-        local qty = C.rounds[item] and C.rounds[item] + self:rand(3) or 1
-        self:put_stack("ground", nil, {item = item, qty = qty})
-        found[#found + 1] = ITEM_DB[item].name .. (qty > 1 and (" x" .. qty) or "")
+        found[#found + 1] = self:drop_found(item, C.rounds[item] and C.rounds[item] + self:rand(3))
     end
     self:push_log(C.epitaphs[self:rand(#C.epitaphs) + 1])
     self:push_log("On them: " .. table.concat(found, ", ") .. ".")
@@ -11745,10 +11873,12 @@ function Game:finds_lines()
         if a.f.day ~= b.f.day then return a.f.day < b.f.day end
         return a.key < b.key
     end)
-    if #list == 0 then return {"Nothing yet. Dead churners and the crates you open go here."} end
+    -- (every line wrapped to the page: 55 columns)
+    if #list == 0 then return wrap("Nothing yet. Dead churners and the crates you open go here.", 55) end
     local lines = {}
     for _, e in ipairs(list) do
-        lines[#lines + 1] = ("Day %d  %s, %s"):format(e.f.day, e.f.label, self:bearing_to(e.key))
+        local head = ("Day %d  %s, %s"):format(e.f.day, e.f.label, self:bearing_to(e.key))
+        for _, l in ipairs(#head > 55 and wrap(head, 55) or {head}) do lines[#lines + 1] = l end
         if e.f.what ~= "" then
             for _, l in ipairs(wrap(e.f.what, 52)) do lines[#lines + 1] = "   " .. l end
         end
@@ -11858,6 +11988,11 @@ function Game:draw_slot_box(x, y, w, h, stack, is_cursor, is_selected)
             -- bottom-right corner, right-aligned (mono 12 is ~7px per char), so
             -- it stays clear of the centered 16x16 icon and inside the box
             local qty_text = tostring(stack.qty)
+            if #qty_text > 2 then   -- (a big pile: on paper, so it reads over the icon)
+                gfx.color(gfx.WHITE)
+                gfx.fill_rect(x + w - 3 - 7 * #qty_text, y + h - 11, 7 * #qty_text + 2, 10)
+                gfx.color(gfx.BLACK)
+            end
             gfx.text(x + w - 2 - 7 * #qty_text, y + h - 2, qty_text)
         end
     end
@@ -12226,6 +12361,64 @@ function Game:ground_scroll(n_ground)
     return math.max(0, math.min(off, (total_rows - GROUND_GRID_ROWS) * GROUND_GRID_COLS))
 end
 
+-- Where cursor row i sits on screen ({x, y, w, h}). A ground cell scrolled
+-- out of view has none drawn: it gets the spot it would have in the grid.
+function Game:inv_row_pos(i)
+    local pos, row = INV_POS[i], INV_ROWS[i]
+    if pos or not row or row[1] ~= "ground" then return pos end
+    local k = row[2] - (self.ground_off or 0) - 1
+    return {x = INV_COL_X + 2 + k % GROUND_GRID_COLS * (GROUND_CELL + GROUND_GAP),
+            y = GROUND_Y + k // GROUND_GRID_COLS * (GROUND_CELL + GROUND_GAP), w = GROUND_CELL, h = GROUND_CELL}
+end
+
+-- Arrow keys on the bag screen: the cursor goes to the nearest cell or slot
+-- that way (dx, dy = -1/0/1), across the ground, the doll and the bag.
+-- Nothing further that way: it wraps round to the far side.
+function Game:inv_move(dx, dy)
+    local cur = self.inv_cursor
+    local row = INV_ROWS[cur]
+    if not row then return end
+    -- the ground grid scrolls: step through it by index first
+    if row[1] == "ground" then
+        local n, cols, i = 0, GROUND_GRID_COLS, row[2]
+        for _, r in ipairs(INV_ROWS) do if r[1] == "ground" then n = n + 1 end end
+        local t = i + dx + dy * cols
+        if dx ~= 0 and (t - 1) // cols ~= (i - 1) // cols then t = nil end
+        if dy > 0 and t and t > n and (n - 1) // cols > (i - 1) // cols then t = n end
+        if t and t >= 1 and t <= n then
+            self.inv_cursor = t   -- (ground rows come first: row index == ground index)
+            return
+        end
+    end
+    local p = self:inv_row_pos(cur)
+    if not p then return end
+    local cx, cy = p.x + p.w / 2, p.y + p.h / 2
+    local best, best_score, wrap, wrap_score
+    for i = 1, #INV_ROWS do
+        local q = i ~= cur and INV_POS[i]
+        if q then
+            local vx, vy = q.x + q.w / 2 - cx, q.y + q.h / 2 - cy
+            local along, across = vx * dx + vy * dy, math.abs(dx ~= 0 and vy or vx)
+            if along > 0 and across <= 2 * along then   -- (roughly that way: within ~63 degrees)
+                local score = along + 2 * across
+                if not best_score or score < best_score then best, best_score = i, score end
+            elseif along <= 0 then   -- the far side, as level as can be
+                local score = 2 * across + along
+                if not wrap_score or score < wrap_score then wrap, wrap_score = i, score end
+            end
+        end
+    end
+    self.inv_cursor = best or wrap or cur
+end
+
+-- X on the bag screen: what the cursor is on goes on the ground.
+function Game:inv_drop()
+    local row = INV_ROWS[self.inv_cursor]
+    if not row or row[1] == "ground" or not self:get_stack(row[1], row[2]) then return false end
+    self.inv_selected = nil
+    return self:try_transfer({row[1], row[2]}, {"ground"})
+end
+
 -- Everything the bag screen shows except where the cursor is: when only the
 -- cursor moved, the screen is patched instead of redrawn.
 function Game:inv_signature()
@@ -12255,25 +12448,63 @@ function Game:inv_stats_lines()
             ("HP %d Rest %d Warm %s"):format(math.floor(p.health), math.floor(p.needs.rest), warm)}
 end
 
--- What the cursor is on and what it does, under the bag.
+-- An item's numbers, short: "Warm 3, +2 cells", "12 dmg, close, bleed 30%",
+-- "Hunger +40". nil when it has none. (Radiation only shows as a number
+-- once you can measure it.)
+function Game:item_stats(item)
+    local d, out = ITEM_DB[item], {}
+    local function add(s) out[#out + 1] = s end
+    if (d.warmth or 0) > 0 then add("Warm " .. d.warmth) end
+    if d.bag_cells then add(d.bag_cells .. " bag cells") end
+    local cells = (d.pocket_cells or 0) + (d.belt_cells or 0)
+    if cells > 0 then add("+" .. cells .. (cells > 1 and " cells" or " cell")) end
+    if d.rad_armor then add(self:can_measure() and ("rads x" .. d.rad_armor) or "filters air") end
+    if d.fx and d.fx.mp then add(d.fx.mp .. " MP") end
+    if d.light then add("light") end
+    if d.fish_bonus then add("fish +" .. d.fish_bonus .. "%") end
+    if d.shoot then
+        add("shot " .. d.shoot.dmg .. " dmg")
+    elseif d.weapon then
+        add(d.weapon.dmg .. " dmg, " .. (d.weapon.thrown and "thrown" or d.weapon.reach))
+        if (d.weapon.bleed or 0) > 0 then add("bleed " .. d.weapon.bleed .. "%") end
+    end
+    for _, need in ipairs({"hunger", "thirst", "rest", "rads"}) do
+        local v = d.consumable and d.consumable[need]
+        if v and (need ~= "rads" or self:can_measure()) then
+            add(need:sub(1, 1):upper() .. need:sub(2) .. " " .. (v > 0 and "+" or "") .. v)
+        end
+    end
+    if #out == 0 then return nil end
+    return table.concat(out, ", ")
+end
+
+-- What the cursor is on, its numbers and what it does, under the bag (at
+-- most three lines), then your own numbers.
 function Game:draw_inv_desc(w, clear)
+    local top = CURSOR_DESC_Y - 7
     if clear then
         gfx.color(gfx.WHITE)
-        gfx.fill_rect(INV_COL_X, CURSOR_DESC_Y - 11, w - INV_COL_X, 30)
+        gfx.fill_rect(INV_COL_X, top - 10, w - INV_COL_X, CONDITIONS_Y - top)
     end
     gfx.color(gfx.BLACK)
     gfx.font(gfx.FONT_MONO_12)
-    local desc = self:cursor_description()
     local max_chars = (w - INV_COL_X - 2) // 7
-    if #desc > max_chars then desc = desc:sub(1, max_chars) end
-    gfx.text(INV_COL_X, CURSOR_DESC_Y, desc)
     local row = INV_ROWS[self.inv_cursor]
     local stack = row and self:get_stack(row[1], row[2])
-    local effect = stack and ITEM_DB[stack.item].desc
-    if effect then gfx.text(INV_COL_X, CURSOR_DESC_Y + 14, effect:sub(1, max_chars)) end
+    local lines = wrap(self:cursor_description(), max_chars)
+    if stack then
+        for _, text in ipairs({self:item_stats(stack.item) or false, ITEM_DB[stack.item].desc or false}) do
+            if text then
+                for _, l in ipairs(wrap(text, max_chars)) do lines[#lines + 1] = l end
+            end
+        end
+    end
+    for i = 1, math.min(3, #lines) do
+        gfx.text(INV_COL_X, top + 12 * (i - 1), lines[i]:sub(1, max_chars))
+    end
     -- your numbers, above the conditions (here because the erase above reaches them)
     for i, line in ipairs(self:inv_stats_lines()) do
-        gfx.text(INV_COL_X, CONDITIONS_Y - 28 + 13 * (i - 1), line:sub(1, max_chars))
+        gfx.text(INV_COL_X, CONDITIONS_Y - 25 + 12 * (i - 1), line:sub(1, max_chars))
     end
 end
 
@@ -12487,7 +12718,7 @@ function Game:draw_inventory(w, h)
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
     gfx.font(gfx.FONT_MONO_12)
-    gfx.text(4, 12, "Up/Dn Enter:move E:use C:craft I:map J:journal H:help")
+    gfx.text(4, 12, "Arrows Enter:move E:use X:drop C:craft I:map H:help")
 
     INV_ROWS = {}
     INV_POS = {}
@@ -12543,7 +12774,9 @@ function Game:draw_inventory(w, h)
         return INV_COL_X + 2 + col * (BACKPACK_CELL + BACKPACK_GAP),
                BACKPACK_Y + row * (BACKPACK_CELL + BACKPACK_GAP)
     end
-    for i = 1, math.min(math.max(n_inv, math.min(n_inv + 1, capacity)), BACKPACK_CAP) do
+    -- (every cell is a row: the cursor can reach any pocket, and an empty
+    -- one takes what you drop on it)
+    for i = 1, math.min(math.max(n_inv, capacity), BACKPACK_CAP) do
         local x, y = bag_cell(i)
         add_row("inventory", i, x, y, BACKPACK_CELL, BACKPACK_CELL)
     end
@@ -12559,11 +12792,6 @@ function Game:draw_inventory(w, h)
                 i == self.inv_cursor,
                 self.inv_selected and self.inv_selected[1] == row[1] and self.inv_selected[2] == row[2])
         end
-    end
-
-    for i = n_inv + 2, capacity do
-        local x, y = bag_cell(i)
-        self:draw_slot_box(x, y, BACKPACK_CELL, BACKPACK_CELL, nil, false, false)
     end
 
     gfx.color(gfx.BLACK)
@@ -13346,6 +13574,8 @@ function Game:begin_intro(saved)
     self.title_cursor = 1
     self.intro_phase = 0
     self.screen = "intro"
+    self.muted = saved and saved.muted or nil   -- (sound off last time: still off)
+    self:sfx("title")
 end
 
 -- Big letters from runs of filled cells (one fill_rect per run).
@@ -13886,7 +14116,7 @@ function Game:draw_craft(w, h)
         if icon and draw_sprite then
             draw_sprite(w - 26, y - 12, SPRITE_W, SPRITE_H, icon)
         end
-        gfx.text(x, y, r.out and ("Makes: " .. ITEM_DB[r.out[1]].name)
+        gfx.text(x, y, r.out and ("Makes: " .. ITEM_DB[r.out[1]].name .. (r.out[2] > 1 and (" x" .. r.out[2]) or ""))
             or (r.study and self:study_text(r.study))
             or (r.clean and "Cleans your guns: less jamming")
             or (r.base == "claim" and "Makes this ruin your camp")
@@ -13975,7 +14205,7 @@ function Game:draw_trade(w, h)
     local _, cfg = self:trade_partner()
     gfx.text(6, 16, cfg.name)
     gfx.font(gfx.FONT_MONO_12)
-    gfx.text(200, 16, ("They ask x%.1f value"):format(cfg.markup))
+    gfx.text(200, 16, ("Prices x%.1f, in rubles"):format(cfg.markup))
     for _, col in ipairs({"mine", "theirs"}) do
         local x = L.col_x[col]
         local rows = self:trade_rows(col)
@@ -13988,7 +14218,8 @@ function Game:draw_trade(w, h)
             local s = rows[i]
             local y = L.top + (i - first) * L.row_h
             local n = pick[s.item]
-            local text = ("%-13s x%-2d %3d%s"):format(ITEM_DB[s.item].name:sub(1, 13), s.qty,
+            local def = ITEM_DB[s.item]
+            local text = ("%-13s x%-3d%3d%s"):format((def.short or def.name):sub(1, 13), s.qty,
                                                     Game.item_value(s.item), n and (" +" .. n) or "")
             if i == c and col == u.col then
                 gfx.color(gfx.BLACK)
@@ -14006,7 +14237,7 @@ function Game:draw_trade(w, h)
     gfx.color(gfx.BLACK)
     gfx.line(200, 26, 200, L.top + L.rows * L.row_h - 10)
     local give, ask = self:trade_totals()
-    gfx.text(6, 234, ("You give %d   They ask %d"):format(give, ask))
+    gfx.text(6, 234, ("You give %d   They ask %d   (in rubles)"):format(give, ask))
     gfx.text(6, 252, u.msg or "")
     gfx.text(6, h - 8, "Arrows Enter:+1 E:-1 T:deal O:work Q:leave")
     gfx.refresh()
@@ -14076,7 +14307,7 @@ end
 -- info page is for testing on a new board: what the game sees of SolarOS.
 -- ---------------------------------------------------------------------
 
-Game.VERSION = "0.11 (2026-10-02)"
+Game.VERSION = "0.12 (2026-10-04)"
 
 local HELP = {
     {"MAP", "Lt/Rt step; Up/Dn then Lt/Rt: diagonal"},
@@ -14085,7 +14316,8 @@ local HELP = {
     {"", "T trade/Checkpoint   C craft   J journal"},
     {"", "G hunt, or fish   R radio   M sound"},
     {"BAG", "Arrows pick  Enter select, Enter move"},
-    {"", "E use: eat, wear, read, play a tape, set"},
+    {"", "E use: eat, wear, read, play   X drop"},
+    {"", "Drop on a full cell: they swap"},
     {"CRAFT", "Up/Dn pick  Enter make  C/Q back"},
     {"TRADE", "Lt/Rt side  Enter +1  E -1  T deal  O work"},
     {"FIGHTS", "Up/Dn pick  Enter choose"},
@@ -14099,12 +14331,24 @@ local HELP = {
     {"", "C in a ruin: claim it. Carry light at night."},
     {"", "Skills grow with use (J). R on the title: records."},
     {"", "Mother Okun trades by the river; a Peddler roams."},
+    {"", "Traders deal in rubles. A knife cuts clothes up."},
     {"", "Leave toys at little cairns (E or T)."},
 }
 
 function Game:open_help()
     self.help_back = self.screen
+    self.help_page = 1
     self.screen = "help"
+end
+
+-- The help rows on page n: the keys (1), the tips (2). They don't fit one screen.
+function Game.help_rows(n)
+    local out, tips = {}, false
+    for _, row in ipairs(HELP) do
+        if row[1] == "TIPS" then tips = true end
+        if tips == (n == 2) then out[#out + 1] = row end
+    end
+    return out
 end
 
 function Game:help_key(key)   -- help, info and journal: any key goes back
@@ -14115,6 +14359,12 @@ function Game:help_key(key)   -- help, info and journal: any key goes back
     if self.screen == "journal" and key == KEY.F then return self:open_finds() end
     if self.screen == "help" and key == KEY.V then
         self.screen = "info"
+    elseif self.screen == "help" and (self.help_page or 1) == 1
+        and (key == gfx.KEY_DOWN or key == gfx.KEY_RIGHT or key == KEY.S or key == KEY.D) then
+        self.help_page = 2
+    elseif self.screen == "help" and self.help_page == 2
+        and (key == gfx.KEY_UP or key == gfx.KEY_LEFT or key == KEY.W or key == KEY.A) then
+        self.help_page = 1
     else
         self.screen = self.help_back or "map"
     end
@@ -14124,16 +14374,21 @@ function Game:draw_help(w, h)
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
     gfx.font(gfx.FONT_BOLD_14)
-    gfx.text(6, 16, "Keys")
+    local page = self.help_page or 1
+    gfx.text(6, 16, page == 1 and "Keys" or "Tips")
     gfx.font(gfx.FONT_MONO_12)
     local y = 36
-    for _, row in ipairs(HELP) do
-        if row[1] ~= "" then y = y + 3 end
-        gfx.text(6, y, row[1])
-        gfx.text(62, y, row[2])
+    for _, row in ipairs(Game.help_rows(page)) do
+        if page == 2 then   -- (no label column: the tips are long)
+            gfx.text(6, y, row[2])
+        else
+            if row[1] ~= "" then y = y + 3 end
+            gfx.text(6, y, row[1])
+            gfx.text(62, y, row[2])
+        end
         y = y + 15
     end
-    gfx.text(6, h - 8, "Any key: back   V: device info")
+    gfx.text(6, h - 8, (page == 1 and "Dn: tips" or "Up: keys") .. "  any key: back  V: device info")
     gfx.refresh()
 end
 
@@ -14371,10 +14626,16 @@ local ok, err = pcall(function()
         elseif key == KEY.C then
             game.inv_selected = nil
             game:open_crafting()
-        elseif key == gfx.KEY_UP or key == KEY.W or key == gfx.KEY_LEFT or key == KEY.A then
-            game.inv_cursor = math.max(1, game.inv_cursor - 1)
-        elseif key == gfx.KEY_DOWN or key == KEY.S or key == gfx.KEY_RIGHT or key == KEY.D then
-            game.inv_cursor = math.min(#INV_ROWS, game.inv_cursor + 1)
+        elseif key == gfx.KEY_UP or key == KEY.W then
+            game:inv_move(0, -1)
+        elseif key == gfx.KEY_DOWN or key == KEY.S then
+            game:inv_move(0, 1)
+        elseif key == gfx.KEY_LEFT or key == KEY.A then
+            game:inv_move(-1, 0)
+        elseif key == gfx.KEY_RIGHT or key == KEY.D then
+            game:inv_move(1, 0)
+        elseif key == KEY.X or key == KEY.BACKSPACE then
+            game:inv_drop()
         elseif key == KEY.E then
             local row = INV_ROWS[game.inv_cursor]
             if row then

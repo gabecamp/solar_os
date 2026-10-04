@@ -26,7 +26,7 @@ local POLL_MS = 250
 -- SolarOS sends Enter as '\n' (LF); CR is kept just in case.
 local KEY = {SPACE = 32, ENTER = 13, LF = 10, ESC = 27,
              A = 97, C = 99, D = 100, E = 101, F = 102, I = 105, Q = 113,
-             S = 115, T = 116, W = 119, H = 104, V = 118, G = 103, M = 109, J = 106, R = 114, O = 111, L = 108, K = 107, Y = 121,
+             S = 115, T = 116, W = 119, H = 104, V = 118, G = 103, M = 109, J = 106, R = 114, O = 111, L = 108, K = 107, Y = 121, X = 120, BACKSPACE = 8,
              CLOSE = 0xF0}   -- (the PC window's close button; the device never sends it)
 
 -- Terrain: id -> {name, cost (MP + hours), passable, shade}
@@ -157,7 +157,7 @@ local TRADE = {
         rag_shirt = 1, rag_trousers = 1, foot_wraps = 1, rag_hood = 1, hand_wraps = 1, ear_wraps = 1,
         slit_goggles = 1, rag_scarf = 1, patch_coat = 4, scrap_bracers = 2, bindle = 3, sack_pack = 5, rag_mask = 2,
         weeping_stone = 35, drowned_eye = 35, flesh_knot = 35, hollow_star = 35,
-        quiet_shell = 35, permit = 80,
+        quiet_shell = 35, permit = 150,
         leather_belt = 10, rope_belt = 4, scrap_metal = 3, jerky = 6,
         shiv = 6, machete = 18, spiked_club = 12, pipe_spear = 15, splint = 5,
         fishing_rod = 8, snare = 4, raw_fish = 3, cooked_fish = 6,

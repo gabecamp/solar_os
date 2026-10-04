@@ -103,7 +103,7 @@ end
 
 -- nil if you can make it now, else the reason you can't.
 function Game:craft_blocker(r)
-    if not (r.repair or r.study or self.known[r.id]) then return "You don't know how to make that." end
+    if not (r.repair or r.study or r.cut or self.known[r.id]) then return "You don't know how to make that." end
     if r.study then return self:study_blocker(r.study) end
     if r.base then
         local why = self:base_blocker(r)
@@ -212,14 +212,45 @@ function Game:read_notes()
     return true
 end
 
-function Game:known_recipes()
-    local list = {}
-    for _, r in ipairs(RECIPES) do
-        if self.known[r.id] then list[#list + 1] = r end
+-- "Cut up" recipes for the clothes in reach (not on your body): Cloth
+-- Scraps, with any sharp edge (CHURN.cut).
+function Game:cut_recipes()
+    local list, seen = {}, {}
+    local function add(item)
+        local n = CHURN.cut.scraps[item]
+        if n and not seen[item] then
+            seen[item] = true
+            list[#list + 1] = {id = "cut_" .. item, name = "Cut Up " .. ITEM_DB[item].name,
+                               inputs = {[item] = 1}, tools = {"@sharp"}, hours = CHURN.cut.hours,
+                               out = {"cloth_scrap", n}, cut = true}
+        end
     end
-    for _, r in ipairs(self:repair_recipes()) do list[#list + 1] = r end   -- broken tech you carry
-    for _, r in ipairs(self:study_recipes()) do list[#list + 1] = r end    -- research (59_research)
+    for _, s in ipairs(self.player.inventory) do add(s.item) end
+    for _, s in ipairs(self:ground_list()) do add(s.item) end
+    for _, slot in ipairs({"rhand", "lhand"}) do
+        if self.player.equipped[slot] then add(self.player.equipped[slot]) end
+    end
+    table.sort(list, function(a, b) return a.name < b.name end)
     return list
+end
+
+-- What the crafting screen lists: what you can make right now first, then
+-- the rest (each part in its usual order).
+function Game:known_recipes()
+    local all = {}
+    for _, r in ipairs(RECIPES) do
+        if self.known[r.id] then all[#all + 1] = r end
+    end
+    for _, r in ipairs(self:repair_recipes()) do all[#all + 1] = r end   -- broken tech you carry
+    for _, r in ipairs(self:study_recipes()) do all[#all + 1] = r end    -- research (59_research)
+    for _, r in ipairs(self:cut_recipes()) do all[#all + 1] = r end      -- clothes into cloth
+    local ready, rest = {}, {}
+    for _, r in ipairs(all) do
+        local list = self:craft_blocker(r) == nil and ready or rest
+        list[#list + 1] = r
+    end
+    for _, r in ipairs(rest) do ready[#ready + 1] = r end
+    return ready
 end
 
 function Game:open_crafting()
@@ -236,7 +267,13 @@ function Game:craft_key(key)
     elseif key == gfx.KEY_DOWN or key == KEY.S then
         c.cursor = math.min(#list, c.cursor + 1)
     elseif key == KEY.ENTER or key == KEY.LF or key == KEY.SPACE then
-        if list[c.cursor] then self:craft(list[c.cursor]) end
+        local r = list[c.cursor]
+        if r and self:craft(r) then
+            -- the list reorders (ready first): stay on the same recipe
+            for i, r2 in ipairs(self:known_recipes()) do
+                if r2.id == r.id then c.cursor = i end
+            end
+        end
     elseif key == KEY.C or key == gfx.KEY_ESCAPE or key == KEY.I then
         self.screen = c.back == "craft" and "map" or c.back
     end

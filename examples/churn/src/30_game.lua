@@ -241,10 +241,7 @@ function Game:scavenge()
     for _ = 1, p.scav_rolls do
         local item
         self.seed, item = weighted_pick(self.seed, table_)
-        if item ~= "nothing" then
-            self:put_stack("ground", nil, {item = item, qty = 1})
-            found[#found + 1] = ITEM_DB[item].name
-        end
+        if item ~= "nothing" then found[#found + 1] = self:drop_found(item) end
     end
     self:skill_xp("scav", SKILLS.xp.search + SKILLS.xp.find * #found)
     self:stat("searches")
@@ -417,6 +414,32 @@ function Game:try_transfer(source, dest)
     for slot, c in pairs(p.wear or {}) do saved_wear[slot] = c end
     local cap_before = self:bag_capacity()
 
+    -- onto a bag cell that holds something else: they trade places (the one
+    -- there goes where this came from: the ground, its bag cell, or the bag)
+    local there, moving = d_kind == "inventory" and d_key and p.inventory[d_key], self:get_stack(s_kind, s_key)
+    if there and moving and not (there.item == moving.item and there.cond == moving.cond) then
+        if s_kind == "inventory" then
+            p.inventory[s_key], p.inventory[d_key] = there, moving
+            self:push_log("Moved " .. ITEM_DB[moving.item].name .. ".")
+            return true
+        end
+        local ok = self:remove_stack(s_kind, s_key) ~= nil
+        p.inventory[d_key] = moving
+        if s_kind == "ground" or not add_to_list(p.inventory, there, self:bag_capacity()) then
+            add_to_list(self:ground_list(), there)
+        end
+        local cap = self:bag_capacity()
+        if #p.inventory > cap and cap < cap_before then ok = false end
+        if not ok then
+            p.inventory, p.equipped, p.wear = saved_inv, saved_eq, saved_wear
+            self.ground[hex_key(p.q, p.r)] = saved_ground
+            self:push_log("Bag too small - empty it first.")
+            return false
+        end
+        recompute_stats(p)
+        self:push_log("Swapped out " .. ITEM_DB[there.item].name .. ".")
+        return true
+    end
     local stack = self:remove_stack(s_kind, s_key)
     if not stack then return false end
     local ok = self:put_stack(d_kind, d_key, stack)
@@ -466,6 +489,15 @@ end
 function Game:use_one(kind, k, stack)
     stack.qty = stack.qty - 1
     if stack.qty <= 0 then self:remove_stack(kind, k) end
+end
+
+-- Something found (a search, a body, a crate) onto the ground here; its name
+-- for the log. qty: how many (else 1, or a pile's roll: ITEM_DB[..].pile).
+function Game:drop_found(item, qty)
+    local pile = ITEM_DB[item].pile
+    qty = qty or (pile and pile[1] + self:rand(pile[2] - pile[1] + 1)) or 1
+    self:put_stack("ground", nil, {item = item, qty = qty})
+    return ITEM_DB[item].name .. (qty > 1 and (" x" .. qty) or "")
 end
 
 -- E on the inventory screen: the obvious thing for the item under the cursor.

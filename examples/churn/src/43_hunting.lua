@@ -14,7 +14,7 @@ function Game:gather()
         self:push_log("Too tired. Rest first.")
         return
     end
-    if self:near_water() and self:carrying("fishing_rod") then return self:fish() end
+    if self:near_water() and self:count_item("fishing_rod") > 0 then return self:fish() end
     local terrain = self.tiles[hex_key(p.q, p.r)]
     if not HUNT.snare_chance[terrain] then
         self:push_log(self:near_water() and "No rod to fish with. (C to make one)" or "No game here.")

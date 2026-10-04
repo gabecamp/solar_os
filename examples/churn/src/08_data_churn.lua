@@ -194,14 +194,17 @@ for id, def in pairs({
     book_gunsmith = {name = "Gunsmith's Ledger", book = "gunsmithing", desc = "E: read (Gunsmithing)"},
     book_hymnal  = {name = "The Choir Hymnal", book = "warding", desc = "E: read (Warding). Costs you"},
     cassette_player = {name = "Cassette Player", desc = "Plays tapes; Battery Cell: E"},
-    tape_cook    = {name = "Tape: Day Forty", desc = "E: play it"},
-    tape_medic   = {name = "Tape: The Medic", desc = "E: play it"},
-    tape_gun     = {name = "Tape: Count Rounds", desc = "E: play it"},
-    tape_choir   = {name = "Tape: The Choir", desc = "E: play it"},
-    tape_lab     = {name = "Tape: Institute 7", desc = "E: play it"},
-    tape_tinker  = {name = "Tape: I Went North", desc = "E: play it"},
-    tape_vesna   = {name = "Tape: Vesna, Day 9", desc = "E: play it"},
-    blank_tape   = {name = "Blank Tape",   desc = "Played out"},
+    tape_cook    = {name = "Cassette Tape: Day Forty", short = "Tape: Day Forty", desc = "E: play it"},
+    tape_medic   = {name = "Cassette Tape: The Medic", short = "Tape: The Medic", desc = "E: play it"},
+    tape_gun     = {name = "Cassette Tape: Count Rounds", short = "Tape: Count Rounds", desc = "E: play it"},
+    tape_choir   = {name = "Cassette Tape: The Choir", short = "Tape: The Choir", desc = "E: play it"},
+    tape_lab     = {name = "Cassette Tape: Institute 7", short = "Tape: Institute 7", desc = "E: play it"},
+    tape_tinker  = {name = "Cassette Tape: I Went North", short = "Tape: I Went North", desc = "E: play it"},
+    tape_vesna   = {name = "Cassette Tape: Vesna, Day 9", short = "Tape: Vesna, Day 9", desc = "E: play it"},
+    blank_tape   = {name = "Blank Cassette Tape", short = "Blank Tape", desc = "Played out"},
+    -- money: traders pay it for what you sell and take it for what they sell
+    -- (TRADE.value 1 each); found in piles of pile = {lo, hi} (Game:drop_found)
+    rubles       = {name = "Rubles",       pile = {5, 25}, desc = "Money. Every trader takes it"},
     usb_drive    = {name = "USB Drive",    desc = "E: pair it with the LoRa Radio"},
     -- handguns: weapon = pistol-whip at arm's length; shoot = the shot (CHURN.guns)
     pm_pistol    = {name = "PM Pistol",    weapon = {dmg = 5, reach = "close"},
@@ -378,7 +381,8 @@ for _, r in ipairs({
 -- stingy) but what it does turn up is more varied.
 for terrain, adds in pairs({
     plains = {{"glass_shard", 2}, {"string", 2}, {"newspaper", 2}, {"tin_can", 2}, {"matches", 1},
-              {"foil", 1}, {"screws", 1}, {"tarp", 1}, {"brass", 1}, {"usb_drive", 1}, {"book_field", 1}},
+              {"foil", 1}, {"screws", 1}, {"tarp", 1}, {"brass", 1}, {"usb_drive", 1}, {"book_field", 1},
+              {"rubles", 1}},
     forest = {{"large_branch", 4}, {"bark", 4}, {"feathers", 2}, {"bone", 2}, {"string", 1},
               {"tape_cook", 1}},
     ruins  = {{"glass_shard", 3}, {"string", 2}, {"tin_can", 3}, {"metal_pot", 1}, {"matches", 2},
@@ -388,7 +392,8 @@ for terrain, adds in pairs({
               {"usb_drive", 1}, {"cassette_player", 1}, {"tape_medic", 1}, {"tape_tinker", 1}, {"tape_vesna", 1},
               {"tape_gun", 1}, {"book_tailor", 1}, {"book_surgeon", 1}, {"book_radio", 1},
               {"brass", 2}, {"lead_scrap", 1}, {"r9x18", 1}, {"r762t", 1}, {"gun_spring", 1},
-              {"magazine", 1}, {"frame_pm", 1}, {"gun_barrel", 1}, {"firing_pin", 1}, {"gun_slide", 1}},
+              {"magazine", 1}, {"frame_pm", 1}, {"gun_barrel", 1}, {"firing_pin", 1}, {"gun_slide", 1},
+              {"rubles", 3}},
     hills  = {{"bone", 3}, {"large_branch", 2}, {"salt", 1}, {"hunting_knife", 1}, {"r762n", 1},
               {"frame_nagant", 1}, {"cylinder", 1}, {"tape_choir", 1}, {"book_hymnal", 1}, {"pale_wax", 1}},
     ford   = {{"glass_shard", 2}, {"bone", 1}, {"tin_can", 1}, {"choir_wire", 1}},
@@ -408,7 +413,7 @@ end
 CHURN.crate_loot = {{"book_lab", 2}, {"book_gunsmith", 2}, {"tape_lab", 2}, {"gunsmith_kit", 2},
                     {"frame_tt", 2}, {"frame_inst", 1}, {"chemicals", 4}, {"gunpowder", 3},
                     {"r9x18", 4}, {"r762t", 2}, {"pm_pistol", 1}, {"tokarev", 1}, {"nagant", 1},
-                    {"inst_sidearm", 1}, {"usb_drive", 3}, {"medkit", 2}, {"antirad", 3}}
+                    {"inst_sidearm", 1}, {"usb_drive", 3}, {"medkit", 2}, {"antirad", 3}, {"rubles", 3}}
 CHURN.crate_chance = 35   -- % a ruin hex has a locked crate to pick
 
 -- Jobs for the new loot (src/52_quests.lua, 46_peddler) and the rare dead
@@ -429,7 +434,7 @@ CHURN.corpse = {chance = 3, prefix = "corpse:",
     loot = {{"tape_cook", 2}, {"tape_gun", 2}, {"tape_choir", 1}, {"tape_lab", 1}, {"tape_tinker", 2},
             {"book_field", 2}, {"book_gunsmith", 1}, {"book_tailor", 1}, {"usb_drive", 3},
             {"gun_spring", 1}, {"firing_pin", 1}, {"gun_barrel", 1}, {"r9x18", 2}, {"r762t", 1},
-            {"cassette_player", 1}},
+            {"cassette_player", 1}, {"rubles", 3}},
     rounds = {r9x18 = 3, r762t = 3},   -- (+0..2)
     epitaphs = {"A churner in a gas mask, still holding a bolt.",
                 "A churner under a collapsed stair, one boot off, as if they meant to run.",
@@ -530,9 +535,9 @@ for _, e in ipairs(ENCOUNTERS) do
         ["fused pair"] = {{"ichor", 2}, {"bone", 1}},
         ["mouthless man"] = {{"ichor", 1}, {"locked_phone", 1}},
         bloom = {{"ichor", 1}, {"pale_eye", 1}},
-        bandit = {{"brass", 2}, {"r9x18", 1}, {"pm_pistol", 1}, {"gun_spring", 1}, {"lighter", 1}},
-        ["toll man"] = {{"brass", 1}, {"r762n", 1}, {"frame_pm", 1}, {"matches", 1}},
-        ["rival churner"] = {{"brass", 2}, {"gun_spring", 1}, {"firing_pin", 1}, {"book_gunsmith", 1}},
+        bandit = {{"brass", 2}, {"r9x18", 1}, {"pm_pistol", 1}, {"gun_spring", 1}, {"lighter", 1}, {"rubles", 3}},
+        ["toll man"] = {{"brass", 1}, {"r762n", 1}, {"frame_pm", 1}, {"matches", 1}, {"rubles", 4}},
+        ["rival churner"] = {{"brass", 2}, {"gun_spring", 1}, {"firing_pin", 1}, {"book_gunsmith", 1}, {"rubles", 3}},
     })[e.who]
     if extra and e.loot then
         for _, x in ipairs(extra) do e.loot[#e.loot + 1] = x end
@@ -555,7 +560,7 @@ for id, v in pairs({
     rad_purge = 30, flare = 6, choir_cell = 40, salt_circle = 8, black_candle = 20, glow_jar = 15,
     choir_charm = 30, elder_sign = 25,
     book_tailor = 10, book_field = 10, book_surgeon = 14, book_radio = 14, book_lab = 20,
-    book_gunsmith = 25, book_hymnal = 30, cassette_player = 15, blank_tape = 1, usb_drive = 15,
+    book_gunsmith = 25, book_hymnal = 30, cassette_player = 15, blank_tape = 1, rubles = 1, usb_drive = 15,
     tape_cook = 6, tape_medic = 6, tape_gun = 6, tape_choir = 6, tape_lab = 6, tape_tinker = 6, tape_vesna = 6,
     pm_pistol = 60, nagant = 65, tokarev = 75, inst_sidearm = 100, marsh_revolver = 120,
     bow = 15, sling = 3, arrow = 2, r9x18 = 4, r762n = 4, r762t = 5, r38 = 8,
@@ -580,3 +585,11 @@ end
 end
 -- one Marsh Revolver lies somewhere in each world (a relic: never made)
 TECH.world_items[#TECH.world_items + 1] = "marsh_revolver"
+
+-- Cutting clothes up for cloth (35_crafting: a "Cut up" recipe shows for each
+-- piece you have off your body, with a sharp edge as the tool): how many
+-- Cloth Scraps each gives. A torn piece gives half (at least 1).
+CHURN.cut = {hours = 1, scraps = {
+    tshirt = 2, jeans = 3, scarf = 1, cap = 1, gloves = 1, earmuffs = 1, rag_shirt = 1, rag_trousers = 1,
+    foot_wraps = 1, rag_hood = 1, hand_wraps = 1, ear_wraps = 1, rag_scarf = 1, patch_coat = 3,
+    bindle = 2, sack_pack = 3, rag_mask = 1, satchel = 2, rag_shoes = 1, backpack = 3}}

@@ -5,7 +5,7 @@
 -- info page is for testing on a new board: what the game sees of SolarOS.
 -- ---------------------------------------------------------------------
 
-Game.VERSION = "0.11 (2026-10-02)"
+Game.VERSION = "0.12 (2026-10-04)"
 
 local HELP = {
     {"MAP", "Lt/Rt step; Up/Dn then Lt/Rt: diagonal"},
@@ -14,7 +14,8 @@ local HELP = {
     {"", "T trade/Checkpoint   C craft   J journal"},
     {"", "G hunt, or fish   R radio   M sound"},
     {"BAG", "Arrows pick  Enter select, Enter move"},
-    {"", "E use: eat, wear, read, play a tape, set"},
+    {"", "E use: eat, wear, read, play   X drop"},
+    {"", "Drop on a full cell: they swap"},
     {"CRAFT", "Up/Dn pick  Enter make  C/Q back"},
     {"TRADE", "Lt/Rt side  Enter +1  E -1  T deal  O work"},
     {"FIGHTS", "Up/Dn pick  Enter choose"},
@@ -28,12 +29,24 @@ local HELP = {
     {"", "C in a ruin: claim it. Carry light at night."},
     {"", "Skills grow with use (J). R on the title: records."},
     {"", "Mother Okun trades by the river; a Peddler roams."},
+    {"", "Traders deal in rubles. A knife cuts clothes up."},
     {"", "Leave toys at little cairns (E or T)."},
 }
 
 function Game:open_help()
     self.help_back = self.screen
+    self.help_page = 1
     self.screen = "help"
+end
+
+-- The help rows on page n: the keys (1), the tips (2). They don't fit one screen.
+function Game.help_rows(n)
+    local out, tips = {}, false
+    for _, row in ipairs(HELP) do
+        if row[1] == "TIPS" then tips = true end
+        if tips == (n == 2) then out[#out + 1] = row end
+    end
+    return out
 end
 
 function Game:help_key(key)   -- help, info and journal: any key goes back
@@ -44,6 +57,12 @@ function Game:help_key(key)   -- help, info and journal: any key goes back
     if self.screen == "journal" and key == KEY.F then return self:open_finds() end
     if self.screen == "help" and key == KEY.V then
         self.screen = "info"
+    elseif self.screen == "help" and (self.help_page or 1) == 1
+        and (key == gfx.KEY_DOWN or key == gfx.KEY_RIGHT or key == KEY.S or key == KEY.D) then
+        self.help_page = 2
+    elseif self.screen == "help" and self.help_page == 2
+        and (key == gfx.KEY_UP or key == gfx.KEY_LEFT or key == KEY.W or key == KEY.A) then
+        self.help_page = 1
     else
         self.screen = self.help_back or "map"
     end
@@ -53,16 +72,21 @@ function Game:draw_help(w, h)
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
     gfx.font(gfx.FONT_BOLD_14)
-    gfx.text(6, 16, "Keys")
+    local page = self.help_page or 1
+    gfx.text(6, 16, page == 1 and "Keys" or "Tips")
     gfx.font(gfx.FONT_MONO_12)
     local y = 36
-    for _, row in ipairs(HELP) do
-        if row[1] ~= "" then y = y + 3 end
-        gfx.text(6, y, row[1])
-        gfx.text(62, y, row[2])
+    for _, row in ipairs(Game.help_rows(page)) do
+        if page == 2 then   -- (no label column: the tips are long)
+            gfx.text(6, y, row[2])
+        else
+            if row[1] ~= "" then y = y + 3 end
+            gfx.text(6, y, row[1])
+            gfx.text(62, y, row[2])
+        end
         y = y + 15
     end
-    gfx.text(6, h - 8, "Any key: back   V: device info")
+    gfx.text(6, h - 8, (page == 1 and "Dn: tips" or "Up: keys") .. "  any key: back  V: device info")
     gfx.refresh()
 end
 

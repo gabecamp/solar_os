@@ -312,8 +312,7 @@ function Game:open_quest_crate()
     for _ = 1, C.rolls do
         local item
         self.seed, item = weighted_pick(self.seed, CHURN.crate_loot)
-        self:put_stack("ground", nil, {item = item, qty = 1})
-        found[#found + 1] = ITEM_DB[item].name
+        found[#found + 1] = self:drop_found(item)
     end
     self:skill_xp("tinker", SKILLS.xp.repair)
     self.quest = nil

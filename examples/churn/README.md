@@ -16,7 +16,10 @@ the Checkpoint alive.
   (K there shows your skills and the recipes you know, F your finds),
   R calls on the radio, M mutes, Q quits (during a run it asks first: Q or
   Enter again to quit). **H** in game lists every key.
-  The bag (I) shows your HP, hunger, thirst, rest and warmth.
+  The bag (I) shows your HP, hunger, thirst, rest and warmth, and the
+  numbers of what the cursor is on (warmth, pockets, damage, food). Arrows
+  move round the bag, the body and the ground; Enter picks up and Enter
+  puts down (on a full cell the two swap); **X** drops.
   The first time you're cold, hungry, thirsty, tired, bleeding, by a fire,
   holding a book or a radio, a **Tip:** line in the log says what helps (once a run).
 - **You start with nothing:** no clothes, no shoes, no bag, and you know
@@ -35,6 +38,11 @@ the Checkpoint alive.
   out in a storm; rags twice as fast. A torn piece (the bag shows "40%" or
   "(torn)" under the cursor) gives no warmth and holds half as much until
   you patch it: **Patch clothes** on the crafting screen, 1 cloth scrap.
+  Any sharp edge cuts a spare piece up for cloth (**Cut Up ...** on the
+  crafting screen, which lists what you can make right now first).
+- **Money:** rubles turn up in ruins, on the dead and on bandits. Traders
+  pay rubles for what you sell, take them for the rest of a price, and
+  give change in rubles.
 - **On a PC or Raspberry Pi:** `python_version/` runs this same game in a
   pygame window. One command installs it: `install.sh` on Linux or a Pi,
   `install.ps1` on Windows (see its README), or by hand `pip install pygame-ce lupa`,
@@ -188,7 +196,7 @@ What the Churn is like now:
   town (always a ruins hex). **T** on his hex opens barter. He asks 1.5x
   what your goods are worth and restocks every 48 hours. He sells
   Anti-Rad, food and water, a Geiger counter, a gas mask, a Multitool and
-  the one **Churn Permit** in the Churn (it's expensive). The first time you
+  the one **Churn Permit** in the Churn (225 rubles). The first time you
   reach him he tells you where the Checkpoint is.
   - **Work (O on the trade screen):** *"Bring me an artifact"* (paid in
     Anti-Rad, food and a Battery Cell), or *"Something's denned up out

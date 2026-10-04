@@ -57,7 +57,7 @@ function Game:draw_craft(w, h)
         if icon and draw_sprite then
             draw_sprite(w - 26, y - 12, SPRITE_W, SPRITE_H, icon)
         end
-        gfx.text(x, y, r.out and ("Makes: " .. ITEM_DB[r.out[1]].name)
+        gfx.text(x, y, r.out and ("Makes: " .. ITEM_DB[r.out[1]].name .. (r.out[2] > 1 and (" x" .. r.out[2]) or ""))
             or (r.study and self:study_text(r.study))
             or (r.clean and "Cleans your guns: less jamming")
             or (r.base == "claim" and "Makes this ruin your camp")

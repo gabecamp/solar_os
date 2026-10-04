@@ -101,7 +101,7 @@ g.player.inventory = {{item = "weeping_stone", qty = 1}, {item = "rock", qty = 1
 g:site_action()
 assert(g.screen == "trade")
 g:trade_key(KEY.T)
-assert(g.trade_ui.msg:find("Pick something"))
+assert(g.trade_ui.msg:find("Pick what"))
 g:trade_key(gfx.KEY_RIGHT)                        -- trader's first row: Anti-Rad
 assert(g.trader.stock[1].item == "antirad")
 g:trade_key(KEY.ENTER); g:trade_key(KEY.ENTER); g:trade_key(KEY.ENTER)   -- take 3
@@ -119,14 +119,35 @@ g:trade_key(KEY.ENTER)                            -- the stone instead
 g:trade_key(KEY.ENTER)                            -- only one to give
 assert(g.trade_ui.give.weeping_stone == 1)
 g:trade_key(KEY.T)
-assert(g.trade_ui.msg == "Deal.", g.trade_ui.msg)
+local change = T.TRADE.value.weeping_stone - ask
+assert(g.trade_ui.msg:find("^Deal. " .. change .. " rubles back."), g.trade_ui.msg)
 assert(count(g, "antirad") == 1 and count(g, "weeping_stone") == 0 and count(g, "rock") == 1)
+assert(g:count_item("rubles") == change, "the change, in rubles (a full bag: on the ground)")
 assert(g.trader.stock[1].qty == 2)
 local has_stone = false
 for _, s in ipairs(g.trader.stock) do has_stone = has_stone or s.item == "weeping_stone" end
 assert(has_stone, "the trader keeps what you sold")
 g:trade_key(KEY.Q)
 assert(g.screen == "map")
+
+print("4b. money: sell for rubles alone; rubles in the bag pay the rest")
+g = fresh()
+stand_on(g, "trader")
+g.player.inventory = {{item = "knife", qty = 1}}
+g.player.equipped.back = "backpack"
+g:open_trade()
+g.trade_ui.give = {knife = 1}
+assert(g:make_deal(), g.trade_ui.msg)
+assert(count(g, "rubles") == T.TRADE.value.knife and count(g, "knife") == 0)
+g.trade_ui.get = {antirad = 1}                   -- 15 x 1.5 = 23: rubles cover it
+assert(not g:make_deal(), "12 rubles aren't 23")
+g.player.inventory[1].qty = 40
+assert(g:make_deal(), g.trade_ui.msg)
+assert(count(g, "rubles") == 40 - math.ceil(T.TRADE.value.antirad * T.TRADE.markup) and count(g, "antirad") == 1)
+g.trade_ui.col = "mine"; g.trade_ui.cursor.mine = 1   -- Enter on rubles: ten at a time
+for _, s in ipairs(g.player.inventory) do if s.item == "rubles" then g.trade_ui.cursor.mine = _ end end
+g:trade_key(KEY.ENTER)
+assert(g.trade_ui.give.rubles == 10, tostring(g.trade_ui.give.rubles))
 
 print("5. a full bag: bought goods land on the ground")
 g = fresh()

@@ -40,10 +40,11 @@ for _ = 1, 30 do
     g.player.mp, g.player.health = 5, 100
     g.ground = {}
     local before = g.skills.scav or 0
+    local n, drop = 0, g.drop_found   -- (finds counted as they drop: a pile of rubles is one)
+    g.drop_found = function(self, ...) n = n + 1; return drop(self, ...) end
     g:scavenge()
+    g.drop_found = nil
     local gained = (g.skills.scav or 0) - before
-    local n = 0   -- (two of a kind stack together)
-    for _, s in ipairs(g.ground[key] or {}) do n = n + s.qty end
     assert(gained == SKILLS.xp.search + SKILLS.xp.find * n, gained .. " for " .. n)
     if n > 0 then found_xp = true end
 end

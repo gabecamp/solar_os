@@ -288,8 +288,7 @@ function Game:pick_crate(key)
     for _ = 1, 2 do
         local item
         self.seed, item = weighted_pick(self.seed, CHURN.crate_loot)
-        self:put_stack("ground", nil, {item = item, qty = 1})
-        found[#found + 1] = ITEM_DB[item].name
+        found[#found + 1] = self:drop_found(item)
     end
     self:skill_xp("tinker", SKILLS.xp.repair)
     self:sfx("gift")
@@ -313,9 +312,7 @@ function Game:find_corpse(key)
     for _ = 1, 1 + self:rand(2) do
         local item
         self.seed, item = weighted_pick(self.seed, C.loot)
-        local qty = C.rounds[item] and C.rounds[item] + self:rand(3) or 1
-        self:put_stack("ground", nil, {item = item, qty = qty})
-        found[#found + 1] = ITEM_DB[item].name .. (qty > 1 and (" x" .. qty) or "")
+        found[#found + 1] = self:drop_found(item, C.rounds[item] and C.rounds[item] + self:rand(3))
     end
     self:push_log(C.epitaphs[self:rand(#C.epitaphs) + 1])
     self:push_log("On them: " .. table.concat(found, ", ") .. ".")
@@ -353,10 +350,12 @@ function Game:finds_lines()
         if a.f.day ~= b.f.day then return a.f.day < b.f.day end
         return a.key < b.key
     end)
-    if #list == 0 then return {"Nothing yet. Dead churners and the crates you open go here."} end
+    -- (every line wrapped to the page: 55 columns)
+    if #list == 0 then return wrap("Nothing yet. Dead churners and the crates you open go here.", 55) end
     local lines = {}
     for _, e in ipairs(list) do
-        lines[#lines + 1] = ("Day %d  %s, %s"):format(e.f.day, e.f.label, self:bearing_to(e.key))
+        local head = ("Day %d  %s, %s"):format(e.f.day, e.f.label, self:bearing_to(e.key))
+        for _, l in ipairs(#head > 55 and wrap(head, 55) or {head}) do lines[#lines + 1] = l end
         if e.f.what ~= "" then
             for _, l in ipairs(wrap(e.f.what, 52)) do lines[#lines + 1] = "   " .. l end
         end

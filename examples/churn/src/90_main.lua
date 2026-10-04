@@ -57,10 +57,16 @@ local ok, err = pcall(function()
         elseif key == KEY.C then
             game.inv_selected = nil
             game:open_crafting()
-        elseif key == gfx.KEY_UP or key == KEY.W or key == gfx.KEY_LEFT or key == KEY.A then
-            game.inv_cursor = math.max(1, game.inv_cursor - 1)
-        elseif key == gfx.KEY_DOWN or key == KEY.S or key == gfx.KEY_RIGHT or key == KEY.D then
-            game.inv_cursor = math.min(#INV_ROWS, game.inv_cursor + 1)
+        elseif key == gfx.KEY_UP or key == KEY.W then
+            game:inv_move(0, -1)
+        elseif key == gfx.KEY_DOWN or key == KEY.S then
+            game:inv_move(0, 1)
+        elseif key == gfx.KEY_LEFT or key == KEY.A then
+            game:inv_move(-1, 0)
+        elseif key == gfx.KEY_RIGHT or key == KEY.D then
+            game:inv_move(1, 0)
+        elseif key == KEY.X or key == KEY.BACKSPACE then
+            game:inv_drop()
         elseif key == KEY.E then
             local row = INV_ROWS[game.inv_cursor]
             if row then

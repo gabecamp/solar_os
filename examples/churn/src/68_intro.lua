@@ -52,6 +52,8 @@ function Game:begin_intro(saved)
     self.title_cursor = 1
     self.intro_phase = 0
     self.screen = "intro"
+    self.muted = saved and saved.muted or nil   -- (sound off last time: still off)
+    self:sfx("title")
 end
 
 -- Big letters from runs of filled cells (one fill_rect per run).

@@ -196,13 +196,22 @@ end
 function Game:make_deal()
     local u, t = self.trade_ui, self:trade_partner()
     local give, ask = self:trade_totals()
-    if next(u.get) == nil then
-        u.msg = "Pick something to take (Right, Enter)."
+    if next(u.get) == nil and next(u.give) == nil then
+        u.msg = "Pick what to sell or take (Enter)."
         return false
     end
-    if give < ask then
-        u.msg = ("Not enough. They want %d, you offer %d."):format(ask, give)
-        return false
+    if give < ask then   -- rubles in the bag make up the rest
+        local spare = 0
+        for _, s in ipairs(self.player.inventory) do
+            if s.item == "rubles" then spare = spare + s.qty end
+        end
+        spare = spare - (u.give.rubles or 0)
+        if spare < ask - give then
+            u.msg = ("Not enough. They want %d, you have %d."):format(ask, give + spare)
+            return false
+        end
+        u.give.rubles = (u.give.rubles or 0) + ask - give
+        give = ask
     end
     for item, n in pairs(u.give) do
         take_units(self.player.inventory, item, n)
@@ -216,8 +225,15 @@ function Game:make_deal()
             dropped = true
         end
     end
+    -- what they owe you back, in rubles
+    local change = give - ask
+    if change > 0 and not self:put_stack("inventory", nil, {item = "rubles", qty = change}) then
+        self:put_stack("ground", nil, {item = "rubles", qty = change})
+        dropped = true
+    end
     u.give, u.get = {}, {}
-    u.msg = dropped and "Deal. Your bag is full: some is on the ground." or "Deal."
+    u.msg = (change > 0 and ("Deal. " .. change .. " rubles back.") or "Deal.")
+        .. (dropped and " Bag full: some is on the ground." or "")
     self:push_log("You traded with " .. (u.who == "town" and "the trader" or TRADE.people[u.who].name) .. ".")
     for col, c in pairs(u.cursor) do
         u.cursor[col] = math.max(1, math.min(c, #self:trade_rows(col)))
@@ -245,7 +261,9 @@ function Game:trade_key(key)
     elseif key == KEY.ENTER or key == KEY.LF or key == KEY.SPACE then
         local have = 0   -- (worn and new pieces of one item are separate rows)
         for _, s in ipairs(row and rows or {}) do if s.item == row.item then have = have + s.qty end end
-        if row and (pick[row.item] or 0) < have then pick[row.item] = (pick[row.item] or 0) + 1 end
+        -- (money goes ten at a time)
+        local step = row and row.item == "rubles" and 10 or 1
+        if row and (pick[row.item] or 0) < have then pick[row.item] = math.min(have, (pick[row.item] or 0) + step) end
     elseif key == KEY.E then
         if row and pick[row.item] then
             pick[row.item] = pick[row.item] > 1 and pick[row.item] - 1 or nil

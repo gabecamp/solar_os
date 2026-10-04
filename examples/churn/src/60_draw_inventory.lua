@@ -96,6 +96,11 @@ function Game:draw_slot_box(x, y, w, h, stack, is_cursor, is_selected)
             -- bottom-right corner, right-aligned (mono 12 is ~7px per char), so
             -- it stays clear of the centered 16x16 icon and inside the box
             local qty_text = tostring(stack.qty)
+            if #qty_text > 2 then   -- (a big pile: on paper, so it reads over the icon)
+                gfx.color(gfx.WHITE)
+                gfx.fill_rect(x + w - 3 - 7 * #qty_text, y + h - 11, 7 * #qty_text + 2, 10)
+                gfx.color(gfx.BLACK)
+            end
             gfx.text(x + w - 2 - 7 * #qty_text, y + h - 2, qty_text)
         end
     end
@@ -464,6 +469,64 @@ function Game:ground_scroll(n_ground)
     return math.max(0, math.min(off, (total_rows - GROUND_GRID_ROWS) * GROUND_GRID_COLS))
 end
 
+-- Where cursor row i sits on screen ({x, y, w, h}). A ground cell scrolled
+-- out of view has none drawn: it gets the spot it would have in the grid.
+function Game:inv_row_pos(i)
+    local pos, row = INV_POS[i], INV_ROWS[i]
+    if pos or not row or row[1] ~= "ground" then return pos end
+    local k = row[2] - (self.ground_off or 0) - 1
+    return {x = INV_COL_X + 2 + k % GROUND_GRID_COLS * (GROUND_CELL + GROUND_GAP),
+            y = GROUND_Y + k // GROUND_GRID_COLS * (GROUND_CELL + GROUND_GAP), w = GROUND_CELL, h = GROUND_CELL}
+end
+
+-- Arrow keys on the bag screen: the cursor goes to the nearest cell or slot
+-- that way (dx, dy = -1/0/1), across the ground, the doll and the bag.
+-- Nothing further that way: it wraps round to the far side.
+function Game:inv_move(dx, dy)
+    local cur = self.inv_cursor
+    local row = INV_ROWS[cur]
+    if not row then return end
+    -- the ground grid scrolls: step through it by index first
+    if row[1] == "ground" then
+        local n, cols, i = 0, GROUND_GRID_COLS, row[2]
+        for _, r in ipairs(INV_ROWS) do if r[1] == "ground" then n = n + 1 end end
+        local t = i + dx + dy * cols
+        if dx ~= 0 and (t - 1) // cols ~= (i - 1) // cols then t = nil end
+        if dy > 0 and t and t > n and (n - 1) // cols > (i - 1) // cols then t = n end
+        if t and t >= 1 and t <= n then
+            self.inv_cursor = t   -- (ground rows come first: row index == ground index)
+            return
+        end
+    end
+    local p = self:inv_row_pos(cur)
+    if not p then return end
+    local cx, cy = p.x + p.w / 2, p.y + p.h / 2
+    local best, best_score, wrap, wrap_score
+    for i = 1, #INV_ROWS do
+        local q = i ~= cur and INV_POS[i]
+        if q then
+            local vx, vy = q.x + q.w / 2 - cx, q.y + q.h / 2 - cy
+            local along, across = vx * dx + vy * dy, math.abs(dx ~= 0 and vy or vx)
+            if along > 0 and across <= 2 * along then   -- (roughly that way: within ~63 degrees)
+                local score = along + 2 * across
+                if not best_score or score < best_score then best, best_score = i, score end
+            elseif along <= 0 then   -- the far side, as level as can be
+                local score = 2 * across + along
+                if not wrap_score or score < wrap_score then wrap, wrap_score = i, score end
+            end
+        end
+    end
+    self.inv_cursor = best or wrap or cur
+end
+
+-- X on the bag screen: what the cursor is on goes on the ground.
+function Game:inv_drop()
+    local row = INV_ROWS[self.inv_cursor]
+    if not row or row[1] == "ground" or not self:get_stack(row[1], row[2]) then return false end
+    self.inv_selected = nil
+    return self:try_transfer({row[1], row[2]}, {"ground"})
+end
+
 -- Everything the bag screen shows except where the cursor is: when only the
 -- cursor moved, the screen is patched instead of redrawn.
 function Game:inv_signature()
@@ -493,25 +556,63 @@ function Game:inv_stats_lines()
             ("HP %d Rest %d Warm %s"):format(math.floor(p.health), math.floor(p.needs.rest), warm)}
 end
 
--- What the cursor is on and what it does, under the bag.
+-- An item's numbers, short: "Warm 3, +2 cells", "12 dmg, close, bleed 30%",
+-- "Hunger +40". nil when it has none. (Radiation only shows as a number
+-- once you can measure it.)
+function Game:item_stats(item)
+    local d, out = ITEM_DB[item], {}
+    local function add(s) out[#out + 1] = s end
+    if (d.warmth or 0) > 0 then add("Warm " .. d.warmth) end
+    if d.bag_cells then add(d.bag_cells .. " bag cells") end
+    local cells = (d.pocket_cells or 0) + (d.belt_cells or 0)
+    if cells > 0 then add("+" .. cells .. (cells > 1 and " cells" or " cell")) end
+    if d.rad_armor then add(self:can_measure() and ("rads x" .. d.rad_armor) or "filters air") end
+    if d.fx and d.fx.mp then add(d.fx.mp .. " MP") end
+    if d.light then add("light") end
+    if d.fish_bonus then add("fish +" .. d.fish_bonus .. "%") end
+    if d.shoot then
+        add("shot " .. d.shoot.dmg .. " dmg")
+    elseif d.weapon then
+        add(d.weapon.dmg .. " dmg, " .. (d.weapon.thrown and "thrown" or d.weapon.reach))
+        if (d.weapon.bleed or 0) > 0 then add("bleed " .. d.weapon.bleed .. "%") end
+    end
+    for _, need in ipairs({"hunger", "thirst", "rest", "rads"}) do
+        local v = d.consumable and d.consumable[need]
+        if v and (need ~= "rads" or self:can_measure()) then
+            add(need:sub(1, 1):upper() .. need:sub(2) .. " " .. (v > 0 and "+" or "") .. v)
+        end
+    end
+    if #out == 0 then return nil end
+    return table.concat(out, ", ")
+end
+
+-- What the cursor is on, its numbers and what it does, under the bag (at
+-- most three lines), then your own numbers.
 function Game:draw_inv_desc(w, clear)
+    local top = CURSOR_DESC_Y - 7
     if clear then
         gfx.color(gfx.WHITE)
-        gfx.fill_rect(INV_COL_X, CURSOR_DESC_Y - 11, w - INV_COL_X, 30)
+        gfx.fill_rect(INV_COL_X, top - 10, w - INV_COL_X, CONDITIONS_Y - top)
     end
     gfx.color(gfx.BLACK)
     gfx.font(gfx.FONT_MONO_12)
-    local desc = self:cursor_description()
     local max_chars = (w - INV_COL_X - 2) // 7
-    if #desc > max_chars then desc = desc:sub(1, max_chars) end
-    gfx.text(INV_COL_X, CURSOR_DESC_Y, desc)
     local row = INV_ROWS[self.inv_cursor]
     local stack = row and self:get_stack(row[1], row[2])
-    local effect = stack and ITEM_DB[stack.item].desc
-    if effect then gfx.text(INV_COL_X, CURSOR_DESC_Y + 14, effect:sub(1, max_chars)) end
+    local lines = wrap(self:cursor_description(), max_chars)
+    if stack then
+        for _, text in ipairs({self:item_stats(stack.item) or false, ITEM_DB[stack.item].desc or false}) do
+            if text then
+                for _, l in ipairs(wrap(text, max_chars)) do lines[#lines + 1] = l end
+            end
+        end
+    end
+    for i = 1, math.min(3, #lines) do
+        gfx.text(INV_COL_X, top + 12 * (i - 1), lines[i]:sub(1, max_chars))
+    end
     -- your numbers, above the conditions (here because the erase above reaches them)
     for i, line in ipairs(self:inv_stats_lines()) do
-        gfx.text(INV_COL_X, CONDITIONS_Y - 28 + 13 * (i - 1), line:sub(1, max_chars))
+        gfx.text(INV_COL_X, CONDITIONS_Y - 25 + 12 * (i - 1), line:sub(1, max_chars))
     end
 end
 
@@ -725,7 +826,7 @@ function Game:draw_inventory(w, h)
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
     gfx.font(gfx.FONT_MONO_12)
-    gfx.text(4, 12, "Up/Dn Enter:move E:use C:craft I:map J:journal H:help")
+    gfx.text(4, 12, "Arrows Enter:move E:use X:drop C:craft I:map H:help")
 
     INV_ROWS = {}
     INV_POS = {}
@@ -781,7 +882,9 @@ function Game:draw_inventory(w, h)
         return INV_COL_X + 2 + col * (BACKPACK_CELL + BACKPACK_GAP),
                BACKPACK_Y + row * (BACKPACK_CELL + BACKPACK_GAP)
     end
-    for i = 1, math.min(math.max(n_inv, math.min(n_inv + 1, capacity)), BACKPACK_CAP) do
+    -- (every cell is a row: the cursor can reach any pocket, and an empty
+    -- one takes what you drop on it)
+    for i = 1, math.min(math.max(n_inv, capacity), BACKPACK_CAP) do
         local x, y = bag_cell(i)
         add_row("inventory", i, x, y, BACKPACK_CELL, BACKPACK_CELL)
     end
@@ -797,11 +900,6 @@ function Game:draw_inventory(w, h)
                 i == self.inv_cursor,
                 self.inv_selected and self.inv_selected[1] == row[1] and self.inv_selected[2] == row[2])
         end
-    end
-
-    for i = n_inv + 2, capacity do
-        local x, y = bag_cell(i)
-        self:draw_slot_box(x, y, BACKPACK_CELL, BACKPACK_CELL, nil, false, false)
     end
 
     gfx.color(gfx.BLACK)

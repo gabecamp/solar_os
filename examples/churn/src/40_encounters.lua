@@ -174,10 +174,7 @@ function Game:enemy_dies()
     for _ = 1, e.def.loot_rolls or 1 do
         local item
         self.seed, item = weighted_pick(self.seed, e.def.loot)
-        if item ~= "nothing" then
-            self:put_stack("ground", nil, {item = item, qty = 1})
-            found[#found + 1] = ITEM_DB[item].name
-        end
+        if item ~= "nothing" then found[#found + 1] = self:drop_found(item) end
     end
     self:drop_enemy_gun(found)
     self:sfx("kill")

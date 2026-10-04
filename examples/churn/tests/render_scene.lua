@@ -85,6 +85,17 @@ g.log = {"Consumed Water Bottle.", "Backpack full.", "Moved Rock."}
 g:draw_inventory(400, 300)
 solaros.dump("ops_inventory_full.txt")
 
+-- Scene 2b1: gear numbers under the bag (cursor on a jacket, a knife, a long-named tape)
+for n, pick in ipairs({"jacket", "knife", "tape_tinker"}) do
+    g = fresh()
+    g.player.equipped.back = "backpack"
+    g.player.inventory = {{item = "jacket", qty = 1}, {item = "knife", qty = 1},
+                          {item = "tape_tinker", qty = 1}, {item = "rubles", qty = 140}}
+    g.inv_cursor = #g:ground_list() + 1 + 14 + n   -- (rows: the ground and its spare cell, 14 slots, the bag)
+    g:draw_inventory(400, 300)
+    solaros.dump("ops_inventory_stats" .. n .. ".txt")
+end
+
 -- Scene 2b2/2b3: the Churn's items with their own icons (tools/paint_icons.py),
 -- 31 a screen: the bag and the ground
 for n, ids2 in ipairs({
@@ -448,6 +459,10 @@ g = fresh()
 g:open_help()
 g:draw_help(400, 300)
 solaros.dump("ops_help.txt")
+g.help_page = 2
+g:draw_help(400, 300)
+solaros.dump("ops_help_tips.txt")
+g.help_page = 1
 g:help_key(118)
 g:draw_info(400, 300)
 solaros.dump("ops_info.txt")
