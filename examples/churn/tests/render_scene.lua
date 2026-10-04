@@ -652,7 +652,7 @@ if g.sites.quarry then
 end
 
 -- Story moments: waking up, and the quarry gate (with the Institute's portrait)
-for _, id in ipairs({"wake", "the_gate", "little_ones"}) do
+for _, id in ipairs({"wake", "the_gate", "little_ones", "vesna"}) do
     g = Game.new()
     g.scene, g.screen = id, "scene"
     g:draw_scene(400, 300)

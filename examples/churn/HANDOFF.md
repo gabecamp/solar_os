@@ -134,6 +134,7 @@ The sim is not byte-reproducible between processes (Lua 5.4 varies `pairs` order
 > - **Names.** Tapes are "Cassette Tape: ..." (short "Tape: ..." for the trade list); "Blank Cassette Tape". **Permit** value 80 -> 150 (225 at the trader). Balance (150 runs, normal): median 18.0 days, alive at the cap 22.7%, escaped 4.7% (was 8%; the bot doesn't buy the permit).
 > - **Records** list only earned achievements, then "N more to find." **Finds** page lines wrap at 55 (the empty-page line was cut off). **Help** was too long for the screen (the last tips never showed): page 1 keys, page 2 tips (Down/Up).
 > - **Sound.** `title` tune once at start-up (`begin_intro`, respects a saved mute); emission: `emission` (caught) is in a range small speakers play, `emission_cover` when you're sheltered (it was silent), `emission_end`.
+> - **Vesna's picture** (same day): `art/vesna.png` (the user's: on her back in a school corridor by the stairs, gas mask, picks by her hand, a lit door at the end). Dark, so `PHOTO` levels (0.06, 0.34) and `rust` -1.5 lift her khaki off the grey floor; near = the full height (a square crop past the edge leaves a white strip). Scene text and epitaph rewritten to match; preview `preview_scene_vesna.png`.
 > - Tests: new `playtest_test.lua`; `trade_test` 4b (rubles), `regression_test` 17, `skills_test` 3, `records_test` 9; `radiation_test` 2 reads every log line (a cairn or a tip could push the feeling off the 3-line log: a flake on ~1 seed in 4).
 >
 > **"13456" (2026-10-03):**

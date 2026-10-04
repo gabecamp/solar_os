@@ -447,7 +447,7 @@ CHURN.corpse = {chance = 3, prefix = "corpse:",
 -- `mult` times as often until you find her, at the top of a stair, with
 -- what she took up there.
 CHURN.vesna = {mult = 4,
-    epitaph = "Vesna. The voice from the tape, at the top of the stairs. Her picks are still in her hand.",
+    epitaph = "Vesna, the voice from the tape, in a gas mask by the stairs. Her picks lie by her hand.",
     loot = {{"lockpicks", 1}, {"usb_drive", 1}, {"book_radio", 1}}}
 -- Rival Churners who'd rather trade (62_guns): `chance` %, when you carry
 -- something they want; one of theirs for one of yours, and they go.
@@ -486,9 +486,10 @@ QUESTS.story.room_rads = 4
 -- Story moments with a picture of their own when the user supplies one
 -- (art/<key>; 67_scenes and draw_ending skip the picture until then).
 QUESTS.scenes.vesna = {title = "Vesna", art = "vesna",
-    text = "At the top of the second stair, against the wall, a woman in a churner's coat. "
-        .. "The voice from the tape. Her picks are still in her hand, and the door she was "
-        .. "picking stands open now, just a crack. Whatever was behind it, she saw it first."}
+    text = "Past the second stair, a woman in a gas mask lies on her back in the corridor, as "
+        .. "if she only lay down to rest. The voice from the tape. Her picks are scattered by "
+        .. "her open hand. At the end of the corridor a door, light in its little window. "
+        .. "Whatever was behind it, she got this close."}
 CHURN.ending_art = {permit = "ending_permit", bribe = "ending_bribe", quiet = "ending_quiet"}
 
 -- Standing with the people who give you work (52_quests): +1 for a job done,

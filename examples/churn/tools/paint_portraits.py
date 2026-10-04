@@ -205,6 +205,12 @@ PHOTO = {
     "stray": {"far": (24, 150, 488, 744), "near": (60, 200, 470, 640),
               "close": (170, 220, 430, 500), "gamma": 1.0, "edge": 0.7,
               "levels": (0.12, 0.60), "bg": 0.70},
+    # the user's (2026-10-04, 1216x912): Vesna dead in a school corridor, gas
+    # mask on, picks by her hand, a door at the end. near = her and the
+    # corridor (the scene shows near); close = the mask and her chest
+    "vesna": {"far": (0, 0, 1216, 912), "near": (100, 1, 1010, 911),
+              "close": (100, 400, 560, 800), "gamma": 0.9, "edge": 0.7,
+              "levels": (0.06, 0.34), "bg": 0.95, "rust": -1.5},   # (dark: narrow levels; her khaki lifted off the floor)
 }
 
 
