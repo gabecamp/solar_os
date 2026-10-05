@@ -602,7 +602,9 @@ function Game:draw_inv_desc(w, clear)
     local row = INV_ROWS[self.inv_cursor]
     local stack = row and self:get_stack(row[1], row[2])
     local lines = wrap(self:cursor_description(), max_chars)
-    if stack then
+    if row and row[1] == "inventory" and not stack then   -- (an empty cell: where the cells come from)
+        for _, l in ipairs(wrap(self:bag_sum_text(), max_chars)) do lines[#lines + 1] = l end
+    elseif stack then
         for _, text in ipairs({self:item_stats(stack.item) or false, ITEM_DB[stack.item].desc or false}) do
             if text then
                 for _, l in ipairs(wrap(text, max_chars)) do lines[#lines + 1] = l end

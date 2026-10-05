@@ -30,8 +30,8 @@ assert(g.player.attrs.Strength == 1 and g.player.attrs.Perception == 5)
 assert(C.attr_points_left(g.player.attrs) == 0)
 press(g, UP, UP, LEFT, LEFT, LEFT)                -- can't go below 1
 assert(g.player.attrs.Strength == C.ATTR_MIN)
-assert(g.player.sight == 3 and g.player.scav_rolls == 3 and g.player.bag_bonus == -2,
-       "Perception 5: sight 3, 3 finds; Strength 1: -2 bag cells")
+assert(g.player.sight == 3 and g.player.scav_rolls == 3 and g.player.bag_bonus == 0,
+       "Perception 5: sight 3, 3 finds; Strength 1: no bag cells lost (only over 3 adds)")
 print("   OK")
 
 print("3. traits: positives spend, negatives give back; start refused below 0")

@@ -350,6 +350,23 @@ function Game:pocket_cells()
     return n
 end
 
+-- How the bag's cells add up, for the bag screen: "Satchel 6 + pockets 2
+-- + Strength 1 = 9" (no bag: "Arms 2 + ...").
+function Game:bag_sum_text()
+    local p = self.player
+    local back = p.equipped.back
+    local bag = back and ITEM_DB[back].bag_cells or POCKET_CELLS
+    if back and self:torn("back") then bag = bag // 2 end
+    local parts = {(back and ITEM_DB[back].name or "Arms") .. " " .. bag}
+    local pk = self:pocket_cells()
+    if pk > 0 then parts[#parts + 1] = "pockets " .. pk end
+    if (p.bag_bonus or 0) > 0 then parts[#parts + 1] = "Strength " .. p.bag_bonus end
+    local cap = self:bag_capacity()
+    local text = table.concat(parts, " + ") .. " = " .. cap
+    if cap < bag + pk + (p.bag_bonus or 0) then text = text .. " (most there's room for)" end
+    return text
+end
+
 -- Bag cells available now: the worn bag (else what you can carry in your
 -- arms) plus your pockets, Strength and Pack Mule, within what the screen
 -- can show.

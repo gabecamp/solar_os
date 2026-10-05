@@ -174,4 +174,27 @@ assert(pos[first_pocket].pocket and not pos[row_of(g, "inventory", cap - 6)].poc
 assert(pos[first_pocket].x == pos[row_of(g, "inventory", 1)].x, "pockets start a row")
 assert(pos[first_pocket].y > pos[row_of(g, "inventory", cap - 6)].y)
 
+print("13. pants + a bindle = 7 at any Strength; an empty cell says how it adds up")
+for str = 1, 3 do
+    g = Game.new()
+    g.player.attrs.Strength = str
+    g:start_game()
+    g.player.equipped.pants, g.player.equipped.back = "jeans", "bindle"
+    assert(g:bag_capacity() == 7, "Strength " .. str .. ": " .. g:bag_capacity())
+end
+assert(g:bag_sum_text() == "Bindle 5 + pockets 2 = 7", g:bag_sum_text())
+g.player.attrs.Strength = 5
+g:set_difficulty(g.difficulty)   -- (recomputes the stats)
+assert(g:bag_sum_text() == "Bindle 5 + pockets 2 + Strength 2 = 9", g:bag_sum_text())
+g.player.inventory = {}
+g.screen = "inventory"
+g:draw_inventory(400, 300)
+g.inv_cursor = row_of(g, "inventory", 1)
+local said = {}
+local text = gfx.text
+gfx.text = function(x, y, s) said[#said + 1] = s end
+g:draw_inv_desc(400, true)
+gfx.text = text
+assert(table.concat(said, "|"):find("Bindle 5 + pockets 2", 1, true), table.concat(said, "|"))
+
 print("PLAYTEST TESTS PASSED")
