@@ -3,7 +3,7 @@
 -- tables and crafting recipes
 -- ---------------------------------------------------------------------
 
-local BACKPACK_CAP = 16      -- most bag cells any build can have (the layout's limit)
+local BACKPACK_CAP = 24      -- most bag cells any build can have (the layout's limit: 8 x 3)
 local POCKET_CELLS = 2       -- what you can carry in your arms, with no bag and no pockets
 
 -- Also the cursor order on the paperdoll: top of the body to the bottom.

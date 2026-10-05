@@ -39,9 +39,10 @@ local GROUND_GRID_COLS = 5
 local GROUND_GRID_ROWS = 2   -- visible rows; the grid scrolls to follow the cursor
 local GROUND_CELL, GROUND_GAP = 30, 2
 local GROUND_Y = 32
--- bag: up to BACKPACK_CAP cells, all visible
-local BACKPACK_COLS = 7
-local BACKPACK_CELL, BACKPACK_GAP = 24, 2
+-- bag: up to BACKPACK_CAP cells, all visible (with a bag on, your pockets
+-- start a row of their own, framed in gray)
+local BACKPACK_COLS = 8
+local BACKPACK_CELL, BACKPACK_GAP = 20, 2
 local BACKPACK_Y = 114
 local BAG_LABEL_Y = BACKPACK_Y - 5
 local CURSOR_DESC_Y = 210
@@ -77,7 +78,7 @@ function Game:current_conditions()
     return "Conditions: " .. text
 end
 
-function Game:draw_slot_box(x, y, w, h, stack, is_cursor, is_selected)
+function Game:draw_slot_box(x, y, w, h, stack, is_cursor, is_selected, pocket)
     if stack and stack.item then
         gfx.color(gfx.LIGHT)
         gfx.fill_rect(x, y, w, h)
@@ -96,7 +97,7 @@ function Game:draw_slot_box(x, y, w, h, stack, is_cursor, is_selected)
             -- bottom-right corner, right-aligned (mono 12 is ~7px per char), so
             -- it stays clear of the centered 16x16 icon and inside the box
             local qty_text = tostring(stack.qty)
-            if #qty_text > 2 then   -- (a big pile: on paper, so it reads over the icon)
+            if #qty_text > 2 or (#qty_text > 1 and w < 24) then   -- (on paper, so it reads over the icon)
                 gfx.color(gfx.WHITE)
                 gfx.fill_rect(x + w - 3 - 7 * #qty_text, y + h - 11, 7 * #qty_text + 2, 10)
                 gfx.color(gfx.BLACK)
@@ -104,8 +105,9 @@ function Game:draw_slot_box(x, y, w, h, stack, is_cursor, is_selected)
             gfx.text(x + w - 2 - 7 * #qty_text, y + h - 2, qty_text)
         end
     end
-    gfx.color(gfx.BLACK)
+    gfx.color(pocket and gfx.DARK or gfx.BLACK)   -- (a pocket: a gray frame)
     gfx.rect(x, y, w, h)
+    gfx.color(gfx.BLACK)
     if is_selected then
         gfx.rect(x - 2, y - 2, w + 4, h + 4)
     elseif is_cursor then
@@ -784,7 +786,7 @@ function Game:redraw_inv_row(i, erase)
             gfx.fill_rect(pos.x - 2, pos.y - 2, pos.w + 4, pos.h + 4)
         end
         self:draw_slot_box(pos.x, pos.y, pos.w, pos.h, self:get_stack(row[1], row[2]),
-                           i == self.inv_cursor, sel)
+                           i == self.inv_cursor, sel, pos.pocket)
     end
 end
 
@@ -876,17 +878,27 @@ function Game:draw_inventory(w, h)
     -- first empty cell (a drop target); the other empty cells are just drawn.
     local capacity = self:bag_capacity()
     local n_inv = #self.player.inventory
+    -- with a bag on, the last `pockets` cells are your clothes' pockets: they
+    -- start a row of their own when the rows allow
+    local back = self.player.equipped.back
+    local pockets = back and math.min(self:pocket_cells(), capacity) or 0
+    local n_bag = capacity - pockets
+    local rows_of = function(n) return (n + BACKPACK_COLS - 1) // BACKPACK_COLS end
+    local skip = 0
+    if pockets > 0 and n_inv <= capacity and rows_of(n_bag) + rows_of(pockets) <= BACKPACK_CAP // BACKPACK_COLS then
+        skip = rows_of(n_bag) * BACKPACK_COLS - n_bag
+    end
     local function bag_cell(i)
-        local col = (i - 1) % BACKPACK_COLS
-        local row = (i - 1) // BACKPACK_COLS
-        return INV_COL_X + 2 + col * (BACKPACK_CELL + BACKPACK_GAP),
-               BACKPACK_Y + row * (BACKPACK_CELL + BACKPACK_GAP)
+        local k = i > n_bag and i - 1 + skip or i - 1
+        return INV_COL_X + 2 + k % BACKPACK_COLS * (BACKPACK_CELL + BACKPACK_GAP),
+               BACKPACK_Y + k // BACKPACK_COLS * (BACKPACK_CELL + BACKPACK_GAP)
     end
     -- (every cell is a row: the cursor can reach any pocket, and an empty
     -- one takes what you drop on it)
     for i = 1, math.min(math.max(n_inv, capacity), BACKPACK_CAP) do
         local x, y = bag_cell(i)
         add_row("inventory", i, x, y, BACKPACK_CELL, BACKPACK_CELL)
+        INV_POS[#INV_ROWS].pocket = i > n_bag and i <= capacity
     end
 
     self.inv_cursor = math.max(1, math.min(self.inv_cursor, #INV_ROWS))
@@ -898,7 +910,8 @@ function Game:draw_inventory(w, h)
             local stack = self:get_stack(row[1], row[2])
             self:draw_slot_box(pos.x, pos.y, pos.w, pos.h, stack,
                 i == self.inv_cursor,
-                self.inv_selected and self.inv_selected[1] == row[1] and self.inv_selected[2] == row[2])
+                self.inv_selected and self.inv_selected[1] == row[1] and self.inv_selected[2] == row[2],
+                pos.pocket)
         end
     end
 
@@ -919,8 +932,8 @@ function Game:draw_inventory(w, h)
     -- what the cursor is on, under the bag
     self:draw_inv_desc(w, false)
 
-    local back = self.player.equipped.back
     local bag_label = (back and ITEM_DB[back].name or "Pockets") .. " " .. n_inv .. "/" .. capacity
+        .. (pockets > 0 and (" " .. pockets .. " pocket" .. (pockets > 1 and "s" or "")) or "")
     gfx.text(INV_COL_X, BAG_LABEL_Y, bag_label)
     self.inv_labels[2] = {BAG_LABEL_Y, bag_label}
 

@@ -153,4 +153,25 @@ g:draw_inventory(400, 300)
 g.inv_cursor = row_of(g, "inventory", 1)
 assert(g:cursor_description():find("Cassette Tape: Day Forty", 1, true))
 
+print("12. pockets count on top of any bag, and get a row of their own")
+g = fresh()
+local e = g.player.equipped
+e.pants, e.jacket, e.belt = "jeans", "jacket", "leather_belt"   -- 6 pockets
+assert(g:pocket_cells() == 6)
+for _, b in ipairs({"backpack", "hide_pack", "travois", "hand_cart"}) do
+    e.back = b
+    local bag = ({backpack = 10, hide_pack = 12, travois = 14, hand_cart = 16})[b]
+    assert(g:bag_capacity() == math.min(L.BACKPACK_CAP, bag + 6 + (g.player.bag_bonus or 0)),
+           b .. ": " .. g:bag_capacity())
+end
+e.back = "backpack"
+g.inv_drawn = nil
+g:draw_inventory(400, 300)
+local rows, pos = rows_pos()
+local cap = g:bag_capacity()
+local first_pocket = row_of(g, "inventory", cap - 5)
+assert(pos[first_pocket].pocket and not pos[row_of(g, "inventory", cap - 6)].pocket)
+assert(pos[first_pocket].x == pos[row_of(g, "inventory", 1)].x, "pockets start a row")
+assert(pos[first_pocket].y > pos[row_of(g, "inventory", cap - 6)].y)
+
 print("PLAYTEST TESTS PASSED")

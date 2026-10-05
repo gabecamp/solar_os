@@ -96,6 +96,18 @@ for n, pick in ipairs({"jacket", "knife", "tape_tinker"}) do
     solaros.dump("ops_inventory_stats" .. n .. ".txt")
 end
 
+-- Scene 2b1b: a backpack and 6 pockets (jeans, jacket, belt): their own row
+g = fresh()
+g.player.equipped.back, g.player.equipped.pants = "backpack", "jeans"
+g.player.equipped.jacket, g.player.equipped.belt = "jacket", "leather_belt"
+g.player.inventory = {}
+for k, id in ipairs({"rock", "knife", "canned_beans", "water_bottle", "cloth_scrap", "rope",
+                     "bandage", "stick", "rubles", "matches", "torch", "antirad"}) do
+    g.player.inventory[k] = {item = id, qty = k == 9 and 85 or k == 5 and 12 or 1}
+end
+g:draw_inventory(400, 300)
+solaros.dump("ops_inventory_pockets.txt")
+
 -- Scene 2b2/2b3: the Churn's items with their own icons (tools/paint_icons.py),
 -- 31 a screen: the bag and the ground
 for n, ids2 in ipairs({

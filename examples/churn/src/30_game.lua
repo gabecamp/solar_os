@@ -338,22 +338,27 @@ local function add_to_list(list, stack, cap)
     return true
 end
 
--- Bag cells available now: the worn bag (or bare pockets) plus Strength and
--- Pack Mule, within what the screen can show.
+-- The pockets in what you wear and the pouches on your belt (torn clothes
+-- hold half).
+function Game:pocket_cells()
+    local n = 0
+    for slot, item in pairs(self.player.equipped) do
+        local def = ITEM_DB[item]
+        local k = (def.pocket_cells or 0) + (def.belt_cells or 0)
+        n = n + (self:torn(slot) and k // 2 or k)
+    end
+    return n
+end
+
+-- Bag cells available now: the worn bag (else what you can carry in your
+-- arms) plus your pockets, Strength and Pack Mule, within what the screen
+-- can show.
 function Game:bag_capacity()
     local p = self.player
-    -- a bag on your back (else what you can carry in your arms), plus the
-    -- pockets in what you wear and the pouches on your belt
-    -- (torn clothes hold half)
-    local function cells(slot, n)
-        return self:torn(slot) and n // 2 or n
-    end
-    local bag = p.equipped.back and cells("back", ITEM_DB[p.equipped.back].bag_cells or 0) or POCKET_CELLS
-    for slot, item in pairs(p.equipped) do
-        local def = ITEM_DB[item]
-        bag = bag + cells(slot, (def.pocket_cells or 0) + (def.belt_cells or 0))
-    end
-    return math.max(2, math.min(BACKPACK_CAP, bag + (p.bag_bonus or 0)))
+    local back = p.equipped.back
+    local bag = back and ITEM_DB[back].bag_cells or POCKET_CELLS
+    if back and self:torn("back") then bag = bag // 2 end
+    return math.max(2, math.min(BACKPACK_CAP, bag + self:pocket_cells() + (p.bag_bonus or 0)))
 end
 
 function Game:put_stack(kind, k, stack)
