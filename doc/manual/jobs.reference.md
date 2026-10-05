@@ -1000,6 +1000,9 @@ chat meshtastic
 job stop meshtastic
 ```
 
+`examples/lua/meshtastic_setup.lua` creates the SPI bus, attaches an RFM95
+radio, and starts the job in one step; edit its settings for other wiring.
+
 Notes:
 
 - The radio uses LoRa sync word `0x2B`, a 16-symbol preamble, CRC, and the
