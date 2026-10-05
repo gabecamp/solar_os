@@ -109,6 +109,7 @@ DERIVED_ALIAS_OWNERS = {
     ("job.meshcore", "meshcore"): "meshcore",
     ("job.midi", "midi"): "command.midi",
     ("job.osc", "osc"): "osc",
+    ("job.meshtastic", "meshtastic"): "command.meshtastic",
     ("job.pocsag", "pocsag"): "command.pocsag",
     ("job.radio-link", "radio-link"): "link",
 }

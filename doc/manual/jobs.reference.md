@@ -956,6 +956,89 @@ Notes:
   previous configuration afterward. A receiver job using the same half-duplex
   radio must be stopped first.
 
+## meshtastic
+
+Meshtastic text messaging on one channel. It configures a registered LoRa packet
+radio with a Meshtastic modem preset, decrypts channel traffic with the
+channel's pre-shared key (AES-CTR), and publishes received text messages. When
+the messaging service is built in, the job is the `meshtastic` Chat provider:
+the channel appears as a conversation, senders become discovered contacts, and
+text written in Chat is encrypted and transmitted. Without it, received text
+goes to the universal inbox only. The job does not relay other nodes' packets
+and does not request or send acknowledgements.
+
+Usage:
+
+```text
+job start meshtastic <radio> <region|frequency-hz> [preset] [channel-name] [key] [name=<long-name>] [short=<short-name>]
+job stop meshtastic
+job status meshtastic
+```
+
+Arguments:
+
+- `region` is `US`, `EU_868`, `EU_433`, or `ANZ`. The frequency slot is derived
+  from the channel name and preset bandwidth. A numeric value in hertz selects
+  an explicit frequency instead.
+- `preset` is `LongFast` (default), `LongSlow`, `LongModerate`, `MediumFast`,
+  `MediumSlow`, `ShortFast`, `ShortSlow`, or `ShortTurbo`.
+- `channel-name` defaults to the preset name. It must match the channel name
+  configured on the network, because it selects both the frequency slot and the
+  one-byte channel hash carried in each packet.
+- `name=` sets the long name other nodes show (up to 39 bytes) and `short=` the
+  short name (up to 4 bytes). They default to `SolarTerm` plus the last four
+  hex digits of the node ID, and to those four digits.
+- `key` is `default` (the public default key, index 1), `none`, `index:N`, or 32
+  or 64 hexadecimal digits for an AES-128 or AES-256 key.
+
+Example:
+
+```text
+job start meshtastic radio0 US
+meshtastic status
+chat meshtastic
+job stop meshtastic
+```
+
+`examples/lua/meshtastic_setup.lua` creates the SPI bus, attaches an RFM95
+radio, and starts the job in one step; edit its settings for other wiring.
+
+Notes:
+
+- The radio uses LoRa sync word `0x2B`, a 16-symbol preamble, CRC, and the
+  explicit-header variable-length mode, matching Meshtastic.
+- `meshtastic status` shows the channel, frequency, packet counters (messages,
+  duplicates, other channel, non-text, decode and CRC errors), and the last
+  RSSI and SNR.
+- The node ID is `!` followed by the last four bytes of the Wi-Fi MAC
+  address. The job broadcasts its NodeInfo (names and ID) when it starts and
+  every three hours, and answers NodeInfo requests at most once every 30
+  seconds.
+- NodeInfo from other nodes names their Chat contacts. A contact you renamed
+  keeps your name.
+- Sent packets use a hop limit of 3 and are reported as sent once they leave
+  the radio; there is no delivery confirmation. Text is limited to 200 bytes.
+- Direct messages use Meshtastic public-key encryption (X25519, AES-CCM) when
+  the other node's public key is known from its NodeInfo, and fall back to the
+  channel key otherwise. The key pair is generated on first start and kept in
+  the credential store; the public key is included in this node's NodeInfo.
+  The first public key heard for a node is kept, and a different later key is
+  counted as a key mismatch and ignored. Remove the contact to accept a new
+  key.
+- Public-key direct messages from a node whose key is not yet known cannot be
+  read and are counted as unknown-sender packets until its NodeInfo arrives.
+- Only text messages (port 1) on the configured channel are published.
+  Telemetry, position, node info, and other ports are counted and ignored.
+  With Chat enabled, direct messages addressed to other nodes are ignored.
+- Meshtastic nodes rebroadcast packets, so the same message is often heard more
+  than once. Duplicates are recognized by sender and packet ID.
+- Channel packets carry no authentication, so a sender shown in the inbox is
+  not verified.
+- Stopping the job restores the radio configuration and state that were active
+  when it started.
+- Channel names are limited to 12 characters. Custom frequency overrides and
+  regions other than those listed must use the numeric frequency form.
+
 ## meshcore
 
 Non-forwarding MeshCore companion provider for Contacts and Messages.

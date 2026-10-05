@@ -27,7 +27,7 @@ static void messages_usage(solar_os_shell_io_t *io)
     solar_os_shell_io_writeln(io, "  messages delete <message-id>");
     solar_os_shell_io_writeln(
         io,
-        "  messages clear <gateway|meshcore|link|all>");
+        "  messages clear <gateway|meshcore|link|meshtastic|all>");
     solar_os_shell_io_writeln(io, "  messages outbox");
     solar_os_shell_io_writeln(io, "  messages cancel <message-id>");
 }
@@ -53,6 +53,10 @@ static bool messages_parse_provider(
     }
     if (strcmp(text, "link") == 0) {
         *provider = SOLAR_OS_MESSAGING_PROVIDER_LINK;
+        return true;
+    }
+    if (strcmp(text, "meshtastic") == 0) {
+        *provider = SOLAR_OS_MESSAGING_PROVIDER_MESHTASTIC;
         return true;
     }
     return false;
@@ -125,7 +129,7 @@ static void messages_status(solar_os_shell_io_t *io)
     }
     for (solar_os_messaging_provider_id_t provider =
              SOLAR_OS_MESSAGING_PROVIDER_GATEWAY;
-         provider <= SOLAR_OS_MESSAGING_PROVIDER_LINK;
+         provider <= SOLAR_OS_MESSAGING_PROVIDER_LAST;
          provider++) {
         solar_os_messaging_provider_status_t provider_status;
         if (solar_os_messaging_provider_get_status(provider,

@@ -583,6 +583,10 @@ static const shell_command_t shell_builtin_commands[] = {
     {"meshcore", "MeshCore identity and radio messaging",
      solar_os_shell_cmd_meshcore},
 #endif
+#if SOLAR_OS_PACKAGE_JOB_MESHTASTIC
+    {"meshtastic", "Meshtastic receiver status",
+     solar_os_shell_cmd_meshtastic},
+#endif
 #if SOLAR_OS_PACKAGE_JOB_POCSAG
     {"pocsag", "POCSAG pager send and receive", solar_os_shell_cmd_pocsag},
 #endif
@@ -1337,7 +1341,7 @@ static const char * const contacts_list_values[] = {
 #endif
 #if SOLAR_OS_PACKAGE_APP_CHAT
 static const char * const chat_selectors[] = {
-    "gateway", "meshcore", "link"
+    "gateway", "meshcore", "link", "meshtastic"
 };
 static const char * const messages_subcommands[] = {
     "status",
@@ -1352,7 +1356,7 @@ static const char * const messages_subcommands[] = {
 };
 static const char * const outbox_subcommands[] = {"list", "cancel"};
 static const char * const messages_clear_values[] = {
-    "gateway", "meshcore", "link", "all"
+    "gateway", "meshcore", "link", "meshtastic", "all"
 };
 #endif
 #if SOLAR_OS_PACKAGE_SERVICE_GATEWAY

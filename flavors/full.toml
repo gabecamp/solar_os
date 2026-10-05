@@ -74,6 +74,7 @@ pocsag = true
 radio_link = true
 meshcore = true
 meshcore_ble = true
+meshtastic = true
 audio_commands = true
 speech = true
 player = true

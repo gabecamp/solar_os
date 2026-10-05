@@ -199,7 +199,7 @@ static bool messaging_text_valid(const char *text,
 static bool messaging_provider_valid(solar_os_messaging_provider_id_t provider)
 {
     return provider >= SOLAR_OS_MESSAGING_PROVIDER_GATEWAY &&
-        provider <= SOLAR_OS_MESSAGING_PROVIDER_LINK;
+        provider <= SOLAR_OS_MESSAGING_PROVIDER_LAST;
 }
 
 static size_t messaging_provider_index(
@@ -438,7 +438,7 @@ static bool messaging_record_valid(const messaging_store_record_t *record)
         return true;
     }
     return record->message.provider >= SOLAR_OS_MESSAGING_PROVIDER_GATEWAY &&
-        record->message.provider <= SOLAR_OS_MESSAGING_PROVIDER_LINK &&
+        record->message.provider <= SOLAR_OS_MESSAGING_PROVIDER_LAST &&
         record->conversation_key[0] != '\0';
 }
 
@@ -982,6 +982,8 @@ static void messaging_restore_inbox(void)
             provider = SOLAR_OS_MESSAGING_PROVIDER_MESHCORE;
         } else if (strcmp(entry->source, "link-chat") == 0) {
             provider = SOLAR_OS_MESSAGING_PROVIDER_LINK;
+        } else if (strcmp(entry->source, "meshtastic") == 0) {
+            provider = SOLAR_OS_MESSAGING_PROVIDER_MESHTASTIC;
         } else {
             continue;
         }
@@ -999,6 +1001,9 @@ static void messaging_restore_inbox(void)
                     SOLAR_OS_CONVERSATION_ROOM :
                 provider == SOLAR_OS_MESSAGING_PROVIDER_LINK &&
                     strncmp(provider_key, "b:", 2U) == 0 ?
+                    SOLAR_OS_CONVERSATION_BROADCAST :
+                provider == SOLAR_OS_MESSAGING_PROVIDER_MESHTASTIC &&
+                    strncmp(provider_key, "c:", 2U) == 0 ?
                     SOLAR_OS_CONVERSATION_BROADCAST :
                     SOLAR_OS_CONVERSATION_DIRECT,
             .title = provider_key,
@@ -1076,6 +1081,8 @@ static void messaging_publish_inbox_projection(
             "meshcore" :
         request->provider == SOLAR_OS_MESSAGING_PROVIDER_LINK ?
             "link-chat" :
+        request->provider == SOLAR_OS_MESSAGING_PROVIDER_MESHTASTIC ?
+            "meshtastic" :
             "messages";
     const solar_os_inbox_publish_t notification = {
         .source = source,
@@ -2137,8 +2144,9 @@ static esp_err_t messaging_clear_inbox_projections(
     static const char *const meshcore_sources[] = {"meshcore"};
     static const char *const link_sources[] = {"link-chat", "link"};
     static const char *const all_sources[] = {
-        "messages", "chat", "meshcore", "link-chat", "link",
+        "messages", "chat", "meshcore", "link-chat", "link", "meshtastic",
     };
+    static const char *const meshtastic_sources[] = {"meshtastic"};
     const char *const *sources = all_sources;
     size_t source_count = sizeof(all_sources) / sizeof(all_sources[0]);
     if (provider == SOLAR_OS_MESSAGING_PROVIDER_GATEWAY) {
@@ -2150,6 +2158,9 @@ static esp_err_t messaging_clear_inbox_projections(
     } else if (provider == SOLAR_OS_MESSAGING_PROVIDER_LINK) {
         sources = link_sources;
         source_count = sizeof(link_sources) / sizeof(link_sources[0]);
+    } else if (provider == SOLAR_OS_MESSAGING_PROVIDER_MESHTASTIC) {
+        sources = meshtastic_sources;
+        source_count = sizeof(meshtastic_sources) / sizeof(meshtastic_sources[0]);
     }
     size_t deleted = 0;
     return solar_os_inbox_delete_sources(sources, source_count, &deleted);

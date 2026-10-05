@@ -29,21 +29,7 @@ TARGETS += script_media_test script_media_rtsp_test
 TARGETS += raster_image_test
 TARGETS += media_lua_bindings_test
 TARGETS += messaging_service_test
-TARGETS += cw2017_test
-TARGETS += rtc_pcf8563_test
-
-rtc_pcf8563_test: rtc_pcf8563_test.c $(ROOT)/src/drivers/rtc_pcf8563.c \
-        $(ROOT)/src/drivers/rtc_pcf8563.h $(ROOT)/src/services/solar_os_pcf8563.c \
-        $(ROOT)/src/services/solar_os_pcf8563.h
-	$(CC) $(CFLAGS) -D_GNU_SOURCE -include compat.h -Iexpansion_stubs -I. \
-		-I$(ROOT)/include -I$(ROOT)/src/services -I$(ROOT)/src/drivers \
-		rtc_pcf8563_test.c $(ROOT)/src/drivers/rtc_pcf8563.c $(ROOT)/src/services/solar_os_pcf8563.c -o $@
-
-cw2017_test: cw2017_test.c $(ROOT)/src/drivers/cw2017.c $(ROOT)/src/drivers/cw2017.h \
-        $(ROOT)/src/services/solar_os_cw2017.c $(ROOT)/src/services/solar_os_cw2017.h
-	$(CC) $(CFLAGS) -D_GNU_SOURCE -include compat.h -Iexpansion_stubs -I. \
-		-I$(ROOT)/include -I$(ROOT)/src/services -I$(ROOT)/src/drivers \
-		cw2017_test.c $(ROOT)/src/drivers/cw2017.c $(ROOT)/src/services/solar_os_cw2017.c -o $@
+TARGETS += meshtastic_test
 
 axp2101_service_test: axp2101_service_test.c $(ROOT)/src/services/solar_os_axp2101.c \
 	$(ROOT)/src/services/solar_os_axp2101.h $(ROOT)/src/drivers/axp2101.c
@@ -636,6 +622,11 @@ wireguard_crypto_test: wireguard_crypto_test.c $(ROOT)/components/wireguard_lwip
 		wireguard_crypto_test.c $(ROOT)/components/wireguard_lwip/src/crypto.c \
 		$(ROOT)/components/wireguard_lwip/src/crypto/refc/x25519.c -o $@
 
+meshtastic_test: meshtastic_test.c $(ROOT)/src/services/solar_os_meshtastic.c \
+		$(ROOT)/src/services/solar_os_meshtastic.h
+	$(CC) $(CFLAGS) -I$(ROOT)/src/services meshtastic_test.c \
+		$(ROOT)/src/services/solar_os_meshtastic.c -lmbedcrypto -o $@
+
 meshcore_channel_key_test: meshcore_channel_key_test.cpp \
 		$(ROOT)/src/services/solar_os_meshcore_channel_key.cpp \
 		$(ROOT)/src/services/solar_os_meshcore_channel_key.h \
@@ -780,6 +771,7 @@ test: $(TARGETS)
 	./terminal_preferences_test
 	./tui_widgets_test
 	./wireguard_crypto_test
+	./meshtastic_test
 	./meshcore_channel_key_test
 	./meshcore_stream_codec_test
 	./meshcore_ble_protocol_test
