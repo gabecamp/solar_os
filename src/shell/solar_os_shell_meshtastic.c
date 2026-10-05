@@ -32,7 +32,7 @@ void solar_os_shell_cmd_meshtastic(solar_os_context_t *ctx, int argc, char **arg
     }
 
     solar_os_shell_io_printf(io,
-                             "Meshtastic: running on %s as !%08" PRIx32 " (%s), chat: %s\n"
+                             "Meshtastic: running on %s as !%08" PRIx32 " (%s), chat: %s, PKI: %s\n"
                              "Channel: %s, hash: 0x%02x\n"
                              "Frequency: %" PRIu32 " Hz, bandwidth: %" PRIu32
                              " Hz, SF: %u\n"
@@ -42,11 +42,14 @@ void solar_os_shell_cmd_meshtastic(solar_os_context_t *ctx, int argc, char **arg
                              ", CRC errors: %" PRIu32 ", receive errors: %" PRIu32 "\n"
                              "Sent: %" PRIu32 ", send errors: %" PRIu32
                              ", NodeInfo sent: %" PRIu32 ", received: %" PRIu32 "\n"
+                             "PKI sent: %" PRIu32 ", received: %" PRIu32
+                             ", unknown sender: %" PRIu32 ", key mismatches: %" PRIu32 "\n"
                              "Last RSSI: %d dBm, last SNR: %d dB, last error: %s\n",
                              status.radio,
                              status.node_id,
                              status.long_name,
                              status.chat ? "on" : "off",
+                             status.pki ? "on" : "off",
                              status.channel,
                              status.channel_hash,
                              status.frequency_hz,
@@ -64,6 +67,10 @@ void solar_os_shell_cmd_meshtastic(solar_os_context_t *ctx, int argc, char **arg
                              status.send_errors,
                              status.nodeinfo_sent,
                              status.nodeinfo_received,
+                             status.pki_sent,
+                             status.pki_received,
+                             status.pki_unknown_sender,
+                             status.key_mismatches,
                              status.last_rssi_dbm,
                              status.last_snr_db,
                              solar_os_shell_error_text(status.last_error));

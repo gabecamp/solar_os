@@ -4,6 +4,10 @@
 #include <string.h>
 
 #include "mbedtls/aes.h"
+#include "mbedtls/ccm.h"
+#include "mbedtls/ecp.h"
+#include "mbedtls/sha256.h"
+#include "mbedtls/version.h"
 
 /* Public default channel key ("AQ==" / index 1) published by Meshtastic. */
 static const uint8_t default_psk[16] = {
@@ -201,8 +205,20 @@ size_t solar_os_meshtastic_user_encode(const solar_os_meshtastic_user_t *user,
         }
         pos += n;
     }
-    const size_t n = write_varint_field(5U, user->hw_model, out + pos, out_len - pos);
-    return n == 0 ? 0 : pos + n;
+    size_t n = write_varint_field(5U, user->hw_model, out + pos, out_len - pos);
+    if (n == 0) {
+        return 0;
+    }
+    pos += n;
+    if (user->has_public_key) {
+        n = write_bytes_field(8U, user->public_key, sizeof(user->public_key),
+                              out + pos, out_len - pos);
+        if (n == 0) {
+            return 0;
+        }
+        pos += n;
+    }
+    return pos;
 }
 
 static void copy_field(char *dst, size_t dst_len, const uint8_t *src, size_t len)
@@ -425,6 +441,9 @@ bool solar_os_meshtastic_user_decode(const uint8_t *buffer,
                 copy_field(user->long_name, sizeof(user->long_name), data, (size_t)value);
             } else if (field == 3) {
                 copy_field(user->short_name, sizeof(user->short_name), data, (size_t)value);
+            } else if (field == 8 && value == SOLAR_OS_MESHTASTIC_PKI_KEY_LEN) {
+                memcpy(user->public_key, data, SOLAR_OS_MESHTASTIC_PKI_KEY_LEN);
+                user->has_public_key = true;
             }
             pos += (size_t)value;
         } else if (wire == 5) {
@@ -500,4 +519,164 @@ bool solar_os_meshtastic_region_frequency(
     const uint32_t slot = solar_os_meshtastic_slot_hash(channel_name) % channels;
     *frequency_hz = r->start_hz + bandwidth_hz / 2U + slot * bandwidth_hz;
     return true;
+}
+
+static void clamp_private_key(uint8_t key[SOLAR_OS_MESHTASTIC_PKI_KEY_LEN])
+{
+    key[0] &= 248U;
+    key[31] &= 127U;
+    key[31] |= 64U;
+}
+
+/* RFC 7748 X25519 using mbedtls Montgomery arithmetic (little-endian I/O). */
+static bool x25519(const uint8_t scalar[SOLAR_OS_MESHTASTIC_PKI_KEY_LEN],
+                   const uint8_t point[SOLAR_OS_MESHTASTIC_PKI_KEY_LEN],
+                   uint8_t out[SOLAR_OS_MESHTASTIC_PKI_KEY_LEN])
+{
+    uint8_t clamped[SOLAR_OS_MESHTASTIC_PKI_KEY_LEN];
+    memcpy(clamped, scalar, sizeof(clamped));
+    clamp_private_key(clamped);
+
+    mbedtls_ecp_group group;
+    mbedtls_ecp_point peer;
+    mbedtls_ecp_point result;
+    mbedtls_mpi d;
+    mbedtls_ecp_group_init(&group);
+    mbedtls_ecp_point_init(&peer);
+    mbedtls_ecp_point_init(&result);
+    mbedtls_mpi_init(&d);
+
+    size_t written = 0;
+    bool ok = mbedtls_ecp_group_load(&group, MBEDTLS_ECP_DP_CURVE25519) == 0 &&
+              mbedtls_mpi_read_binary_le(&d, clamped, sizeof(clamped)) == 0 &&
+              mbedtls_ecp_point_read_binary(&group, &peer, point,
+                                            SOLAR_OS_MESHTASTIC_PKI_KEY_LEN) == 0 &&
+              mbedtls_ecp_mul(&group, &result, &d, &peer, NULL, NULL) == 0 &&
+              mbedtls_ecp_point_write_binary(&group, &result, MBEDTLS_ECP_PF_UNCOMPRESSED,
+                                             &written, out,
+                                             SOLAR_OS_MESHTASTIC_PKI_KEY_LEN) == 0 &&
+              written == SOLAR_OS_MESHTASTIC_PKI_KEY_LEN;
+
+    mbedtls_mpi_free(&d);
+    mbedtls_ecp_point_free(&result);
+    mbedtls_ecp_point_free(&peer);
+    mbedtls_ecp_group_free(&group);
+    memset(clamped, 0, sizeof(clamped));
+    return ok;
+}
+
+bool solar_os_meshtastic_pki_public_key(uint8_t private_key[SOLAR_OS_MESHTASTIC_PKI_KEY_LEN],
+                                        uint8_t public_key[SOLAR_OS_MESHTASTIC_PKI_KEY_LEN])
+{
+    static const uint8_t base[SOLAR_OS_MESHTASTIC_PKI_KEY_LEN] = {9};
+    if (private_key == NULL || public_key == NULL) {
+        return false;
+    }
+    clamp_private_key(private_key);
+    return x25519(private_key, base, public_key);
+}
+
+static bool pki_shared_key(const uint8_t private_key[SOLAR_OS_MESHTASTIC_PKI_KEY_LEN],
+                           const uint8_t peer_public_key[SOLAR_OS_MESHTASTIC_PKI_KEY_LEN],
+                           uint8_t key[32])
+{
+    uint8_t shared[SOLAR_OS_MESHTASTIC_PKI_KEY_LEN];
+    if (!x25519(private_key, peer_public_key, shared)) {
+        return false;
+    }
+    uint8_t any = 0;
+    for (size_t i = 0; i < sizeof(shared); i++) {
+        any |= shared[i];
+    }
+#if MBEDTLS_VERSION_MAJOR >= 3
+    const int hashed = mbedtls_sha256(shared, sizeof(shared), key, 0);
+#else
+    const int hashed = mbedtls_sha256_ret(shared, sizeof(shared), key, 0);
+#endif
+    memset(shared, 0, sizeof(shared));
+    /* An all-zero secret means a low-order peer key. */
+    return any != 0 && hashed == 0;
+}
+
+static void pki_nonce(uint32_t from, uint32_t packet_id, uint32_t extra_nonce, uint8_t nonce[16])
+{
+    solar_os_meshtastic_build_nonce(from, packet_id, nonce);
+    nonce[4] = (uint8_t)extra_nonce;
+    nonce[5] = (uint8_t)(extra_nonce >> 8);
+    nonce[6] = (uint8_t)(extra_nonce >> 16);
+    nonce[7] = (uint8_t)(extra_nonce >> 24);
+}
+
+#define PKI_NONCE_LEN 13U
+#define PKI_TAG_LEN 8U
+
+bool solar_os_meshtastic_pki_encrypt(const uint8_t private_key[SOLAR_OS_MESHTASTIC_PKI_KEY_LEN],
+                                     const uint8_t peer_public_key[SOLAR_OS_MESHTASTIC_PKI_KEY_LEN],
+                                     uint32_t from,
+                                     uint32_t packet_id,
+                                     uint32_t extra_nonce,
+                                     const uint8_t *plain,
+                                     size_t len,
+                                     uint8_t *out)
+{
+    if (private_key == NULL || peer_public_key == NULL || out == NULL ||
+        (plain == NULL && len != 0)) {
+        return false;
+    }
+    uint8_t key[32];
+    if (!pki_shared_key(private_key, peer_public_key, key)) {
+        return false;
+    }
+    uint8_t nonce[16];
+    pki_nonce(from, packet_id, extra_nonce, nonce);
+
+    mbedtls_ccm_context ccm;
+    mbedtls_ccm_init(&ccm);
+    bool ok = mbedtls_ccm_setkey(&ccm, MBEDTLS_CIPHER_ID_AES, key, 256) == 0 &&
+              mbedtls_ccm_encrypt_and_tag(&ccm, len, nonce, PKI_NONCE_LEN, NULL, 0,
+                                          plain, out, out + len, PKI_TAG_LEN) == 0;
+    mbedtls_ccm_free(&ccm);
+    memset(key, 0, sizeof(key));
+    if (ok) {
+        out[len + PKI_TAG_LEN] = (uint8_t)extra_nonce;
+        out[len + PKI_TAG_LEN + 1U] = (uint8_t)(extra_nonce >> 8);
+        out[len + PKI_TAG_LEN + 2U] = (uint8_t)(extra_nonce >> 16);
+        out[len + PKI_TAG_LEN + 3U] = (uint8_t)(extra_nonce >> 24);
+    }
+    return ok;
+}
+
+bool solar_os_meshtastic_pki_decrypt(const uint8_t private_key[SOLAR_OS_MESHTASTIC_PKI_KEY_LEN],
+                                     const uint8_t peer_public_key[SOLAR_OS_MESHTASTIC_PKI_KEY_LEN],
+                                     uint32_t from,
+                                     uint32_t packet_id,
+                                     const uint8_t *in,
+                                     size_t len,
+                                     uint8_t *out,
+                                     size_t *out_len)
+{
+    if (private_key == NULL || peer_public_key == NULL || in == NULL || out == NULL ||
+        out_len == NULL || len <= SOLAR_OS_MESHTASTIC_PKI_OVERHEAD) {
+        return false;
+    }
+    const size_t cipher_len = len - SOLAR_OS_MESHTASTIC_PKI_OVERHEAD;
+    const uint32_t extra_nonce = read_u32_le(in + cipher_len + PKI_TAG_LEN);
+    uint8_t key[32];
+    if (!pki_shared_key(private_key, peer_public_key, key)) {
+        return false;
+    }
+    uint8_t nonce[16];
+    pki_nonce(from, packet_id, extra_nonce, nonce);
+
+    mbedtls_ccm_context ccm;
+    mbedtls_ccm_init(&ccm);
+    bool ok = mbedtls_ccm_setkey(&ccm, MBEDTLS_CIPHER_ID_AES, key, 256) == 0 &&
+              mbedtls_ccm_auth_decrypt(&ccm, cipher_len, nonce, PKI_NONCE_LEN, NULL, 0,
+                                       in, out, in + cipher_len, PKI_TAG_LEN) == 0;
+    mbedtls_ccm_free(&ccm);
+    memset(key, 0, sizeof(key));
+    if (ok) {
+        *out_len = cipher_len;
+    }
+    return ok;
 }

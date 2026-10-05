@@ -1,13 +1,13 @@
 #pragma once
 
 /*
- * Meshtastic over-the-air packet handling (receive path).
+ * Meshtastic over-the-air packet handling.
  *
  * This is an independent implementation written from the published Meshtastic
- * protocol documentation: a 16-byte clear header followed by an AES-CTR
- * encrypted protobuf `Data` message. It is not derived from the (GPL-3.0)
- * Meshtastic firmware source. Only unicast/broadcast channel-PSK traffic can be
- * decoded; PKI direct messages are not supported.
+ * protocol documentation: a 16-byte clear header followed by a protobuf `Data`
+ * message, encrypted with the channel key (AES-CTR) or, for direct messages,
+ * a per-peer X25519 key (AES-CCM). It is not derived from the (GPL-3.0)
+ * Meshtastic firmware source.
  */
 
 #include <stdbool.h>
@@ -27,6 +27,9 @@ extern "C" {
 #define SOLAR_OS_MESHTASTIC_LONG_NAME_MAX 39U
 #define SOLAR_OS_MESHTASTIC_SHORT_NAME_MAX 4U
 #define SOLAR_OS_MESHTASTIC_HW_PRIVATE 255U
+#define SOLAR_OS_MESHTASTIC_PKI_KEY_LEN 32U
+/* PKI payload overhead: 8-byte CCM tag plus 4-byte extra nonce. */
+#define SOLAR_OS_MESHTASTIC_PKI_OVERHEAD 12U
 #define SOLAR_OS_MESHTASTIC_SYNC_WORD 0x2BU
 #define SOLAR_OS_MESHTASTIC_PREAMBLE 16U
 #define SOLAR_OS_MESHTASTIC_TEXT_MAX 200U
@@ -132,6 +135,8 @@ typedef struct {
     char long_name[SOLAR_OS_MESHTASTIC_LONG_NAME_MAX + 1U];
     char short_name[SOLAR_OS_MESHTASTIC_SHORT_NAME_MAX * 4U + 1U];
     uint32_t hw_model;
+    bool has_public_key;
+    uint8_t public_key[SOLAR_OS_MESHTASTIC_PKI_KEY_LEN];
 } solar_os_meshtastic_user_t;
 
 /* User message (NodeInfo payload): id, long_name, short_name, hw_model. */
@@ -160,6 +165,33 @@ bool solar_os_meshtastic_region_frequency(
     uint32_t bandwidth_hz,
     const char *channel_name,
     uint32_t *frequency_hz);
+
+/*
+ * Public-key direct messages: X25519 shared secret, hashed with SHA-256 to an
+ * AES-256 key, then AES-CCM with an 8-byte tag. The nonce is the channel nonce
+ * with bytes 4..7 replaced by a random extra nonce, which travels after the tag.
+ */
+/* Clamps private_key in place and derives its public key. */
+bool solar_os_meshtastic_pki_public_key(uint8_t private_key[SOLAR_OS_MESHTASTIC_PKI_KEY_LEN],
+                                        uint8_t public_key[SOLAR_OS_MESHTASTIC_PKI_KEY_LEN]);
+/* out must hold len + SOLAR_OS_MESHTASTIC_PKI_OVERHEAD bytes. */
+bool solar_os_meshtastic_pki_encrypt(const uint8_t private_key[SOLAR_OS_MESHTASTIC_PKI_KEY_LEN],
+                                     const uint8_t peer_public_key[SOLAR_OS_MESHTASTIC_PKI_KEY_LEN],
+                                     uint32_t from,
+                                     uint32_t packet_id,
+                                     uint32_t extra_nonce,
+                                     const uint8_t *plain,
+                                     size_t len,
+                                     uint8_t *out);
+/* out must hold len - SOLAR_OS_MESHTASTIC_PKI_OVERHEAD bytes. */
+bool solar_os_meshtastic_pki_decrypt(const uint8_t private_key[SOLAR_OS_MESHTASTIC_PKI_KEY_LEN],
+                                     const uint8_t peer_public_key[SOLAR_OS_MESHTASTIC_PKI_KEY_LEN],
+                                     uint32_t from,
+                                     uint32_t packet_id,
+                                     const uint8_t *in,
+                                     size_t len,
+                                     uint8_t *out,
+                                     size_t *out_len);
 
 /* Nonce layout: packet id (u64 LE), sender (u32 LE), zero counter. */
 void solar_os_meshtastic_build_nonce(uint32_t from,

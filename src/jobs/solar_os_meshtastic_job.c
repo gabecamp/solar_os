@@ -26,7 +26,14 @@
 #define MESHTASTIC_CHAT 0
 #endif
 
-#define MESHTASTIC_TASK_STACK 5120
+#if MESHTASTIC_CHAT && SOLAR_OS_PACKAGE_SERVICE_CREDENTIALS
+#include "solar_os_credentials.h"
+#define MESHTASTIC_PKI 1
+#else
+#define MESHTASTIC_PKI 0
+#endif
+
+#define MESHTASTIC_TASK_STACK 8192
 #define MESHTASTIC_RECEIVE_TIMEOUT_MS 100U
 #define MESHTASTIC_STOP_WAIT_MS 1000U
 #define MESHTASTIC_DEDUPE_SLOTS 32U
@@ -57,6 +64,8 @@ typedef struct {
     uint32_t nodeinfo_sent_ms;
     uint32_t nodeinfo_reply_ms;
     bool nodeinfo_replied;
+    bool pki;
+    uint8_t private_key[SOLAR_OS_MESHTASTIC_PKI_KEY_LEN];
     char channel_key[SOLAR_OS_MESHTASTIC_CHANNEL_NAME_MAX + 3U];
 } meshtastic_state_t;
 
@@ -244,18 +253,58 @@ static void node_address(uint32_t node, uint8_t address[4])
     address[3] = (uint8_t)node;
 }
 
-static esp_err_t publish_chat(const solar_os_meshtastic_header_t *header, const char *body)
+/* The endpoint's provider metadata holds the node's 32-byte public key once
+ * one is known. The first key seen is kept; a different later key is counted
+ * and ignored. */
+static bool node_public_key(uint32_t node, uint8_t key[SOLAR_OS_MESHTASTIC_PKI_KEY_LEN])
 {
     uint8_t address[4];
-    node_address(header->from, address);
+    node_address(node, address);
+    solar_os_endpoint_t endpoint;
+    if (solar_os_contacts_find_endpoint(SOLAR_OS_MESSAGING_PROVIDER_MESHTASTIC, address,
+                                        sizeof(address), &endpoint) != ESP_OK ||
+        endpoint.provider_metadata_len != SOLAR_OS_MESHTASTIC_PKI_KEY_LEN) {
+        return false;
+    }
+    memcpy(key, endpoint.provider_metadata, SOLAR_OS_MESHTASTIC_PKI_KEY_LEN);
+    return true;
+}
+
+static esp_err_t upsert_node(uint32_t node,
+                             const char *name,
+                             const uint8_t *public_key,
+                             solar_os_contact_id_t *contact_id,
+                             solar_os_endpoint_id_t *endpoint_id)
+{
+    uint8_t address[4];
+    node_address(node, address);
+    uint8_t key[SOLAR_OS_MESHTASTIC_PKI_KEY_LEN];
+    bool have_key = node_public_key(node, key);
+    if (public_key != NULL) {
+        if (!have_key) {
+            memcpy(key, public_key, sizeof(key));
+            have_key = true;
+        } else if (memcmp(key, public_key, sizeof(key)) != 0) {
+            meshtastic.status.key_mismatches++;
+            SOLAR_OS_LOGW(TAG, "!%08" PRIx32 " announced a different public key; keeping the first",
+                          node);
+        }
+    }
+    return solar_os_contacts_upsert_discovered(
+        SOLAR_OS_MESSAGING_PROVIDER_MESHTASTIC, address, sizeof(address), name,
+        SOLAR_OS_ENDPOINT_CAP_DIRECT | SOLAR_OS_ENDPOINT_CAP_BROADCAST, now_ms(),
+        have_key ? key : NULL, have_key ? sizeof(key) : 0U, contact_id, endpoint_id);
+}
+
+static esp_err_t publish_chat(const solar_os_meshtastic_header_t *header,
+                              const char *body,
+                              bool pki)
+{
     char default_name[SOLAR_OS_CONTACT_NAME_MAX + 1U];
     snprintf(default_name, sizeof(default_name), "!%08" PRIx32, header->from);
     solar_os_contact_id_t contact_id = SOLAR_OS_CONTACT_ID_NONE;
     solar_os_endpoint_id_t endpoint_id = SOLAR_OS_ENDPOINT_ID_NONE;
-    esp_err_t err = solar_os_contacts_upsert_discovered(
-        SOLAR_OS_MESSAGING_PROVIDER_MESHTASTIC, address, sizeof(address), default_name,
-        SOLAR_OS_ENDPOINT_CAP_DIRECT | SOLAR_OS_ENDPOINT_CAP_BROADCAST, now_ms(),
-        meshtastic.channel.name, strlen(meshtastic.channel.name), &contact_id, &endpoint_id);
+    esp_err_t err = upsert_node(header->from, default_name, NULL, &contact_id, &endpoint_id);
     if (err != ESP_OK) {
         return err;
     }
@@ -281,9 +330,17 @@ static esp_err_t publish_chat(const solar_os_meshtastic_header_t *header, const 
         strlcpy(title, contact.display_name, sizeof(title));
         kind = SOLAR_OS_CONVERSATION_DIRECT;
     }
-    uint32_t security = SOLAR_OS_SECURITY_SENDER_UNVERIFIED;
-    if (meshtastic.channel.key_len > 0) {
-        security |= SOLAR_OS_SECURITY_ENCRYPTED | SOLAR_OS_SECURITY_SHARED_KEY;
+    uint32_t security;
+    if (pki) {
+        security = SOLAR_OS_SECURITY_ENCRYPTED | SOLAR_OS_SECURITY_PEER_KEY_KNOWN;
+        if (endpoint.trust == SOLAR_OS_CONTACT_TRUST_TRUSTED) {
+            security |= SOLAR_OS_SECURITY_PEER_TRUSTED;
+        }
+    } else {
+        security = SOLAR_OS_SECURITY_SENDER_UNVERIFIED;
+        if (meshtastic.channel.key_len > 0) {
+            security |= SOLAR_OS_SECURITY_ENCRYPTED | SOLAR_OS_SECURITY_SHARED_KEY;
+        }
     }
     const solar_os_messaging_inbound_t inbound = {
         .provider = SOLAR_OS_MESSAGING_PROVIDER_MESHTASTIC,
@@ -303,7 +360,8 @@ static esp_err_t publish_chat(const solar_os_meshtastic_header_t *header, const 
 #endif
 
 static void publish_text(const solar_os_meshtastic_header_t *header,
-                         const solar_os_meshtastic_data_t *data)
+                         const solar_os_meshtastic_data_t *data,
+                         bool pki)
 {
     char body[SOLAR_OS_INBOX_BODY_MAX];
     copy_text(data, body, sizeof(body));
@@ -311,7 +369,7 @@ static void publish_text(const solar_os_meshtastic_header_t *header,
     esp_err_t err;
 #if MESHTASTIC_CHAT
     if (meshtastic.chat) {
-        err = publish_chat(header, body);
+        err = publish_chat(header, body, pki);
     } else
 #endif
     {
@@ -345,6 +403,12 @@ static void publish_text(const solar_os_meshtastic_header_t *header,
         return;
     }
     meshtastic.status.messages++;
+    if (pki) {
+        meshtastic.status.pki_received++;
+    }
+#if !MESHTASTIC_CHAT
+    (void)pki;
+#endif
 }
 
 static void enter_rx(void)
@@ -362,7 +426,8 @@ static esp_err_t transmit_data(uint32_t to,
                                uint32_t portnum,
                                const uint8_t *payload,
                                size_t payload_in_len,
-                               bool want_response)
+                               bool want_response,
+                               const uint8_t *peer_public_key)
 {
     uint32_t id = 0;
     do {
@@ -374,22 +439,40 @@ static esp_err_t transmit_data(uint32_t to,
         .id = id,
         .hop_limit = SOLAR_OS_MESHTASTIC_DEFAULT_HOP_LIMIT,
         .hop_start = SOLAR_OS_MESHTASTIC_DEFAULT_HOP_LIMIT,
-        .channel_hash = meshtastic.channel.hash,
+        .channel_hash = peer_public_key != NULL ? 0U : meshtastic.channel.hash,
         .relay_node = (uint8_t)meshtastic.status.node_id,
     };
 
     solar_os_radio_packet_t packet;
     memset(&packet, 0, sizeof(packet));
     solar_os_meshtastic_header_build(&header, packet.data);
-    const size_t payload_len = solar_os_meshtastic_data_encode(
-        portnum, payload, payload_in_len, want_response,
-        packet.data + SOLAR_OS_MESHTASTIC_HEADER_LEN,
-        sizeof(packet.data) - SOLAR_OS_MESHTASTIC_HEADER_LEN);
-    if (payload_len == 0 ||
-        !solar_os_meshtastic_crypt(&meshtastic.channel, header.from, header.id,
-                                   packet.data + SOLAR_OS_MESHTASTIC_HEADER_LEN,
-                                   payload_len)) {
-        return ESP_ERR_INVALID_SIZE;
+    uint8_t *body = packet.data + SOLAR_OS_MESHTASTIC_HEADER_LEN;
+    const size_t body_max = sizeof(packet.data) - 1U - SOLAR_OS_MESHTASTIC_HEADER_LEN;
+    size_t payload_len = 0;
+    if (peer_public_key != NULL) {
+#if MESHTASTIC_PKI
+        uint8_t plain[SOLAR_OS_RADIO_PACKET_MAX];
+        const size_t plain_len = solar_os_meshtastic_data_encode(
+            portnum, payload, payload_in_len, want_response, plain,
+            body_max - SOLAR_OS_MESHTASTIC_PKI_OVERHEAD);
+        if (plain_len == 0 ||
+            !solar_os_meshtastic_pki_encrypt(meshtastic.private_key, peer_public_key,
+                                             header.from, header.id, esp_random(), plain,
+                                             plain_len, body)) {
+            return ESP_ERR_INVALID_SIZE;
+        }
+        payload_len = plain_len + SOLAR_OS_MESHTASTIC_PKI_OVERHEAD;
+#else
+        return ESP_ERR_NOT_SUPPORTED;
+#endif
+    } else {
+        payload_len = solar_os_meshtastic_data_encode(portnum, payload, payload_in_len,
+                                                      want_response, body, body_max);
+        if (payload_len == 0 ||
+            !solar_os_meshtastic_crypt(&meshtastic.channel, header.from, header.id, body,
+                                       payload_len)) {
+            return ESP_ERR_INVALID_SIZE;
+        }
     }
     packet.len = SOLAR_OS_MESHTASTIC_HEADER_LEN + payload_len;
 
@@ -400,6 +483,9 @@ static esp_err_t transmit_data(uint32_t to,
     enter_rx();
     if (err == ESP_OK) {
         meshtastic.status.sent++;
+        if (peer_public_key != NULL) {
+            meshtastic.status.pki_sent++;
+        }
     } else {
         meshtastic.status.send_errors++;
         meshtastic.status.last_error = err;
@@ -407,13 +493,16 @@ static esp_err_t transmit_data(uint32_t to,
     return err;
 }
 
-static esp_err_t transmit_text(uint32_t to, const char *text, size_t text_len)
+static esp_err_t transmit_text(uint32_t to,
+                               const char *text,
+                               size_t text_len,
+                               const uint8_t *peer_public_key)
 {
     if (text_len == 0 || text_len > SOLAR_OS_MESHTASTIC_TEXT_MAX) {
         return ESP_ERR_INVALID_SIZE;
     }
     return transmit_data(to, SOLAR_OS_MESHTASTIC_PORT_TEXT, (const uint8_t *)text,
-                         text_len, false);
+                         text_len, false, peer_public_key);
 }
 
 static esp_err_t transmit_nodeinfo(uint32_t to)
@@ -424,7 +513,7 @@ static esp_err_t transmit_nodeinfo(uint32_t to)
         return ESP_ERR_INVALID_SIZE;
     }
     const esp_err_t err =
-        transmit_data(to, SOLAR_OS_MESHTASTIC_PORT_NODEINFO, user, len, false);
+        transmit_data(to, SOLAR_OS_MESHTASTIC_PORT_NODEINFO, user, len, false, NULL);
     if (err == ESP_OK) {
         meshtastic.status.nodeinfo_sent++;
     }
@@ -456,26 +545,20 @@ static void answer_nodeinfo_request(uint32_t requester)
 }
 
 #if MESHTASTIC_CHAT
-static void learn_node_name(uint32_t node, const solar_os_meshtastic_user_t *user)
+static void learn_node(uint32_t node, const solar_os_meshtastic_user_t *user)
 {
-    if (user->long_name[0] == '\0') {
-        return;
-    }
     char default_name[SOLAR_OS_CONTACT_NAME_MAX + 1U];
     snprintf(default_name, sizeof(default_name), "!%08" PRIx32, node);
-    uint8_t address[4];
-    node_address(node, address);
     solar_os_contact_id_t contact_id = SOLAR_OS_CONTACT_ID_NONE;
-    if (solar_os_contacts_upsert_discovered(
-            SOLAR_OS_MESSAGING_PROVIDER_MESHTASTIC, address, sizeof(address),
-            user->long_name, SOLAR_OS_ENDPOINT_CAP_DIRECT | SOLAR_OS_ENDPOINT_CAP_BROADCAST,
-            now_ms(), meshtastic.channel.name, strlen(meshtastic.channel.name),
-            &contact_id, NULL) != ESP_OK) {
+    if (upsert_node(node, user->long_name[0] != '\0' ? user->long_name : default_name,
+                    user->has_public_key ? user->public_key : NULL, &contact_id,
+                    NULL) != ESP_OK) {
         return;
     }
     /* Only replace the placeholder ID; keep names the user chose. */
     solar_os_contact_t contact;
-    if (solar_os_contacts_get(contact_id, &contact) == ESP_OK &&
+    if (user->long_name[0] != '\0' &&
+        solar_os_contacts_get(contact_id, &contact) == ESP_OK &&
         strcmp(contact.display_name, default_name) == 0) {
         (void)solar_os_contacts_rename(contact_id, user->long_name);
     }
@@ -494,7 +577,7 @@ static void handle_nodeinfo(const solar_os_meshtastic_header_t *header,
     meshtastic.status.nodeinfo_received++;
 #if MESHTASTIC_CHAT
     if (meshtastic.chat) {
-        learn_node_name(header->from, &user);
+        learn_node(header->from, &user);
     }
 #endif
     if (data->want_response && (header->to == meshtastic.status.node_id ||
@@ -560,13 +643,95 @@ static void process_outbox(void)
                                          NULL) != ESP_OK) {
         return;
     }
-    const esp_err_t err = transmit_text(to, outbound->body, len);
+    const uint8_t *peer_key = NULL;
+#if MESHTASTIC_PKI
+    uint8_t key[SOLAR_OS_MESHTASTIC_PKI_KEY_LEN];
+    if (to != SOLAR_OS_MESHTASTIC_BROADCAST && meshtastic.pki && node_public_key(to, key)) {
+        peer_key = key;
+    }
+#endif
+    const esp_err_t err = transmit_text(to, outbound->body, len, peer_key);
     if (err == ESP_OK) {
         (void)solar_os_messaging_outbox_update(outbound->id, SOLAR_OS_DELIVERY_SENT, NULL);
     } else {
         fail_outbound(outbound->id, esp_err_to_name(err));
     }
 }
+
+#if MESHTASTIC_PKI
+static const char kIdentityLabel[] = "identity";
+
+/* Loads the stored X25519 key pair, generating and storing one if absent. */
+static esp_err_t pki_start(void)
+{
+    uint8_t secret[2U * SOLAR_OS_MESHTASTIC_PKI_KEY_LEN];
+    size_t secret_len = 0;
+    solar_os_credential_info_t record;
+    esp_err_t err = solar_os_credentials_find(SOLAR_OS_MESSAGING_PROVIDER_MESHTASTIC,
+                                              SOLAR_OS_CREDENTIAL_ASYMMETRIC_IDENTITY,
+                                              kIdentityLabel, &record);
+    if (err == ESP_OK) {
+        err = solar_os_credentials_read_secret(record.id, secret, sizeof(secret), &secret_len);
+        if (err == ESP_OK && secret_len != sizeof(secret)) {
+            err = ESP_ERR_INVALID_SIZE;
+        }
+    } else if (err == ESP_ERR_NOT_FOUND) {
+        esp_fill_random(secret, SOLAR_OS_MESHTASTIC_PKI_KEY_LEN);
+        err = solar_os_meshtastic_pki_public_key(secret, secret + SOLAR_OS_MESHTASTIC_PKI_KEY_LEN)
+                  ? solar_os_credentials_put(SOLAR_OS_MESSAGING_PROVIDER_MESHTASTIC,
+                                             SOLAR_OS_CREDENTIAL_ASYMMETRIC_IDENTITY,
+                                             kIdentityLabel, secret, sizeof(secret), false,
+                                             NULL)
+                  : ESP_FAIL;
+    }
+    if (err == ESP_OK) {
+        memcpy(meshtastic.private_key, secret, SOLAR_OS_MESHTASTIC_PKI_KEY_LEN);
+        /* Derive the public key again rather than trusting the stored copy. */
+        if (solar_os_meshtastic_pki_public_key(meshtastic.private_key,
+                                               meshtastic.user.public_key)) {
+            meshtastic.user.has_public_key = true;
+            meshtastic.pki = true;
+        } else {
+            err = ESP_FAIL;
+        }
+    }
+    solar_os_credentials_wipe(secret, sizeof(secret));
+    return err;
+}
+
+static void handle_pki_packet(const solar_os_radio_packet_t *packet,
+                              const solar_os_meshtastic_header_t *header)
+{
+    uint8_t peer_key[SOLAR_OS_MESHTASTIC_PKI_KEY_LEN];
+    if (!node_public_key(header->from, peer_key)) {
+        meshtastic.status.pki_unknown_sender++;
+        return;
+    }
+    uint8_t plain[SOLAR_OS_RADIO_PACKET_MAX];
+    size_t plain_len = 0;
+    if (!solar_os_meshtastic_pki_decrypt(meshtastic.private_key, peer_key, header->from,
+                                         header->id,
+                                         packet->data + SOLAR_OS_MESHTASTIC_HEADER_LEN,
+                                         packet->len - SOLAR_OS_MESHTASTIC_HEADER_LEN, plain,
+                                         &plain_len)) {
+        meshtastic.status.decode_errors++;
+        return;
+    }
+    solar_os_meshtastic_data_t data;
+    if (!solar_os_meshtastic_data_decode(plain, plain_len, &data)) {
+        meshtastic.status.decode_errors++;
+        return;
+    }
+    if (data.portnum == SOLAR_OS_MESHTASTIC_PORT_NODEINFO) {
+        handle_nodeinfo(header, &data);
+    } else if (data.portnum == SOLAR_OS_MESHTASTIC_PORT_TEXT && data.payload != NULL &&
+               data.payload_len > 0) {
+        publish_text(header, &data, true);
+    } else {
+        meshtastic.status.non_text++;
+    }
+}
+#endif
 
 static esp_err_t chat_start(void)
 {
@@ -618,7 +783,11 @@ static void handle_packet(const solar_os_radio_packet_t *packet)
         meshtastic.status.decode_errors++;
         return;
     }
-    if (header.channel_hash != meshtastic.channel.hash) {
+    /* PKI direct messages carry channel hash 0 and are addressed to us. */
+    const bool pki_packet = meshtastic.pki && header.channel_hash == 0 &&
+                            header.to == meshtastic.status.node_id &&
+                            meshtastic.channel.hash != 0;
+    if (!pki_packet && header.channel_hash != meshtastic.channel.hash) {
         meshtastic.status.other_channel++;
         return;
     }
@@ -630,6 +799,12 @@ static void handle_packet(const solar_os_radio_packet_t *packet)
         meshtastic.status.duplicates++;
         return;
     }
+#if MESHTASTIC_PKI
+    if (pki_packet) {
+        handle_pki_packet(packet, &header);
+        return;
+    }
+#endif
 
     uint8_t plain[SOLAR_OS_RADIO_PACKET_MAX];
     const size_t payload_len = packet->len - SOLAR_OS_MESHTASTIC_HEADER_LEN;
@@ -660,7 +835,7 @@ static void handle_packet(const solar_os_radio_packet_t *packet)
         meshtastic.status.other_channel++;
         return;
     }
-    publish_text(&header, &data);
+    publish_text(&header, &data, false);
 }
 
 static void meshtastic_task(void *arg)
@@ -813,6 +988,12 @@ static esp_err_t meshtastic_start(solar_os_context_t *ctx, int argc, char **argv
     strlcpy(meshtastic.status.long_name, meshtastic.user.long_name,
             sizeof(meshtastic.status.long_name));
     snprintf(meshtastic.channel_key, sizeof(meshtastic.channel_key), "c:%s", channel.name);
+#if MESHTASTIC_PKI
+    const esp_err_t pki_err = pki_start();
+    if (pki_err != ESP_OK) {
+        SOLAR_OS_LOGW(TAG, "PKI unavailable: %s", esp_err_to_name(pki_err));
+    }
+#endif
 #if MESHTASTIC_CHAT
     const esp_err_t chat_err = chat_start();
     meshtastic.chat = chat_err == ESP_OK;
@@ -821,6 +1002,7 @@ static esp_err_t meshtastic_start(solar_os_context_t *ctx, int argc, char **argv
     }
 #endif
     meshtastic.status.chat = meshtastic.chat;
+    meshtastic.status.pki = meshtastic.pki;
 
     if (solar_os_task_create_pinned_internal(meshtastic_task,
                                              "meshtastic_rx",
@@ -879,6 +1061,7 @@ static void meshtastic_stop(solar_os_context_t *ctx)
             SOLAR_OS_MESSAGING_PROVIDER_MESHTASTIC, false, false, ESP_OK, NULL);
     }
 #endif
+    memset(meshtastic.private_key, 0, sizeof(meshtastic.private_key));
     restore_radio();
     SOLAR_OS_LOGI(TAG,
                   "stopped: packets=%" PRIu32 " messages=%" PRIu32 " sent=%" PRIu32,

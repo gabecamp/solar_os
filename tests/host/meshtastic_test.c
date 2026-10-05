@@ -237,12 +237,77 @@ static int test_nodeinfo(void)
     return 0;
 }
 
+static const uint8_t rfc7748_alice_private[32] = {0x77, 0x07, 0x6d, 0x0a, 0x73, 0x18, 0xa5, 0x7d, 0x3c, 0x16, 0xc1, 0x72, 0x51, 0xb2, 0x66, 0x45, 0xdf, 0x4c, 0x2f, 0x87, 0xeb, 0xc0, 0x99, 0x2a, 0xb1, 0x77, 0xfb, 0xa5, 0x1d, 0xb9, 0x2c, 0x2a};
+static const uint8_t rfc7748_alice_public[32] = {0x85, 0x20, 0xf0, 0x09, 0x89, 0x30, 0xa7, 0x54, 0x74, 0x8b, 0x7d, 0xdc, 0xb4, 0x3e, 0xf7, 0x5a, 0x0d, 0xbf, 0x3a, 0x0d, 0x26, 0x38, 0x1a, 0xf4, 0xeb, 0xa4, 0xa9, 0x8e, 0xaa, 0x9b, 0x4e, 0x6a};
+static const uint8_t rfc7748_bob_private[32] = {0x5d, 0xab, 0x08, 0x7e, 0x62, 0x4a, 0x8a, 0x4b, 0x79, 0xe1, 0x7f, 0x8b, 0x83, 0x80, 0x0e, 0xe6, 0x6f, 0x3b, 0xb1, 0x29, 0x26, 0x18, 0xb6, 0xfd, 0x1c, 0x2f, 0x8b, 0x27, 0xff, 0x88, 0xe0, 0xeb};
+static const uint8_t rfc7748_bob_public[32] = {0xde, 0x9e, 0xdb, 0x7d, 0x7b, 0x7d, 0xc1, 0xb4, 0xd3, 0x5b, 0x61, 0xc2, 0xec, 0xe4, 0x35, 0x37, 0x3f, 0x83, 0x43, 0xc8, 0x5b, 0x78, 0x67, 0x4d, 0xad, 0xfc, 0x7e, 0x14, 0x6f, 0x88, 0x2b, 0x4f};
+/* Python `cryptography`: AES-256-CCM (8-byte tag) keyed by SHA-256 of the
+ * X25519 secret, nonce = channel nonce with extra nonce 0x01020304 in bytes 4..7. */
+static const uint8_t pki_cipher[26] = {0x7d, 0x58, 0xbe, 0x45, 0x52, 0x30, 0xeb, 0xc7, 0x43, 0xdb, 0x4f, 0xf5, 0xdd, 0x5a, 0x35, 0x4f, 0xfb, 0x9b, 0x01, 0x4e, 0xf3, 0xdc, 0x04, 0x03, 0x02, 0x01};
+
+static int test_pki(void)
+{
+    uint8_t alice[32];
+    uint8_t bob[32];
+    uint8_t public_key[32];
+    memcpy(alice, rfc7748_alice_private, sizeof(alice));
+    memcpy(bob, rfc7748_bob_private, sizeof(bob));
+    CHECK(solar_os_meshtastic_pki_public_key(alice, public_key));
+    CHECK(memcmp(public_key, rfc7748_alice_public, 32U) == 0);
+    CHECK(solar_os_meshtastic_pki_public_key(bob, public_key));
+    CHECK(memcmp(public_key, rfc7748_bob_public, 32U) == 0);
+
+    const uint8_t plain[] = {0x08, 0x01, 0x12, 0x0a, 'h', 'e', 'l', 'l', 'o',
+                             ' ', 'm', 'e', 's', 'h'};
+    uint8_t cipher[sizeof(plain) + SOLAR_OS_MESHTASTIC_PKI_OVERHEAD];
+    CHECK(solar_os_meshtastic_pki_encrypt(alice, rfc7748_bob_public, 0x11223344U,
+                                          0xAABBCCDDU, 0x01020304U, plain,
+                                          sizeof(plain), cipher));
+    CHECK(sizeof(cipher) == sizeof(pki_cipher));
+    CHECK(memcmp(cipher, pki_cipher, sizeof(cipher)) == 0);
+
+    /* Bob decrypts with his key and Alice's public key. */
+    uint8_t out[sizeof(plain)];
+    size_t out_len = 0;
+    CHECK(solar_os_meshtastic_pki_decrypt(bob, rfc7748_alice_public, 0x11223344U,
+                                          0xAABBCCDDU, pki_cipher, sizeof(pki_cipher),
+                                          out, &out_len));
+    CHECK(out_len == sizeof(plain) && memcmp(out, plain, sizeof(plain)) == 0);
+
+    /* Tampering, a wrong sender, or a wrong key fail authentication. */
+    uint8_t tampered[sizeof(pki_cipher)];
+    memcpy(tampered, pki_cipher, sizeof(tampered));
+    tampered[3] ^= 1U;
+    CHECK(!solar_os_meshtastic_pki_decrypt(bob, rfc7748_alice_public, 0x11223344U,
+                                           0xAABBCCDDU, tampered, sizeof(tampered),
+                                           out, &out_len));
+    CHECK(!solar_os_meshtastic_pki_decrypt(bob, rfc7748_alice_public, 0x11223345U,
+                                           0xAABBCCDDU, pki_cipher, sizeof(pki_cipher),
+                                           out, &out_len));
+    CHECK(!solar_os_meshtastic_pki_decrypt(bob, rfc7748_bob_public, 0x11223344U,
+                                           0xAABBCCDDU, pki_cipher, sizeof(pki_cipher),
+                                           out, &out_len));
+
+    /* NodeInfo carries the public key as User field 8. */
+    solar_os_meshtastic_user_t user = {.id = "!11223344", .long_name = "A",
+                                       .short_name = "A", .has_public_key = true};
+    memcpy(user.public_key, rfc7748_alice_public, 32U);
+    uint8_t encoded[96];
+    const size_t len = solar_os_meshtastic_user_encode(&user, encoded, sizeof(encoded));
+    CHECK(len > 34U && encoded[len - 34U] == 0x42 && encoded[len - 33U] == 32U);
+    solar_os_meshtastic_user_t decoded;
+    CHECK(solar_os_meshtastic_user_decode(encoded, len, &decoded));
+    CHECK(decoded.has_public_key &&
+          memcmp(decoded.public_key, rfc7748_alice_public, 32U) == 0);
+    return 0;
+}
+
 int main(void)
 {
     if (test_channel_hash() || test_decrypt_default_key() ||
         test_decrypt_aes256() || test_header() ||
         test_data_decode_rejects_truncated() || test_frequency() ||
-        test_encode_roundtrip() || test_nodeinfo()) {
+        test_encode_roundtrip() || test_nodeinfo() || test_pki()) {
         return 1;
     }
     puts("meshtastic_test: ok");
