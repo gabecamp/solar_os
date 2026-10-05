@@ -362,6 +362,11 @@ label = "POCSAG pager"
 category = "Radio"
 members = ["job_pocsag"]
 
+[groups.meshtastic]
+label = "Meshtastic text receiver"
+category = "Radio"
+members = ["job_meshtastic"]
+
 [groups.radio_link]
 label = "Packet radio link"
 category = "Radio"
@@ -2634,6 +2639,16 @@ sources = [
   "jobs/solar_os_pocsag_job.c",
   "shell/solar_os_shell_pocsag.c",
 ]
+any_capabilities = ["expansion_spi", "expansion_gpio"]
+
+[packages.job_meshtastic]
+label = "job.meshtastic"
+depends = ["service_inbox", "service_radio"]
+sources = [
+  "services/solar_os_meshtastic.c",
+  "jobs/solar_os_meshtastic_job.c",
+]
+requires = ["mbedtls"]
 any_capabilities = ["expansion_spi", "expansion_gpio"]
 
 [packages.job_radio_link]

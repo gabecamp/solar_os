@@ -956,6 +956,60 @@ Notes:
   previous configuration afterward. A receiver job using the same half-duplex
   radio must be stopped first.
 
+## meshtastic
+
+Meshtastic text receiver. It configures a registered LoRa packet radio with a
+Meshtastic modem preset, listens on one channel, decrypts channel traffic with
+the channel's pre-shared key (AES-CTR), and publishes received text messages to
+the universal inbox. The job is receive-only: it never transmits and does not
+forward or acknowledge packets.
+
+Usage:
+
+```text
+job start meshtastic <radio> <region|frequency-hz> [preset] [channel-name] [key]
+job stop meshtastic
+job status meshtastic
+```
+
+Arguments:
+
+- `region` is `US`, `EU_868`, `EU_433`, or `ANZ`. The frequency slot is derived
+  from the channel name and preset bandwidth. A numeric value in hertz selects
+  an explicit frequency instead.
+- `preset` is `LongFast` (default), `LongSlow`, `LongModerate`, `MediumFast`,
+  `MediumSlow`, `ShortFast`, `ShortSlow`, or `ShortTurbo`.
+- `channel-name` defaults to the preset name. It must match the channel name
+  configured on the network, because it selects both the frequency slot and the
+  one-byte channel hash carried in each packet.
+- `key` is `default` (the public default key, index 1), `none`, `index:N`, or 32
+  or 64 hexadecimal digits for an AES-128 or AES-256 key.
+
+Example:
+
+```text
+job start meshtastic radio0 US
+inbox list unread
+job stop meshtastic
+```
+
+Notes:
+
+- The radio uses LoRa sync word `0x2B`, a 16-symbol preamble, CRC, and the
+  explicit-header variable-length mode, matching Meshtastic.
+- Only text messages (port 1) on the configured channel are published.
+  Telemetry, position, node info, and other ports are counted and ignored.
+  Direct messages protected with Meshtastic public-key encryption cannot be
+  decoded and are counted as decode errors.
+- Meshtastic nodes rebroadcast packets, so the same message is often heard more
+  than once. Duplicates are recognized by sender and packet ID.
+- Channel packets carry no authentication, so a sender shown in the inbox is
+  not verified.
+- Stopping the job restores the radio configuration and state that were active
+  when it started.
+- Channel names are limited to 12 characters. Custom frequency overrides and
+  regions other than those listed must use the numeric frequency form.
+
 ## meshcore
 
 Non-forwarding MeshCore companion provider for Contacts and Messages.

@@ -26,6 +26,7 @@ TARGETS += script_media_test script_media_rtsp_test
 TARGETS += raster_image_test
 TARGETS += media_lua_bindings_test
 TARGETS += messaging_service_test
+TARGETS += meshtastic_test
 
 axp2101_service_test: axp2101_service_test.c $(ROOT)/src/services/solar_os_axp2101.c \
 	$(ROOT)/src/services/solar_os_axp2101.h $(ROOT)/src/drivers/axp2101.c
@@ -566,6 +567,11 @@ wireguard_crypto_test: wireguard_crypto_test.c $(ROOT)/components/wireguard_lwip
 		wireguard_crypto_test.c $(ROOT)/components/wireguard_lwip/src/crypto.c \
 		$(ROOT)/components/wireguard_lwip/src/crypto/refc/x25519.c -o $@
 
+meshtastic_test: meshtastic_test.c $(ROOT)/src/services/solar_os_meshtastic.c \
+		$(ROOT)/src/services/solar_os_meshtastic.h
+	$(CC) $(CFLAGS) -I$(ROOT)/src/services meshtastic_test.c \
+		$(ROOT)/src/services/solar_os_meshtastic.c -lmbedcrypto -o $@
+
 meshcore_channel_key_test: meshcore_channel_key_test.cpp \
 		$(ROOT)/src/services/solar_os_meshcore_channel_key.cpp \
 		$(ROOT)/src/services/solar_os_meshcore_channel_key.h \
@@ -708,6 +714,7 @@ test: $(TARGETS)
 	./terminal_preferences_test
 	./tui_widgets_test
 	./wireguard_crypto_test
+	./meshtastic_test
 	./meshcore_channel_key_test
 	./meshcore_stream_codec_test
 	./meshcore_ble_protocol_test
