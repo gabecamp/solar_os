@@ -32,6 +32,8 @@
 #define MESHTASTIC_DEDUPE_SLOTS 32U
 #define MESHTASTIC_DEFAULT_TX_POWER_DBM 14
 #define MESHTASTIC_SEND_TIMEOUT_MS 8000U
+#define MESHTASTIC_NODEINFO_INTERVAL_MS (3U * 60U * 60U * 1000U)
+#define MESHTASTIC_NODEINFO_REPLY_GAP_MS (30U * 1000U)
 
 static const char *TAG = "meshtastic";
 
@@ -50,6 +52,11 @@ typedef struct {
     volatile bool stop_requested;
     TaskHandle_t task;
     bool chat;
+    solar_os_meshtastic_user_t user;
+    bool nodeinfo_due;
+    uint32_t nodeinfo_sent_ms;
+    uint32_t nodeinfo_reply_ms;
+    bool nodeinfo_replied;
     char channel_key[SOLAR_OS_MESHTASTIC_CHANNEL_NAME_MAX + 3U];
 } meshtastic_state_t;
 
@@ -129,6 +136,8 @@ typedef struct {
     const char *preset;
     const char *channel_name;
     const char *key;
+    const char *long_name;
+    const char *short_name;
 } meshtastic_args_t;
 
 static bool parse_args(int argc, char **argv, meshtastic_args_t *args)
@@ -138,15 +147,42 @@ static bool parse_args(int argc, char **argv, meshtastic_args_t *args)
         strcmp(argv[0], solar_os_meshtastic_job.name) == 0) {
         first = 1;
     }
-    const int count = argc - first;
-    if (argv == NULL || count < 2 || count > 5) {
+    if (argv == NULL) {
         return false;
     }
-    args->radio = argv[first];
-    args->region_or_frequency = argv[first + 1];
-    args->preset = count >= 3 ? argv[first + 2] : "LongFast";
-    args->channel_name = count >= 4 ? argv[first + 3] : NULL;
-    args->key = count >= 5 ? argv[first + 4] : "default";
+    const char *positional[5] = {0};
+    int count = 0;
+    args->long_name = NULL;
+    args->short_name = NULL;
+    for (int i = first; i < argc; i++) {
+        if (strncmp(argv[i], "name=", 5U) == 0) {
+            args->long_name = argv[i] + 5;
+        } else if (strncmp(argv[i], "short=", 6U) == 0) {
+            args->short_name = argv[i] + 6;
+        } else if (count < 5) {
+            positional[count++] = argv[i];
+        } else {
+            return false;
+        }
+    }
+    if (count < 2) {
+        return false;
+    }
+    args->radio = positional[0];
+    args->region_or_frequency = positional[1];
+    args->preset = count >= 3 ? positional[2] : "LongFast";
+    args->channel_name = count >= 4 ? positional[3] : NULL;
+    args->key = count >= 5 ? positional[4] : "default";
+    if (args->long_name != NULL &&
+        (args->long_name[0] == '\0' ||
+         strlen(args->long_name) > SOLAR_OS_MESHTASTIC_LONG_NAME_MAX)) {
+        return false;
+    }
+    if (args->short_name != NULL &&
+        (args->short_name[0] == '\0' ||
+         strlen(args->short_name) > SOLAR_OS_MESHTASTIC_SHORT_NAME_MAX)) {
+        return false;
+    }
     return true;
 }
 
@@ -321,12 +357,13 @@ static void enter_rx(void)
     }
 }
 
-/* Encrypts and transmits one text packet, then returns the radio to RX. */
-static esp_err_t transmit_text(uint32_t to, const char *text, size_t text_len)
+/* Encrypts and transmits one Data packet, then returns the radio to RX. */
+static esp_err_t transmit_data(uint32_t to,
+                               uint32_t portnum,
+                               const uint8_t *payload,
+                               size_t payload_in_len,
+                               bool want_response)
 {
-    if (text_len == 0 || text_len > SOLAR_OS_MESHTASTIC_TEXT_MAX) {
-        return ESP_ERR_INVALID_SIZE;
-    }
     uint32_t id = 0;
     do {
         id = esp_random();
@@ -345,7 +382,7 @@ static esp_err_t transmit_text(uint32_t to, const char *text, size_t text_len)
     memset(&packet, 0, sizeof(packet));
     solar_os_meshtastic_header_build(&header, packet.data);
     const size_t payload_len = solar_os_meshtastic_data_encode(
-        SOLAR_OS_MESHTASTIC_PORT_TEXT, (const uint8_t *)text, text_len,
+        portnum, payload, payload_in_len, want_response,
         packet.data + SOLAR_OS_MESHTASTIC_HEADER_LEN,
         sizeof(packet.data) - SOLAR_OS_MESHTASTIC_HEADER_LEN);
     if (payload_len == 0 ||
@@ -368,6 +405,102 @@ static esp_err_t transmit_text(uint32_t to, const char *text, size_t text_len)
         meshtastic.status.last_error = err;
     }
     return err;
+}
+
+static esp_err_t transmit_text(uint32_t to, const char *text, size_t text_len)
+{
+    if (text_len == 0 || text_len > SOLAR_OS_MESHTASTIC_TEXT_MAX) {
+        return ESP_ERR_INVALID_SIZE;
+    }
+    return transmit_data(to, SOLAR_OS_MESHTASTIC_PORT_TEXT, (const uint8_t *)text,
+                         text_len, false);
+}
+
+static esp_err_t transmit_nodeinfo(uint32_t to)
+{
+    uint8_t user[96];
+    const size_t len = solar_os_meshtastic_user_encode(&meshtastic.user, user, sizeof(user));
+    if (len == 0) {
+        return ESP_ERR_INVALID_SIZE;
+    }
+    const esp_err_t err =
+        transmit_data(to, SOLAR_OS_MESHTASTIC_PORT_NODEINFO, user, len, false);
+    if (err == ESP_OK) {
+        meshtastic.status.nodeinfo_sent++;
+    }
+    return err;
+}
+
+/* Periodic broadcast, plus at most one reply per gap to NodeInfo requests. */
+static void process_nodeinfo(void)
+{
+    const uint32_t now = now_ms();
+    if (meshtastic.nodeinfo_due ||
+        now - meshtastic.nodeinfo_sent_ms >= MESHTASTIC_NODEINFO_INTERVAL_MS) {
+        meshtastic.nodeinfo_due = false;
+        meshtastic.nodeinfo_sent_ms = now;
+        (void)transmit_nodeinfo(SOLAR_OS_MESHTASTIC_BROADCAST);
+    }
+}
+
+static void answer_nodeinfo_request(uint32_t requester)
+{
+    const uint32_t now = now_ms();
+    if (meshtastic.nodeinfo_replied &&
+        now - meshtastic.nodeinfo_reply_ms < MESHTASTIC_NODEINFO_REPLY_GAP_MS) {
+        return;
+    }
+    meshtastic.nodeinfo_replied = true;
+    meshtastic.nodeinfo_reply_ms = now;
+    (void)transmit_nodeinfo(requester);
+}
+
+#if MESHTASTIC_CHAT
+static void learn_node_name(uint32_t node, const solar_os_meshtastic_user_t *user)
+{
+    if (user->long_name[0] == '\0') {
+        return;
+    }
+    char default_name[SOLAR_OS_CONTACT_NAME_MAX + 1U];
+    snprintf(default_name, sizeof(default_name), "!%08" PRIx32, node);
+    uint8_t address[4];
+    node_address(node, address);
+    solar_os_contact_id_t contact_id = SOLAR_OS_CONTACT_ID_NONE;
+    if (solar_os_contacts_upsert_discovered(
+            SOLAR_OS_MESSAGING_PROVIDER_MESHTASTIC, address, sizeof(address),
+            user->long_name, SOLAR_OS_ENDPOINT_CAP_DIRECT | SOLAR_OS_ENDPOINT_CAP_BROADCAST,
+            now_ms(), meshtastic.channel.name, strlen(meshtastic.channel.name),
+            &contact_id, NULL) != ESP_OK) {
+        return;
+    }
+    /* Only replace the placeholder ID; keep names the user chose. */
+    solar_os_contact_t contact;
+    if (solar_os_contacts_get(contact_id, &contact) == ESP_OK &&
+        strcmp(contact.display_name, default_name) == 0) {
+        (void)solar_os_contacts_rename(contact_id, user->long_name);
+    }
+}
+#endif
+
+static void handle_nodeinfo(const solar_os_meshtastic_header_t *header,
+                            const solar_os_meshtastic_data_t *data)
+{
+    solar_os_meshtastic_user_t user;
+    if (data->payload == NULL ||
+        !solar_os_meshtastic_user_decode(data->payload, data->payload_len, &user)) {
+        meshtastic.status.decode_errors++;
+        return;
+    }
+    meshtastic.status.nodeinfo_received++;
+#if MESHTASTIC_CHAT
+    if (meshtastic.chat) {
+        learn_node_name(header->from, &user);
+    }
+#endif
+    if (data->want_response && (header->to == meshtastic.status.node_id ||
+                                header->to == SOLAR_OS_MESHTASTIC_BROADCAST)) {
+        answer_nodeinfo_request(header->from);
+    }
 }
 
 #if MESHTASTIC_CHAT
@@ -513,6 +646,10 @@ static void handle_packet(const solar_os_radio_packet_t *packet)
         meshtastic.status.decode_errors++;
         return;
     }
+    if (data.portnum == SOLAR_OS_MESHTASTIC_PORT_NODEINFO) {
+        handle_nodeinfo(&header, &data);
+        return;
+    }
     if (data.portnum != SOLAR_OS_MESHTASTIC_PORT_TEXT ||
         data.payload == NULL || data.payload_len == 0) {
         meshtastic.status.non_text++;
@@ -534,6 +671,7 @@ static void meshtastic_task(void *arg)
         const esp_err_t err = solar_os_radio_receive(
             meshtastic.status.radio, &packet, MESHTASTIC_RECEIVE_TIMEOUT_MS);
         if (err == ESP_ERR_TIMEOUT) {
+            process_nodeinfo();
 #if MESHTASTIC_CHAT
             if (meshtastic.chat) {
                 process_outbox();
@@ -657,6 +795,23 @@ static esp_err_t meshtastic_start(solar_os_context_t *ctx, int argc, char **argv
     meshtastic.status.channel_hash = channel.hash;
     meshtastic.status.last_error = ESP_OK;
     meshtastic.status.node_id = node_id;
+    snprintf(meshtastic.user.id, sizeof(meshtastic.user.id), "!%08" PRIx32, node_id);
+    if (args.long_name != NULL) {
+        strlcpy(meshtastic.user.long_name, args.long_name, sizeof(meshtastic.user.long_name));
+    } else {
+        snprintf(meshtastic.user.long_name, sizeof(meshtastic.user.long_name),
+                 "SolarTerm %04" PRIx32, node_id & 0xFFFFU);
+    }
+    if (args.short_name != NULL) {
+        strlcpy(meshtastic.user.short_name, args.short_name, sizeof(meshtastic.user.short_name));
+    } else {
+        snprintf(meshtastic.user.short_name, sizeof(meshtastic.user.short_name),
+                 "%04" PRIx32, node_id & 0xFFFFU);
+    }
+    meshtastic.user.hw_model = SOLAR_OS_MESHTASTIC_HW_PRIVATE;
+    meshtastic.nodeinfo_due = true;
+    strlcpy(meshtastic.status.long_name, meshtastic.user.long_name,
+            sizeof(meshtastic.status.long_name));
     snprintf(meshtastic.channel_key, sizeof(meshtastic.channel_key), "c:%s", channel.name);
 #if MESHTASTIC_CHAT
     const esp_err_t chat_err = chat_start();

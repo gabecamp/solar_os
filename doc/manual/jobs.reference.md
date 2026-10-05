@@ -970,7 +970,7 @@ and does not request or send acknowledgements.
 Usage:
 
 ```text
-job start meshtastic <radio> <region|frequency-hz> [preset] [channel-name] [key]
+job start meshtastic <radio> <region|frequency-hz> [preset] [channel-name] [key] [name=<long-name>] [short=<short-name>]
 job stop meshtastic
 job status meshtastic
 ```
@@ -985,6 +985,9 @@ Arguments:
 - `channel-name` defaults to the preset name. It must match the channel name
   configured on the network, because it selects both the frequency slot and the
   one-byte channel hash carried in each packet.
+- `name=` sets the long name other nodes show (up to 39 bytes) and `short=` the
+  short name (up to 4 bytes). They default to `SolarTerm` plus the last four
+  hex digits of the node ID, and to those four digits.
 - `key` is `default` (the public default key, index 1), `none`, `index:N`, or 32
   or 64 hexadecimal digits for an AES-128 or AES-256 key.
 
@@ -1005,8 +1008,11 @@ Notes:
   duplicates, other channel, non-text, decode and CRC errors), and the last
   RSSI and SNR.
 - The node ID is `!` followed by the last four bytes of the Wi-Fi MAC
-  address. The job does not announce node information, so other nodes show it
-  by that ID only.
+  address. The job broadcasts its NodeInfo (names and ID) when it starts and
+  every three hours, and answers NodeInfo requests at most once every 30
+  seconds. It sends no public key.
+- NodeInfo from other nodes names their Chat contacts. A contact you renamed
+  keeps your name.
 - Sent packets use a hop limit of 3 and are reported as sent once they leave
   the radio; there is no delivery confirmation. Text is limited to 200 bytes.
 - Direct conversations use the channel key, not Meshtastic public-key

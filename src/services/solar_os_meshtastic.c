@@ -124,40 +124,94 @@ static size_t write_varint(uint64_t value, uint8_t *out, size_t out_len)
     return pos;
 }
 
+static size_t write_bytes_field(uint32_t field,
+                                const uint8_t *data,
+                                size_t len,
+                                uint8_t *out,
+                                size_t out_len)
+{
+    size_t pos = write_varint((field << 3) | 2U, out, out_len);
+    if (pos == 0) {
+        return 0;
+    }
+    const size_t n = write_varint(len, out + pos, out_len - pos);
+    if (n == 0 || len > out_len - pos - n) {
+        return 0;
+    }
+    pos += n;
+    if (len > 0) {
+        memcpy(out + pos, data, len);
+    }
+    return pos + len;
+}
+
+static size_t write_varint_field(uint32_t field, uint64_t value, uint8_t *out, size_t out_len)
+{
+    const size_t pos = write_varint(field << 3, out, out_len);
+    if (pos == 0) {
+        return 0;
+    }
+    const size_t n = write_varint(value, out + pos, out_len - pos);
+    return n == 0 ? 0 : pos + n;
+}
+
 size_t solar_os_meshtastic_data_encode(uint32_t portnum,
                                        const uint8_t *payload,
                                        size_t payload_len,
+                                       bool want_response,
                                        uint8_t *out,
                                        size_t out_len)
 {
     if (out == NULL || (payload == NULL && payload_len != 0)) {
         return 0;
     }
+    size_t pos = write_varint_field(1U, portnum, out, out_len);
+    if (pos == 0) {
+        return 0;
+    }
+    size_t n = write_bytes_field(2U, payload, payload_len, out + pos, out_len - pos);
+    if (n == 0) {
+        return 0;
+    }
+    pos += n;
+    if (want_response) {
+        n = write_varint_field(3U, 1U, out + pos, out_len - pos);
+        if (n == 0) {
+            return 0;
+        }
+        pos += n;
+    }
+    return pos;
+}
+
+size_t solar_os_meshtastic_user_encode(const solar_os_meshtastic_user_t *user,
+                                       uint8_t *out,
+                                       size_t out_len)
+{
+    if (user == NULL || out == NULL) {
+        return 0;
+    }
+    const char *fields[3] = {user->id, user->long_name, user->short_name};
     size_t pos = 0;
-    size_t n = write_varint((1U << 3) | 0U, out, out_len);
-    if (n == 0) {
-        return 0;
+    for (uint32_t i = 0; i < 3U; i++) {
+        const size_t n = write_bytes_field(i + 1U, (const uint8_t *)fields[i],
+                                           strlen(fields[i]), out + pos, out_len - pos);
+        if (n == 0) {
+            return 0;
+        }
+        pos += n;
     }
-    pos += n;
-    n = write_varint(portnum, out + pos, out_len - pos);
-    if (n == 0) {
-        return 0;
+    const size_t n = write_varint_field(5U, user->hw_model, out + pos, out_len - pos);
+    return n == 0 ? 0 : pos + n;
+}
+
+static void copy_field(char *dst, size_t dst_len, const uint8_t *src, size_t len)
+{
+    if (len >= dst_len) {
+        len = dst_len - 1U;
     }
-    pos += n;
-    n = write_varint((2U << 3) | 2U, out + pos, out_len - pos);
-    if (n == 0) {
-        return 0;
-    }
-    pos += n;
-    n = write_varint(payload_len, out + pos, out_len - pos);
-    if (n == 0 || payload_len > out_len - pos - n) {
-        return 0;
-    }
-    pos += n;
-    if (payload_len > 0) {
-        memcpy(out + pos, payload, payload_len);
-    }
-    return pos + payload_len;
+    memcpy(dst, src, len);
+    dst[len] = '\0';
 }
 
 bool solar_os_meshtastic_channel_init(solar_os_meshtastic_channel_t *channel,
@@ -324,6 +378,60 @@ bool solar_os_meshtastic_data_decode(const uint8_t *buffer,
                 data->has_emoji = true;
                 data->emoji = fixed;
             }
+        } else if (wire == 1) {
+            if (len - pos < 8U) {
+                return false;
+            }
+            pos += 8U;
+        } else {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool solar_os_meshtastic_user_decode(const uint8_t *buffer,
+                                     size_t len,
+                                     solar_os_meshtastic_user_t *user)
+{
+    if (buffer == NULL || user == NULL) {
+        return false;
+    }
+    memset(user, 0, sizeof(*user));
+    size_t pos = 0;
+    while (pos < len) {
+        uint64_t key = 0;
+        uint64_t value = 0;
+        if (!read_varint(buffer, len, &pos, &key)) {
+            return false;
+        }
+        const uint32_t field = (uint32_t)(key >> 3);
+        const uint32_t wire = (uint32_t)(key & 7U);
+        if (wire == 0) {
+            if (!read_varint(buffer, len, &pos, &value)) {
+                return false;
+            }
+            if (field == 5) {
+                user->hw_model = (uint32_t)value;
+            }
+        } else if (wire == 2) {
+            if (!read_varint(buffer, len, &pos, &value) || value > len - pos) {
+                return false;
+            }
+            const uint8_t *data = buffer + pos;
+            if (field == 1) {
+                copy_field(user->id, sizeof(user->id), data, (size_t)value);
+            } else if (field == 2) {
+                copy_field(user->long_name, sizeof(user->long_name), data, (size_t)value);
+            } else if (field == 3) {
+                copy_field(user->short_name, sizeof(user->short_name), data, (size_t)value);
+            }
+            pos += (size_t)value;
+        } else if (wire == 5) {
+            if (len - pos < 4U) {
+                return false;
+            }
+            pos += 4U;
         } else if (wire == 1) {
             if (len - pos < 8U) {
                 return false;

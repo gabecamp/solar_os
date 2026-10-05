@@ -168,7 +168,7 @@ static int test_encode_roundtrip(void)
     CHECK(packet[12] == 0x63);
 
     const size_t len = solar_os_meshtastic_data_encode(
-        SOLAR_OS_MESHTASTIC_PORT_TEXT, (const uint8_t *)"hello mesh", 10U,
+        SOLAR_OS_MESHTASTIC_PORT_TEXT, (const uint8_t *)"hello mesh", 10U, false,
         packet + SOLAR_OS_MESHTASTIC_HEADER_LEN, 32U);
     CHECK(len == 14U);
 
@@ -189,8 +189,51 @@ static int test_encode_roundtrip(void)
 
     uint8_t small[8];
     CHECK(solar_os_meshtastic_data_encode(SOLAR_OS_MESHTASTIC_PORT_TEXT,
-                                          (const uint8_t *)"hello mesh", 10U,
+                                          (const uint8_t *)"hello mesh", 10U, false,
                                           small, sizeof(small)) == 0);
+    return 0;
+}
+
+static int test_nodeinfo(void)
+{
+    const solar_os_meshtastic_user_t in = {
+        .id = "!11223344",
+        .long_name = "SolarTerm 3344",
+        .short_name = "ST44",
+        .hw_model = SOLAR_OS_MESHTASTIC_HW_PRIVATE,
+    };
+    uint8_t user[64];
+    const size_t user_len = solar_os_meshtastic_user_encode(&in, user, sizeof(user));
+    /* 11 + 16 + 6 id/name/short fields, then hw_model 255 as a 2-byte varint. */
+    CHECK(user_len == 11U + 16U + 6U + 3U);
+    CHECK(user[0] == 0x0a && user[1] == 9U && memcmp(user + 2, "!11223344", 9U) == 0);
+    CHECK(user[user_len - 3U] == 0x28 && user[user_len - 2U] == 0xff &&
+          user[user_len - 1U] == 0x01);
+
+    uint8_t data[96];
+    const size_t data_len = solar_os_meshtastic_data_encode(
+        SOLAR_OS_MESHTASTIC_PORT_NODEINFO, user, user_len, true, data, sizeof(data));
+    CHECK(data_len == 2U + 2U + user_len + 2U);
+    solar_os_meshtastic_data_t decoded;
+    CHECK(solar_os_meshtastic_data_decode(data, data_len, &decoded));
+    CHECK(decoded.portnum == SOLAR_OS_MESHTASTIC_PORT_NODEINFO);
+    CHECK(decoded.want_response);
+
+    solar_os_meshtastic_user_t out;
+    CHECK(solar_os_meshtastic_user_decode(decoded.payload, decoded.payload_len, &out));
+    CHECK(strcmp(out.id, in.id) == 0);
+    CHECK(strcmp(out.long_name, in.long_name) == 0);
+    CHECK(strcmp(out.short_name, in.short_name) == 0);
+    CHECK(out.hw_model == SOLAR_OS_MESHTASTIC_HW_PRIVATE);
+
+    /* Unknown fields (macaddr bytes, role varint, public key) are skipped. */
+    const uint8_t extra[] = {
+        0x12, 0x03, 'B', 'o', 'b', 0x22, 0x02, 0xaa, 0xbb, 0x38, 0x02,
+        0x42, 0x01, 0x00,
+    };
+    CHECK(solar_os_meshtastic_user_decode(extra, sizeof(extra), &out));
+    CHECK(strcmp(out.long_name, "Bob") == 0 && out.id[0] == '\0');
+    CHECK(!solar_os_meshtastic_user_decode(extra, 4U, &out));
     return 0;
 }
 
@@ -199,7 +242,7 @@ int main(void)
     if (test_channel_hash() || test_decrypt_default_key() ||
         test_decrypt_aes256() || test_header() ||
         test_data_decode_rejects_truncated() || test_frequency() ||
-        test_encode_roundtrip()) {
+        test_encode_roundtrip() || test_nodeinfo()) {
         return 1;
     }
     puts("meshtastic_test: ok");

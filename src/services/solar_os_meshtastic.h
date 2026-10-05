@@ -23,6 +23,10 @@ extern "C" {
 #define SOLAR_OS_MESHTASTIC_CHANNEL_NAME_MAX 12U
 #define SOLAR_OS_MESHTASTIC_BROADCAST 0xFFFFFFFFU
 #define SOLAR_OS_MESHTASTIC_PORT_TEXT 1U
+#define SOLAR_OS_MESHTASTIC_PORT_NODEINFO 4U
+#define SOLAR_OS_MESHTASTIC_LONG_NAME_MAX 39U
+#define SOLAR_OS_MESHTASTIC_SHORT_NAME_MAX 4U
+#define SOLAR_OS_MESHTASTIC_HW_PRIVATE 255U
 #define SOLAR_OS_MESHTASTIC_SYNC_WORD 0x2BU
 #define SOLAR_OS_MESHTASTIC_PREAMBLE 16U
 #define SOLAR_OS_MESHTASTIC_TEXT_MAX 200U
@@ -114,13 +118,30 @@ bool solar_os_meshtastic_crypt(const solar_os_meshtastic_channel_t *channel,
 void solar_os_meshtastic_header_build(const solar_os_meshtastic_header_t *header,
                                       uint8_t out[SOLAR_OS_MESHTASTIC_HEADER_LEN]);
 
-/* Encodes a Data message with portnum and payload (fields 1 and 2). Returns the
- * encoded length, or 0 when it does not fit in out_len. */
+/* Encodes a Data message: portnum, payload and, when set, want_response
+ * (fields 1-3). Returns the encoded length, or 0 when it does not fit. */
 size_t solar_os_meshtastic_data_encode(uint32_t portnum,
                                        const uint8_t *payload,
                                        size_t payload_len,
+                                       bool want_response,
                                        uint8_t *out,
                                        size_t out_len);
+
+typedef struct {
+    char id[16];
+    char long_name[SOLAR_OS_MESHTASTIC_LONG_NAME_MAX + 1U];
+    char short_name[SOLAR_OS_MESHTASTIC_SHORT_NAME_MAX * 4U + 1U];
+    uint32_t hw_model;
+} solar_os_meshtastic_user_t;
+
+/* User message (NodeInfo payload): id, long_name, short_name, hw_model. */
+size_t solar_os_meshtastic_user_encode(const solar_os_meshtastic_user_t *user,
+                                       uint8_t *out,
+                                       size_t out_len);
+/* Unknown fields are skipped; strings are truncated to fit. */
+bool solar_os_meshtastic_user_decode(const uint8_t *buffer,
+                                     size_t len,
+                                     solar_os_meshtastic_user_t *user);
 
 bool solar_os_meshtastic_data_decode(const uint8_t *buffer,
                                      size_t len,

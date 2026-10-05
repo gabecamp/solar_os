@@ -12,6 +12,7 @@ typedef struct {
     bool running;
     bool chat;
     uint32_t node_id;
+    char long_name[SOLAR_OS_MESHTASTIC_LONG_NAME_MAX + 1U];
     char radio[SOLAR_OS_RADIO_NAME_MAX];
     char channel[SOLAR_OS_MESHTASTIC_CHANNEL_NAME_MAX + 1U];
     uint32_t frequency_hz;
@@ -28,6 +29,8 @@ typedef struct {
     uint32_t receive_errors;
     uint32_t sent;
     uint32_t send_errors;
+    uint32_t nodeinfo_sent;
+    uint32_t nodeinfo_received;
     int16_t last_rssi_dbm;
     int16_t last_snr_db;
     esp_err_t last_error;
