@@ -146,6 +146,7 @@ The display-shell app exit chord is `CTRL+ALT+DEL`. Port shells use `Ctrl+]`.
 | `email` | `email configure <imaps://host[:port]> <user> <password> [mailbox]` | Save an IMAPS account; the default mailbox is `INBOX`. |
 | `email` | `email sync` | Start a one-shot mailbox synchronization. |
 | `email` | `email forget` | Remove the saved account and local email list. |
+| `meshtastic` | `meshtastic status` | Show Meshtastic receiver channel, frequency, packet counters, RSSI, and SNR. |
 | `pocsag` | `pocsag status` | Show POCSAG receiver configuration, counters, correction statistics, and RSSI. |
 | `pocsag` | `pocsag send <radio> <frequency-hz> <baud> <ric> <message> [alpha\|numeric] [normal\|inverted] [function]` | Encode and transmit one POCSAG page. |
 
@@ -1101,6 +1102,7 @@ available for the compiled board.
 | `link` | `link stream status [port]` | Show virtual-port peer, connection, queue, traffic, retry, reconnect, and error state. |
 | `link` | `link stream create <link> <port> <peer-id>` | Register a reliable peer-bound Link stream as a normal SolarOS byte-stream port. |
 | `link` | `link stream remove <port>` | Remove an unclaimed Link stream port. |
+| `meshtastic` | `meshtastic status` | Show Meshtastic receiver channel, frequency, packet counters, RSSI, and SNR. |
 | `pocsag` | `pocsag status` | Show detailed status for the POCSAG background receiver. |
 | `pocsag` | `pocsag send <radio> <frequency-hz> <baud> <ric> <message> [alpha\|numeric] [normal\|inverted] [function]` | Encode and transmit one POCSAG page. |
 | `uart` | `uart [status [bus]]` | Show the default `uart0` or a selected named UART bus. |

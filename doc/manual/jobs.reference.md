@@ -989,6 +989,7 @@ Example:
 
 ```text
 job start meshtastic radio0 US
+meshtastic status
 inbox list unread
 job stop meshtastic
 ```
@@ -997,6 +998,9 @@ Notes:
 
 - The radio uses LoRa sync word `0x2B`, a 16-symbol preamble, CRC, and the
   explicit-header variable-length mode, matching Meshtastic.
+- `meshtastic status` shows the channel, frequency, packet counters (messages,
+  duplicates, other channel, non-text, decode and CRC errors), and the last
+  RSSI and SNR.
 - Only text messages (port 1) on the configured channel are published.
   Telemetry, position, node info, and other ports are counted and ignored.
   Direct messages protected with Meshtastic public-key encryption cannot be

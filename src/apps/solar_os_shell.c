@@ -583,6 +583,10 @@ static const shell_command_t shell_builtin_commands[] = {
     {"meshcore", "MeshCore identity and radio messaging",
      solar_os_shell_cmd_meshcore},
 #endif
+#if SOLAR_OS_PACKAGE_JOB_MESHTASTIC
+    {"meshtastic", "Meshtastic receiver status",
+     solar_os_shell_cmd_meshtastic},
+#endif
 #if SOLAR_OS_PACKAGE_JOB_POCSAG
     {"pocsag", "POCSAG pager send and receive", solar_os_shell_cmd_pocsag},
 #endif

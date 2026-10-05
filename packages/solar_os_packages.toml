@@ -2647,6 +2647,7 @@ depends = ["service_inbox", "service_radio"]
 sources = [
   "services/solar_os_meshtastic.c",
   "jobs/solar_os_meshtastic_job.c",
+  "shell/solar_os_shell_meshtastic.c",
 ]
 requires = ["mbedtls"]
 any_capabilities = ["expansion_spi", "expansion_gpio"]
