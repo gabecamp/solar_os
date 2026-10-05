@@ -5,7 +5,7 @@
 -- info page is for testing on a new board: what the game sees of SolarOS.
 -- ---------------------------------------------------------------------
 
-Game.VERSION = "0.12 (2026-10-04)"
+Game.VERSION = "@VERSION@"   -- (tools/build.py puts the version here: tools/version.json)
 
 local HELP = {
     {"MAP", "Lt/Rt step; Up/Dn then Lt/Rt: diagonal"},
