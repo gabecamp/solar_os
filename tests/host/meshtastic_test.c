@@ -151,11 +151,55 @@ static int test_frequency(void)
     return 0;
 }
 
+static int test_encode_roundtrip(void)
+{
+    const solar_os_meshtastic_header_t in = {
+        .to = SOLAR_OS_MESHTASTIC_BROADCAST,
+        .from = 0x11223344U,
+        .id = 0xAABBCCDDU,
+        .hop_limit = 3,
+        .hop_start = 3,
+        .want_ack = false,
+        .channel_hash = 0x08,
+        .relay_node = 0x44,
+    };
+    uint8_t packet[SOLAR_OS_MESHTASTIC_HEADER_LEN + 32];
+    solar_os_meshtastic_header_build(&in, packet);
+    CHECK(packet[12] == 0x63);
+
+    const size_t len = solar_os_meshtastic_data_encode(
+        SOLAR_OS_MESHTASTIC_PORT_TEXT, (const uint8_t *)"hello mesh", 10U,
+        packet + SOLAR_OS_MESHTASTIC_HEADER_LEN, 32U);
+    CHECK(len == 14U);
+
+    /* Encrypting the encoded text must reproduce the reference ciphertext. */
+    const uint8_t index = 1;
+    solar_os_meshtastic_channel_t channel;
+    CHECK(solar_os_meshtastic_channel_init(&channel, "LongFast", &index, 1));
+    CHECK(solar_os_meshtastic_crypt(&channel, in.from, in.id,
+                                    packet + SOLAR_OS_MESHTASTIC_HEADER_LEN, len));
+    CHECK(memcmp(packet + SOLAR_OS_MESHTASTIC_HEADER_LEN, default_key_cipher,
+                 sizeof(default_key_cipher)) == 0);
+
+    solar_os_meshtastic_header_t out;
+    CHECK(solar_os_meshtastic_header_parse(packet, SOLAR_OS_MESHTASTIC_HEADER_LEN + len, &out));
+    CHECK(out.to == in.to && out.from == in.from && out.id == in.id);
+    CHECK(out.hop_limit == 3U && out.hop_start == 3U && !out.want_ack);
+    CHECK(out.channel_hash == 0x08 && out.relay_node == 0x44);
+
+    uint8_t small[8];
+    CHECK(solar_os_meshtastic_data_encode(SOLAR_OS_MESHTASTIC_PORT_TEXT,
+                                          (const uint8_t *)"hello mesh", 10U,
+                                          small, sizeof(small)) == 0);
+    return 0;
+}
+
 int main(void)
 {
     if (test_channel_hash() || test_decrypt_default_key() ||
         test_decrypt_aes256() || test_header() ||
-        test_data_decode_rejects_truncated() || test_frequency()) {
+        test_data_decode_rejects_truncated() || test_frequency() ||
+        test_encode_roundtrip()) {
         return 1;
     }
     puts("meshtastic_test: ok");

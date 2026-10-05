@@ -958,11 +958,14 @@ Notes:
 
 ## meshtastic
 
-Meshtastic text receiver. It configures a registered LoRa packet radio with a
-Meshtastic modem preset, listens on one channel, decrypts channel traffic with
-the channel's pre-shared key (AES-CTR), and publishes received text messages to
-the universal inbox. The job is receive-only: it never transmits and does not
-forward or acknowledge packets.
+Meshtastic text messaging on one channel. It configures a registered LoRa packet
+radio with a Meshtastic modem preset, decrypts channel traffic with the
+channel's pre-shared key (AES-CTR), and publishes received text messages. When
+the messaging service is built in, the job is the `meshtastic` Chat provider:
+the channel appears as a conversation, senders become discovered contacts, and
+text written in Chat is encrypted and transmitted. Without it, received text
+goes to the universal inbox only. The job does not relay other nodes' packets
+and does not request or send acknowledgements.
 
 Usage:
 
@@ -990,7 +993,7 @@ Example:
 ```text
 job start meshtastic radio0 US
 meshtastic status
-inbox list unread
+chat meshtastic
 job stop meshtastic
 ```
 
@@ -1001,10 +1004,18 @@ Notes:
 - `meshtastic status` shows the channel, frequency, packet counters (messages,
   duplicates, other channel, non-text, decode and CRC errors), and the last
   RSSI and SNR.
+- The node ID is `!` followed by the last four bytes of the Wi-Fi MAC
+  address. The job does not announce node information, so other nodes show it
+  by that ID only.
+- Sent packets use a hop limit of 3 and are reported as sent once they leave
+  the radio; there is no delivery confirmation. Text is limited to 200 bytes.
+- Direct conversations use the channel key, not Meshtastic public-key
+  encryption. Nodes that require public-key direct messages may ignore them.
 - Only text messages (port 1) on the configured channel are published.
   Telemetry, position, node info, and other ports are counted and ignored.
   Direct messages protected with Meshtastic public-key encryption cannot be
-  decoded and are counted as decode errors.
+  decoded and are counted as decode errors. With Chat enabled, direct messages
+  addressed to other nodes are ignored.
 - Meshtastic nodes rebroadcast packets, so the same message is often heard more
   than once. Duplicates are recognized by sender and packet ID.
 - Channel packets carry no authentication, so a sender shown in the inbox is

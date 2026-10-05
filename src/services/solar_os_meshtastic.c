@@ -84,6 +84,82 @@ bool solar_os_meshtastic_header_parse(const uint8_t *packet,
     return true;
 }
 
+static void write_u32_le(uint8_t *p, uint32_t value)
+{
+    p[0] = (uint8_t)value;
+    p[1] = (uint8_t)(value >> 8);
+    p[2] = (uint8_t)(value >> 16);
+    p[3] = (uint8_t)(value >> 24);
+}
+
+void solar_os_meshtastic_header_build(const solar_os_meshtastic_header_t *header,
+                                      uint8_t out[SOLAR_OS_MESHTASTIC_HEADER_LEN])
+{
+    write_u32_le(out, header->to);
+    write_u32_le(out + 4, header->from);
+    write_u32_le(out + 8, header->id);
+    out[12] = (uint8_t)((header->hop_limit & 0x07U) |
+                        (header->want_ack ? 0x08U : 0U) |
+                        (header->via_mqtt ? 0x10U : 0U) |
+                        ((header->hop_start & 0x07U) << 5));
+    out[13] = header->channel_hash;
+    out[14] = header->next_hop;
+    out[15] = header->relay_node;
+}
+
+static size_t write_varint(uint64_t value, uint8_t *out, size_t out_len)
+{
+    size_t pos = 0;
+    do {
+        if (pos >= out_len) {
+            return 0;
+        }
+        uint8_t byte = (uint8_t)(value & 0x7FU);
+        value >>= 7;
+        if (value != 0) {
+            byte |= 0x80U;
+        }
+        out[pos++] = byte;
+    } while (value != 0);
+    return pos;
+}
+
+size_t solar_os_meshtastic_data_encode(uint32_t portnum,
+                                       const uint8_t *payload,
+                                       size_t payload_len,
+                                       uint8_t *out,
+                                       size_t out_len)
+{
+    if (out == NULL || (payload == NULL && payload_len != 0)) {
+        return 0;
+    }
+    size_t pos = 0;
+    size_t n = write_varint((1U << 3) | 0U, out, out_len);
+    if (n == 0) {
+        return 0;
+    }
+    pos += n;
+    n = write_varint(portnum, out + pos, out_len - pos);
+    if (n == 0) {
+        return 0;
+    }
+    pos += n;
+    n = write_varint((2U << 3) | 2U, out + pos, out_len - pos);
+    if (n == 0) {
+        return 0;
+    }
+    pos += n;
+    n = write_varint(payload_len, out + pos, out_len - pos);
+    if (n == 0 || payload_len > out_len - pos - n) {
+        return 0;
+    }
+    pos += n;
+    if (payload_len > 0) {
+        memcpy(out + pos, payload, payload_len);
+    }
+    return pos + payload_len;
+}
+
 bool solar_os_meshtastic_channel_init(solar_os_meshtastic_channel_t *channel,
                                       const char *name,
                                       const uint8_t *psk,

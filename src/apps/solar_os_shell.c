@@ -1341,7 +1341,7 @@ static const char * const contacts_list_values[] = {
 #endif
 #if SOLAR_OS_PACKAGE_APP_CHAT
 static const char * const chat_selectors[] = {
-    "gateway", "meshcore", "link"
+    "gateway", "meshcore", "link", "meshtastic"
 };
 static const char * const messages_subcommands[] = {
     "status",
@@ -1356,7 +1356,7 @@ static const char * const messages_subcommands[] = {
 };
 static const char * const outbox_subcommands[] = {"list", "cancel"};
 static const char * const messages_clear_values[] = {
-    "gateway", "meshcore", "link", "all"
+    "gateway", "meshcore", "link", "meshtastic", "all"
 };
 #endif
 #if SOLAR_OS_PACKAGE_SERVICE_GATEWAY

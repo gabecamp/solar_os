@@ -25,6 +25,8 @@ extern "C" {
 #define SOLAR_OS_MESHTASTIC_PORT_TEXT 1U
 #define SOLAR_OS_MESHTASTIC_SYNC_WORD 0x2BU
 #define SOLAR_OS_MESHTASTIC_PREAMBLE 16U
+#define SOLAR_OS_MESHTASTIC_TEXT_MAX 200U
+#define SOLAR_OS_MESHTASTIC_DEFAULT_HOP_LIMIT 3U
 
 typedef struct {
     uint32_t to;
@@ -107,6 +109,18 @@ bool solar_os_meshtastic_crypt(const solar_os_meshtastic_channel_t *channel,
                                uint32_t packet_id,
                                uint8_t *data,
                                size_t len);
+
+/* Writes the 16-byte clear header. hop_limit and hop_start are 0..7. */
+void solar_os_meshtastic_header_build(const solar_os_meshtastic_header_t *header,
+                                      uint8_t out[SOLAR_OS_MESHTASTIC_HEADER_LEN]);
+
+/* Encodes a Data message with portnum and payload (fields 1 and 2). Returns the
+ * encoded length, or 0 when it does not fit in out_len. */
+size_t solar_os_meshtastic_data_encode(uint32_t portnum,
+                                       const uint8_t *payload,
+                                       size_t payload_len,
+                                       uint8_t *out,
+                                       size_t out_len);
 
 bool solar_os_meshtastic_data_decode(const uint8_t *buffer,
                                      size_t len,
