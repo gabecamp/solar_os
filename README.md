@@ -18,6 +18,12 @@ It contains the complete command, application, job, board, expansion, Python,
 Lua, package, and workflow documentation. Edit the topic in `doc/manual/`;
 do not maintain a separate device or website copy.
 
+Firmware includes a searchable topic directory and a small setup and recovery
+guide. On devices with Wi-Fi, PSRAM, and SD storage, run `help update` to install
+the signed full manual for the running version. Its guides and scripting API
+references remain available offline while the SD card is mounted. See
+[Browsing and refreshing documentation](doc/manual/help.md) for setup.
+
 ## Build
 
 SolarOS requires PlatformIO Core 6.2.0 or newer and uses ESP-IDF 5.5.5 through
@@ -41,6 +47,7 @@ pio run -e t_lora_pager
 pio run -e t_deck_plus
 pio run -e waveshare_esp32_s3_sim7670g_4g
 pio run -e waveshare_esp32_s3_epaper_3_97
+pio run -e xteink_x4_pro
 pio run -e elecrow_crowpanel_esp32_s3_4_2_epaper
 pio run -e elecrow_crowpanel_esp32_s3_5_79_epaper
 pio run -e odroid_go
