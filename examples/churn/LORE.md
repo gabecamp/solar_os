@@ -183,7 +183,7 @@ Five forces run the Churn, and they form a loop: emissions feed the hot fields, 
 
 The traders pay well for them, bandits want them, and the sergeant at the Checkpoint takes three as a bribe. The guards' orders say to hold none longer than necessary (Section 11 explains why).
 
-**Night.** From 20:00 to 06:00 your sight shrinks without a torch or headlamp, encounters rise, and the **night horrors** come out. A fire or a light halves their chance; a camp with a bedroll keeps them away completely.
+**Night.** From 20:00 to 06:00 your sight shrinks without a torch or headlamp, encounters rise, and the **night horrors** come out. A fire or a light halves their chance; a camp with a bedroll keeps them off you on the move, but only wards keep them from a camp where you sleep.
 
 **Seasons and weather.** You wake in late Autumn, and each season lasts ten days:
 
@@ -239,7 +239,7 @@ Every run grows a new map, but its landmarks always keep the same relationships:
 | Warrens | Burrows of the Little Ones | Three, in forest or hills, at least 5 hexes apart |
 | Cairns | Little piles of stones with a shell on top | Seven, 2 to 5 hexes from a warren |
 | The Peddler's round | Seven stops he walks in turn, half a day at each | One in each slice of the compass |
-| Your camp | Any ruin you claim, built up with a stash box, bedroll, rain barrel, barricade | Wherever you choose |
+| Your camp | Any ruin you claim, one at a time, built up with a stash box or lockbox, bedroll, rain barrel, barricade, fire pit, drying rack, workbench, berry patch and map wall | Wherever you choose |
 
 The land itself has five faces: **plains** and **ruins** are quick to cross; **forest**, **hills** and **fords** take twice as long; **water** can't be crossed. Ruins and hills are the only shelter from an emission; ruins, hills and forest shelter you from a storm.
 
@@ -366,7 +366,7 @@ The Churn changed whatever was outside on the first night and whatever has lived
 
 **The anomalies.** Places where the rules stopped working. Each one is a puzzle: throw bolts to find the safe path, repeat a sequence, turn runes to match a carving. Solve it and it may leave an artifact behind; fail it and it hurts in odd ways.
 
-**The night horrors.** They come only between 20:00 and 06:00, come half as often to a light or a fire, and never come to a camp with a bedroll. Each has a rule:
+**The night horrors.** They come only between 20:00 and 06:00, come half as often to a light or a fire, and never find you walking near a camp with a bedroll. Sleeping there is another matter: only wards keep them off. Each has a rule:
 
 - **The Long Man:** look away and he is gone. Speak to it, and half the time it leaves you an artifact, and half the time something happens you can't explain.
 - **The Crawler:** without light your blows barely land; hold a torch close and it may flee.
@@ -429,6 +429,8 @@ You wake knowing only how to get through the first day: a torch, a fire, a banda
 **Rubles.** The money of the old world still buys things here. Piles of rubles turn up in ruins, in Institute crates, on dead churners and in bandits' pockets. Every trader takes them, pays them out for what you sell, and gives change in them. The Trader's Churn Permit costs 225, more than most churners ever hold at once.
 
 **Carrying.** You wake with nothing, so at first your arms hold two things. A bag on your back replaces them: a bindle 5, a satchel 6, a backpack 10, up to a hand cart's 16. Every pocket you wear adds on top of the bag: jeans and a jacket 2 each, a belt's pouches 1 or 2. Torn clothes hold half. Strong backs carry more, one cell per point of Strength over 3, and Pack Mule adds 2. Weak arms never cost you a cell. Pants and a bindle always make 7.
+
+**Your camp.** A churner can claim one ruin at a time and make it home. A camp keeps working while you're away. A fire pit burns whatever fuel you leave it, and the pot over it cooks. Meat on the drying rack smokes in a day, and the snare line and berry patch put food in the stash by morning. Tools left on the workbench are there when you need them, an antenna on the mast lets the radio reach out for free, and a pelt makes a bed. Up to three wards hold the edge of the light: salt circles, can rattles, black candles, choir charms, an Elder Sign. They wear out in days, and an unwarded camp is where the dark comes to knock while you sleep. Artifacts on the trophy shelf ward it too, and toys there bring the Little Ones, who leave something in return. Leave a camp unguarded and other churners go through it. A barricade turns them away until it breaks, a lockbox keeps the stash whole, and a dog on its bed means nobody tries. The map wall holds every place you know. Claim another ruin and the old camp stays where it was, with everything you left in it.
 
 ## Guns in the Churn
 
