@@ -428,6 +428,8 @@ You wake knowing only how to get through the first day: a torch, a fire, a banda
 
 **Rubles.** The money of the old world still buys things here. Piles of rubles turn up in ruins, in Institute crates, on dead churners and in bandits' pockets. Every trader takes them, pays them out for what you sell, and gives change in them. The Trader's Churn Permit costs 225, more than most churners ever hold at once.
 
+**Carrying.** You wake with nothing, so at first your arms hold two things. A bag on your back replaces them: a bindle 5, a satchel 6, a backpack 10, up to a hand cart's 16. Every pocket you wear adds on top of the bag: jeans and a jacket 2 each, a belt's pouches 1 or 2. Torn clothes hold half. Strong backs carry more, one cell per point of Strength over 3, and Pack Mule adds 2. Weak arms never cost you a cell. Pants and a bindle always make 7.
+
 ## Guns in the Churn
 
 Guns are rare, loud and they wear out. Most are pieced together from parts the land turns up; the ones that come whole come off dead bandits, out of locked crates, or, once in each world, out of the marsh.
