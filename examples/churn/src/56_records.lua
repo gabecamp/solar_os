@@ -34,7 +34,7 @@ local RECORDS = {
         {"homeowner", "Homeowner", "Build all four camp parts",
          function(g)
              if not g.base then return false end
-             for _, part in ipairs(BASE.order) do
+             for _, part in ipairs({"box", "bedroll", "barrel", "barricade"}) do   -- (the first four)
                  if not g.base.built[part] then return false end
              end
              return true

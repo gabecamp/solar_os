@@ -108,6 +108,31 @@ end
 g:draw_inventory(400, 300)
 solaros.dump("ops_inventory_pockets.txt")
 
+-- Scene 2b1c: the camp screen: a claimed ruin with most things built and
+-- the slots in use (the empty plot and the dog bed show what they take)
+g = fresh()
+g.player.equipped.back = "backpack"
+g.base = {key = g.player.q .. "," .. g.player.r, built = {box = true, bedroll = true, barrel = true,
+          barricade = true, firepit = true, rack = true, bench = true, mapwall = true}, wall = 75,
+          fire_until = g.player.hours + 3,
+          slots = {fire = {item = "stick", qty = 4}, pot = {item = "strange_meat", qty = 2, t = 1},
+                   bed = {item = "jawhound_pelt", qty = 1}, light = {item = "glow_jar", qty = 1},
+                   ward1 = {item = "salt_circle", qty = 1, left = 4}, ward2 = {item = "black_candle", qty = 1, left = 2},
+                   rack = {item = "raw_fish", qty = 3, t = 10}, trap = {item = "snare", qty = 2},
+                   bench1 = {item = "multitool", qty = 1}, bench2 = {item = "pliers", qty = 1},
+                   shelf1 = {item = "weeping_stone", qty = 1}, shelf2 = {item = "toy_car", qty = 1},
+                   mast = {item = "antenna", qty = 1}}}
+g.ground[g.base.key] = {{item = "water_bottle", qty = 3}, {item = "canned_beans", qty = 2}, {item = "rope", qty = 1}}
+g.player.inventory = {{item = "stick", qty = 3}, {item = "knife", qty = 1}}
+g:open_camp()
+g.inv_cursor = #g:ground_list() + 2   -- (the fire pit)
+g.log = {"You make this ruin your camp. T: the camp.", "Built: Fire pit."}
+g:draw_inventory(400, 300)
+solaros.dump("ops_camp.txt")
+g.page, g.screen = "map", "skills"
+g:draw_skills(400, 300)
+solaros.dump("ops_camp_map.txt")
+
 -- Scene 2b2/2b3: the Churn's items with their own icons (tools/paint_icons.py),
 -- 31 a screen: the bag and the ground
 for n, ids2 in ipairs({

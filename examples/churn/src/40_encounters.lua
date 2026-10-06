@@ -16,7 +16,7 @@ function Game:roll(pct)
 end
 
 function Game:maybe_encounter(terrain_id)
-    if self:at_base() and self:base_has("barricade") then return end   -- safe at camp
+    if self:at_base() and self:wall_up() then return end   -- safe at camp (while the barricade stands)
     if (self.enc_cooldown or 0) > 0 then
         self.enc_cooldown = self.enc_cooldown - 1
         return

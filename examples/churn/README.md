@@ -44,6 +44,29 @@ the Checkpoint alive.
   you patch it: **Patch clothes** on the crafting screen, 1 cloth scrap.
   Any sharp edge cuts a spare piece up for cloth (**Cut Up ...** on the
   crafting screen, which lists what you can make right now first).
+- **Your camp:** claim a ruin (C, *Claim this ruin*) and **T** there opens
+  the camp screen: its stash, your bag, and 22 slots that keep working while
+  you're away. Only one camp at a time; claiming another leaves the old
+  one's things behind.
+  - **Fire pit + pot:** feed it fuel and it burns on its own; raw meat,
+    fish or dirty water in the pot cooks over it.
+  - **Bed:** a pelt or tarp, for better rest. **Lamp:** a glow jar,
+    candle or torch keeps the dark back.
+  - **3 wards** (salt circle, rattle, candle, charm, Elder Sign): fewer
+    things come in the night, fewer raids. They wear out in days.
+  - **Drying rack:** smoked meat in a day. **Snare line:** meat most
+    mornings. **Berry patch:** berries every morning.
+  - **Workbench:** 3 tools that count when you craft there, an hour
+    faster, better odds on guns and repairs.
+  - **Radio mast:** with an antenna, free calls from camp and a slow
+    recharge. **Trophy shelf:** artifacts ward the camp; toys bring the
+    Little Ones' gifts. **Dog bed:** E there and your dog stays to guard.
+  - **Rain barrel, barricade, box, map wall:** the barrel's bottles, the
+    barricade's condition (E: mend it), what a raid can take (a lockbox:
+    nothing), and E on the map wall: every place you know.
+  - While you're away, someone may go through an unguarded camp. Resting
+    there at night, something may come to the edge of the light, unless
+    the camp is warded.
 - **Money:** rubles turn up in ruins, on the dead and on bandits. Traders
   pay rubles for what you sell, take them for the rest of a price, and
   give change in rubles.
@@ -391,7 +414,8 @@ Trader's den job sends you after one of them.
 
 ### Night horrors (20:00 to 06:00)
 They only come after dark (4% per move), half as often if you carry a
-light or stand by a fire, and never at a camp with a bedroll.
+light or stand by a fire, and never on the move near a camp with a bedroll
+(though resting there, something may come to an unwarded camp).
 - **The Long Man:** someone at the edge of your light, too tall, arms
   hanging past his knees. *Look away* and he's gone (and you sleep badly).
   Run, or **speak to it**: half the time it bends down and leaves you an

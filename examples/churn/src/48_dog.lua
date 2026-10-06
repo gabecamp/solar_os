@@ -19,9 +19,10 @@ function Game:maybe_dog()
 end
 
 -- The first food in the bag the dog would eat (DOG.eats, in order).
-function Game:dog_food()
+function Game:dog_food(list)
+    list = list or self.player.inventory
     for _, item in ipairs(DOG.eats) do
-        for i, s in ipairs(self.player.inventory) do
+        for i, s in ipairs(list) do
             if s.item == item then return i, item end
         end
     end
@@ -48,13 +49,13 @@ end
 
 -- Hide/flee bonus while the dog is with you.
 function Game:dog_bonus()
-    return self.dog and DOG.warn_bonus or 0
+    return self:dog_with_you() and DOG.warn_bonus or 0
 end
 
 -- In a fight, the dog's turn: maybe a bite. Returns true if the fight ended.
 function Game:dog_turn()
     local e = self.enc
-    if not self.dog or e.over or e.range ~= "close" then return false end
+    if not self:dog_with_you() or e.over or e.range ~= "close" then return false end
     if self:roll(DOG.bite_chance) then
         local dmg = DOG.bite[1] + self:rand(DOG.bite[2] - DOG.bite[1] + 1)
         self:enc_hit(dmg, nil, "Your dog bites the " .. e.def.who)
@@ -64,7 +65,7 @@ end
 
 -- The dog jumps in front of a blow. Returns true if it took it.
 function Game:dog_guard(dmg)
-    if not self.dog or not self:roll(DOG.guard) then return false end
+    if not self:dog_with_you() or not self:roll(DOG.guard) then return false end
     local dog = self.dog
     dog.hp = dog.hp - dmg
     if dog.hp <= 0 then
@@ -85,21 +86,24 @@ function Game:dog_hour(hour)
     if hour % 6 == 0 and dog.hp < DOG.hp then dog.hp = dog.hp + 1 end
     if hour - dog.fed_hour < DOG.meal_hours then return end
     dog.fed_hour = hour
-    local i, item = self:dog_food()
+    -- (left at camp, it eats from the stash)
+    local list = dog.at_camp and self.base and self:camp_pile() or self.player.inventory
+    local i, item = self:dog_food(list)
     if i then
-        local s = self.player.inventory[i]
+        local s = list[i]
         s.qty = s.qty - 1
-        if s.qty <= 0 then table.remove(self.player.inventory, i) end
+        if s.qty <= 0 then table.remove(list, i) end
         dog.hungry_days = 0
-        self:push_log("Your dog eats the " .. ITEM_DB[item].name:lower() .. ".")
+        if not dog.at_camp then self:push_log("Your dog eats the " .. ITEM_DB[item].name:lower() .. ".") end
     else
         dog.hungry_days = dog.hungry_days + 1
+        local say = dog.at_camp and function(t) self:camp_news(t) end or function(t) self:push_log(t) end
         if dog.hungry_days >= DOG.leave_after then
             self.dog = nil
             self:sfx("whine")
-            self:push_log("Your dog is gone. Too long without food.")
+            say(dog.at_camp and "Your dog has left the camp. Too long without food." or "Your dog is gone. Too long without food.")
         else
-            self:push_log("Your dog is hungry. Nothing in the bag it can eat.")
+            say(dog.at_camp and "Your dog at camp is hungry: leave food in the stash." or "Your dog is hungry. Nothing in the bag it can eat.")
         end
     end
 end

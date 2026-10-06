@@ -289,9 +289,48 @@ local TECH = {
 -- A base (src/51_base.lua): claim a ruin, then build on it. The barrel
 -- fills a bottle every barrel_hours (2 in rain) into the stash box.
 local BASE = {
-    order = {"box", "bedroll", "barrel", "barricade"},
-    names = {box = "Stash box", bedroll = "Bedroll", barrel = "Rain barrel", barricade = "Barricade"},
+    order = {"box", "lockbox", "bedroll", "barrel", "barricade", "firepit", "rack", "bench", "garden", "mapwall"},
+    names = {box = "Stash box", lockbox = "Lockbox", bedroll = "Bedroll", barrel = "Rain barrel",
+             barricade = "Barricade", firepit = "Fire pit", rack = "Drying rack", bench = "Workbench",
+             garden = "Berry patch", mapwall = "Map wall"},
     barrel_hours = 12, barrel_max = 6, bed_rest_bonus = 0.5,
+    -- The camp screen (T at your camp; src/51_base.lua). Slots in screen
+    -- order, 6 a row: id, label (4 letters, under the cell), name, what it
+    -- takes (BASE.takes), the build it needs, most it holds (nil = any).
+    -- info = shows a state, holds nothing.
+    slots = {
+        {"fire", "Fire", "Fire pit", "fuel", "firepit"}, {"pot", "Pot", "Cooking pot", "cook", "firepit"},
+        {"bed", "Bed", "Bedding", "bedding", nil, 1}, {"dog", "Dog", "Dog bed", "dogbed", nil, 1},
+        {"light", "Lamp", "Lamp hook", "light", nil, 1}, {"mast", "Mast", "Radio mast", "mast", nil, 1},
+        {"ward1", "Ward", "Ward", "ward", nil, 1}, {"ward2", "Ward", "Ward", "ward", nil, 1},
+        {"ward3", "Ward", "Ward", "ward", nil, 1}, {"rack", "Rack", "Drying rack", "smoke", "rack"},
+        {"trap", "Trap", "Snare line", "trap", nil, 3}, {"plot", "Plot", "Berry patch", "plot", "garden", 5},
+        {"bench1", "Tool", "Workbench", "tool", "bench", 1}, {"bench2", "Tool", "Workbench", "tool", "bench", 1},
+        {"bench3", "Tool", "Workbench", "tool", "bench", 1}, {"shelf1", "Shlf", "Trophy shelf", "shelf", nil, 1},
+        {"shelf2", "Shlf", "Trophy shelf", "shelf", nil, 1}, {"shelf3", "Shlf", "Trophy shelf", "shelf", nil, 1},
+        {"barrel", "Rain", "Rain barrel", "info", "barrel"}, {"wall", "Wall", "Barricade", "info", "barricade"},
+        {"box", "Box", "Stash box", "info", "box"}, {"map", "Map", "Map wall", "info", "mapwall"},
+    },
+    -- what each kind of slot takes (item lists; light/tool/shelf are worked out in 51_base)
+    takes = {
+        fuel = {stick = 2, newspaper = 1, bark = 1, large_branch = 4, charcoal = 6},   -- hours a piece burns
+        cook = {strange_meat = "cooked_meat", raw_fish = "cooked_fish", dirty_water = "water_bottle"},
+        smoke = {strange_meat = "smoked_meat", cooked_meat = "smoked_meat", raw_fish = "smoked_meat"},
+        bedding = {jawhound_pelt = true, hide = true, pelt_coat = true, tarp = true},
+        dogbed = {cloth_scrap = true, hide = true, raw_hide = true, jawhound_pelt = true},
+        mast = {antenna = true}, trap = {snare = true}, plot = {berries = true},
+        ward = {salt_circle = 5, can_rattle = 6, black_candle = 3, choir_charm = 8, elder_sign = 10},   -- days it lasts
+    },
+    cook_hours = 3, smoke_hours = 24,       -- with the fire lit / on the rack
+    bed_pelt_bonus = 0.25,                  -- more rest on a pelt (on top of the bedroll's)
+    visit = 15,                             -- % something comes in the night while you rest at camp (unwarded)
+    ward_mult = 0.5, light_mult = 0.7, pelt_mult = 0.8, shelf_mult = 0.85,   -- night visits x this, each
+    raid = 20, raid_ward = 6, raid_light = 5, raid_shelf = 3,   -- % a day while you're away, - per ward...
+    wall_hp = 100, wall_raid = {15, 30}, wall_storm = 10, mend = 40,   -- barricade condition
+    trap_catch = 30, trap_break = 10, plot_per = 2,             -- % a snare catches a day; berries: 1 per 2 planted
+    gift = 25,                              -- % a day the Little Ones leave something for toys on the shelf
+    bench_hours = 1, bench_chance = 10,     -- crafting at the workbench: an hour faster, +10% when it can fail
+    mast_charge_hours = 12, news_max = 4,
 }
 
 -- Quests (src/52_quests.lua): offer = what they say, journal = the reminder.

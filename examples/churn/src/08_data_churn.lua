@@ -252,10 +252,10 @@ for id, topic in pairs({
     rag_scarf = "rags", patch_coat = "rags", scrap_bracers = "rags", sack_pack = "rags",
     rag_mask = "rags", rope_belt = "rags",
     snare = "bushcraft", fishing_rod = "bushcraft", spear = "bushcraft", club = "bushcraft",
-    bedroll = "bushcraft", barricade = "bushcraft",
+    bedroll = "bushcraft", barricade = "bushcraft", rack = "bushcraft", garden = "bushcraft", mapwall = "bushcraft",
     filter = "medicine", splint = "medicine",
     shiv = "tinkering", machete = "tinkering", spiked_club = "tinkering", pipe_spear = "tinkering",
-    barrel = "tinkering",
+    barrel = "tinkering", bench = "tinkering", lockbox = "tinkering",
 }) do
     for _, r in ipairs(RECIPES) do
         if r.id == id then r.topic, r.known = topic, nil end

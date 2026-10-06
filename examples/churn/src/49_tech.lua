@@ -29,7 +29,7 @@ end
 
 function Game:repair_chance(fix)
     return math.max(5, math.min(95, fix.base + TECH.per_point * (self.player.attrs.Perception - 3)
-                                    + self:skill_bonus("tinker")))
+                                    + self:skill_bonus("tinker") + self:bench_bonus()))
 end
 
 -- Called by Game:craft for a repair recipe (after craft_blocker passed).
@@ -192,7 +192,8 @@ function Game:radio_call(i)
     else
         local answered = RADIO[ch.id](self)
         if answered then
-            r.charge = r.charge - 1
+            -- (free from camp with an antenna on the mast)
+            if not (self:at_base() and self:camp_stack("mast")) then r.charge = r.charge - 1 end
             -- "open": the voice stays reachable (Anna after you bring her bandages)
             r.next[ch.id] = answered ~= "open" and (self.player.hours + self:channel_wait(ch)) or nil
         end

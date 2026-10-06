@@ -41,7 +41,7 @@ print("1. only bare survival is known; every topic teaches something")
 local g = fresh()
 local known = 0
 for _, r in ipairs(C.RECIPES) do if g.known[r.id] then known = known + 1 end end
-assert(known <= 15, "too much known at the start: " .. known)
+assert(known <= 16, "too much known at the start: " .. known)   -- (16: the camp's fire pit)
 for _, id in ipairs({"torch", "campfire", "bandage", "rag_shirt", "foot_wraps", "fire_drill"}) do
     assert(g.known[id], id .. " known")
 end

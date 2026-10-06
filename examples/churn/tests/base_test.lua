@@ -64,6 +64,7 @@ g.weather = function() return "Cold snap" end
 assert(not g:is_cold(), "the bedroll keeps you warm")
 g.player.needs.rest, g.player.mp = 10, 0
 g:rest()
+if g.screen == "encounter" then g.enc, g.screen = nil, "map" end   -- (a night visitor at an unwarded camp)
 local bed_rest = g.player.needs.rest
 assert(has_log(g, "bedroll"))
 local g2 = fresh()

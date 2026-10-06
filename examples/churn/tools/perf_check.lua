@@ -160,6 +160,6 @@ for _, f in ipairs(frames) do
     worst = math.max(worst, f[2])
 end
 local bad = false
-if MAX_HEAP and real_peak > MAX_HEAP then print(("FAIL: real peak heap %d KB > %d"):format(real_peak, MAX_HEAP)); bad = true end
+if MAX_HEAP and real_peak > MAX_HEAP then print(("FAIL: real peak heap %.0f KB > %d"):format(real_peak, MAX_HEAP)); bad = true end
 if MAX_CALLS and worst > MAX_CALLS then print(("FAIL: a frame took %d calls > %d"):format(worst, MAX_CALLS)); bad = true end
 if bad then os.exit(1) end

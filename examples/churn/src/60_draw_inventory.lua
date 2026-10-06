@@ -49,6 +49,9 @@ local CURSOR_DESC_Y = 210
 local CONDITIONS_Y = 264     -- full width, under the doll
 -- log lines sit on the last lines of the reported screen height
 local INV_LOG_LINES = 2
+-- the camp screen's slots (BASE.slots, 6 a row) in the doll's place:
+-- {x0, y0, cell, column step, row step}, a label under each cell
+local CAMP_GRID = {6, 26, 30, 34, 48}
 
 local function item_abbr(item_id)
     return ITEM_DB[item_id].name:sub(1, 1)
@@ -440,6 +443,43 @@ function Game:draw_equip_slot(slot, x, y, w, h, is_cursor, is_selected)
     end
 end
 
+-- One camp slot (the camp screen): its cell, and its label under it.
+-- A slot that isn't built yet is a gray frame with "--"; the four info
+-- slots show their state in words.
+function Game:draw_camp_slot(id, x, y, w, h, is_cursor, is_selected)
+    local slot = Game.camp_slot(id)
+    local b = self.base
+    gfx.font(gfx.FONT_MONO_12)
+    local blocked = self:camp_slot_blocker(slot)
+    local word
+    if slot[4] == "info" and not blocked then
+        if id == "barrel" then
+            local n = 0
+            for _, st in ipairs(self:camp_pile()) do if st.item == "water_bottle" then n = n + st.qty end end
+            word = tostring(n)
+        elseif id == "wall" then word = tostring(b.wall or BASE.wall_hp)
+        elseif id == "box" then word = b.built.lockbox and "Lck" or "Box"
+        else word = "Map" end
+    elseif blocked then
+        word = "--"
+    end
+    if word then
+        gfx.color(gfx.WHITE)
+        gfx.fill_rect(x, y, w, h)
+        gfx.color(gfx.BLACK)
+        gfx.text(x + (w - 7 * #word) // 2, y + h // 2 + 4, word)
+        gfx.color(blocked and gfx.DARK or gfx.BLACK)
+        gfx.rect(x, y, w, h)
+        gfx.color(gfx.BLACK)
+        if is_selected then gfx.rect(x - 2, y - 2, w + 4, h + 4)
+        elseif is_cursor then gfx.rect(x - 1, y - 1, w + 2, h + 2) end
+    else
+        self:draw_slot_box(x, y, w, h, self:camp_stack(id), is_cursor, is_selected)
+    end
+    gfx.color(gfx.BLACK)
+    gfx.text(x + (w - 7 * #slot[2]) // 2, y + h + 12, slot[2])
+end
+
 -- What the cursor is on, e.g. "Head: Cap" or "Bag: Rock x3".
 function Game:cursor_description()
     local row = INV_ROWS[self.inv_cursor]
@@ -447,7 +487,7 @@ function Game:cursor_description()
     local kind, key = row[1], row[2]
     local stack = self:get_stack(kind, key)
     local where = kind == "ground" and ((self:at_base() and self:base_has("box")) and "Box" or "Ground") or kind == "inventory" and "Bag"
-        or EQUIP_NAME[key]
+        or kind == "camp" and Game.camp_slot(key)[3] or EQUIP_NAME[key]
     if not stack then return where .. ": empty" end
     local text = where .. ": " .. ITEM_DB[stack.item].name
     if stack.qty > 1 then text = text .. " x" .. stack.qty end
@@ -532,7 +572,17 @@ end
 -- Everything the bag screen shows except where the cursor is: when only the
 -- cursor moved, the screen is patched instead of redrawn.
 function Game:inv_signature()
+    local camp = {}
+    if self.camp_view and self.base then   -- (the camp's slots and state)
+        camp[1] = self:camp_summary()
+        for _, slot in ipairs(BASE.slots) do
+            local st = self:camp_stack(slot[1])
+            camp[#camp + 1] = st and (st.item .. st.qty) or "-"
+        end
+        for part in pairs(self.base.built) do camp[#camp + 1] = part end
+    end
     local p, out = self.player, {self:current_conditions(), table.concat(self:inv_stats_lines(), "|"),
+                                 table.concat(camp, ","),
                                  self.ground_off or 0, self:bag_capacity(),
                                  (self:at_base() and self:base_has("box")) and "box" or "ground"}
     for _, list in ipairs({self:ground_list(), p.inventory}) do
@@ -602,7 +652,9 @@ function Game:draw_inv_desc(w, clear)
     local row = INV_ROWS[self.inv_cursor]
     local stack = row and self:get_stack(row[1], row[2])
     local lines = wrap(self:cursor_description(), max_chars)
-    if row and row[1] == "inventory" and not stack then   -- (an empty cell: where the cells come from)
+    if row and row[1] == "camp" then   -- (what the slot does, or is doing)
+        for _, l in ipairs(wrap(self:camp_slot_text(row[2]), max_chars)) do lines[#lines + 1] = l end
+    elseif row and row[1] == "inventory" and not stack then   -- (an empty cell: where the cells come from)
         for _, l in ipairs(wrap(self:bag_sum_text(), max_chars)) do lines[#lines + 1] = l end
     elseif stack then
         for _, text in ipairs({self:item_stats(stack.item) or false, ITEM_DB[stack.item].desc or false}) do
@@ -772,7 +824,13 @@ function Game:redraw_inv_row(i, erase)
     if not (row and pos) then return end
     local sel = self.inv_selected
     sel = sel ~= nil and sel[1] == row[1] and sel[2] == row[2]
-    if row[1] == "equip" then
+    if row[1] == "camp" then
+        if erase then
+            gfx.color(gfx.WHITE)
+            gfx.fill_rect(pos.x - 2, pos.y - 2, pos.w + 4, pos.h + 4)
+        end
+        self:draw_camp_slot(row[2], pos.x, pos.y, pos.w, pos.h, i == self.inv_cursor, sel)
+    elseif row[1] == "equip" then
         if erase then
             -- the cursor's rect is the 1px ring just outside the slot (its
             -- own frame is redrawn below): put the doll's pixels back there
@@ -830,7 +888,10 @@ function Game:draw_inventory(w, h)
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
     gfx.font(gfx.FONT_MONO_12)
-    gfx.text(4, 12, "Arrows Enter:move E:use X:drop C:craft I:map H:help")
+    local camp = self.camp_view and self.base and self:at_base()
+    self.camp_view = camp or nil
+    gfx.text(4, 12, camp and "CAMP  Arrows Enter:move E:use T:bag I:map"
+        or ("Arrows Enter:move E:use X:drop C:craft I:map " .. (self:at_base() and "T:camp" or "H:help")))
 
     INV_ROWS = {}
     INV_POS = {}
@@ -851,7 +912,7 @@ function Game:draw_inventory(w, h)
     local per_page = GROUND_GRID_COLS * GROUND_GRID_ROWS
     local off = self:ground_scroll(n_ground)
     self.ground_off = off
-    local label = (self:at_base() and self:base_has("box")) and "Stash box" or "Ground"
+    local label = camp and "Camp stash" or (self:at_base() and self:base_has("box")) and "Stash box" or "Ground"
     if #ground > per_page then
         label = label .. " " .. (off + 1) .. "-" .. math.min(#ground, off + per_page)
             .. "/" .. #ground
@@ -870,10 +931,18 @@ function Game:draw_inventory(w, h)
         end
     end
 
-    -- equipped slots (positioned near the body, not listed)
-    for _, slot in ipairs(EQUIP_SLOTS) do
-        local r = EQUIP_RECT[slot]
-        add_row("equip", slot, r[1], r[2], r[3], r[4])
+    -- equipped slots (positioned near the body, not listed), or on the camp
+    -- screen the camp's slots in their grid
+    if camp then
+        local g = CAMP_GRID
+        for i, slot in ipairs(BASE.slots) do
+            add_row("camp", slot[1], g[1] + (i - 1) % 6 * g[4], g[2] + (i - 1) // 6 * g[5], g[3], g[3])
+        end
+    else
+        for _, slot in ipairs(EQUIP_SLOTS) do
+            local r = EQUIP_RECT[slot]
+            add_row("equip", slot, r[1], r[2], r[3], r[4])
+        end
     end
 
     -- bag: one cell per unit of capacity. Every stack is a row, plus the
@@ -918,12 +987,16 @@ function Game:draw_inventory(w, h)
     end
 
     gfx.color(gfx.BLACK)
-    gfx.text(4, CONDITIONS_Y, self:current_conditions())
+    gfx.text(4, CONDITIONS_Y, camp and self:camp_summary() or self:current_conditions())
 
-    -- silhouette + equip slots
-    self:draw_doll()
+    -- silhouette + equip slots (the camp screen: its slots)
+    if not camp then self:draw_doll() end
     for i, row in ipairs(INV_ROWS) do
-        if row[1] == "equip" then
+        if row[1] == "camp" then
+            local pos = INV_POS[i]
+            self:draw_camp_slot(row[2], pos.x, pos.y, pos.w, pos.h, i == self.inv_cursor,
+                self.inv_selected and self.inv_selected[1] == row[1] and self.inv_selected[2] == row[2])
+        elseif row[1] == "equip" then
             local pos = INV_POS[i]
             self:draw_equip_slot(row[2], pos.x, pos.y, pos.w, pos.h,
                 i == self.inv_cursor,

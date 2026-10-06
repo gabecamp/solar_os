@@ -34,8 +34,15 @@ end
 
 -- Hours a recipe takes: practised tinkerers are an hour quicker.
 function Game:craft_hours(r)
-    if self:skill_level("tinker") >= SKILLS.fast_craft then return math.max(1, r.hours - 1) end
-    return r.hours
+    local h = r.hours
+    if self:skill_level("tinker") >= SKILLS.fast_craft then h = h - 1 end
+    if self:at_base() and self:base_has("bench") and not r.base then h = h - BASE.bench_hours end
+    return math.max(1, h)
+end
+
+-- +% on fiddly work (guns, repairs) at the camp's workbench.
+function Game:bench_bonus()
+    return self:at_base() and self:base_has("bench") and BASE.bench_chance or 0
 end
 
 -- "Scav 2  Fish 1  Fight 3  Tinker 0" (journal).
@@ -55,6 +62,7 @@ end
 
 function Game:skills_page_lines()
     if self.page == "finds" then return self:finds_lines() end
+    if self.page == "map" then return self:map_wall_lines() end
     local lines = {"Skill               Lv  XP       Bonus"}
     for _, name in ipairs(SKILLS.order) do
         local level, xp = self:skill_level(name), (self.skills or {})[name] or 0
@@ -93,7 +101,8 @@ function Game:skills_key(key, h)
     elseif key == gfx.KEY_DOWN or key == KEY.S then
         self.skills_off = math.min(max_off, (self.skills_off or 0) + 3)
     else
-        self.screen = "journal"
+        self.screen = self.skills_back or "journal"
+        self.skills_back = nil
     end
 end
 
@@ -101,7 +110,7 @@ function Game:draw_skills(w, h)
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
     gfx.font(gfx.FONT_BOLD_14)
-    gfx.text(6, 16, self.page == "finds" and "Finds" or "Skills and recipes")
+    gfx.text(6, 16, ({finds = "Finds", map = "Map wall"})[self.page] or "Skills and recipes")
     gfx.font(gfx.FONT_MONO_12)
     local lines, fit = self:skills_page_lines(), Game.skills_fit(h)
     local off = math.max(0, math.min(self.skills_off or 0, #lines - fit))

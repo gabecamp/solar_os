@@ -147,6 +147,7 @@ function Game:try_move(q, r)
     if p.needs.thirst <= 0 then self:push_log("You are dehydrated!") end
     self:find_stash()
     self:check_snare()
+    self:camp_arrive()
     if not self:check_death("You bled out.") and not self:arrive_site() and not self:quest_arrive()
         and not self:little_arrive() then
         self:maybe_encounter(terrain_id)
@@ -272,15 +273,16 @@ function Game:rest()
     if fire then   -- a campfire: warm, and better sleep
         p.needs.rest = clamp(p.needs.rest + REST_HOURS * (100 / 6) * WORLD.fire_rest_bonus)
     end
-    if bed then    -- your own bedroll at camp
-        p.needs.rest = clamp(p.needs.rest + REST_HOURS * (100 / 6) * BASE.bed_rest_bonus)
+    if bed then    -- your own bedroll at camp (and a pelt on it: better still)
+        local bonus = BASE.bed_rest_bonus + (self:camp_stack("bed") and BASE.bed_pelt_bonus or 0)
+        p.needs.rest = clamp(p.needs.rest + REST_HOURS * (100 / 6) * bonus)
     end
     p.mp = effective_max_mp(p)
     self:refresh_view()
     self:push_log("Rested " .. REST_HOURS .. "h" .. (bed and " in your bedroll." or fire and " by the fire." or "."))
     if self:weather() == "Rain" then self:rain_fill() end
     if p.injuries.bleeding then self:push_log("You're still bleeding. Bandage it (E on cloth).") end
-    self:check_death("You bled out in your sleep.")
+    if not self:check_death("You bled out in your sleep.") then self:camp_night() end
 end
 
 -- -- inventory transfer -------------------------------------------------
@@ -299,6 +301,8 @@ function Game:get_stack(kind, k)
     elseif kind == "equip" then
         local item = self.player.equipped[k]
         return item and {item = item, qty = 1, cond = self:stack_cond(k)} or nil
+    elseif kind == "camp" then
+        return self:camp_stack(k)
     end
 end
 
@@ -320,6 +324,8 @@ function Game:remove_stack(kind, k)
         self.player.equipped[k] = nil
         if self.player.wear then self.player.wear[k] = nil end
         return item and {item = item, qty = 1, cond = cond} or nil
+    elseif kind == "camp" then
+        return self:camp_remove(k)
     end
 end
 
@@ -379,6 +385,7 @@ function Game:bag_capacity()
 end
 
 function Game:put_stack(kind, k, stack)
+    if kind == "camp" then return self:camp_put(k, stack) end
     if kind == "ground" then
         add_to_list(self:ground_list(), stack)
         return true
@@ -434,6 +441,8 @@ function Game:try_transfer(source, dest)
     local saved_eq, saved_wear = {}, {}
     for slot, item in pairs(p.equipped) do saved_eq[slot] = item end
     for slot, c in pairs(p.wear or {}) do saved_wear[slot] = c end
+    local saved_slots = {}   -- (the camp's slots, when the move touches them)
+    for id, st in pairs(self.base and self.base.slots or {}) do saved_slots[id] = st end
     local cap_before = self:bag_capacity()
 
     -- onto a bag cell that holds something else: they trade places (the one
@@ -455,6 +464,7 @@ function Game:try_transfer(source, dest)
         if not ok then
             p.inventory, p.equipped, p.wear = saved_inv, saved_eq, saved_wear
             self.ground[hex_key(p.q, p.r)] = saved_ground
+            if self.base then self.base.slots = saved_slots end
             self:push_log("Bag too small - empty it first.")
             return false
         end
@@ -475,6 +485,7 @@ function Game:try_transfer(source, dest)
     if not ok then
         p.inventory, p.equipped, p.wear = saved_inv, saved_eq, saved_wear
         self.ground[hex_key(p.q, p.r)] = saved_ground
+        if self.base then self.base.slots = saved_slots end
         return false
     end
     recompute_stats(p)   -- held artifacts change stats
@@ -526,6 +537,7 @@ end
 -- Food/drink is eaten, gear is worn, anything else goes to a free hand; on a
 -- body slot it takes the item off (held food is eaten instead).
 function Game:use_item(kind, k)
+    if kind == "camp" then return self:camp_action(k) end
     local stack = self:get_stack(kind, k)
     if not stack then return end
     local def = ITEM_DB[stack.item]

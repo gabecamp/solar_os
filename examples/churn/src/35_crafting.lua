@@ -35,6 +35,10 @@ function Game:count_item(item)
     for _, slot in ipairs({"rhand", "lhand"}) do
         if self.player.equipped[slot] == item then n = n + 1 end
     end
+    for _, id in ipairs(self:bench_tools()) do
+        local s = self:camp_stack(id)
+        if s.item == item then n = n + s.qty end
+    end
     return n
 end
 
@@ -73,12 +77,30 @@ function Game:take_items(item, qty)
             qty = qty - 1
         end
     end
+    for _, id in ipairs(self:bench_tools()) do   -- (the workbench last)
+        local s = self:camp_stack(id)
+        if qty > 0 and s.item == item then
+            local take = math.min(qty, s.qty)
+            s.qty, qty = s.qty - take, qty - take
+            if s.qty <= 0 then self.base.slots[id] = nil end
+        end
+    end
     return qty == 0
 end
 
 function Game:fire_here()
-    local camp = self.camps[hex_key(self.player.q, self.player.r)]
-    return camp ~= nil and self.player.hours < camp.until_hour
+    return self:fire_at(self.player.hours)
+end
+
+-- Tools on the camp's workbench (they count when you craft at camp).
+function Game:bench_tools()
+    local out = {}
+    if not (self:at_base() and self:base_has("bench")) then return out end
+    for _, id in ipairs({"bench1", "bench2", "bench3"}) do
+        local s = self:camp_stack(id)
+        if s then out[#out + 1] = id end
+    end
+    return out
 end
 
 -- Any gun or bow you can reach (for Clean Guns).
@@ -185,7 +207,7 @@ end
 -- Assembly odds (a recipe with `chance`): Perception and tinkering.
 function Game:craft_chance(r)
     return math.max(5, math.min(95, r.chance + TECH.per_point * (self.player.attrs.Perception - 3)
-                                    + self:skill_bonus("tinker")))
+                                    + self:skill_bonus("tinker") + self:bench_bonus()))
 end
 
 -- Scrawled Notes: learn a recipe you don't know yet (the notes are used up).

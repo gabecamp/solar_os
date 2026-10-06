@@ -116,6 +116,8 @@ function Game:site_action()
         self:open_trade("peddler")
     elseif self:little_spot(hex_key(self.player.q, self.player.r)) == "cairn" then
         self:offer_trinket()
+    elseif self:at_base() then
+        self:open_camp()
     else
         self:push_log("Nobody here. (T trades at a trader)")
     end

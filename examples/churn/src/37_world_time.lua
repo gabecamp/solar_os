@@ -156,6 +156,7 @@ end
 
 function Game:fire_at(hours)
     local camp = self.camps[hex_key(self.player.q, self.player.r)]
+    if self:at_base() and self:camp_fire(hours) then return true end   -- (the camp's fire pit)
     return camp ~= nil and hours < camp.until_hour
 end
 
@@ -174,7 +175,7 @@ function Game:has_light()
     for slot, item in pairs(eq) do
         if not HOLD_SLOTS[slot] and ITEM_DB[item].light then return true end   -- a headlamp
     end
-    return false
+    return self:at_base() and self:camp_stack("light") ~= nil   -- (the camp's lamp)
 end
 
 -- Recompute what you can see: at night sight drops by one without light.

@@ -40,6 +40,7 @@ local ok, err = pcall(function()
             game:open_crafting()
         elseif key == KEY.I then
             game.screen = "inventory"
+            game.camp_view = nil
             game.inv_cursor = 1
             game.inv_selected = nil
         end
@@ -50,6 +51,10 @@ local ok, err = pcall(function()
             game:ask_quit()
         elseif key == KEY.I then
             game.screen = "map"
+            game.camp_view = nil
+        elseif key == KEY.T and game:at_base() then   -- the bag <-> the camp
+            game.camp_view = not game.camp_view or nil
+            game.inv_cursor, game.inv_selected = 1, nil
         elseif key == KEY.H then
             game:open_help()
         elseif key == KEY.J then
