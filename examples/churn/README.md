@@ -409,7 +409,15 @@ Two rare kind faces on the road (encounters, not radio voices).
   antlers that end in hands.
 
 You can hunt the animals as well as meet them: **G** on plains, in a
-forest or in the hills (by water with a Fishing Rod, G fishes instead). The
+forest or in the hills (by water with a Fishing Rod, G fishes instead).
+
+**Fishing** is a small game of its own (2 hours a cast). Space watches the
+float; when it goes under, Enter strikes (too early spooks them, too late
+loses the bait). Then each turn the fish pulls left or right (lean the
+other way), dives or lunges (Down: give it line) or rests (Up: reel it in).
+Pulls tighten the line: past the mark it snaps, and too slack it shakes the
+hook. A perch is one fish, a pike two, a river eel three; sometimes it's
+junk off the bottom. Perception and Karl's gear make the line stronger. The
 Trader's den job sends you after one of them.
 
 ### Night horrors (20:00 to 06:00)

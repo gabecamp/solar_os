@@ -120,6 +120,7 @@ g.ground["0,0"] = {{item = "fishing_rod", qty = 1}}
 g.near_water = function() return true end
 local fished = false
 g.fish = function() fished = true end
+g.quick_fish = true
 g:gather()
 assert(fished, "G by water with the rod on the ground")
 

@@ -13,8 +13,9 @@ if it were one file - they are chapters, not modules.
 Never edit churn.lua by hand; edit src/ and rebuild.
 
 Version: tools/version.json holds {"series", "build", "date", "digest"}. When
-the parts change (their digest differs), the build number goes up by one and
-the date is today's; the same parts rebuild to the same file. The version
+the parts change (their digest differs), the build number is the last
+commit's + 1 and the date is today's (rebuilding before a commit never
+counts twice); the same parts rebuild to the same file. The version
 ("0.13.7 (2026-10-05)") is the first line of churn.lua and replaces
 "@VERSION@" in the parts (Game.VERSION, shown on the H/V info page).
 """
@@ -22,6 +23,7 @@ import datetime
 import hashlib
 import json
 import pathlib
+import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -48,15 +50,30 @@ def bundle():
     return "".join(out), parts
 
 
+def committed_version():
+    """tools/version.json as the last commit has it (None outside git): new
+    builds count from there, so a commit is one step however often you
+    rebuilt before it."""
+    try:
+        out = subprocess.run(["git", "show", "HEAD:./tools/version.json"], cwd=ROOT,
+                             capture_output=True, text=True, check=True).stdout
+        return json.loads(out)
+    except (OSError, subprocess.CalledProcessError, ValueError):
+        return None
+
+
 def version(body, bump):
-    """The version for these parts: the stored one, or the next build when
-    the parts changed (saved, unless only checking)."""
+    """The version for these parts: the committed one while they're the
+    same, else the committed build + 1 (saved, unless only checking)."""
     v = json.loads(VERSION_FILE.read_text())
     digest = hashlib.sha256(body.encode()).hexdigest()[:16]
     if digest != v["digest"] and bump:
-        v["build"] += 1
-        v["date"] = datetime.date.today().isoformat()
-        v["digest"] = digest
+        base = committed_version() or v
+        if digest == base["digest"]:
+            v = base
+        else:
+            v = dict(base, build=base["build"] + 1, digest=digest,
+                     date=datetime.date.today().isoformat())
         VERSION_FILE.write_text(json.dumps(v, indent=2) + "\n")
         print("version %s.%d" % (v["series"], v["build"]))
     return "%s.%d (%s)" % (v["series"], v["build"], v["date"])

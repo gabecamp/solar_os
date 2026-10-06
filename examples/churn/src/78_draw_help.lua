@@ -18,6 +18,7 @@ local HELP = {
     {"", "Drop on a full cell: they swap"},
     {"CRAFT", "Up/Dn pick  Enter make  C/Q back"},
     {"CAMP", "T at your camp: slots, stash; T bag/camp"},
+    {"FISH", "Spc wait, Enter strike; Lt/Rt Up Dn fight"},
     {"TRADE", "Lt/Rt side  Enter +1  E -1  T deal  O work"},
     {"FIGHTS", "Up/Dn pick  Enter choose"},
     {"PUZZLE", "Arrows move  T+arrow throw  1-4 sigils"},

@@ -92,6 +92,7 @@ local function try_gather(g)
     local fishing = g:near_water() and g:carrying("fishing_rod")
     if not fishing and g:weapon().dmg < 9 and not g:shooter() then return false end   -- (no bare-handed hunts)
     local h = g.player.hours
+    g.quick_fish = true   -- (one roll, not the minigame)
     g:gather()
     return g.player.hours ~= h
 end

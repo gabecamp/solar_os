@@ -14,7 +14,11 @@ function Game:gather()
         self:push_log("Too tired. Rest first.")
         return
     end
-    if self:near_water() and self:count_item("fishing_rod") > 0 then return self:fish() end
+    if self:near_water() and self:count_item("fishing_rod") > 0 then
+        -- the minigame (63_fishing); quick_fish: one roll instead (the balance bot)
+        if self.quick_fish then return self:fish() end
+        return self:fish_start()
+    end
     local terrain = self.tiles[hex_key(p.q, p.r)]
     if not HUNT.snare_chance[terrain] then
         self:push_log(self:near_water() and "No rod to fish with. (C to make one)" or "No game here.")

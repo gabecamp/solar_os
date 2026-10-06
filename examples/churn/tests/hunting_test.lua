@@ -61,11 +61,12 @@ find(g, "ford", true)
 g:gather()
 assert(has_log(g, "No rod"))
 
-print("3. fishing with a rod by water")
+print("3. fishing with a rod by water (quick: one roll, as the balance bot fishes)")
 g = fresh()
 find(g, "plains", true)
 g.player.inventory = {{item = "fishing_rod", qty = 1}}
 g.karl_next = 1e9   -- Karl can turn up while you fish; not in this test
+g.quick_fish = true
 saved = HUNT.fish_chance
 HUNT.fish_chance = 1000
 hours = g.player.hours
@@ -73,6 +74,60 @@ g:gather()
 HUNT.fish_chance = saved
 assert(count(g, "raw_fish") == 1 and g.player.hours == hours + HUNT.fish_hours)
 assert(g.screen == "map", "fishing never starts a fight")
+
+print("3b. the minigame: G opens it; strike on the plunge; answer the fish; land it")
+local KEY = H.KEY
+local gfx = fake.gfx
+local LEFT, RIGHT, UP, DOWN = gfx.KEY_LEFT, gfx.KEY_RIGHT, gfx.KEY_UP, gfx.KEY_DOWN
+local function play(g, careful)
+    local f = g.fishing
+    while f.phase == "wait" do g:fishing_key(f.beats[f.beat] == "plunge" and KEY.ENTER or KEY.SPACE) end
+    local n = 0
+    while f.phase == "fight" and n < 100 do
+        local k = ({left = RIGHT, right = LEFT, dive = DOWN, rest = UP, lunge = DOWN})[f.act]
+        if careful and f.tension > g:fish_snap() - 30 and f.act ~= "rest" then k = DOWN end
+        g:fishing_key(k)
+        n = n + 1
+    end
+    return f
+end
+local landed = 0
+for i = 1, 40 do
+    g = fresh()
+    find(g, "plains", true)
+    g.player.inventory = {{item = "fishing_rod", qty = 1}}
+    g.karl_next, g.seed = 1e9, i * 101
+    hours = g.player.hours
+    g:gather()
+    assert(g.screen == "fishing" and g.player.hours == hours + HUNT.fish_hours, "the minigame, 2h")
+    local f = play(g, true)
+    assert(f.phase == "done")
+    if f.caught then landed = landed + 1 end
+    g:fishing_key(KEY.SPACE)
+    assert(g.screen == "map" and g.fishing == nil, "a key after the result: back to the map")
+end
+assert(landed >= 34, "a careful angler lands most: " .. landed .. "/40")
+g = fresh()
+find(g, "plains", true)
+g.player.inventory = {{item = "fishing_rod", qty = 1}}
+g.karl_next = 1e9
+g:gather()
+g:fishing_key(KEY.ENTER)   -- (struck at a still float)
+assert(g.fishing.phase == "wait" and g.fishing.spooked == 1, "too early: spooked, wait again")
+local f = g.fishing
+while f.beats[f.beat] ~= "plunge" do g:fishing_key(KEY.SPACE) end
+g:fishing_key(KEY.SPACE)   -- (waited past it)
+assert(f.phase == "done" and not f.caught and has_log(g, "bait"), "too late: the bait's gone")
+g = fresh()
+find(g, "plains", true)
+g.player.inventory = {{item = "fishing_rod", qty = 1}}
+g.karl_next = 1e9
+g:gather()
+f = g.fishing
+while f.phase == "wait" do g:fishing_key(f.beats[f.beat] == "plunge" and KEY.ENTER or KEY.SPACE) end
+local n = 0
+while f.phase == "fight" and n < 100 do g:fishing_key(UP); n = n + 1 end   -- (reel, reel, reel)
+assert(f.phase == "done" and (f.caught or has_log(g, "SNAP") or has_log(g, "slack")))
 
 print("4. snares: set with E, empty at first, catch over time")
 g = fresh()

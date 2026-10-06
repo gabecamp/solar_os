@@ -133,6 +133,21 @@ g.page, g.screen = "map", "skills"
 g:draw_skills(400, 300)
 solaros.dump("ops_camp_map.txt")
 
+-- Scenes: fishing - the float going under, then a pike on the line
+g = fresh()
+g.player.mp = 5
+g:fish_start()
+local f = g.fishing
+f.beat, f.float, f.msg = #f.beats, "plunge", "The float goes UNDER! (Enter: strike)"
+g:draw_fishing(400, 300)
+solaros.dump("ops_fishing_bite.txt")
+f.beat = #f.beats
+g:fishing_key(10)   -- strike
+f.dist, f.tension, f.act = 6, 72, "left"
+f.msg = "You lean into it. It's tiring. It pulls hard to the left!"
+g:draw_fishing(400, 300)
+solaros.dump("ops_fishing_fight.txt")
+
 -- Scene 2b2/2b3: the Churn's items with their own icons (tools/paint_icons.py),
 -- 31 a screen: the bag and the ground
 for n, ids2 in ipairs({

@@ -206,6 +206,29 @@ local HUNT = {
     fish_hours = 2, fish_chance = 50, hunt_hours = 2, hunt_chance = 50,
     snare_chance = {forest = 5, plains = 3, hills = 3},
     snare_catch = {"strange_meat", 2},
+    -- The fishing minigame (src/63_fishing.lua). Bite: `wait` beats of a still
+    -- float (a twitch now and then: twitch %), then it goes under for one
+    -- beat. Strike then (Enter) to hook it. Fight, turn by turn: the fish pulls
+    -- left/right, dives or rests (weights), and you answer. tension 0..snap;
+    -- under `slack` for slack_turns turns it shakes the hook. Reel it in
+    -- from `dist` to land it; it tires by the stamina it loses.
+    game = {
+        wait = {3, 7}, twitch = 35, spooks = 2,
+        tension = 35, snap = 100, slack = 8, slack_turns = 2, snap_per = 5,   -- +5 snap per Perception over 3
+        pull = 12, pull_var = {-4, 8}, lunge = 24, rest_ease = 8,   -- (a pull: 8 to 20; a lunge: 24)                 -- tension a pull adds each turn / a rest takes off
+        lean = {tension = 6, tire = 2}, wrong = {tension = 12, dist = 1},
+        reel = {tension = 18, dist = 1}, reel_rest = {tension = 8, dist = 2},
+        give = {tension = -22, dist = 1}, give_dive = {tension = -18, tire = 1},
+        acts = {{"left", 3}, {"right", 3}, {"dive", 2}, {"rest", 2}, {"lunge", 1}},
+        -- what bites: {id, name, weight, stamina, dist, catch {item, qty}}
+        fish = {
+            {"perch", "a pale perch", 5, 6, 7, {"raw_fish", 1}},
+            {"pike", "an eyeless pike", 3, 10, 10, {"raw_fish", 2}},
+            {"eel", "a river eel, long as your arm", 2, 15, 13, {"raw_fish", 3}},
+            {"snag", "something heavy and dead", 1, 3, 5, "junk"},
+        },
+        junk = {{"tin_can", 3}, {"scrap_metal", 2}, {"bolts", 2}, {"boots", 1}, {"drowned_eye", 1}},
+    },
 }
 
 -- Karl (K-A-R-L), the riddling fisherman. Only by water (a ford, or next to

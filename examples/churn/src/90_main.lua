@@ -139,6 +139,8 @@ local ok, err = pcall(function()
                 game:draw_encounter(w, h)
             elseif game.screen == "puzzle" then
                 game:draw_puzzle(w, h)
+            elseif game.screen == "fishing" then
+                game:draw_fishing(w, h)
             elseif game.screen == "craft" then
                 game:draw_craft(w, h)
             elseif game.screen == "scene" then
@@ -187,6 +189,8 @@ local ok, err = pcall(function()
                 game:encounter_key(key)
             elseif game.screen == "puzzle" then
                 game:puzzle_key(key)
+            elseif game.screen == "fishing" then
+                game:fishing_key(key)
             elseif game.screen == "craft" then
                 if key == KEY.Q then game:ask_quit() else game:craft_key(key) end
             elseif game.screen == "trade" then
