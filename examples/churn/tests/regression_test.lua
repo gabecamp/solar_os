@@ -52,7 +52,7 @@ print("[17] E on the inventory screen eats/drinks the item under the cursor")
 -- spawn ground: rock, stick, cloth_scrap, canned_beans, water_bottle -> cursor 5 is water
 local _, _, texts = run_loop({105, 100, 100, 100, 100, 101}, 6)   -- (Right x4: the 5th ground cell)
 assert(drew(texts, "Consumed Water Bottle."), "E did not consume the water bottle")
-assert(drew(texts, "Arrows Enter:move E:use X:drop C:craft"), "inventory hint should mention E")
+assert(drew(texts, "Enter move E use X drop C craft"), "inventory hint should mention E")
 local _, _, texts2 = run_loop({105, 101}, 2)   -- cursor 1 = rock: E puts it in a hand
 assert(drew(texts2, "Moved Rock."), "E on a rock should pick it up into a hand")
 print("    OK")

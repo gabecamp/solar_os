@@ -871,7 +871,7 @@ function Game:move_inv_cursor_drawn(old, w)
     -- the cells' erase boxes reach the labels' descenders: write them again
     gfx.color(gfx.BLACK)
     gfx.font(gfx.FONT_MONO_12)
-    for _, l in ipairs(self.inv_labels or {}) do gfx.text(INV_COL_X, l[1], l[2]) end
+    for _, l in ipairs(self.inv_labels or {}) do Game.ui_tag(INV_COL_X + 2, l[1], l[2]) end
     self.inv_drawn.cursor = self.inv_cursor
     gfx.refresh()
 end
@@ -892,8 +892,8 @@ function Game:draw_inventory(w, h)
     gfx.font(gfx.FONT_MONO_12)
     local camp = self.camp_view and self.base and self:at_base()
     self.camp_view = camp or nil
-    gfx.text(4, 12, camp and "CAMP  Arrows Enter:move E:use T:bag I:map"
-        or ("Arrows Enter:move E:use X:drop C:craft I:map " .. (self:at_base() and "T:camp" or "H:help")))
+    Game.ui_title(w, camp and "Camp" or "Bag", camp and "Enter move  E use  T bag  I map"
+        or ("Enter move E use X drop C craft I map " .. (self:at_base() and "T camp" or "H help")), 16)
 
     INV_ROWS = {}
     INV_POS = {}
@@ -919,7 +919,7 @@ function Game:draw_inventory(w, h)
         label = label .. " " .. (off + 1) .. "-" .. math.min(#ground, off + per_page)
             .. "/" .. #ground
     end
-    gfx.text(INV_COL_X, GROUND_Y - 5, label)
+    Game.ui_tag(INV_COL_X + 2, GROUND_Y - 5, label)
     self.inv_labels = {{GROUND_Y - 5, label}}
     for i = 1, n_ground do
         if i > off and i <= off + per_page then
@@ -1011,7 +1011,7 @@ function Game:draw_inventory(w, h)
 
     local bag_label = (back and ITEM_DB[back].name or "Pockets") .. " " .. n_inv .. "/" .. capacity
         .. (pockets > 0 and (" " .. pockets .. " pocket" .. (pockets > 1 and "s" or "")) or "")
-    gfx.text(INV_COL_X, BAG_LABEL_Y, bag_label)
+    Game.ui_tag(INV_COL_X + 2, BAG_LABEL_Y, bag_label)
     self.inv_labels[2] = {BAG_LABEL_Y, bag_label}
 
     -- log: the newest INV_LOG_LINES lines, the last one at h - 8

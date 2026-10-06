@@ -44,16 +44,19 @@ function Game:draw_creator(w, h)
     local p = self.player
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
-    gfx.font(gfx.FONT_BOLD_14)
-    gfx.text(6, 16, "Create your survivor")
-    gfx.font(gfx.FONT_MONO_12)
+    Game.ui_title(w, "Create your survivor")
     gfx.text(210, 16, "Difficulty 1-3: " .. DIFFICULTY[self.difficulty or "normal"].short)
 
     gfx.text(6, 36, "Attributes  left " .. attr_points_left(p.attrs))
     for i, name in ipairs(ATTRIBUTES) do
         local y = CREATOR_ATTR_Y + (i - 1) * CREATOR_ROW_H
         local v = p.attrs[name]
-        gfx.text(6, y, (self.creator_cursor == i and ">" or " ") .. name)
+        if self.creator_cursor == i then   -- (the row under the cursor: a black bar)
+            gfx.fill_rect(4, y - 10, 92, 13)
+            gfx.color(gfx.WHITE)
+        end
+        gfx.text(8, y, name)
+        gfx.color(gfx.BLACK)
         for c = 1, ATTR_MAX do
             local cx = 100 + (c - 1) * 12
             if c <= v then gfx.fill_rect(cx, y - 9, 10, 9) else gfx.rect(cx, y - 9, 10, 9) end
@@ -67,10 +70,15 @@ function Game:draw_creator(w, h)
         local row = #ATTRIBUTES + i
         local y = CREATOR_TRAIT_Y + (i - 1) * CREATOR_ROW_H
         local mark = p.traits[t.name] and "[x] " or "[ ] "
-        gfx.text(CREATOR_TRAIT_X, y, (self.creator_cursor == row and ">" or " ") .. mark .. t.name)
+        if self.creator_cursor == row then
+            gfx.fill_rect(CREATOR_TRAIT_X - 2, y - 10, w - CREATOR_TRAIT_X - 4, 13)
+            gfx.color(gfx.WHITE)
+        end
+        gfx.text(CREATOR_TRAIT_X, y, mark .. t.name)
         -- what it does to the budget: positives spend, negatives give
         local cost = (t.cost > 0 and "-" or "+") .. math.abs(t.cost)
         gfx.text(w - 6 - 7 * #cost, y, cost)
+        gfx.color(gfx.BLACK)
     end
 
     -- the highlighted row explained, then the build it gives
@@ -91,7 +99,7 @@ function Game:draw_creator(w, h)
     end
 
     gfx.text(6, h - 20, "Up/Dn row  L/R attribute")
-    gfx.text(6, h - 8, "Spc trait  Enter start  R records  Q quit")
+    Game.ui_keys(w, h, "Spc trait  Enter start  R records  Q quit")
     gfx.refresh()
 end
 
@@ -101,28 +109,39 @@ function Game:draw_encounter(w, h)
     local e, p = self.enc, self.player
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
-    gfx.font(gfx.FONT_BOLD_14)
-    gfx.text(6, 16, e.def.name)
-    gfx.font(gfx.FONT_MONO_12)
+    Game.ui_title(w, e.def.name)
     for i, line in ipairs(e.intro) do gfx.text(6, 22 + 13 * i, line) end
-    self:draw_portrait(e, w - 102, 18)
+    self:draw_portrait(e, w - 102, 24)
     gfx.color(gfx.BLACK)
     gfx.font(gfx.FONT_MONO_12)
     gfx.line(6, 114, w - 108, 114)
     for i, line in ipairs(e.msg) do gfx.text(6, 116 + 13 * i, line) end
-    local status = "You " .. math.floor(p.health) .. " HP"
-    if p.injuries.bleeding then status = status .. " bleeding" end
+    -- the status line: the range on a tag, your health as a bar, then it
+    local x = 6
     if e.def.hp then
-        local gun, sep = self:enemy_gun_name(), "   "
-        if gun then sep = "  " end   -- (room for the gun on one line)
-        status = "Range " .. RANGE_NAME[e.range] .. sep .. status
-            .. sep .. "It: " .. (e.seen and self:enemy_condition() or "?")
-            .. (gun and " (" .. gun .. ")" or "")
+        local range = RANGE_NAME[e.range]:upper()
+        Game.ui_tag(x + 2, 186, range)
+        x = x + 7 * #range + 12
     end
-    gfx.text(6, 186, status)
+    gfx.text(x, 186, "You")
+    Game.ui_bar(x + 26, 177, 50, 10, p.health / 100, p.health >= 30)
+    x = x + 80
+    local status = math.floor(p.health) .. (p.injuries.bleeding and " bleeding" or "")
+    if e.def.hp then
+        local gun = self:enemy_gun_name()
+        status = status .. "  It: " .. (e.seen and self:enemy_condition() or "?") .. (gun and " (" .. gun .. ")" or "")
+    end
+    gfx.text(x, 186, status)
     gfx.line(6, 192, w - 6, 192)
+    -- the choices: the one under the cursor on a black bar
     for i, o in ipairs(self:encounter_options()) do
-        gfx.text(6, 194 + 13 * i, (i == e.cursor and ">" or " ") .. i .. " " .. o[1])
+        local y = 194 + 13 * i
+        if i == e.cursor then
+            gfx.fill_rect(4, y - 10, w - 8, 13)
+            gfx.color(gfx.WHITE)
+        end
+        gfx.text(8, y, i .. "  " .. o[1])
+        gfx.color(gfx.BLACK)
     end
     gfx.refresh()
 end
@@ -142,9 +161,7 @@ function Game:draw_puzzle(w, h)
     local z = self.puz
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
-    gfx.font(gfx.FONT_BOLD_14)
-    gfx.text(6, 16, self.enc.def.name)
-    gfx.font(gfx.FONT_MONO_12)
+    Game.ui_title(w, self.enc.def.name)
     if z.kind == "bolts" then
         gfx.text(6, 34, "Your detector clicks once for each deadly spot")
         gfx.text(6, 47, "next to you. Reach the glint at the top.")
@@ -178,7 +195,7 @@ function Game:draw_puzzle(w, h)
         gfx.color(gfx.BLACK)
         gfx.text(6, 238, "Bolts: " .. z.bolts .. (z.aiming and "   (aiming)" or ""))
         gfx.text(6, 254, z.msg)
-        gfx.text(6, h - 8, "Arrows move  T+arrow throw a bolt  Esc back away")
+        Game.ui_keys(w, h, "Arrows move  T+arrow throw a bolt  Esc back away")
     elseif z.kind == "sequence" then
         gfx.text(6, 34, z.showing and "The signs burn in this order. Remember them."
             or "Press the keys for the signs, in order.")
@@ -202,7 +219,7 @@ function Game:draw_puzzle(w, h)
             draw_sprite(x + 7, 169, 16, 16, SIGILS[i])
             gfx.text(x + 12, 208, tostring(i))
         end
-        gfx.text(6, h - 8, z.showing and "Any key: hide them   Esc back away" or "Keys 1-4   Esc back away")
+        Game.ui_keys(w, h, z.showing and "Any key: hide them   Esc back away" or "Keys 1-4   Esc back away")
     else
         gfx.text(6, 34, "Runes are cut into the stone. Pressing one turns")
         gfx.text(6, 47, "it and its neighbours. Match the carving above.")
@@ -217,7 +234,7 @@ function Game:draw_puzzle(w, h)
             gfx.text(x + 17, 214, tostring(i))
         end
         gfx.text(6, 244, "Presses left: " .. z.moves)
-        gfx.text(6, h - 8, "Keys 1-" .. RUNE_N .. "   Esc back away")
+        Game.ui_keys(w, h, "Keys 1-" .. RUNE_N .. "   Esc back away")
     end
     gfx.refresh()
 end
@@ -225,9 +242,7 @@ end
 function Game:draw_dead(w, h)
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
-    gfx.font(gfx.FONT_BOLD_14)
-    gfx.text(6, 40, "You are dead.")
-    gfx.font(gfx.FONT_MONO_12)
+    Game.ui_title(w, "You are dead.")
     gfx.text(6, 70, self.death_cause or "")
     local y = 100
     if self.death_note then   -- (a death with more to say: the Institute)
@@ -241,7 +256,7 @@ function Game:draw_dead(w, h)
         gfx.text(6, y, line)
         y = y + 16
     end
-    gfx.text(6, h - 8, "Enter: new survivor  R: records  Q: quit")
+    Game.ui_keys(w, h, "Enter: new survivor  R: records  Q: quit")
     gfx.refresh()
 end
 

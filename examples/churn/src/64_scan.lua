@@ -105,11 +105,7 @@ function Game:draw_scan(w, h)
     local u, S = self.radio_ui.scan, CHURN.scan
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
-    gfx.font(gfx.FONT_BOLD_14)
-    gfx.text(6, 16, "Scanning the band")
-    gfx.font(gfx.FONT_MONO_12)
-    gfx.text(250, 16, ("Charge %d/%d"):format(self.radio.charge, TECH.radio_max))
-    gfx.line(6, 22, w - 6, 22)
+    Game.ui_title(w, "Scanning the band", ("Charge %d/%d"):format(self.radio.charge, TECH.radio_max))
     -- the dial: ticks every 5 MHz, the needle at f
     local x0, x1, y = 20, w - 20, 90
     gfx.line(x0, y, x1, y)
@@ -133,7 +129,7 @@ function Game:draw_scan(w, h)
     for i, line in ipairs(wrap(u.msg or "", 55)) do
         if i <= 4 then gfx.text(6, 180 + 14 * (i - 1), line) end
     end
-    gfx.text(6, h - 8, "Lt/Rt tune  Up/Dn x5  Enter listen  Q back")
+    Game.ui_keys(w, h, "Lt/Rt tune  Up/Dn x5  Enter listen  Q back")
     gfx.refresh()
 end
 

@@ -252,9 +252,7 @@ function Game:draw_records(w, h)
     local rec = Game.records()
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
-    gfx.font(gfx.FONT_BOLD_14)
-    gfx.text(6, 18, "Records")
-    gfx.font(gfx.FONT_MONO_12)
+    Game.ui_title(w, "Records")
     local y = 40
     for _, line in ipairs(self:records_lines()) do
         gfx.text(6, y, line:sub(1, 56))
@@ -285,6 +283,6 @@ function Game:draw_records(w, h)
         gfx.text(6, y + 2, ("%d more to find."):format(#RECORDS.list - got))
     end
     if not SAVE.can_write() then gfx.text(6, h - 22, "(not saved: this SolarOS can't write files)") end
-    gfx.text(6, h - 8, "Any key: back")
+    Game.ui_keys(w, h, "Any key: back")
     gfx.refresh()
 end

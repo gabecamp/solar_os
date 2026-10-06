@@ -24,11 +24,8 @@ function Game:draw_trade(w, h)
     local u, L = self.trade_ui, TRADE_UI
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
-    gfx.font(gfx.FONT_BOLD_14)
     local _, cfg = self:trade_partner()
-    gfx.text(6, 16, cfg.name)
-    gfx.font(gfx.FONT_MONO_12)
-    gfx.text(200, 16, ("Prices x%.1f, in rubles"):format(cfg.markup))
+    Game.ui_title(w, cfg.name, ("Prices x%.1f, in rubles"):format(cfg.markup))
     for _, col in ipairs({"mine", "theirs"}) do
         local x = L.col_x[col]
         local rows = self:trade_rows(col)
@@ -62,7 +59,7 @@ function Game:draw_trade(w, h)
     local give, ask = self:trade_totals()
     gfx.text(6, 234, ("You give %d   They ask %d   (in rubles)"):format(give, ask))
     gfx.text(6, 252, u.msg or "")
-    gfx.text(6, h - 8, "Arrows Enter:+1 E:-1 T:deal O:work " .. (u.who == "town" and "N:notes " or "") .. "Q:leave")
+    Game.ui_keys(w, h, "Arrows Enter:+1 E:-1 T:deal O:work " .. (u.who == "town" and "N:notes " or "") .. "Q:leave")
     gfx.refresh()
 end
 
@@ -70,9 +67,7 @@ function Game:draw_gate(w, h)
     local u = self.gate_ui
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
-    gfx.font(gfx.FONT_BOLD_14)
-    gfx.text(6, 22, "The Checkpoint")
-    gfx.font(gfx.FONT_MONO_12)
+    Game.ui_title(w, "The Checkpoint")
     local y = 48
     for _, line in ipairs(wrap(TRADE_UI.gate_intro, 54)) do
         gfx.text(6, y, line)
@@ -91,7 +86,7 @@ function Game:draw_gate(w, h)
     if #u.opts == 1 then
         gfx.text(6, y + 10, ("You need a Churn Permit or %d artifacts."):format(GOAL.bribe))
     end
-    gfx.text(6, h - 8, "Up/Dn pick  Enter choose  Q back")
+    Game.ui_keys(w, h, "Up/Dn pick  Enter choose  Q back")
     gfx.refresh()
 end
 
@@ -99,9 +94,7 @@ function Game:draw_ending(w, h)
     local e = self.ending
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
-    gfx.font(gfx.FONT_BOLD_14)
-    gfx.text(6, 30, "You left the Churn.")
-    gfx.font(gfx.FONT_MONO_12)
+    Game.ui_title(w, "You left the Churn.")
     local y, cols = 60, 54
     local art = CHURN.ending_art[e.how]
     if art and PORTRAIT_DATA[art] then   -- (a picture for this ending, once there is one)
@@ -120,6 +113,6 @@ function Game:draw_ending(w, h)
         y = y + 15
         gfx.text(6, y, line)
     end
-    gfx.text(6, h - 8, "Enter: new survivor  R: records  Q: quit")
+    Game.ui_keys(w, h, "Enter: new survivor  R: records  Q: quit")
     gfx.refresh()
 end

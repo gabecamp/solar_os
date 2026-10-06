@@ -203,9 +203,7 @@ function Game:draw_fishing(w, h)
     local f = self.fishing
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
-    gfx.font(gfx.FONT_BOLD_14)
-    gfx.text(6, 16, "Fishing")
-    gfx.font(gfx.FONT_MONO_12)
+    Game.ui_title(w, "Fishing")
     -- the water and the bank
     local top, bank_x = 60, 40
     gfx.color(gfx.LIGHT)
@@ -278,7 +276,7 @@ function Game:draw_fishing(w, h)
     for i, line in ipairs(wrap(f.msg or "", 55)) do
         if i <= 2 then gfx.text(6, ly + 13 * (i - 1), line) end
     end
-    gfx.text(6, h - 8, f.phase == "wait" and "Space wait  Enter strike  Q stop"
+    Game.ui_keys(w, h, f.phase == "wait" and "Space wait  Enter strike  Q stop"
         or f.phase == "fight" and "Lt/Rt lean  Up reel  Dn give line  Q cut"
         or "Any key: back")
     gfx.refresh()

@@ -221,11 +221,7 @@ function Game:draw_radio(w, h)
     if u.scan then return self:draw_scan(w, h) end
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
-    gfx.font(gfx.FONT_BOLD_14)
-    gfx.text(6, 16, "LoRa Radio")
-    gfx.font(gfx.FONT_MONO_12)
-    gfx.text(220, 16, ("Charge %d/%d"):format(r.charge, TECH.radio_max))
-    gfx.line(6, 22, w - 6, 22)
+    Game.ui_title(w, "LoRa Radio", ("Charge %d/%d"):format(r.charge, TECH.radio_max))
     for i, ch in ipairs(TECH.channels) do
         local y = 44 + (i - 1) * 18
         local wait = (r.next[ch.id] or 0) - self.player.hours
@@ -247,6 +243,6 @@ function Game:draw_radio(w, h)
     gfx.color(gfx.BLACK)
     gfx.line(6, 126, w - 6, 126)
     for i, line in ipairs(u.msg) do gfx.text(6, 132 + 14 * i, line) end
-    gfx.text(6, h - 8, "Up/Dn pick  Enter call  Q back")
+    Game.ui_keys(w, h, "Up/Dn pick  Enter call  Q back")
     gfx.refresh()
 end

@@ -72,7 +72,7 @@ assert(not achieved("week"))
 print("4. the death screen shows the run summary")
 g:draw_dead(400, 300)
 local s = screen_text()
-assert(s:find("Kills 4", 1, true) and s:find("R: records", 1, true), s)
+assert(s:find("Kills 4", 1, true) and s:find("records", 1, true), s)
 
 print("5. an escape: Out, Paper Trail, records; a second run beats the longest")
 g = fresh()

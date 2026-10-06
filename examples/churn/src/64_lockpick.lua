@@ -80,10 +80,7 @@ function Game:draw_lockpick(w, h)
     local L, P = self.lock, CHURN.pick
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
-    gfx.font(gfx.FONT_BOLD_14)
-    gfx.text(6, 16, "Picking the lock")
-    gfx.font(gfx.FONT_MONO_12)
-    gfx.text(w - 6 - 7 * 12, 16, ("Strain %d/%d"):format(L.strain, P.strain_max))
+    Game.ui_title(w, "Picking the lock", ("Strain %d/%d"):format(L.strain, P.strain_max))
     -- the lock: a shear line across, a column per pin
     local x0, base, notch, col = 60, 200, 22, 46
     local top = base - P.height * notch
@@ -104,6 +101,6 @@ function Game:draw_lockpick(w, h)
     for i, line in ipairs(wrap(L.msg or "", 55)) do
         if i <= 3 then gfx.text(6, 250 + 13 * (i - 1), line) end
     end
-    gfx.text(6, h - 8, L.over and "Any key: back" or "Up/Dn move pin  Enter set  Q leave it")
+    Game.ui_keys(w, h, L.over and "Any key: back" or "Up/Dn move pin  Enter set  Q leave it")
     gfx.refresh()
 end

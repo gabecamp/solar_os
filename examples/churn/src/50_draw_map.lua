@@ -25,7 +25,7 @@ end
 -- to its right (from PANEL_X); the log and key hints across the bottom.
 local MAP_W, MAP_TOP, MAP_BOTTOM = 256, 4, 236
 local PANEL_X = 262
-local LEGEND_Y = 130
+local LEGEND_Y = 148
 local LEGEND_ORDER = {"plains", "forest", "hills", "ruins", "ford", "water"}
 
 -- You, your Little Ones and your dog, at your hex's center.
@@ -83,31 +83,47 @@ function Game:draw_map(w, h)
     local origin_x = MAP_W // 2 - ppx
     local origin_y = (MAP_TOP + MAP_BOTTOM) // 2 - ppy
 
-    -- HUD: time and weather, then movement, needs, health, conditions
-    gfx.color(gfx.BLACK)
+    -- HUD: the day on a black strip; the weather; bars for health and
+    -- needs; movement as pips; then conditions, radiation, where to go
     gfx.font(gfx.FONT_MONO_12)
     local day, hour = self:clock()
-    gfx.text(PANEL_X, 14, ("Day %d %02d:00%s"):format(day, hour, self:is_night() and " Night" or ""))
+    local pw = w - PANEL_X + 2
+    gfx.color(gfx.BLACK)
+    gfx.fill_rect(PANEL_X - 2, 0, pw, 18)
+    gfx.color(gfx.WHITE)
+    gfx.text(PANEL_X + 2, 13, ("Day %d  %02d:00"):format(day, hour))
+    if self:is_night() then gfx.text(w - 6 - 7 * 5, 13, "Night") end
+    gfx.color(gfx.BLACK)
     -- an emission coming (or raging) matters more than the weather
-    gfx.text(PANEL_X, 28, self:emission_text() or self:weather_text(self:fire_here() and "  Fire" or nil))
+    gfx.text(PANEL_X, 32, self:emission_text() or self:weather_text(self:fire_here() and "  Fire" or nil))
+    local bars = {{"HP", p.health}, {"Eat", p.needs.hunger}, {"Dri", p.needs.thirst}, {"Rst", p.needs.rest}}
+    for i, b in ipairs(bars) do
+        local y = 38 + (i - 1) * 13
+        gfx.text(PANEL_X, y + 9, b[1])
+        Game.ui_bar(PANEL_X + 24, y, 76, 10, b[2] / 100, b[2] >= 30)   -- (gray while fine, black when low)
+        gfx.text(PANEL_X + 104, y + 9, tostring(math.floor(b[2])))
+    end
+    -- movement points as pips, then sight
+    local y = 99
+    gfx.text(PANEL_X, y, "MP")
+    for i = 1, p.max_mp do
+        local x = PANEL_X + 18 + (i - 1) * 10
+        if i <= p.mp then gfx.fill_rect(x, y - 8, 8, 8) else gfx.rect(x, y - 8, 8, 8) end
+    end
+    gfx.text(PANEL_X + 24 + p.max_mp * 10, y, "Sight " .. (p.view_sight or p.sight))
     local scav = SCAVENGE_LOOT[self.tiles[hex_key(p.q, p.r)]]
         and (self:scavenge_left() .. "/" .. SCAVENGE_TRIES) or "-"
-    gfx.text(PANEL_X, 42, "MP " .. math.max(p.mp, 0) .. "/" .. p.max_mp
-        .. " Sight " .. (p.view_sight or p.sight))
-    gfx.text(PANEL_X, 56, "Hun " .. math.floor(p.needs.hunger)
-        .. " Thi " .. math.floor(p.needs.thirst))
-    gfx.text(PANEL_X, 70, "Rest " .. math.floor(p.needs.rest) .. "  HP " .. math.floor(p.health))
     local inj = {}
     if p.injuries.bleeding then inj[#inj + 1] = "BLEEDING" end
     if p.injuries.wounded_hours > 0 then inj[#inj + 1] = "Wounded" end
     if (p.cold_hours or 0) > 0 then inj[#inj + 1] = "COLD" end
     if (p.sick_hours or 0) > 0 then inj[#inj + 1] = "SICK" end
     inj[#inj + 1] = "Scav " .. scav
-    gfx.text(PANEL_X, 84, table.concat(inj, " "))
+    gfx.text(PANEL_X, 113, table.concat(inj, " "))
     local rad_line = self:rad_text()
-    if rad_line then gfx.text(PANEL_X, 98, rad_line) end
+    if rad_line then gfx.text(PANEL_X, 127, rad_line) end
     local goal_line = self:goal_text()
-    if goal_line then gfx.text(PANEL_X, 112, goal_line) end
+    if goal_line then gfx.text(PANEL_X, 141, goal_line) end
     local site_at = {}
     for name, key in pairs(self.sites) do site_at[key] = name end
     if self.base then site_at[self.base.key] = "camp" end   -- drawn like a site
@@ -277,7 +293,7 @@ function Game:draw_map(w, h)
         gfx.text(6, ly, line)
         ly = ly + 14
     end
-    gfx.text(6, h - 8, self.move_lean
+    Game.ui_keys(w, h, self.move_lean
         and ((self.move_lean < 0 and "Up" or "Down") .. ": now Left or Right picks the side")
         or "Arrows Spc:rest F:search E:water I:bag H:help")
 
@@ -291,7 +307,7 @@ function Game:draw_legend()
     gfx.font(gfx.FONT_MONO_12)
     for i, terrain_id in ipairs(LEGEND_ORDER) do
         local t = TERRAIN[terrain_id]
-        local x, y = PANEL_X + 2, LEGEND_Y + (i - 1) * 18
+        local x, y = PANEL_X + 2, LEGEND_Y + (i - 1) * 15
 
         local fill = shade_color(t.shade)
         if fill ~= gfx.WHITE then

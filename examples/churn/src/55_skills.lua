@@ -110,9 +110,7 @@ end
 function Game:draw_skills(w, h)
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
-    gfx.font(gfx.FONT_BOLD_14)
-    gfx.text(6, 16, ({finds = "Finds", map = "Map wall", bestiary = "Bestiary"})[self.page] or "Skills and recipes")
-    gfx.font(gfx.FONT_MONO_12)
+    Game.ui_title(w, ({finds = "Finds", map = "Map wall", bestiary = "Bestiary"})[self.page] or "Skills and recipes")
     local lines, fit = self:skills_page_lines(), Game.skills_fit(h)
     local off = math.max(0, math.min(self.skills_off or 0, #lines - fit))
     local y = 40
@@ -120,6 +118,6 @@ function Game:draw_skills(w, h)
         gfx.text(6, y, lines[i])
         y = y + 14
     end
-    gfx.text(6, h - 8, #lines > fit and "Up/Dn scroll  any other key: back" or "Any key: back")
+    Game.ui_keys(w, h, #lines > fit and "Up/Dn scroll  any key: back" or "Any key: back")
     gfx.refresh()
 end

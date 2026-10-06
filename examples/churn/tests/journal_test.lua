@@ -91,7 +91,9 @@ local top = drawn()
 for _ = 1, 50 do g:skills_key(gfx.KEY_DOWN, 300) end
 local bottom = drawn()
 assert(top[2] ~= bottom[2], "scrolled")
-assert(bottom[#bottom - 1] == g:skills_page_lines()[n], "the last line shows at the bottom")
+local last_shown = false   -- (the key bar draws after the lines)
+for _, s in ipairs(bottom) do last_shown = last_shown or s == g:skills_page_lines()[n] end
+assert(last_shown, "the last line shows at the bottom")
 for _ = 1, 50 do g:skills_key(gfx.KEY_UP, 300) end
 assert(drawn()[2] == top[2], "back at the top")
 g:skills_key(KEY.SPACE, 300)

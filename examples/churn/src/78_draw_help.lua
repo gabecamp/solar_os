@@ -74,10 +74,8 @@ end
 function Game:draw_help(w, h)
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
-    gfx.font(gfx.FONT_BOLD_14)
     local page = self.help_page or 1
-    gfx.text(6, 16, page == 1 and "Keys" or "Tips")
-    gfx.font(gfx.FONT_MONO_12)
+    Game.ui_title(w, page == 1 and "Keys" or "Tips", "The Churn " .. Game.VERSION:match("^%S+"))
     local y = 36
     for _, row in ipairs(Game.help_rows(page)) do
         if page == 2 then   -- (no label column: the tips are long)
@@ -89,7 +87,7 @@ function Game:draw_help(w, h)
         end
         y = y + 15
     end
-    gfx.text(6, h - 8, (page == 1 and "Dn: tips" or "Up: keys") .. "  any key: back  V: device info")
+    Game.ui_keys(w, h, (page == 1 and "Dn: tips" or "Up: keys") .. "  any key: back  V: device info")
     gfx.refresh()
 end
 
@@ -139,14 +137,12 @@ end
 function Game:draw_info(w, h)
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
-    gfx.font(gfx.FONT_BOLD_14)
-    gfx.text(6, 16, "Device info")
-    gfx.font(gfx.FONT_MONO_12)
+    Game.ui_title(w, "Device info")
     local y = 40
     for _, line in ipairs(self:device_lines()) do
         gfx.text(6, y, line:sub(1, 56))
         y = y + 16
     end
-    gfx.text(6, h - 8, "Any key: back")
+    Game.ui_keys(w, h, "Any key: back")
     gfx.refresh()
 end

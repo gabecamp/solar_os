@@ -11,14 +11,10 @@ function Game:draw_craft(w, h)
     c.cursor = math.max(1, math.min(c.cursor, #list))
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
-    gfx.font(gfx.FONT_BOLD_14)
-    gfx.text(6, 16, "Crafting")
-    gfx.font(gfx.FONT_MONO_12)
     local camp = self.camps[hex_key(self.player.q, self.player.r)]
     local fire = self:fire_here()
-        and ("Fire here: " .. (camp.until_hour - self.player.hours) .. "h left") or "No fire here"
-    gfx.text(w - 6 - 7 * #fire, 16, fire)
-    gfx.line(6, 22, w - 6, 22)
+        and (camp and camp.until_hour > self.player.hours and ("Fire: " .. (camp.until_hour - self.player.hours) .. "h left") or "Fire burning") or "No fire here"
+    Game.ui_title(w, "Crafting", fire)
 
     -- the list: a mark for what you can make right now. It scrolls: only
     -- `rows` fit above the log, so the window follows the cursor.
@@ -113,6 +109,6 @@ function Game:draw_craft(w, h)
         gfx.text(6, yy, self.log[i])
         yy = yy + 13
     end
-    gfx.text(6, h - 6, "Up/Dn pick  Enter make  C/Esc back  Q quit")
+    Game.ui_keys(w, h, "Up/Dn pick  Enter make  C/Esc back  Q quit")
     gfx.refresh()
 end

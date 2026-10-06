@@ -40,9 +40,7 @@ function Game:draw_scene(w, h)
     local sc = QUESTS.scenes[self.scene] or QUESTS.scenes.wake
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
-    gfx.font(gfx.FONT_BOLD_14)
-    gfx.text(10, 24, sc.title)
-    gfx.font(gfx.FONT_MONO_12)
+    Game.ui_title(w, sc.title)
     local cols = 54
     if sc.art and PORTRAIT_DATA[sc.art] and draw_sprite then   -- (no picture yet: text only)
         self:draw_portrait({def = {art = sc.art}}, w - PORTRAIT_SIZE - 10, 34)
@@ -55,5 +53,5 @@ function Game:draw_scene(w, h)
         gfx.text(10, y, line)
         y = y + 16
     end
-    gfx.text(10, h - 8, "Any key to go on")
+    Game.ui_keys(w, h, "any key: go on")
 end

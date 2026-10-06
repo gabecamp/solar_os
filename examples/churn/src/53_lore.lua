@@ -101,9 +101,7 @@ function Game:draw_lore(w, h)
     local page = LORE.pages[self.lore_page]
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
-    gfx.font(gfx.FONT_BOLD_14)
-    gfx.text(6, 18, page.title)
-    gfx.font(gfx.FONT_MONO_12)
+    Game.ui_title(w, page.title)
     gfx.text(w - 60, 18, self.lore_page .. "/" .. self:lore_count())
     gfx.line(6, 26, w - 6, 26)
     local y = 48
@@ -113,6 +111,6 @@ function Game:draw_lore(w, h)
             y = y + 16
         end
     end
-    gfx.text(6, h - 8, "Up/Dn page  any other key: back")
+    Game.ui_keys(w, h, "Up/Dn page  any key: back")
     gfx.refresh()
 end

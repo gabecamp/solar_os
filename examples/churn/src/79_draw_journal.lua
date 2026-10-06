@@ -101,9 +101,7 @@ end
 function Game:draw_journal(w, h)
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
-    gfx.font(gfx.FONT_BOLD_14)
-    gfx.text(6, 16, "Journal")
-    gfx.font(gfx.FONT_MONO_12)
+    Game.ui_title(w, "Journal")
     local y, max_y = 40, h - 24
     local all = {}
     for _, line in ipairs(self:journal_lines()) do
@@ -118,6 +116,6 @@ function Game:draw_journal(w, h)
         gfx.text(6, y, line)
         y = y + 14
     end
-    gfx.text(6, h - 8, (self:lore_count() > 0 and "L: pages  " or "") .. "K: skills  F: finds  B: beasts  any key: back")
+    Game.ui_keys(w, h, (self:lore_count() > 0 and "L: pages  " or "") .. "K: skills  F: finds  B: beasts  any key: back")
     gfx.refresh()
 end
