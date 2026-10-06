@@ -174,6 +174,12 @@ g.page, g.screen = "bestiary", "skills"
 g:draw_skills(400, 300)
 solaros.dump("ops_bestiary.txt")
 
+-- Scene: the map panel's bars, low on food and water, dread high
+g = fresh()
+g.player.needs.hunger, g.player.needs.thirst, g.player.dread = 22, 48, 68
+g:draw_map(400, 300)
+solaros.dump("ops_map_dread.txt")
+
 -- Scene 2b2/2b3: the Churn's items with their own icons (tools/paint_icons.py),
 -- 31 a screen: the bag and the ground
 for n, ids2 in ipairs({
