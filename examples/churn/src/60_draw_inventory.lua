@@ -74,6 +74,8 @@ function Game:current_conditions()
     if (self.player.sick_hours or 0) > 0 then table.insert(list, "Sick") end
     local rad_stage = RAD.stages[self:rad_stage()]
     if rad_stage then table.insert(list, self:can_measure() and rad_stage.name or rad_stage.feel) end
+    local dread = self:dread_name()
+    if dread then table.insert(list, dread) end
     if #list == 0 then return "Conditions: none" end
     local text = table.concat(list, ", ")
     -- all four at once don't fit after the prefix (mono 12 is ~7px/char)

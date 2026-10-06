@@ -23,6 +23,8 @@ function Game:after_consume(def, kind, k)
         end
     end
     if def.sick and self:roll(def.sick) then self:make_sick() end
+    local calm = def.name == "Vodka" and CHURN.dread.vodka or def.name == "Sedative" and CHURN.dread.sedative
+    if calm then self:dread(calm) end   -- (64_dread)
     if def.cures and (p.sick_hours or 0) > 0 then
         p.sick_hours = 0
         self:push_log("Your gut settles.")

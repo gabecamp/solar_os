@@ -2,6 +2,16 @@
 -- jobs, Karl's dog, the Peddler's swap, a drive's crate, dead churners.
 package.path = "./?.lua;" .. package.path
 local fake = require("solaros")
+
+-- Pick a lock the way a player who can read the pins would (64_lockpick).
+local function solve_lock(g)
+    local L = g.lock
+    while L and not L.over do
+        for _ = 1, L.pins[L.i] - L.h do g:lockpick_key(fake.gfx.KEY_UP) end
+        g:lockpick_key(10)
+    end
+    if g.lock then g:lockpick_key(32) end   -- (any key: back)
+end
 fake.gfx.begin()
 local Game, H = dofile("lib_hunt.lua")
 local KEY, QUESTS, CHURN = H.KEY, H.QUESTS, H.CHURN
@@ -184,6 +194,8 @@ local n0 = #g:ground_list()
 assert(not g:quest_arrive() and g.quest, "locked: the job stays")
 g.player.inventory = {{item = "lockpicks", qty = 1}}
 g:quest_arrive()
+assert(g.screen == "lockpick", "a lock to pick")
+solve_lock(g)
 assert(#g:ground_list() >= n0 + 1, "opened")
 -- the first one holds a map to a CLEARANCE crate by the quarry; that one, the pass
 assert(g.quest and g.quest.kind == "deep_crate" and g.inst_chain == 1, "a second map")
@@ -194,16 +206,20 @@ assert((math.abs(dq - qq) + math.abs(dr - qr) + math.abs(dq + dr - qq - qr)) // 
 assert(g:quest_text():find("CLEARANCE"))
 g.player.q, g.player.r = dq, dr
 g:quest_arrive()
+assert(#g.lock.pins == 5, "the CLEARANCE crate: five pins")
+solve_lock(g)
 assert(not g.quest and g.inst_chain == 2 and count(g, "institute_pass") == 1, "the pass")
 assert(g.story.pass, "the story knows")
 -- a pass already in hand: the crate has something else instead
 g.story.pass, g.inst_chain = true, 1
 g.quest = {kind = "deep_crate", giver = "A second map", target = dk}
 g:quest_arrive()
+solve_lock(g)
 assert(count(g, "institute_pass") == 1 and count(g, "antirad") >= 2)
 -- and a later Institute crate doesn't start the chain again
 g.quest = {kind = "crate", giver = "A USB drive", target = dk}
 g:quest_arrive()
+solve_lock(g)
 assert(not g.quest, "once a run")
 
 print("10. dead churners: rare (~3% of ruins searches), once a hex, saved")
@@ -409,6 +425,7 @@ g.player.q, g.player.r = parse(crate_key)
 for sd = 1, 200 do
     g.seed, g.crates = sd, {}
     g:pick_crate(crate_key)
+    solve_lock(g)
     if g.finds[crate_key] then break end
 end
 assert(g.finds[crate_key] and g.finds[crate_key].kind == "crate")

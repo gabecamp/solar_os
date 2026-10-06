@@ -54,6 +54,11 @@ function Game:journal_lines()
     if standing then add(standing) end
     local camp = self:base_text()
     if camp then add(camp) end
+    local risen = self:legacy_text()
+    if risen then add(risen) end
+    if self:dread_name() then
+        add(("Dread: %d (%s). A fire, your bed, the dog, a tape ease it."):format(math.floor(p.dread), self:dread_name()))
+    end
     local permit = self:count_item("permit") > 0
     add(("Artifacts: %d of %d.%s"):format(self:artifact_count(), GOAL.bribe,
         permit and " You have a Churn Permit." or ""))
@@ -113,6 +118,6 @@ function Game:draw_journal(w, h)
         gfx.text(6, y, line)
         y = y + 14
     end
-    gfx.text(6, h - 8, (self:lore_count() > 0 and "L: read pages  " or "") .. "K: skills  F: finds  any key: back")
+    gfx.text(6, h - 8, (self:lore_count() > 0 and "L: pages  " or "") .. "K: skills  F: finds  B: beasts  any key: back")
     gfx.refresh()
 end

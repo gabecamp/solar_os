@@ -308,13 +308,20 @@ function Game:open_quest_crate()
         self:push_log(C.locked)
         return false
     end
+    self:lock_start(kind == "deep_crate" and CHURN.pick.deep_pins or CHURN.pick.pins,
+                    function(g) g:quest_crate_opened() end)
+    return true
+end
+
+-- The lock gave (64_lockpick): the Institute crate's contents, and what comes next.
+function Game:quest_crate_opened()
+    local C, kind = QUESTS.crate, self.quest.kind
     local found = {}
     for _ = 1, C.rolls do
         local item
         self.seed, item = weighted_pick(self.seed, CHURN.crate_loot)
         found[#found + 1] = self:drop_found(item)
     end
-    self:skill_xp("tinker", SKILLS.xp.repair)
     self.quest = nil
     self.quests_done = (self.quests_done or 0) + 1
     self:sfx("gift")

@@ -149,6 +149,7 @@ function Game:play_tape(item)
         self:push_log("The player is dead. A Battery Cell (E) would wake it.")
         return false
     end
+    self:dread(CHURN.dread.tape)   -- (a human voice in the dark: it helps)
     self.tapedeck.charge = self.tapedeck.charge - 1
     if item == "tape_vesna" and not self.vesna then self.vesna = "heard" end   -- (find_corpse)
     local p = self.player
@@ -281,17 +282,26 @@ end
 function Game:pick_crate(key)
     if self.tiles[key] ~= "ruins" or self:count_item("lockpicks") == 0 then return end
     self.crates = self.crates or {}
+    if self.crates[key] == "locked" then   -- (one you left, or broke a pick on)
+        return self:lock_start(CHURN.pick.pins, function(g) g:open_crate(key) end)
+    end
     if self.crates[key] then return end
     self.crates[key] = true
     if not self:roll(CHURN.crate_chance + self:skill_bonus("scav")) then return end
+    self.crates[key] = "locked"
+    self:push_log("Under the rubble: a locked crate. You get out the picks.")
+    self:lock_start(CHURN.pick.pins, function(g) g:open_crate(key) end)
+end
+
+-- The lock gave (64_lockpick): what's inside.
+function Game:open_crate(key)
+    self.crates[key] = true
     local found = {}
     for _ = 1, 2 do
         local item
         self.seed, item = weighted_pick(self.seed, CHURN.crate_loot)
         found[#found + 1] = self:drop_found(item)
     end
-    self:skill_xp("tinker", SKILLS.xp.repair)
-    self:sfx("gift")
     self:push_log("You pick a locked crate: " .. table.concat(found, ", ") .. ".")
     self:note_find(key, "crate", "A locked crate", found)
 end
@@ -314,6 +324,7 @@ function Game:find_corpse(key)
         self.seed, item = weighted_pick(self.seed, C.loot)
         found[#found + 1] = self:drop_found(item, C.rounds[item] and C.rounds[item] + self:rand(3))
     end
+    self:dread(CHURN.dread.corpse)
     self:push_log(C.epitaphs[self:rand(#C.epitaphs) + 1])
     self:push_log("On them: " .. table.concat(found, ", ") .. ".")
     self:note_find(key, "corpse", "A dead churner", found)
@@ -322,6 +333,7 @@ end
 -- The churner from the tape: what she took up the stairs.
 function Game:find_vesna(key)
     self.vesna = "found"
+    self:dread(CHURN.dread.vesna)
     self:queue_scene("vesna")
     local names = {}
     for _, it in ipairs(CHURN.vesna.loot) do

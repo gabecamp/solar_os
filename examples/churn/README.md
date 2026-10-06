@@ -67,6 +67,26 @@ the Checkpoint alive.
   - While you're away, someone may go through an unguarded camp. Resting
     there at night, something may come to the edge of the light, unless
     the camp is warded.
+- **Locks:** a locked crate is a pin game. Up raises the pin; at the
+  right notch you may feel it give. One notch too far, or Enter at the
+  wrong height, strains the pick, and the third strain snaps it. Q leaves
+  the crate for another try.
+- **Scanning the band:** the radio's last row turns a dial (400-470 MHz).
+  A few stations sit on it each day; the signal bar rises as you get
+  close. Numbers mark a stash, morse names a place, a churner calls for
+  help from where they lie... and some voices shouldn't be on the air.
+- **Dread:** horrors, emissions, the dead, the dark and those voices wear
+  on you. A fire, your own bed, the dog, a tape, vodka or a sedative ease
+  it. Uneasy at 35; at 60 the Churn whispers in the log; past 70 you see
+  things that aren't there; at 85 (terror) sleep does half the good.
+- **Bestiary (B in the journal):** a page for every creature you meet.
+  Watch one in a fight and you know its weak spot: +10% to hit that kind
+  for the rest of the run. Full pages (seen, watched, killed) sell to the
+  Trader for 15 rubles each (N on his screen).
+- **What's left of you:** when you die, what you carried and wore stays
+  with the body. In your next world something wears it: the Risen waits a
+  few hexes from the start (on the map, and in the journal), fighting with
+  your best weapon. Kill it and your gear is yours again.
 - **Money:** rubles turn up in ruins, on the dead and on bandits. Traders
   pay rubles for what you sell, take them for the rest of a price, and
   give change in rubles.

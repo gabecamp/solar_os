@@ -62,7 +62,7 @@ function Game:draw_trade(w, h)
     local give, ask = self:trade_totals()
     gfx.text(6, 234, ("You give %d   They ask %d   (in rubles)"):format(give, ask))
     gfx.text(6, 252, u.msg or "")
-    gfx.text(6, h - 8, "Arrows Enter:+1 E:-1 T:deal O:work Q:leave")
+    gfx.text(6, h - 8, "Arrows Enter:+1 E:-1 T:deal O:work " .. (u.who == "town" and "N:notes " or "") .. "Q:leave")
     gfx.refresh()
 end
 

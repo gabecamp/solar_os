@@ -52,8 +52,8 @@ function Game:emission_log()
     self.emission_caught = n and n.caught
     if not n then return end
     if n.warn then self:sfx("siren"); self:queue_scene("first_emission") end
-    if n.caught then self:sfx("emission")
-    elseif n.sheltered then self:sfx("emission_cover") end
+    if n.caught then self:sfx("emission"); self:dread(CHURN.dread.emission)
+    elseif n.sheltered then self:sfx("emission_cover"); self:dread(CHURN.dread.sheltered) end
     if n.ended then self:sfx("emission_end") end
     if n.warn then
         self:push_log(("The sky bruises purple. Emission in %dh! Ruins/hills!"):format(RAD.emission.warn))

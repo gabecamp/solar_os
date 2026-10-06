@@ -154,6 +154,7 @@ function RADIO.karl(self)
 end
 function RADIO.signal(self)
     local p = self.player
+    self:dread(CHURN.dread.signal)
     if self.story then self.story.calls = (self.story.calls or 0) + 1 end
     if not self.signal_page then   -- the first time, it reads you something
         self.signal_page = true
@@ -202,19 +203,22 @@ end
 
 function Game:radio_key(key)
     local u = self.radio_ui
+    if u.scan then return self:scan_key(key) end   -- (64_scan)
     if key == KEY.Q or key == gfx.KEY_ESCAPE or key == KEY.R then
         self.screen = "map"
     elseif key == gfx.KEY_UP or key == KEY.W then
         u.cursor = math.max(1, u.cursor - 1)
     elseif key == gfx.KEY_DOWN or key == KEY.S then
-        u.cursor = math.min(#TECH.channels, u.cursor + 1)
+        u.cursor = math.min(#TECH.channels + 1, u.cursor + 1)   -- (the last row: scan the band)
     elseif key == KEY.ENTER or key == KEY.LF or key == KEY.SPACE then
+        if u.cursor > #TECH.channels then return self:scan_start() end
         self:radio_call(u.cursor)
     end
 end
 
 function Game:draw_radio(w, h)
     local u, r = self.radio_ui, self.radio
+    if u.scan then return self:draw_scan(w, h) end
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
     gfx.font(gfx.FONT_BOLD_14)
@@ -234,6 +238,13 @@ function Game:draw_radio(w, h)
         gfx.text(300, y, status)
         gfx.color(gfx.BLACK)
     end
+    local sy = 44 + #TECH.channels * 18   -- the scan row
+    if u.cursor > #TECH.channels then
+        gfx.fill_rect(4, sy - 12, w - 8, 16)
+        gfx.color(gfx.WHITE)
+    end
+    gfx.text(10, sy, "Scan the band...")
+    gfx.color(gfx.BLACK)
     gfx.line(6, 126, w - 6, 126)
     for i, line in ipairs(u.msg) do gfx.text(6, 132 + 14 * i, line) end
     gfx.text(6, h - 8, "Up/Dn pick  Enter call  Q back")

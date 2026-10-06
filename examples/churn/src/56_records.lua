@@ -112,6 +112,20 @@ function Game.clean_records(rec)
     if type(rec.best_escape) == "string" and DIFFICULTY[rec.best_escape] then
         out.best_escape = rec.best_escape
     end
+    -- what's left of your last body (64_legacy): stacks of real items only
+    local leg = rec.legacy
+    if type(leg) == "table" and type(leg.items) == "table" then
+        local items = {}
+        for _, s in ipairs(leg.items) do
+            if type(s) == "table" and type(s.item) == "string" and ITEM_DB[s.item] and count(s.qty) > 0 then
+                items[#items + 1] = {item = s.item, qty = count(s.qty)}
+            end
+        end
+        if #items > 0 then
+            out.legacy = {items = items, cause = type(leg.cause) == "string" and leg.cause or "You died.",
+                          day = count(leg.day)}
+        end
+    end
     return out
 end
 

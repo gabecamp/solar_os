@@ -4,6 +4,16 @@
 -- (@sharp, @fire_container, @heat...) and the new things E does.
 package.path = "./?.lua;" .. package.path
 local fake = require("solaros")
+
+-- Pick a lock the way a player who can read the pins would (64_lockpick).
+local function solve_lock(g)
+    local L = g.lock
+    while L and not L.over do
+        for _ = 1, L.pins[L.i] - L.h do g:lockpick_key(fake.gfx.KEY_UP) end
+        g:lockpick_key(10)
+    end
+    if g.lock then g:lockpick_key(32) end   -- (any key: back)
+end
 local gfx = fake.gfx
 gfx.begin()
 
@@ -223,6 +233,7 @@ for k, t in pairs(g.tiles) do
         g.player.q, g.player.r = Game.key_qr(k)
         local n = #g:ground_list()
         g:pick_crate(k)
+        solve_lock(g)
         if #g:ground_list() > n then opened = opened + 1 end
         local m = #g:ground_list()
         g:pick_crate(k)

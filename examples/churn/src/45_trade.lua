@@ -272,6 +272,8 @@ function Game:trade_key(key)
         end
     elseif key == KEY.T then
         self:make_deal()
+    elseif key == KEY.N and u.who == "town" then   -- full bestiary pages (64_bestiary)
+        u.msg = self:sell_bestiary()
     elseif key == KEY.O then   -- (W is "up" here)
         if u.who == "ferry" then self:ferry_work()
         elseif u.who == "town" then self:trader_work()

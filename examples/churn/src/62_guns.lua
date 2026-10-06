@@ -32,7 +32,7 @@ end
 
 function Game:shoot_chance(item)
     local p, e, G = self.player, self.enc, CHURN.guns
-    return G.shoot_hit + 8 * (p.attrs.Perception - 3) + (e.aim or 0) + self:skill_bonus("fight")
+    return G.shoot_hit + 8 * (p.attrs.Perception - 3) + (e.aim or 0) + self:skill_bonus("fight") + self:beast_bonus()
         + ITEM_DB[item].shoot.hit - (e.range == "far" and G.far_penalty or 0)
 end
 

@@ -148,6 +148,32 @@ f.msg = "You lean into it. It's tiring. It pulls hard to the left!"
 g:draw_fishing(400, 300)
 solaros.dump("ops_fishing_fight.txt")
 
+-- Scenes: picking a lock (two pins set), scanning the band near a station,
+-- the bestiary, and what's left of you
+g = fresh()
+g:lock_start(5, function() end)
+g.lock.pins = {2, 4, 1, 3, 5}
+g.lock.i, g.lock.h, g.lock.strain = 3, 1, 1
+g.lock.msg = "Notch 1. Something gives, just slightly."
+g:draw_lockpick(400, 300)
+solaros.dump("ops_lockpick.txt")
+g = fresh()
+g.player.inventory = {{item = "lora_radio", qty = 1}}
+g:open_radio()
+g.radio.charge = 4
+local st = g:scan_stations()[1]
+g:scan_start()
+g.radio_ui.scan.f = st.f - 1
+g.radio_ui.scan.msg = "Something, faint. Closer..."
+g:draw_radio(400, 300)
+solaros.dump("ops_scan.txt")
+g.bestiary = {jawhound = {name = "Jawhound", seen = 3, watched = true, killed = 2},
+              crow = {name = "Knotted Crows", seen = 1, killed = 0},
+              bandit = {name = "Road Bandits", seen = 2, watched = true, killed = 1, sold = true}}
+g.page, g.screen = "bestiary", "skills"
+g:draw_skills(400, 300)
+solaros.dump("ops_bestiary.txt")
+
 -- Scene 2b2/2b3: the Churn's items with their own icons (tools/paint_icons.py),
 -- 31 a screen: the bag and the ground
 for n, ids2 in ipairs({

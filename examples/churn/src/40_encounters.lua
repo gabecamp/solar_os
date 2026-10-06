@@ -51,6 +51,8 @@ function Game:start_encounter(def)
                 intro = wrap(def.intro, ENC_INTRO_COLS), cursor = 1, aim = 0,
                 demanding = def.kind == "bandit"}
     if def.kind == "bandit" then self:enc_say(def.demand) end
+    self:beast_seen(def)
+    if (def.kind == "horror" or def.dark) and not def.phantom then self:dread(CHURN.dread.horror) end
     self:arm_enemy()
     self:maybe_parley()
     if self:placed_here("can_rattle") and self.enc.range ~= "far" then   -- the cans rang
@@ -73,7 +75,7 @@ function Game:end_encounter(summary)
     self.enc.over = true
     self.enc_cooldown = FIGHT.ENCOUNTER_COOLDOWN
     local d = self.enc.def
-    if (d.kind == "horror" or d.dark) and self.player.health > 0 then self:stat("horrors") end
+    if (d.kind == "horror" or d.dark) and not d.phantom and self.player.health > 0 then self:stat("horrors") end
     if summary then self:push_log(summary) end
 end
 
@@ -177,6 +179,8 @@ function Game:enemy_dies()
         if item ~= "nothing" then found[#found + 1] = self:drop_found(item) end
     end
     self:drop_enemy_gun(found)
+    self:beast_killed(e.def)
+    if e.def.legacy then self:legacy_dies() end
     self:sfx("kill")
     self:skill_xp("fight", SKILLS.xp.kill)
     self:stat("kills")
@@ -280,6 +284,7 @@ end
 function Game:encounter_action(action)
     local e, p = self.enc, self.player
     e.msg = {}
+    if e.def.phantom then return self:phantom_gone() end   -- (it was never there: 64_dread)
     if action == "tame" then return self:dog_tame() end
     if action:find("_little$") then return self:little_action(action) end
     if action:find("_institute$") then return self:institute_action(action) end
@@ -329,6 +334,7 @@ function Game:encounter_action(action)
     elseif action == "attack" then
         local w, wname = self:weapon()
         local hit = FIGHT.PLAYER_HIT + 8 * (p.attrs.Speed - 3) + e.aim + self:skill_bonus("fight")
+            + self:beast_bonus()
         e.aim = 0
         if self:roll(hit) then
             self:skill_xp("fight", SKILLS.xp.hit)
@@ -346,7 +352,8 @@ function Game:encounter_action(action)
         p.equipped[slot] = nil
         recompute_stats(p)
         self:put_stack("ground", nil, {item = item, qty = 1})
-        if self:roll(FIGHT.THROW_HIT + 8 * (p.attrs.Perception - 3) + e.aim + self:skill_bonus("fight")) then
+        if self:roll(FIGHT.THROW_HIT + 8 * (p.attrs.Perception - 3) + e.aim + self:skill_bonus("fight")
+                     + self:beast_bonus()) then
             self:skill_xp("fight", SKILLS.xp.hit)
             self:enc_hit(w.dmg, w.bleed, "Your " .. ITEM_DB[item].name:lower() .. " strikes the " .. e.def.who)
         else
@@ -357,6 +364,7 @@ function Game:encounter_action(action)
         if self:roll(FIGHT.WATCH_CHANCE + 10 * (p.attrs.Perception - 3)) then
             e.seen = true
             e.aim = FIGHT.WATCH_AIM
+            self:beast_watched(e.def)
             self:enc_say("You study how it moves. It looks " .. self:enemy_condition()
                 .. ", and you see an opening.")
         else

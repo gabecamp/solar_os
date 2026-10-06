@@ -95,6 +95,7 @@ function Game:start_game()
     self:refresh_view()
     self.screen = "map"
     self:queue_scene("wake")
+    self:place_legacy()
     return true
 end
 
@@ -105,6 +106,7 @@ function Game:check_death(cause)
     self:sfx("death")
     Game.delete_save()           -- one life: a dead survivor can't be continued
     self.death_cause = cause
+    self:save_legacy(cause)      -- (what you carried waits in the next world: 64_legacy)
     self:record_run(nil, cause)
     return true
 end
@@ -148,10 +150,12 @@ function Game:try_move(q, r)
     self:find_stash()
     self:check_snare()
     self:camp_arrive()
+    self:scan_arrive()
     if not self:check_death("You bled out.") and not self:arrive_site() and not self:quest_arrive()
-        and not self:little_arrive() then
+        and not self:little_arrive() and not self:legacy_arrive() then
         self:maybe_encounter(terrain_id)
     end
+    if self.screen == "map" then self:dread_move() end
 end
 
 -- The map's movement keys. Hexes have six neighbors and there are four
@@ -268,8 +272,11 @@ function Game:rest()
         return
     end
     local fire, bed = self:fire_here(), self:bed_here()
+    local terror, rest0 = (p.dread or 0) >= CHURN.dread.tiers[3][1], p.needs.rest
     p.hours = p.hours + REST_HOURS
     apply_rest_hours(p, REST_HOURS)
+    if terror then p.needs.rest = rest0 + (p.needs.rest - rest0) * CHURN.dread.sleep end   -- (you can't sleep)
+    if bed then self:dread(CHURN.dread.bed_rest) elseif fire then self:dread(CHURN.dread.fire_rest) end
     if fire then   -- a campfire: warm, and better sleep
         p.needs.rest = clamp(p.needs.rest + REST_HOURS * (100 / 6) * WORLD.fire_rest_bonus)
     end

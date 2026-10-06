@@ -594,3 +594,54 @@ CHURN.cut = {hours = 1, scraps = {
     tshirt = 2, jeans = 3, scarf = 1, cap = 1, gloves = 1, earmuffs = 1, rag_shirt = 1, rag_trousers = 1,
     foot_wraps = 1, rag_hood = 1, hand_wraps = 1, ear_wraps = 1, rag_scarf = 1, patch_coat = 3,
     bindle = 2, sack_pack = 3, rag_mask = 1, satchel = 2, rag_shoes = 1, backpack = 3}}
+
+-- Lockpicking (src/64_lockpick.lua): a crate has `pins` pins (an Institute
+-- crate deep_pins), each setting at a height 1..height. Raise one with Up;
+-- at its height you may feel it give (hint %, +hint_per per Perception over
+-- 3, + tinkering bonus). Past it, or Enter at the wrong height, strains the
+-- pick; at strain_max it snaps (one Lockpicks gone, the crate stays locked).
+CHURN.pick = {pins = 4, deep_pins = 5, height = 5, hint = 55, hint_per = 10, strain_max = 3}
+
+-- Scanning the band on the LoRa radio (src/64_scan.lua): low..high MHz.
+-- Each day a few stations sit somewhere on it (n, never on Karl's 433);
+-- `near` MHz off you hear them faintly. Listening costs a charge.
+CHURN.scan = {low = 400, high = 470, n = {2, 3}, near = 4, avoid = {433},
+    kinds = {{"stash", 3}, {"body", 2}, {"site", 2}, {"voice", 2}},
+    static = {"...hiss...", "...a carrier, then nothing...", "...a dog barking, far off...",
+              "...music, slowed down...", "...someone breathing..."},
+    numbers = "A flat voice reads numbers. Grid, bearing, distance. You mark it.",
+    body = "'...if anyone hears... I'm hurt, in the ruins... I can see the...' It cuts out.",
+    site = "Morse, over and over. You know enough of it: a place.",
+    voice = {"'You're out late,' says your own voice. 'Come home.'",
+             "Children counting, in no language. They reach your number and stop.",
+             "Someone says your name, and then the name of everyone you've lost."}}
+
+-- Dread (src/64_dread.lua): 0..100 on the player. What raises and eases it,
+-- the tiers (35 uneasy, 60 dread, 85 terror) and what they bring: phantom
+-- lines (% a move from 60), phantoms that aren't there (% a move from 70),
+-- no sleep worth having at terror (rest x sleep).
+CHURN.dread = {horror = 12, emission = 15, sheltered = 5, corpse = 6, vesna = 10, dark_hour = 1,
+    voice = 15, signal = 8, risen = 15,
+    fire_rest = -8, bed_rest = -15, tape = -12, vodka = -10, sedative = -15, dog_hours = 3, camp_day = -2,
+    tiers = {{35, "Uneasy"}, {60, "Dread"}, {85, "Terror"}},
+    whisper = 8, phantom = 4, sleep = 0.5,
+    lines = {"Someone says your name. There's no one.", "Footsteps behind you stop when you stop.",
+             "A child laughs in the grass, very close.", "Your shadow is a beat late.",
+             "You count your fingers. You count again.", "The wind smells of your mother's kitchen.",
+             "Something in the bag is breathing.", "You hear the Signal in your teeth."}}
+
+-- The bestiary (src/64_bestiary.lua): each creature you meet gets a page.
+-- Watch it once and you know its weak spot: +bonus % to hit it ever after.
+-- A full page (seen, watched, killed) sells to the Trader for `price`.
+CHURN.bestiary = {bonus = 10, price = 15,
+    skip = {helper = true, anomaly = true, dog = true, little = true, karl = true}}
+
+-- What's left of you (src/64_legacy.lua): when you die, your gear stays with
+-- the body, and in your next world something wears it. It waits near/far
+-- hexes from where you start; kill it and the gear is yours again.
+CHURN.legacy = {near = 4, far = 8, max_stacks = 16, hp = 50, hp_per = 3, hp_max = 95,
+    art = "long_man", who = "risen",
+    intro = "It walks like you used to. It wears your coat, and the boots you patched, and "
+         .. "what's left of your face. %s. It turns its head the way you do when you hear "
+         .. "your name.",
+    talk = "Its mouth makes the shape of your name. Nothing comes out."}

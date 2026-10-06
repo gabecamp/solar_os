@@ -217,6 +217,7 @@ function Game:tick()
         self:emission_hour(hour)
         self:dog_hour(hour)
         self:base_hour(hour)
+        self:dread_hour(hour)
     end
     self.ticked_hour = p.hours
     local cold = (p.cold_hours or 0) > 0

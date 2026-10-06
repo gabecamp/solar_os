@@ -57,6 +57,7 @@ function Game:help_key(key)   -- help, info and journal: any key goes back
     end
     if self.screen == "journal" and key == KEY.K then return self:open_skills() end
     if self.screen == "journal" and key == KEY.F then return self:open_finds() end
+    if self.screen == "journal" and key == KEY.B then return self:open_bestiary() end
     if self.screen == "help" and key == KEY.V then
         self.screen = "info"
     elseif self.screen == "help" and (self.help_page or 1) == 1
