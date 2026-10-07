@@ -35,15 +35,15 @@ for _, r in pairs(EQUIP_RECT) do r[1], r[2] = r[1] + BODY_DX, r[2] + BODY_DY end
 -- right column (from INV_COL_X): ground grid, bag grid with its name and
 -- fill count above it, then what the cursor is on
 local INV_COL_X = 212
-local GROUND_GRID_COLS = 5
-local GROUND_GRID_ROWS = 2   -- visible rows; the grid scrolls to follow the cursor
-local GROUND_CELL, GROUND_GAP = 30, 2
+local GROUND_GRID_COLS = 8   -- (bag-sized cells: 24 in view before it scrolls)
+local GROUND_GRID_ROWS = 3   -- visible rows; the grid scrolls to follow the cursor
+local GROUND_CELL, GROUND_GAP = 20, 2
 local GROUND_Y = 32
 -- bag: up to BACKPACK_CAP cells, all visible (with a bag on, your pockets
 -- start a row of their own, framed in gray)
 local BACKPACK_COLS = 8
 local BACKPACK_CELL, BACKPACK_GAP = 20, 2
-local BACKPACK_Y = 114
+local BACKPACK_Y = 116
 local BAG_LABEL_Y = BACKPACK_Y - 5
 local CURSOR_DESC_Y = 210
 local CONDITIONS_Y = 264     -- full width, under the doll

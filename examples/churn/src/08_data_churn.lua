@@ -50,7 +50,7 @@ local CHURN = {
          needs = {"ichor", "pale_eye", "book_hymnal", "elder_sign"}},
     },
     study = {hours = 3, base = 5, per_point = 1, book_mult = 2, need = 6, need_step = 1,
-             read_hours = 2, tape_hours = 1, tape_max = 4, usb_hours = 1, usb_fail = 25},
+             read_hours = 2, reread_hours = 4, tape_hours = 1, tape_max = 4, usb_hours = 1, usb_fail = 25},
 
     -- Cassettes: the logs of the dead. Each teaches from its topic once.
     tapes = {
@@ -593,7 +593,9 @@ TECH.world_items[#TECH.world_items + 1] = "marsh_revolver"
 CHURN.cut = {hours = 1, scraps = {
     tshirt = 2, jeans = 3, scarf = 1, cap = 1, gloves = 1, earmuffs = 1, rag_shirt = 1, rag_trousers = 1,
     foot_wraps = 1, rag_hood = 1, hand_wraps = 1, ear_wraps = 1, rag_scarf = 1, patch_coat = 3,
-    bindle = 2, sack_pack = 3, rag_mask = 1, satchel = 2, rag_shoes = 1, backpack = 3}}
+    bindle = 2, sack_pack = 3, rag_mask = 1, satchel = 2, rag_shoes = 1, backpack = 3,
+    boots = 2, jacket = 3, bracers = 1, leather_belt = 1, rope_belt = 1, scrap_bracers = 1,
+    karls_waders = 2, karls_hat = 1, hide_tunic = 2, hide_gloves = 1, hide_pack = 2, pelt_coat = 3}}
 
 -- Lockpicking (src/64_lockpick.lua): a crate has `pins` pins (an Institute
 -- crate deep_pins), each setting at a height 1..height. Raise one with Up;

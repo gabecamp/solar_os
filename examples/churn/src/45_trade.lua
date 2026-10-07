@@ -173,6 +173,14 @@ function Game.units_value(list, item, n)
     return total
 end
 
+-- One unit's price in rubles, as the trade screen lists it: what yours
+-- sells for (worn things for less), what theirs costs (with the markup).
+function Game:unit_price(col, s)
+    if col == "mine" then return math.floor(Game.item_value(s.item) * (25 + 0.75 * (s.cond or 100)) / 100) end
+    local _, cfg = self:trade_partner()
+    return math.ceil(math.max(1, Game.item_value(s.item)) * self:markup_for(self.trade_ui.who or "town", cfg.markup))
+end
+
 function Game:trade_totals()
     local u = self.trade_ui
     local give, get = 0, 0

@@ -121,16 +121,35 @@ function Game:read_book(item)
     local topic, t = def.book, Game.topic_def(def.book)
     self.books_read = self.books_read or {}
     self.research = self.research or {}
-    p.hours = p.hours + CHURN.study.read_hours
-    apply_awake_hours(p, CHURN.study.read_hours)
+    -- the first read anywhere; one reread, slower, and only by a fire or at camp
+    local read = self.books_read[item]
+    if read == "reread" then
+        self:push_log("You've had all you'll get out of the " .. def.name .. ".")
+        return
+    end
+    if read then
+        if not self:topic_next(topic) then
+            self:push_log("You know everything in the " .. def.name .. ".")
+            return
+        end
+        if not (self:fire_here() or self:at_base()) then
+            self:push_log("To study it closely, reread it by a fire or at camp.")
+            return
+        end
+    end
+    local hours = read and CHURN.study.reread_hours or CHURN.study.read_hours
+    p.hours = p.hours + hours
+    apply_awake_hours(p, hours)
     if t.cost then p.needs.rest = math.max(0, p.needs.rest - t.cost) end
-    if not self.books_read[item] then
+    if not read then
         self.books_read[item] = true
         if self:learn_next(topic, "From the " .. def.name) then return end
-    end
-    if not self:topic_next(topic) then
-        self:push_log("You know everything in the " .. def.name .. ".")
-        return
+        if not self:topic_next(topic) then
+            self:push_log("You know everything in the " .. def.name .. ".")
+            return
+        end
+    else
+        self.books_read[item] = "reread"
     end
     self.research[topic] = (self.research[topic] or 0) + CHURN.study.base
     self:push_log(("You reread the %s. (%s %d/%d)"):format(def.name, t.name, self.research[topic],

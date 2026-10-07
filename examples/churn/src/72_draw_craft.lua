@@ -61,6 +61,16 @@ function Game:draw_craft(w, h)
             or (r.mend and self:mend_text())
             or (r.burn and ("Lights a small fire (" .. r.burn .. "h)"))
             or "Builds a campfire here")
+        -- what it makes: its numbers, then what it's for (three lines at most)
+        local cols = (w - x - 6) // 7
+        if r.out then
+            local d, lines = ITEM_DB[r.out[1]], {}
+            for _, text in ipairs({self:item_stats(r.out[1]) or false, d.desc or false}) do
+                if text then for _, l in ipairs(wrap(text, cols)) do lines[#lines + 1] = l end end
+            end
+            for i = 1, math.min(3, #lines) do gfx.text(x, y + 13 * i, lines[i]) end
+            y = y + 13 * math.min(3, #lines)
+        end
         y = y + 18
         if r.study then   -- research: the topic's book doubles it
             local book = Game.topic_def(r.study).book
@@ -96,8 +106,8 @@ function Game:draw_craft(w, h)
         end
         y = y + 18
         local why = self:craft_blocker(r)
-        for i, line in ipairs(wrap(why or "Ready: Enter to make it.", (w - x - 6) // 7)) do
-            gfx.text(x, y + (i - 1) * 13, line)
+        for i, line in ipairs(wrap(why or "Ready: Enter to make it.", cols)) do
+            if y + (i - 1) * 13 < h - 56 then gfx.text(x, y + (i - 1) * 13, line) end
         end
     end
 

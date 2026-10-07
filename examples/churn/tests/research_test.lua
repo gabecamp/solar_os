@@ -117,8 +117,16 @@ local med = g:topic_next("medicine")
 g:use_item("inventory", 1)
 assert(g.known[med.id] and bag_count(g, "book_surgeon") == 1, "a book isn't used up")
 local med2 = g:topic_next("medicine")
+local h0 = g.player.hours
+g:use_item("inventory", 1)
+assert((g.research.medicine or 0) == 0 and g.player.hours == h0, "no reread away from a fire")
+g.camps[g.player.q .. "," .. g.player.r] = {until_hour = g.player.hours + 100}
 g:use_item("inventory", 1)
 assert(not g.known[med2.id] and (g.research.medicine or 0) > 0, "a reread only helps")
+assert(g.player.hours - h0 == C.CHURN.study.reread_hours, "a reread is slow")
+local r1 = g.research.medicine
+g:use_item("inventory", 1)
+assert(g.research.medicine == r1 and has_log(g, "all you'll get"), "only one reread")
 print("   OK")
 
 print("5. cassettes: need a charged player; the tape plays once")

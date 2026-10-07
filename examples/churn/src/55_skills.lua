@@ -64,6 +64,7 @@ function Game:skills_page_lines()
     if self.page == "finds" then return self:finds_lines() end
     if self.page == "map" then return self:map_wall_lines() end
     if self.page == "bestiary" then return self:bestiary_lines() end
+    if self.page == "status" then return self:status_lines() end
     local lines = {"Skill               Lv  XP       Bonus"}
     for _, name in ipairs(SKILLS.order) do
         local level, xp = self:skill_level(name), (self.skills or {})[name] or 0
@@ -110,7 +111,7 @@ end
 function Game:draw_skills(w, h)
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
-    Game.ui_title(w, ({finds = "Finds", map = "Map wall", bestiary = "Bestiary"})[self.page] or "Skills and recipes")
+    Game.ui_title(w, ({finds = "Finds", map = "Map wall", bestiary = "Bestiary", status = "You"})[self.page] or "Skills and recipes")
     local lines, fit = self:skills_page_lines(), Game.skills_fit(h)
     local off = math.max(0, math.min(self.skills_off or 0, #lines - fit))
     local y = 40

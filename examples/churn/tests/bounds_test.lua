@@ -15,11 +15,11 @@ local game = Game.new()
 game.player.q, game.player.r = 0, 0
 game.player.bag_bonus = 16   -- widest possible bag: every one of BACKPACK_CAP cells
 
--- full bag (distinct fake items so nothing merges), 15 ground stacks
+-- full bag (distinct fake items so nothing merges), 30 ground stacks
 game.player.inventory = {}
 for i = 1, L.BACKPACK_CAP do game.player.inventory[i] = {item = "rock", qty = i} end
 local ground = game:ground_list()
-while #ground < 15 do ground[#ground + 1] = {item = "cloth_scrap", qty = #ground} end
+while #ground < 30 do ground[#ground + 1] = {item = "cloth_scrap", qty = #ground} end
 for _, slot in ipairs(L.EQUIP_SLOTS) do game.player.equipped[slot] = "cap" end
 
 local problems = 0

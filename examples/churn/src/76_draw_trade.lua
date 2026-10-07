@@ -25,13 +25,13 @@ function Game:draw_trade(w, h)
     gfx.clear(gfx.WHITE)
     gfx.color(gfx.BLACK)
     local _, cfg = self:trade_partner()
-    Game.ui_title(w, cfg.name, ("Prices x%.1f, in rubles"):format(cfg.markup))
+    Game.ui_title(w, cfg.name, ("%d rubles on you"):format(self:count_item("rubles")))
     for _, col in ipairs({"mine", "theirs"}) do
         local x = L.col_x[col]
         local rows = self:trade_rows(col)
         local pick = col == "mine" and u.give or u.get
         gfx.color(gfx.BLACK)
-        gfx.text(x, 36, col == "mine" and "Your bag  (you give)" or "Theirs  (you take)")
+        gfx.text(x, 36, col == "mine" and "Yours      sells for" or "Theirs        costs")
         local c = u.cursor[col]
         local first = math.max(1, c - L.rows + 1)
         for i = first, math.min(#rows, first + L.rows - 1) do
@@ -39,8 +39,8 @@ function Game:draw_trade(w, h)
             local y = L.top + (i - first) * L.row_h
             local n = pick[s.item]
             local def = ITEM_DB[s.item]
-            local text = ("%-13s x%-3d%3d%s"):format((def.short or def.name):sub(1, 13), s.qty,
-                                                    Game.item_value(s.item), n and (" +" .. n) or "")
+            local text = ("%-12s x%-3d%4dr%s"):format((def.short or def.name):sub(1, 12), s.qty,
+                                                     self:unit_price(col, s), n and (" +" .. n) or "")
             if i == c and col == u.col then
                 gfx.color(gfx.BLACK)
                 gfx.fill_rect(x - 2, y - 11, L.col_w, L.row_h)
@@ -57,7 +57,7 @@ function Game:draw_trade(w, h)
     gfx.color(gfx.BLACK)
     gfx.line(200, 26, 200, L.top + L.rows * L.row_h - 10)
     local give, ask = self:trade_totals()
-    gfx.text(6, 234, ("You give %d   They ask %d   (in rubles)"):format(give, ask))
+    gfx.text(6, 234, ("You give %dr   They ask %dr"):format(give, ask))
     gfx.text(6, 252, u.msg or "")
     Game.ui_keys(w, h, "Arrows Enter:+1 E:-1 T:deal O:work " .. (u.who == "town" and "N:notes " or "") .. "Q:leave")
     gfx.refresh()

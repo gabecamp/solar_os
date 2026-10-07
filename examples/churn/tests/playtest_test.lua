@@ -2,7 +2,9 @@
 -- (and wrap), every pocket can be reached, X drops, dropping on a full cell
 -- swaps; clothes cut into scraps; what you can make comes first; a fishing
 -- rod on the ground still fishes; gear shows its numbers; rubles; the
--- records screen only lists what you've earned; a title tune.
+-- records screen only lists what you've earned; a title tune. Then: all
+-- clothes cut up; the crafting panel describes; real ruble prices at the
+-- trader; the P status page; 24 ground cells in view.
 package.path = "./?.lua;" .. package.path
 local fake = require("solaros")
 local gfx = fake.gfx
@@ -197,5 +199,67 @@ gfx.text = function(x, y, s) said[#said + 1] = s end
 g:draw_inv_desc(400, true)
 gfx.text = text
 assert(table.concat(said, "|"):find("Bindle 5 + pockets 2", 1, true), table.concat(said, "|"))
+
+print("14. all clothes cut up, leather too; lenses and lamps don't")
+g = fresh()
+g.player.inventory = {{item = "knife", qty = 1}}
+for _, it in ipairs({"boots", "jacket", "karls_hat", "hide_tunic", "leather_belt", "pelt_coat"}) do
+    table.insert(g.player.inventory, {item = it, qty = 1})
+end
+table.insert(g.player.inventory, {item = "sunglasses", qty = 1})
+local cuts = {}
+for _, r in ipairs(g:known_recipes()) do if r.cut then cuts[r.id] = true end end
+for _, it in ipairs({"boots", "jacket", "karls_hat", "hide_tunic", "leather_belt", "pelt_coat"}) do
+    assert(cuts["cut_" .. it], "cut up " .. it)
+end
+assert(not cuts.cut_sunglasses, "no scraps from lenses")
+
+print("15. the crafting panel says what the thing is")
+g = fresh()
+g.ground["0,0"] = {{item = "cloth_scrap", qty = 4}}
+g.screen = "craft"
+for i, r in ipairs(g:known_recipes()) do if r.id == "rag_shirt" then g.craft_ui.cursor = i end end
+said = {}
+gfx.text = function(x, y, s) said[#said + 1] = s end
+g:draw_craft(400, 300)
+gfx.text = text
+assert(table.concat(said, "|"):find("Warm 1", 1, true), "the rag shirt's warmth")
+
+print("16. the trader lists real prices, in rubles")
+g = fresh()
+g.player.inventory = {{item = "knife", qty = 1}, {item = "rubles", qty = 40}}
+g:open_trade("town")
+local stock = g:trade_rows("theirs")
+local s1 = stock[1]
+assert(g:unit_price("theirs", s1) >= math.max(1, Game.item_value(s1.item)), "their price has the markup")
+assert(g:unit_price("mine", {item = "knife", qty = 1, cond = 100}) == Game.item_value("knife"))
+assert(g:unit_price("mine", {item = "knife", qty = 1, cond = 0}) < Game.item_value("knife"), "worn: less")
+said = {}
+gfx.text = function(x, y, s) said[#said + 1] = s end
+g:draw_trade(400, 300)
+gfx.text = text
+local all = table.concat(said, "|")
+assert(all:find("40 rubles on you", 1, true), "your money in the title")
+assert(all:find(g:unit_price("theirs", s1) .. "r", 1, true), "their price, as charged")
+
+print("17. P: the status page - numbers, attributes, conditions explained")
+g = fresh()
+g.screen = "map"
+g.player.injuries.bleeding = true
+g:open_status()
+assert(g.screen == "skills" and g.page == "status")
+local lines = table.concat(g:skills_page_lines(), "|")
+assert(lines:find("Attributes", 1, true) and lines:find("Strength", 1, true))
+assert(lines:find("Barefoot: no warmth", 1, true) and lines:find("Bleeding: hurts", 1, true), lines)
+g:skills_key(113)
+assert(g.screen == "map", "any key: back where you were")
+
+print("18. 23 things on the ground fit without scrolling")
+g = fresh()
+for i = 1, 23 do table.insert(g.ground["0,0"], {item = i % 2 == 0 and "rock" or "stick", qty = i}) end
+g:draw_inventory(400, 300)
+local _, pos = rows_pos()
+for i = 1, 24 do assert(pos[i], "ground cell " .. i .. " in view") end
+assert(g.ground_off == 0)
 
 print("PLAYTEST TESTS PASSED")

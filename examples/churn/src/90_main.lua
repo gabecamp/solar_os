@@ -36,6 +36,8 @@ local ok, err = pcall(function()
             game:open_radio()
         elseif key == KEY.J then
             game:open_journal()
+        elseif key == KEY.P then
+            game:open_status()
         elseif key == KEY.C then
             game:open_crafting()
         elseif key == KEY.I then
@@ -59,6 +61,9 @@ local ok, err = pcall(function()
             game:open_help()
         elseif key == KEY.J then
             game:open_journal()
+        elseif key == KEY.P then
+            game.inv_selected = nil
+            game:open_status()
         elseif key == KEY.C then
             game.inv_selected = nil
             game:open_crafting()

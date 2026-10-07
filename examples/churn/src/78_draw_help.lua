@@ -12,7 +12,7 @@ local HELP = {
     {"", "(WASD too)   Space rest 4h"},
     {"", "F search   E water: fill/drink   I bag"},
     {"", "T trade/Checkpoint   C craft   J journal"},
-    {"", "G hunt, or fish   R radio   M sound"},
+    {"", "G hunt/fish  R radio  M sound  P you"},
     {"BAG", "Arrows pick  Enter select, Enter move"},
     {"", "E use: eat, wear, read, play   X drop"},
     {"", "Drop on a full cell: they swap"},

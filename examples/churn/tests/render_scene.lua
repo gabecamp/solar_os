@@ -791,3 +791,16 @@ g:start_encounter({kind = "animal", name = "Jawhound", art = "jawhound", who = "
 g:enc_say("The PM Pistol cracks. You hit the jawhound (-19). It's bleeding.")
 g:draw_encounter(400, 300)
 solaros.dump("ops_encounter_gun.txt")
+
+-- Scene: P, the status page - a cold, bleeding churner with traits
+g = Game.new()
+g:start_game()
+g.player.equipped.shirt, g.player.equipped.pants = "tshirt", "jeans"
+g.player.traits = {Quick = true, ["Big Eater"] = true}
+g.player.injuries.bleeding = true
+g.player.cold_hours = 2
+g.player.dread = 40
+g.screen = "map"
+g:open_status()
+g:draw_skills(400, 300)
+solaros.dump("ops_status.txt")

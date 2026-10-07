@@ -42,8 +42,9 @@ the Checkpoint alive.
   out in a storm; rags twice as fast. A torn piece (the bag shows "40%" or
   "(torn)" under the cursor) gives no warmth and holds half as much until
   you patch it: **Patch clothes** on the crafting screen, 1 cloth scrap.
-  Any sharp edge cuts a spare piece up for cloth (**Cut Up ...** on the
-  crafting screen, which lists what you can make right now first).
+  Any sharp edge cuts a spare piece of clothing up for cloth, leather and
+  boots too (**Cut Up ...** on the crafting screen, which lists what you
+  can make right now first and says what each thing is and does).
 - **Your camp:** claim a ruin (C, *Claim this ruin*) and **T** there opens
   the camp screen: its stash, your bag, and 22 slots that keep working while
   you're away. Only one camp at a time; claiming another leaves the old
@@ -89,7 +90,12 @@ the Checkpoint alive.
   your best weapon. Kill it and your gear is yours again.
 - **Money:** rubles turn up in ruins, on the dead and on bandits. Traders
   pay rubles for what you sell, take them for the rest of a price, and
-  give change in rubles.
+  give change in rubles. Their screen lists every price in rubles: what
+  yours sells for (worn things for less), what theirs costs with the
+  markup, and how many rubles you have.
+- **You (P on the map or in the bag):** health, MP, needs, warmth, rads,
+  dread and what you can carry; each condition you have and what it is
+  doing to you; your attributes and traits.
 - **On a PC or Raspberry Pi:** `python_version/` runs this same game in a
   pygame window. One command installs it: `install.sh` on Linux or a Pi,
   `install.ps1` on Windows (see its README), or by hand `pip install pygame-ce lupa`,
@@ -121,8 +127,9 @@ simplest first:
   Chemistry needs chemicals to work with, Gunsmithing a gun or a gun part,
   and Warding something of *theirs* (black ichor, a pale eye). Warding takes
   something out of you each time.
-- **Books** (E): the first read teaches the next recipe in the topic; a
-  reread only helps.
+- **Books** (E): the first read (2 hours, anywhere) teaches the next recipe
+  in the topic. One reread, by a fire or at your camp, takes 4 hours and
+  gives research points; after that the book has nothing more for you.
 - **Cassettes** (E): a Cassette Player with charge (a Battery Cell, E) plays
   the logs of dead churners. Each tape teaches once, and some mention a stash.
 - **USB drives** (E): with a LoRa Radio, a charge reads a drive: one or two
