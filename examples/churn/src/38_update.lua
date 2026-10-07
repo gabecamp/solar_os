@@ -91,15 +91,35 @@ function Game:update_check()
     if Game.version_newer(latest, Game.VERSION:match("^%S+")) then self.update_avail = latest end
 end
 
+-- The progress picture (art: tools/paint_reach.py -> 38_reach_art): a
+-- rotten arm crawls out of the left edge after a crow, its claws closing
+-- on it as the download ends. The tip of the claws is at x = reach_tip
+-- in the arm's picture.
+Game.UPDATE.reach_tip, Game.UPDATE.reach_y = 364, 64
+
 function Game:draw_update_progress(w, h, got, length)
+    local U = Game.UPDATE
+    local frac = length > 0 and math.min(1, got / length) or 0
     gfx.clear(gfx.WHITE)
     Game.ui_title(w, "Updating The Churn", self.update_avail)
     gfx.font(gfx.FONT_MONO_12)
-    gfx.text(10, 80, "Downloading the new version...")
-    Game.ui_bar(10, 96, w - 20, 14, length > 0 and got / length or 0)
-    gfx.text(10, 130, length > 0 and ("%d of %d KB"):format(got // 1024, length // 1024)
+    gfx.text(10, 48, "Downloading the new version...")
+    local cx, y = w - 70, U.reach_y
+    local tip = 24 + math.floor(frac * (cx + 6 - 24))
+    gfx.color(gfx.BLACK)
+    gfx.line(0, y + 62, w, y + 62)   -- the ground
+    if draw_sprite and Game.ARM_ART then
+        for _, t in ipairs(Game.art_tiles("CROW_ART")) do draw_sprite(cx + t.x, y + t.y, 32, 32, t.data) end
+        local ox = tip - U.reach_tip
+        for _, t in ipairs(Game.art_tiles("ARM_ART")) do
+            if ox + t.x + 32 > 0 then draw_sprite(ox + t.x, y + t.y, 32, 32, t.data) end
+        end
+    else   -- (no bitmaps: a plain bar)
+        Game.ui_bar(10, y + 20, w - 20, 14, frac)
+    end
+    gfx.text(10, y + 84, length > 0 and ("%d of %d KB"):format(got // 1024, length // 1024)
         or ("%d KB"):format(got // 1024))
-    gfx.text(10, 160, "Your save is safe. Don't switch off.")
+    gfx.text(10, y + 112, "Your save is safe. Don't switch off.")
     gfx.refresh()
 end
 
