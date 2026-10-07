@@ -819,3 +819,15 @@ g:draw_update_progress(400, 300, 60 * 1024, 980 * 1024)
 solaros.dump("ops_update_start.txt")
 g:draw_update_progress(400, 300, 980 * 1024, 980 * 1024)
 solaros.dump("ops_update_done.txt")
+
+-- Scene: a mutation to choose (second stage), and the status page with two
+g = Game.new()
+g:start_game()
+g.player.rads = 65
+g.player.mut_stage = 1
+g.player.mutations = {hide = true}
+g.screen = "map"
+g:mutation_offer()
+g.mut.cursor = 2
+g:draw_mutate(400, 300)
+solaros.dump("ops_mutate.txt")

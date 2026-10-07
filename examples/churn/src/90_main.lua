@@ -148,6 +148,8 @@ local ok, err = xpcall(function()
                 game:draw_fishing(w, h)
             elseif game.screen == "lockpick" then
                 game:draw_lockpick(w, h)
+            elseif game.screen == "mutate" then
+                game:draw_mutate(w, h)
             elseif game.screen == "craft" then
                 game:draw_craft(w, h)
             elseif game.screen == "scene" then
@@ -200,6 +202,8 @@ local ok, err = xpcall(function()
                 game:fishing_key(key)
             elseif game.screen == "lockpick" then
                 game:lockpick_key(key)
+            elseif game.screen == "mutate" then
+                game:mutate_key(key)
             elseif game.screen == "craft" then
                 if key == KEY.Q then game:ask_quit() else game:craft_key(key) end
             elseif game.screen == "trade" then

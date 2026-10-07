@@ -17,6 +17,7 @@ end
 
 -- From the main loop: true if a scene is now on screen.
 function Game:show_queued_scene()
+    if self:mutation_offer() then return true end   -- (64_mutate)
     local q = self.scene_queue
     if self.screen ~= "map" or not q or #q == 0 then return false end
     self.scene = table.remove(q, 1)

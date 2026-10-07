@@ -590,6 +590,26 @@ TECH.world_items[#TECH.world_items + 1] = "marsh_revolver"
 -- Cutting clothes up for cloth (35_crafting: a "Cut up" recipe shows for each
 -- piece you have off your body, with a sharp edge as the tool): how many
 -- Cloth Scraps each gives. A torn piece gives half (at least 1).
+-- Mutations (src/64_mutate.lua): each radiation stage you reach (RAD.stages)
+-- offers a choice of two changes, or none. A mutation is a gain and a cost:
+-- fx are the keys recompute_stats knows (mp, sight, bag, heal, hunger,
+-- thirst, rest_drain, encounter), plus armor (damage taken -n) and night
+-- (no sight lost in the dark). p.mutations[id] = true (saved with the player).
+CHURN.mutate = {dread = 5, stages = {
+    {{id = "hide", name = "Thick Hide", gain = "blows hurt 2 less", cost = "thirst +25%",
+      fx = {armor = 2, thirst = 1.25}},
+     {id = "marrow", name = "Marrow Fever", gain = "wounds knit: +0.4 HP an hour", cost = "hunger +30%",
+      fx = {heal = 0.4, hunger = 1.3}}},
+    {{id = "cat", name = "Cat Eyes", gain = "the dark costs no sight", cost = "meetings +20% (they see them)",
+      fx = {night = 1, encounter = 1.2}},
+     {id = "bones", name = "Hollow Bones", gain = "+1 MP", cost = "-2 bag cells",
+      fx = {mp = 1, bag = -2}}},
+    {{id = "glow", name = "Dim Glow", gain = "meetings x0.6", cost = "rest drains 30% faster",
+      fx = {encounter = 0.6, rest_drain = 1.3}},
+     {id = "gut", name = "Second Stomach", gain = "hunger x0.6", cost = "thirst +40%",
+      fx = {hunger = 0.6, thirst = 1.4}}},
+}}
+
 CHURN.cut = {hours = 1, scraps = {
     tshirt = 2, jeans = 3, scarf = 1, cap = 1, gloves = 1, earmuffs = 1, rag_shirt = 1, rag_trousers = 1,
     foot_wraps = 1, rag_hood = 1, hand_wraps = 1, ear_wraps = 1, rag_scarf = 1, patch_coat = 3,

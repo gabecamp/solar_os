@@ -84,6 +84,13 @@ the Checkpoint alive.
   Watch one in a fight and you know its weak spot: +10% to hit that kind
   for the rest of the run. Full pages (seen, watched, killed) sell to the
   Trader for 15 rubles each (N on his screen).
+- **Mutations:** each radiation stage you reach for the first time
+  (Irradiated, Rad sick, Rad poisoned) offers two changes, each with a gain
+  and a cost, or **Refuse**. Thick Hide (blows hurt 2 less, thirstier) or
+  Marrow Fever (wounds knit, hungrier); Cat Eyes (no sight lost in the
+  dark, more meetings) or Hollow Bones (+1 MP, 2 fewer bag cells); Dim Glow
+  (fewer meetings, tires faster) or Second Stomach (less hunger, thirstier).
+  The choice is for good and shows on the **P** page.
 - **What's left of you:** when you die, what you carried and wore stays
   with the body. In your next world something wears it: the Risen waits a
   few hexes from the start (on the map, and in the journal), fighting with

@@ -1,5 +1,5 @@
--- Lockpicking, scanning the band, dread, the bestiary, and what's left of
--- you (src/64_*.lua).
+-- Lockpicking, scanning the band, dread, the bestiary, what's left of you,
+-- and mutations (src/64_*.lua).
 package.path = "./?.lua;" .. package.path
 local fake = require("solaros")
 local gfx = fake.gfx
@@ -175,5 +175,50 @@ assert(count(g3, "knife") == 1 and count(g3, "jacket") == 1 and count(g3, "canne
 assert(Game.records().legacy == nil and g3.legacy == nil, "gone for good")
 Game.reload_records()
 assert(Game.records().legacy == nil)
+
+print("7. mutations: each radiation stage offers a choice; gains and costs show in the stats")
+g = fresh()
+g.screen = "map"
+assert(not g:mutation_offer(), "nothing while healthy")
+g.player.rads = 35
+assert(g:rad_stage() == 1 and g:mutation_offer() and g.screen == "mutate" and g.mut.stage == 1)
+local thirst0, armor0 = g.player.thirst_mult, g.player.armor or 0
+g:draw_mutate(400, 300)
+g:mutate_key(DOWN); g:mutate_key(UP)
+g:mutate_key(ENTER)   -- Thick Hide
+assert(g.screen == "map" and g.player.mutations.hide and g.player.mut_stage == 1)
+assert(g.player.armor == armor0 + 2 and g.player.thirst_mult > thirst0, "armor up, thirst up")
+assert(has_log(g, "You change: Thick Hide"))
+assert(not g:mutation_offer(), "stage 1 is spent, even if the sickness comes back")
+g.player.health = 100
+g.enc = {def = {kind = "beast", name = "x", who = "x", hp = 10, dmg = {2, 2}}, hp = 10, range = "close", msg = {}, intro = {}}
+g.screen = "encounter"
+g:enemy_hits({2, 2}, 0, "It hits you")
+assert(g.player.health == 99, "a hit of 2 against armor 2 still costs 1: " .. g.player.health)
+g.enc, g.screen = nil, "map"
+-- the next stages, one at a time, even if the dose skipped one; Refuse keeps you as you are
+g.player.rads = 90
+assert(g:mutation_offer() and g.mut.stage == 2)
+g:mutate_key(51)   -- 3: Refuse
+assert(g.player.mut_stage == 2 and not g.player.mutations.cat and not g.player.mutations.bones)
+assert(g:mutation_offer() and g.mut.stage == 3)
+g:mutate_key(50)   -- 2: Second Stomach
+assert(g.player.mutations.gut and not g:mutation_offer(), "all three offered")
+-- night eyes lose nothing in the dark
+g.player.mutations.cat = true
+g:set_difficulty(g.difficulty)
+g.player.hours = 23
+g:refresh_view()
+assert(g.player.view_sight == g.player.sight, "cat eyes: no sight lost at night")
+-- the status page lists them
+g.page = "status"
+local lines = table.concat(g:status_lines(), "|")
+assert(lines:find("Mutations", 1, true) and lines:find("Second Stomach", 1, true) and lines:find("Cat Eyes", 1, true))
+-- saved with the player
+FAKE_DIRS = {["/sd/churn"] = true}
+assert(g:save())
+local g4 = Game.new(); g4:start_game()
+g4:load_state(Game.read_save())
+assert(g4.player.mutations.gut and g4.player.mut_stage == 3, "mutations survive a save")
 
 print("MECHANICS TESTS PASSED")

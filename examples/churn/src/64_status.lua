@@ -78,5 +78,10 @@ function Game:status_lines()
             add(("  %-13s %s"):format(t.name, t.desc))
         end
     end
+    local muts = self:mutation_lines()
+    if #muts > 0 then
+        add("Mutations")
+        for _, l in ipairs(muts) do add(l) end
+    end
     return lines
 end

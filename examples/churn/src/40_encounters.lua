@@ -227,6 +227,7 @@ function Game:enemy_hits(range, bleed, how)
     local p, d = self.player, self.enc.def
     local dmg = range[1] + self:rand(range[2] - range[1] + 1)
     if self:dog_guard(dmg) then return end
+    dmg = math.max(1, dmg - (p.armor or 0))   -- (a thick hide, 64_mutate)
     p.health = clamp(p.health - dmg)
     self:wear_hit()
     self:sfx("hurt")

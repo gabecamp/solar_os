@@ -347,7 +347,7 @@ local FX_MULT = {hunger = true, rest_gain = true, thirst = true, rest_drain = tr
                  encounter = true}
 local function recompute_stats(player)
     local a = player.attrs
-    local fx = {mp = 0, sight = 0, scav = 0, bag = 0, heal = 0, scav_hurt = 0,
+    local fx = {mp = 0, sight = 0, scav = 0, bag = 0, heal = 0, scav_hurt = 0, armor = 0, night = 0,
                 hunger = 1, rest_gain = 1, thirst = 1, rest_drain = 1, encounter = 1}
     local function add(effects)
         for k, v in pairs(effects) do
@@ -356,6 +356,11 @@ local function recompute_stats(player)
     end
     for _, t in ipairs(TRAITS) do
         if player.traits[t.name] then add(t.fx) end
+    end
+    for _, stage in ipairs(CHURN.mutate.stages) do   -- what the Churn did to you (64_mutate)
+        for _, m in ipairs(stage) do
+            if (player.mutations or {})[m.id] then add(m.fx) end
+        end
     end
     -- worn things with fx (a travois slows you, a charm thins the meetings)
     for slot, item in pairs(player.equipped) do
@@ -377,6 +382,7 @@ local function recompute_stats(player)
     player.heal_per_hour = fx.heal
     player.encounter_mult = fx.encounter
     player.scav_hurt = fx.scav_hurt
+    player.armor, player.night_eyes = fx.armor, fx.night > 0
     if player.mp and player.mp > player.max_mp then player.mp = player.max_mp end
 end
 

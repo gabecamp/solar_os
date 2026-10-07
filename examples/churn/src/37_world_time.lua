@@ -181,7 +181,7 @@ end
 -- Recompute what you can see: at night sight drops by one without light.
 function Game:refresh_view()
     local p = self.player
-    local dark = self:is_night() and not self:has_light()
+    local dark = self:is_night() and not self:has_light() and not p.night_eyes
     local fog = self:weather() == "Fog"
     p.view_sight = math.max(1, p.sight - (dark and 1 or 0) - (fog and 1 or 0))
     update_visibility(p, self.tiles)
