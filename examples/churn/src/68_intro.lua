@@ -149,9 +149,20 @@ end
 function Game:intro_key(key)
     if key == KEY.Q then
         self.quit = true
-    else
-        self.screen = "title"
+        return
     end
+    if not self.update_checked and Game.update_possible() then   -- (38_update)
+        local w, h = gfx.size()
+        local px = Game.INTRO.panel
+        gfx.color(gfx.WHITE)
+        gfx.fill_rect(px, h - 40, w - px, 20)
+        gfx.color(gfx.BLACK)
+        gfx.font(gfx.FONT_MONO_12)
+        gfx.text(px + 10, h - 26, "Checking for updates...")
+        gfx.refresh()
+        self:update_check()
+    end
+    self.screen = "title"
 end
 
 -- The title menu: Continue (with a save), New survivor.
@@ -163,6 +174,7 @@ function Game:title_rows()
             (WORLD.start_hour + d.player.hours) // 24 + 1, math.floor(d.player.health or 0)), "continue"}
     end
     rows[#rows + 1] = {"New survivor", "new"}
+    if self.update_avail then rows[#rows + 1] = {"Update to " .. self.update_avail, "update"} end
     return rows
 end
 
@@ -186,6 +198,15 @@ function Game:draw_title(w, h)
         gfx.text(px + 6, y, row[1])
         gfx.color(gfx.BLACK)
     end
+    -- a newer version is out, or how the update went
+    local note = self.update_msg or (self.update_avail and "A new version is out.")
+    if note then
+        local y = 120 + #self:title_rows() * 24 + 4
+        for _, line in ipairs(wrap(note, (w - px - 10) // 7)) do
+            if y < h - 34 then gfx.text(px + 6, y, line) end
+            y = y + 13
+        end
+    end
     gfx.text(px + 6, h - 22, "Up/Dn pick  Enter go")
     gfx.text(px + 6, h - 8, "R records   Q quit")
     gfx.refresh()
@@ -199,6 +220,11 @@ function Game:title_key(key)
         self.title_cursor = math.min(#rows, self.title_cursor + 1)
     elseif key == KEY.ENTER or key == KEY.LF or key == KEY.SPACE then
         local pick = rows[self.title_cursor] or rows[#rows]
+        if pick[2] == "update" then
+            self:update_download()
+            self.title_cursor = 1
+            return
+        end
         if pick[2] == "continue" then
             self:load_state(self.title_save)
         else

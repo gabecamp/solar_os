@@ -804,3 +804,14 @@ g.screen = "map"
 g:open_status()
 g:draw_skills(400, 300)
 solaros.dump("ops_status.txt")
+
+-- Scene: a newer version on the title menu, and the download under way
+g = Game.new()
+g:begin_intro(nil)
+g.screen = "title"
+g.update_avail = "0.13.12"
+g.title_cursor = 2
+g:draw_title(400, 300)
+solaros.dump("ops_title_update.txt")
+g:draw_update_progress(400, 300, 412 * 1024, 980 * 1024)
+solaros.dump("ops_update_progress.txt")

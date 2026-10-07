@@ -96,6 +96,14 @@ the Checkpoint alive.
 - **You (P on the map or in the bag):** health, MP, needs, warmth, rads,
   dread and what you can carry; each condition you have and what it is
   doing to you; your attributes and traits.
+- **Updates itself (with your say-so):** leaving the start screen, if
+  Wi-Fi is already connected, the game asks GitHub for the newest version
+  number (a few seconds at most). If there's a newer one, the title menu
+  offers **Update to x.y.z**; pick it and the new `churn.lua` downloads
+  (about 1 MB), is checked, and replaces the old one (kept as
+  `churn.lua.bak`). Quit and start the game again to play it. Your save
+  isn't touched. No Wi-Fi or a failed download: nothing changes.
+  `churn_update.lua` still does the same by hand.
 - **If it crashes:** the error and where it happened go to `churn/crash.txt`
   on the card and show on screen; send that file along with a bug report.
 - **On a PC or Raspberry Pi:** `python_version/` runs this same game in a
