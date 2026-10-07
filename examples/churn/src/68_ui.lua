@@ -84,6 +84,13 @@ function Game.ui_bar(x, y, bw, bh, frac, dark)
     gfx.color(gfx.BLACK)
 end
 
+-- Letters work with or without Shift or Caps Lock: A-Z read as a-z (every
+-- binding is lowercase; arrows and the rest are 0x80 and up, untouched).
+function Game.norm_key(key)
+    if key and key >= 65 and key <= 90 then return key + 32 end
+    return key
+end
+
 -- A small label on a black tag (section headings on busy screens).
 function Game.ui_tag(x, y, text)
     gfx.color(gfx.BLACK)

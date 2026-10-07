@@ -162,7 +162,7 @@ local ok, err = xpcall(function()
             dirty = false
         end
 
-        local key = gfx.getch(POLL_MS)
+        local key = Game.norm_key(gfx.getch(POLL_MS))
         if key == nil and game.screen == "intro" then game:intro_tick(w, h) end   -- (the eye turns)
         if key == KEY.CLOSE then
             game:close_requested()

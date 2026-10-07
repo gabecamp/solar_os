@@ -262,4 +262,10 @@ local _, pos = rows_pos()
 for i = 1, 24 do assert(pos[i], "ground cell " .. i .. " in view") end
 assert(g.ground_off == 0)
 
+print("19. Caps Lock or Shift: letters still work")
+assert(Game.norm_key(73) == 105 and Game.norm_key(105) == 105, "I and i")
+assert(Game.norm_key(nil) == nil and Game.norm_key(13) == 13 and Game.norm_key(0x80) == 0x80)
+local main = io.open("../src/90_main.lua"):read("a")
+assert(main:find("Game.norm_key(gfx.getch(", 1, true), "the main loop reads keys through it")
+
 print("PLAYTEST TESTS PASSED")
