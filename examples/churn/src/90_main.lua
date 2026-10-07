@@ -8,7 +8,7 @@ collectgarbage("collect")
 
 gfx.begin()
 
-local ok, err = pcall(function()
+local ok, err = xpcall(function()
     local game = Game.new()
     local w, h = gfx.size()
     game:begin_intro(Game.read_save())   -- the splash, then the title menu
@@ -241,7 +241,37 @@ local ok, err = pcall(function()
     -- quitting mid-run keeps it (a run on the title or creator isn't started yet)
     game.force_save = true
     game:autosave()
-end)
+end, function(e) return debug.traceback(tostring(e), 2) end)
+
+-- A crash: keep what went wrong in churn/crash.txt and show it until a key
+-- (or a minute), so a stuck screen says why instead of just stopping.
+if not ok then
+    Game.draw_pump(false)
+    pcall(function()
+        local dir, path = SAVE.path()
+        if dir and SAVE.can_write() then
+            if solaros.storage.makedirs then pcall(solaros.storage.makedirs, dir) end
+            solaros.storage.write_file(path:gsub("[^/]+$", "crash.txt"), tostring(err):sub(1, 4000))
+        end
+    end)
+    pcall(function()
+        local w = gfx.size()
+        gfx.clear(gfx.WHITE)
+        Game.ui_title(w, "The Churn crashed")
+        gfx.font(gfx.FONT_MONO_12)
+        local y = 36
+        for _, line in ipairs(wrap(tostring(err):gsub("\t", " "), 55)) do
+            if y > 262 then break end
+            gfx.text(6, y, line)
+            y = y + 13
+        end
+        gfx.text(6, 282, "Saved to churn/crash.txt. Any key: quit")
+        gfx.refresh()
+        for _ = 1, 600 do
+            if gfx.getch(100) ~= nil or solaros.should_exit() then break end
+        end
+    end)
+end
 
 -- Per SolarOS convention: cleanup must run even when drawing/logic fails,
 -- and the error is re-raised afterward so it still surfaces (with a real

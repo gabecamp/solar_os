@@ -126,6 +126,9 @@ assert(g:dread_move() and g.enc.def.phantom, "a phantom")
 g:encounter_action("attack")
 assert(g.enc.over and g.player.dread < 95, "nothing there")
 assert((g.stats.horrors or 0) == 0, "a phantom is no horror lived through")
+g.screen = "encounter"
+g:encounter_key(13)   -- Continue (a playtest froze here: it vanished again and again)
+assert(g.enc == nil and g.screen == "map", "Continue leaves a phantom")
 g = fresh()
 g.player.inventory = {{item = "vodka", qty = 1}}
 g.player.dread = 50

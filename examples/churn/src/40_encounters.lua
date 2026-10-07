@@ -284,7 +284,8 @@ end
 function Game:encounter_action(action)
     local e, p = self.enc, self.player
     e.msg = {}
-    if e.def.phantom then return self:phantom_gone() end   -- (it was never there: 64_dread)
+    -- (it was never there: 64_dread. Once it is gone, Continue leaves as usual)
+    if e.def.phantom and not e.over then return self:phantom_gone() end
     if action == "tame" then return self:dog_tame() end
     if action:find("_little$") then return self:little_action(action) end
     if action:find("_institute$") then return self:institute_action(action) end
