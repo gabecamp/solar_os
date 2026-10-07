@@ -424,7 +424,7 @@ local NIGHT = {
               .. "hangs from its mouth. It doesn't move.", speed = 3},
         {kind = "beast", name = "The Crawler", art = "crawler", who = "crawler", dark = true,
          intro = "Something picks its way toward you on too many long, jointed legs, hung "
-              .. "with wet black strands like roots. Two eyes catch your light. It clicks. "
+              .. "with wet black strands like roots. Two eyes catch what little light there is. It clicks. "
               .. "It's coming.",
          hp = 40, dmg = {6, 12}, hit = 55, speed = 4, bleed = 25, start = "near",
          loot = {{"strange_meat", 2}, {"nothing", 1}}, loot_rolls = 1},
