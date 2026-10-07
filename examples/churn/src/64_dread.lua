@@ -1,8 +1,10 @@
 -- ---------------------------------------------------------------------
 -- Dread (numbers in CHURN.dread): what the Churn does to your mind, 0..100
 -- on the player (p.dread, saved with the player). Horrors, emissions, the
--- dead, the dark and the wrong voices on the radio raise it; a fire, your
--- own bed, the dog at your side, a tape, vodka and a sedative ease it.
+-- dead, the dark and the wrong voices on the radio raise it. It fades on its
+-- own (by day -0.75 an hour, at night a quarter of that, more at camp), and
+-- faster with a rest (-3, by a fire -10, in your bed -20), the dog at your
+-- side, a tape, vodka and a sedative.
 --   Uneasy (35+): only the label.
 --   Dread (60+): the Churn whispers in the log as you walk.
 --   70+: now and then something is there that isn't - one action and it's gone.
@@ -23,14 +25,19 @@ function Game:dread_name()
     return name
 end
 
--- One hour (from tick): the dark gets in; the dog and a camp by day ease it.
+-- One hour (from tick): the dark gets in. Otherwise the mind settles on its
+-- own, by day faster than at night (a light or a fire at night counts), and
+-- faster at camp; the dog helps too.
 function Game:dread_hour(hour)
     local D = CHURN.dread
-    if self:is_night(hour) and not self:has_light() and not self:fire_at(hour) and not self:at_base() then
+    local night = self:is_night(hour)
+    if night and not self:has_light() and not self:fire_at(hour) and not self:at_base() then
         self:dread(D.dark_hour)
+    else
+        self:dread(night and D.night_ease or D.day_ease)
     end
     if self:dog_with_you() and hour % D.dog_hours == 0 then self:dread(-1) end
-    if self:at_base() and not self:is_night(hour) then self:dread(D.camp_day / 12) end
+    if self:at_base() then self:dread(D.camp_hour) end
 end
 
 -- After a move (from try_move): a whisper, or a phantom. True if a phantom

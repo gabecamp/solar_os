@@ -77,8 +77,10 @@ the Checkpoint alive.
   close. Numbers mark a stash, morse names a place, a churner calls for
   help from where they lie... and some voices shouldn't be on the air.
 - **Dread:** horrors, emissions, the dead, the dark and those voices wear
-  on you. A fire, your own bed, the dog, a tape, vodka or a sedative ease
-  it. Uneasy at 35; at 60 the Churn whispers in the log; past 70 you see
+  on you. It fades by itself (by day, about 9 points over 12 hours,
+  a quarter of that at night, more at camp) and faster with a rest
+  (Space: 3 points, by a fire 10, in your bed 20), the dog, a tape, vodka
+  or a sedative. Only the dark, with no light or fire, adds to it. Uneasy at 35; at 60 the Churn whispers in the log; past 70 you see
   things that aren't there; at 85 (terror) sleep does half the good.
 - **Bestiary (B in the journal):** a page for every creature you meet.
   Watch one in a fight and you know its weak spot: +10% to hit that kind

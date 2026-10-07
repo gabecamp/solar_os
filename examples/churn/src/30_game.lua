@@ -276,7 +276,7 @@ function Game:rest()
     p.hours = p.hours + REST_HOURS
     apply_rest_hours(p, REST_HOURS)
     if terror then p.needs.rest = rest0 + (p.needs.rest - rest0) * CHURN.dread.sleep end   -- (you can't sleep)
-    if bed then self:dread(CHURN.dread.bed_rest) elseif fire then self:dread(CHURN.dread.fire_rest) end
+    self:dread(bed and CHURN.dread.bed_rest or fire and CHURN.dread.fire_rest or CHURN.dread.rest_calm)
     if fire then   -- a campfire: warm, and better sleep
         p.needs.rest = clamp(p.needs.rest + REST_HOURS * (100 / 6) * WORLD.fire_rest_bonus)
     end

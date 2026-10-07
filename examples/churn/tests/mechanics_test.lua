@@ -221,4 +221,31 @@ local g4 = Game.new(); g4:start_game()
 g4:load_state(Game.read_save())
 assert(g4.player.mutations.gut and g4.player.mut_stage == 3, "mutations survive a save")
 
+print("8. dread fades on its own: by day, faster with rest, faster still by a fire or in a bed")
+local function after(setup, hours, rests)
+    local gg = fresh()
+    gg.player.dread = 80
+    gg.player.hours, gg.ticked_hour = 0, 0   -- (08:00: the clock starts at 8)
+    setup(gg)
+    for _ = 1, rests do gg.player.mp = 0; gg:rest(); gg:tick() end
+    if hours > 0 then gg.player.hours = gg.player.hours + hours; gg:tick() end
+    return gg.player.dread
+end
+local D = 80
+local walking = after(function() end, 12, 0)
+assert(walking <= D - 8, "twelve hours of day: -0.75 an hour at least (" .. walking .. ")")
+local resting = after(function() end, 0, 3)
+assert(resting < D - 15, "three plain rests help (" .. resting .. ")")
+local fire = after(function(gg) gg.camps[gg.player.q .. "," .. gg.player.r] = {until_hour = 999} end, 0, 3)
+assert(fire < resting - 15, "a fire helps much more (" .. fire .. " vs " .. resting .. ")")
+local night = fresh()
+night.player.dread, night.player.hours, night.ticked_hour = 80, 14, 14   -- (22:00)
+night.player.equipped.rhand = "torch"
+night.player.hours = 20; night:tick()
+assert(night.player.dread < 80, "a lit night still eases it a little")
+local dark = fresh()
+dark.player.dread, dark.player.hours, dark.ticked_hour = 50, 14, 14
+dark.player.hours = 20; dark:tick()
+assert(dark.player.dread > 50, "the dark still gets in")
+
 print("MECHANICS TESTS PASSED")
