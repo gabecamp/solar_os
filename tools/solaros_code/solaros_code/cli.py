@@ -11,6 +11,7 @@ from .agent import DEFAULT_MODEL, Agent
 from .mods import ModRegistry, load_mods
 from .permissions import MODES, Permissions
 from .prompt import build_system_prompt
+from .sharing import run_command as run_mods_command
 from .sessions import Session, SessionStore
 from .tools import TOOLS, Workspace
 
@@ -182,9 +183,12 @@ def _default_workspace() -> str:
 
 
 def main(argv: list[str] | None = None, client: Any = None, stdin: IO[str] | None = None, out: IO[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    argv = sys.argv[1:] if argv is None else argv
     out = out or sys.stdout
     stdin = stdin or sys.stdin
+    if argv[:1] == ["mods"]:
+        return run_mods_command(argv[1:], out, stdin)
+    args = build_parser().parse_args(argv)
     ws = Workspace(args.workspace or _default_workspace())
     store = SessionStore()
     client = client or _make_client()
@@ -218,7 +222,8 @@ def main(argv: list[str] | None = None, client: Any = None, stdin: IO[str] | Non
     out.write(f"SolarOS Code in {ws.root}  (model {agent.model}, /help for commands)\n")
     while True:
         try:
-            out.write("\nsolaros> ")
+            status = agent.mods.status_line()
+            out.write(f"\n{'[' + status + '] ' if status else ''}solaros> ")
             out.flush()
             line = stdin.readline()
             if line == "":  # EOF

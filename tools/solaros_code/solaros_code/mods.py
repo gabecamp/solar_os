@@ -60,6 +60,14 @@ class ModAPI:
         self._registry.commands[name] = (handler, help, self._record.name)
         self._record.commands.append(name)
 
+    def status(self, fn: Callable[[], "str | None"]) -> None:
+        """Add a segment to the prompt line. Return None to show nothing."""
+        self._registry.status_fns.append((self._record.name, fn))
+
+    def notify(self, text: str) -> None:
+        """Show a one-line notice in the terminal, attributed to this mod."""
+        self._registry.notify(f"{self._record.name}: {text}")
+
     def before_prompt(self, fn: PromptHook) -> None:
         self._registry.prompt_hooks.append((self._record.name, fn))
 
@@ -77,6 +85,7 @@ class ModRegistry:
         self.prompt_hooks: list[tuple[str, PromptHook]] = []
         self.before_tool_hooks: list[tuple[str, BeforeToolHook]] = []
         self.after_tool_hooks: list[tuple[str, AfterToolHook]] = []
+        self.status_fns: list[tuple[str, Callable[[], "str | None"]]] = []
         self.records: list[ModRecord] = []
         self.errors: list[str] = []
         self.notify: Callable[[str], None] = lambda message: None
@@ -113,10 +122,24 @@ class ModRegistry:
         self.prompt_hooks = [h for h in self.prompt_hooks if h[0] != mod_name]
         self.before_tool_hooks = [h for h in self.before_tool_hooks if h[0] != mod_name]
         self.after_tool_hooks = [h for h in self.after_tool_hooks if h[0] != mod_name]
+        self.status_fns = [h for h in self.status_fns if h[0] != mod_name]
 
     def _hook_failed(self, mod_name: str, stage: str) -> None:
         detail = traceback.format_exc(limit=1).strip().splitlines()[-1]
         self.notify(f"mod {mod_name} failed in {stage}: {detail}")
+
+    def status_line(self) -> str:
+        """Joined status segments, or an empty string when no mod shows one."""
+        segments = []
+        for mod_name, fn in self.status_fns:
+            try:
+                value = fn()
+            except Exception:  # noqa: BLE001
+                self._hook_failed(mod_name, "status")
+                continue
+            if value:
+                segments.append(str(value))
+        return " | ".join(segments)
 
     def apply_prompt(self, text: str) -> str:
         for mod_name, fn in self.prompt_hooks:

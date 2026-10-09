@@ -40,6 +40,7 @@ Run from the repo root (the examples set `PYTHONPATH`), or pass `--workspace PAT
   `SOLAROS_CODE_HOME`). Use `/sessions`, `/resume [id]`, `/clear`, or `-c`.
 - **Slash commands:** `/help`, `/clear`, `/resume`, `/sessions`, `/model`,
   `/perm`, `/tools`, `/usage`, `/mods`, `/exit`, plus any commands mods add.
+- **Mods:** `mods list|install|remove` (see below).
 
 ## Mods
 
@@ -64,10 +65,39 @@ built-in name.
 `examples/mods/guard.py` blocks destructive shell commands and adds `/branch`.
 Copy it into `~/.solaros-code/mods/` to try it.
 
+Two more things a mod can do:
+
+```python
+def register(api):
+    api.status(lambda: "build:ok")   # segment on the prompt line: [build:ok] solaros>
+    api.notify("loaded")             # one-line notice, prefixed with the mod name
+```
+
+Status segments are joined with ` | ` and drawn on every prompt. A segment that
+raises is skipped and reported.
+
+### Sharing mods
+
+A mod is one Python file, so sharing means sending that file:
+
+```sh
+PYTHONPATH=tools/solaros_code python -m solaros_code mods list
+PYTHONPATH=tools/solaros_code python -m solaros_code mods install https://example.org/guard.py --sha256 HEX
+PYTHONPATH=tools/solaros_code python -m solaros_code mods install ./guard.py
+PYTHONPATH=tools/solaros_code python -m solaros_code mods remove guard
+```
+
+`install` accepts a local path or an `https://` URL (plain `http` is refused),
+caps files at 256 KB, rejects code that does not compile, and prints the SHA-256
+and the source before asking to confirm. Pass `--sha256` to refuse any file that
+differs from the hash you were given. Pass `--yes` to skip the prompt, and
+`--force` to replace an installed mod with the same name. Installing a mod runs
+its code with your privileges, so install only from people you trust.
+
 ## Not yet built
 
 This is a first version of a Claude Code-style agent, not a full clone. Missing
-for now: MCP servers, subagents, status-line and UI extensions for mods,
+for now: MCP servers, subagents, a full-screen TUI, a public mod registry,
 context compaction for very long sessions, image input, and a full-screen TUI.
 Those are the next things to add.
 

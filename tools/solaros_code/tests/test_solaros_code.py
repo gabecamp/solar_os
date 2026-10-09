@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 import tempfile
@@ -11,6 +12,7 @@ from types import SimpleNamespace
 
 from solaros_code.agent import Agent
 from solaros_code.mods import ModRegistry, load_mods
+from solaros_code.sharing import SharingError, fetch, install, installed, remove
 from solaros_code.permissions import Permissions
 from solaros_code.sessions import Session, SessionStore
 from solaros_code.tools import TOOLS, ToolError, Workspace, edit_file, grep, read_file, run_tool, write_file
@@ -276,6 +278,84 @@ def register(api):
         self.assertNotIn("/repo", off.commands)
         self.assertIn("/repo", on.commands)
         self.assertFalse(on.records[-1].trusted)
+
+
+class UiAndSharingTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.mods_dir = self.root / "installed"
+        self.source = self.root / "shared-tool.py"
+        self.source.write_text("def register(api):\n    api.command('/shared', lambda a: 'shared ok')\n")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_status_segments_are_joined_and_failures_isolated(self):
+        (self.root / "s.py").write_text(
+            "def register(api):\n"
+            "    api.status(lambda: 'mode:x')\n"
+            "    api.status(lambda: None)\n"
+            "    api.status(lambda: 1 / 0)\n"
+        )
+        reg = ModRegistry()
+        reg.load_dir(self.root, trusted=True)
+        self.assertEqual(reg.status_line(), "mode:x")
+
+    def test_mod_notify_reaches_the_terminal_hook(self):
+        (self.root / "n.py").write_text("def register(api):\n    api.notify('ready')\n")
+        seen = []
+        reg = ModRegistry()
+        reg.notify = seen.append
+        reg.load_dir(self.root, trusted=True)
+        self.assertEqual(seen, ["n: ready"])  # a mod may announce itself at load time
+
+    def test_install_shows_source_and_respects_refusal(self):
+        out, stdin = io.StringIO(), io.StringIO("n\n")
+        with self.assertRaises(SharingError):
+            install(str(self.source), directory=self.mods_dir, out=out, stdin=stdin)
+        self.assertFalse((self.mods_dir / "shared-tool.py").exists())
+        self.assertIn("sha256:", out.getvalue())
+
+    def test_install_with_yes_and_pinned_hash(self):
+        digest = hashlib.sha256(self.source.read_bytes()).hexdigest()
+        target = install(str(self.source), sha256=digest, assume_yes=True,
+                         directory=self.mods_dir, out=io.StringIO(), stdin=io.StringIO(""))
+        self.assertTrue(target.is_file())
+        reg = ModRegistry()
+        reg.load_dir(self.mods_dir, trusted=True)
+        self.assertEqual(reg.commands["/shared"][0](""), "shared ok")
+
+    def test_pinned_hash_mismatch_refused(self):
+        with self.assertRaises(SharingError):
+            install(str(self.source), sha256="0" * 64, assume_yes=True,
+                    directory=self.mods_dir, out=io.StringIO(), stdin=io.StringIO(""))
+
+    def test_syntax_error_and_bad_name_refused(self):
+        bad = self.root / "broken.py"
+        bad.write_text("def register(:\n")
+        with self.assertRaises(SharingError):
+            install(str(bad), assume_yes=True, directory=self.mods_dir, out=io.StringIO(), stdin=io.StringIO(""))
+        with self.assertRaises(SharingError):
+            install(str(self.source), name="Bad Name", assume_yes=True,
+                    directory=self.mods_dir, out=io.StringIO(), stdin=io.StringIO(""))
+
+    def test_existing_mod_needs_force(self):
+        kwargs = dict(assume_yes=True, directory=self.mods_dir, out=io.StringIO(), stdin=io.StringIO(""))
+        install(str(self.source), **kwargs)
+        with self.assertRaises(SharingError):
+            install(str(self.source), **kwargs)
+        install(str(self.source), force=True, **kwargs)
+
+    def test_http_and_remove(self):
+        with self.assertRaises(SharingError):
+            fetch("http://example.com/mod.py")
+        install(str(self.source), assume_yes=True, directory=self.mods_dir,
+                out=io.StringIO(), stdin=io.StringIO(""))
+        remove("shared-tool", directory=self.mods_dir)
+        self.assertEqual(installed(self.mods_dir), [])
+        with self.assertRaises(SharingError):
+            remove("shared-tool", directory=self.mods_dir)
 
 
 if __name__ == "__main__":
