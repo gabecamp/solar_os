@@ -25,3 +25,5 @@ tests/host/ble_nimble_test
 tests/host/ble_multi_peer_test
 tests/host/ble_hid_test
 tests/host/meshtastic_test
+
+tools/**/__pycache__/
