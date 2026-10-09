@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import unittest.mock
 import tempfile
 import unittest
 from pathlib import Path
@@ -12,7 +13,8 @@ from types import SimpleNamespace
 
 from solaros_code.agent import Agent
 from solaros_code.mods import ModRegistry, load_mods
-from solaros_code.sharing import SharingError, fetch, install, installed, remove
+from solaros_code.registry import build_index, load_index, parse_index
+from solaros_code.sharing import SharingError, fetch, install, installed, remove, run_command as run_mods_command
 from solaros_code.permissions import Permissions
 from solaros_code.sessions import Session, SessionStore
 from solaros_code.tools import TOOLS, ToolError, Workspace, edit_file, grep, read_file, run_tool, write_file
@@ -356,6 +358,80 @@ class UiAndSharingTests(unittest.TestCase):
         self.assertEqual(installed(self.mods_dir), [])
         with self.assertRaises(SharingError):
             remove("shared-tool", directory=self.mods_dir)
+
+
+class RegistryTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        (self.root / "shared.py").write_text('"""Shared example mod."""\n__version__ = "2.1.0"\n'
+                                              "def register(api):\n    api.command('/shared', lambda a: 'ok')\n")
+        self.mods = self.root / "installed"
+        self.index_path = self.root / "index.json"
+        self.index_path.write_text(json.dumps(build_index(self.root)))
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def run_cli(self, *argv):
+        out = io.StringIO()
+        code = run_mods_command(list(argv), out, io.StringIO("y\n"))
+        return code, out.getvalue()
+
+    def test_build_index_reads_description_and_version(self):
+        entry = build_index(self.root)["mods"][0]
+        self.assertEqual(entry["name"], "shared")
+        self.assertEqual(entry["version"], "2.1.0")
+        self.assertEqual(entry["description"], "Shared example mod.")
+        self.assertEqual(entry["url"], "shared.py")
+
+    def test_index_validation(self):
+        good = {"name": "a", "url": "a.py", "sha256": "0" * 64}
+        for bad in [
+            {"version": 2, "mods": []},
+            {"version": 1},
+            {"version": 1, "mods": [dict(good, sha256="xyz")]},
+            {"version": 1, "mods": [dict(good, name="Bad Name")]},
+            {"version": 1, "mods": [good, good]},
+            {"version": 1, "mods": [{"name": "a"}]},
+        ]:
+            with self.assertRaises(SharingError, msg=str(bad)):
+                parse_index(json.dumps(bad).encode(), str(self.index_path))
+
+    def test_relative_urls_resolve_against_local_index(self):
+        index = load_index(str(self.index_path))
+        self.assertEqual(index.find("shared").url, str((self.root / "shared.py").resolve()))
+        self.assertEqual([e.name for e in index.search("EXAMPLE")], ["shared"])
+
+    def test_search_and_info_via_cli(self):
+        code, text = self.run_cli("search", "shared", "--registry", str(self.index_path))
+        self.assertEqual(code, 0)
+        self.assertIn("shared 2.1.0", text)
+        code, text = self.run_cli("info", "shared", "--registry", str(self.index_path))
+        self.assertIn("sha256:", text)
+        code, text = self.run_cli("info", "missing", "--registry", str(self.index_path))
+        self.assertEqual(code, 1)
+
+    def test_install_by_name_pins_index_hash(self):
+        index = load_index(str(self.index_path))
+        entry = index.find("shared")
+        target = install(entry.url, name=entry.name, sha256=entry.sha256, assume_yes=True,
+                         directory=self.mods, out=io.StringIO(), stdin=io.StringIO(""))
+        self.assertTrue(target.is_file())
+
+    def test_tampered_file_refused_by_index_hash(self):
+        index = load_index(str(self.index_path))
+        entry = index.find("shared")
+        (self.root / "shared.py").write_text("def register(api):\n    pass\n")
+        with self.assertRaises(SharingError):
+            install(entry.url, name=entry.name, sha256=entry.sha256, assume_yes=True,
+                    directory=self.mods, out=io.StringIO(), stdin=io.StringIO(""))
+
+    def test_no_registry_configured(self):
+        with unittest.mock.patch.dict("os.environ", {}, clear=True):
+            code, text = self.run_cli("search")
+        self.assertEqual(code, 1)
+        self.assertIn("no registry", text)
 
 
 if __name__ == "__main__":

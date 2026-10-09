@@ -40,7 +40,7 @@ Run from the repo root (the examples set `PYTHONPATH`), or pass `--workspace PAT
   `SOLAROS_CODE_HOME`). Use `/sessions`, `/resume [id]`, `/clear`, or `-c`.
 - **Slash commands:** `/help`, `/clear`, `/resume`, `/sessions`, `/model`,
   `/perm`, `/tools`, `/usage`, `/mods`, `/exit`, plus any commands mods add.
-- **Mods:** `mods list|install|remove` (see below).
+- **Mods:** `mods list|search|info|install|remove` (see below).
 
 ## Mods
 
@@ -94,10 +94,39 @@ differs from the hash you were given. Pass `--yes` to skip the prompt, and
 `--force` to replace an installed mod with the same name. Installing a mod runs
 its code with your privileges, so install only from people you trust.
 
+### Registry
+
+A registry is a JSON index of mods: name, version, description, author, URL,
+and SHA-256. It can live on disk or at an `https://` URL. Set it once, then
+search and install by name:
+
+```sh
+export SOLAROS_CODE_REGISTRY=https://example.org/solaros-mods/index.json   # or a local path
+python -m solaros_code mods search status
+python -m solaros_code mods info guard
+python -m solaros_code mods install guard        # pins the hash from the index
+```
+
+`examples/mods/index.json` is a sample index for the example mods. Publish your
+own by putting mods in a directory and running:
+
+```sh
+python tools/build_registry.py mods/ --out mods/index.json --base-url https://example.org/solaros-mods/
+```
+
+Each mod's first docstring line becomes its description. A module-level
+`__version__ = "x.y.z"` sets its version. Leave out `--base-url` to keep relative
+URLs for a local index.
+
+Installing by name uses the hash in the index, so a changed file is refused. The
+index is trusted: only point the registry at indexes you trust. The index sets
+the hash, but it does not vouch for the mod's behaviour. Install prints the
+source and asks for confirmation before anything runs.
+
 ## Not yet built
 
 This is a first version of a Claude Code-style agent, not a full clone. Missing
-for now: MCP servers, subagents, a full-screen TUI, a public mod registry,
+for now: MCP servers, subagents, a full-screen TUI, a hosted registry service with accounts or signing,
 context compaction for very long sessions, image input, and a full-screen TUI.
 Those are the next things to add.
 

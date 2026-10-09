@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "mods": [
+    {
+      "name": "guard",
+      "version": "1.0.0",
+      "description": "Example mod: block destructive shell commands and add a /branch command.",
+      "url": "guard.py",
+      "sha256": "007e05469457c8ca64685edaaeaa7e1b972f9cb22705e04492adf48fd7c988de"
+    },
+    {
+      "name": "mode_badge",
+      "version": "1.0.0",
+      "description": "Example mod: show a status segment on the prompt line and announce on load.",
+      "url": "mode_badge.py",
+      "sha256": "fe59c39897a4bc108ca983ee7731b28564311d662455817089da19a8ed74cec2"
+    }
+  ]
+}

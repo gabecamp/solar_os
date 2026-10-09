@@ -118,15 +118,27 @@ def remove(name: str, directory: Path = USER_MODS_DIR) -> Path:
     return target
 
 
+def _looks_like_name(value: str) -> bool:
+    return bool(_NAME_RE.match(value))
+
+
 def run_command(argv: list[str], out: IO[str], stdin: IO[str]) -> int:
     """Handle `solaros-code mods ...`. Returns a process exit code."""
     import argparse  # noqa: PLC0415 - only needed for this subcommand
+    from .registry import load_index  # noqa: PLC0415 - avoids a cycle at import time
 
-    parser = argparse.ArgumentParser(prog="solaros-code mods", description="Install, list, and remove mods.")
+    parser = argparse.ArgumentParser(prog="solaros-code mods", description="Find, install, list, and remove mods.")
     sub = parser.add_subparsers(dest="action", required=True)
     sub.add_parser("list", help="list installed user mods")
-    add = sub.add_parser("install", help="install a mod from a local path or https:// URL")
-    add.add_argument("source")
+    find = sub.add_parser("search", help="search a registry")
+    find.add_argument("term", nargs="?", default="")
+    find.add_argument("--registry", help="index location (default: $SOLAROS_CODE_REGISTRY)")
+    info = sub.add_parser("info", help="show a registry entry")
+    info.add_argument("name")
+    info.add_argument("--registry", help="index location (default: $SOLAROS_CODE_REGISTRY)")
+    add = sub.add_parser("install", help="install by registry name, or from a local path or https:// URL")
+    add.add_argument("source", help="a mod name from the registry, or a path / https:// URL")
+    add.add_argument("--registry", help="index location (default: $SOLAROS_CODE_REGISTRY)")
     add.add_argument("--name", help="override the mod name (default: file name)")
     add.add_argument("--sha256", help="refuse unless the file has this SHA-256")
     add.add_argument("--yes", action="store_true", help="install without the confirmation prompt")
@@ -136,12 +148,44 @@ def run_command(argv: list[str], out: IO[str], stdin: IO[str]) -> int:
     args = parser.parse_args(argv)
 
     try:
-        if args.action == "list":
+        if args.action in ("search", "info") or (args.action == "install" and _looks_like_name(args.source)):
+            location = args.registry or os.environ.get("SOLAROS_CODE_REGISTRY")
+            if not location:
+                raise SharingError("no registry: pass --registry URL_OR_PATH or set SOLAROS_CODE_REGISTRY")
+            index = load_index(location)
+        if args.action == "search":
+            hits = index.search(args.term)
+            if not hits:
+                out.write("no matching mods\n")
+            for e in hits:
+                out.write(f"  {e.name} {e.version}  {e.description}\n")
+        elif args.action == "info":
+            entry = index.find(args.name)
+            if entry is None:
+                raise SharingError(f"{args.name} is not in the registry")
+            out.write(f"name:        {entry.name}\nversion:     {entry.version}\nauthor:      {entry.author}\n")
+            out.write(f"description: {entry.description}\nurl:         {entry.url}\nsha256:      {entry.sha256}\n")
+        elif args.action == "list":
             files = installed()
             if not files:
                 out.write("no user mods installed\n")
             for path in files:
                 out.write(f"  {path.stem}  sha256 {hashlib.sha256(path.read_bytes()).hexdigest()[:16]}\n")
+        elif args.action == "install" and _looks_like_name(args.source):
+            entry = index.find(args.source)
+            if entry is None:
+                raise SharingError(f"{args.source} is not in the registry")
+            out.write(f"registry: {entry.name} {entry.version} by {entry.author or 'unknown'}\n")
+            target = install(
+                entry.url,
+                name=entry.name,
+                sha256=entry.sha256,
+                assume_yes=args.yes,
+                force=args.force,
+                out=out,
+                stdin=stdin,
+            )
+            out.write(f"installed {target}\n")
         elif args.action == "install":
             target = install(
                 args.source,

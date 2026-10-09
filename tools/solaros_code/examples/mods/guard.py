@@ -7,6 +7,8 @@ import subprocess
 
 BLOCKED = ("rm -rf", "git push --force", "git reset --hard")
 
+__version__ = "1.0.0"
+
 
 def register(api):
     def block_destructive(tool, args):
