@@ -50,7 +50,7 @@ if [ -z "${NATIVE:-}" ]; then   # (smaller: the handheld doesn't need the symbol
     STRIP="${CC%-gcc}-strip"
     if [ -x "$STRIP" ]; then "$STRIP" "$STAGE/churn_sdl"; fi
 fi
-cp ../churn.lua default.gcw0.desktop icon.png "$STAGE/"
+cp ../churn.lua default.gcw0.desktop icon.png churn.sh "$STAGE/"
 [ -f DejaVu-LICENSE.txt ] && cp DejaVu-LICENSE.txt "$STAGE/"
 rm -rf "$STAGE/lua"
 rm -f "$OUT"

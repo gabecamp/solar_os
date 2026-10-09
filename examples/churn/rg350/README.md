@@ -43,6 +43,16 @@ scale of the 400x300 picture that fits: 1x on the RG350's 640x480. On a
 works but gives uneven pixels. Options: `--size WxH`, `--scale N` (0 = fill
 the screen), `--no-legend`, `--mute`.
 
+## If it won't open
+
+The package starts the game through `churn.sh`, which writes what happened
+(the firmware's libraries, each start-up step, any error) to `churn_log.txt`
+in the root of the SD card (and in the home folder). Read it on a PC and
+send it along. Firmware note: OpenDingux Beta (2022 and later) is built on
+uClibc-ng 1.0.x, newer than the 2014 toolchain the program is built with;
+if the log shows the program can't start, it needs a build with the Beta SDK
+(`configs/od_gcw0_defconfig` in github.com/OpenDingux/buildroot).
+
 ## Where things go
 
 Saves and records are in `~/.the-churn` (or `$CHURN_DATA`), so the game file

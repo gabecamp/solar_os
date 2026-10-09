@@ -1,7 +1,7 @@
 [Desktop Entry]
 Name=The Churn
 Comment=A survival game in an exclusion zone
-Exec=churn_sdl churn.lua
+Exec=sh churn.sh churn.lua
 Terminal=false
 Type=Application
 StartupNotify=true

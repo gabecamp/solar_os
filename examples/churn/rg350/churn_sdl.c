@@ -753,8 +753,12 @@ static void show_error(const char *msg)
     if (!script) for (;;) { if (poll_key() > 0 || closed) break; SDL_Delay(20); }
 }
 
+#define SAY(...) do { fprintf(stderr, "churn: " __VA_ARGS__); fputc('\n', stderr); } while (0)
+
 int main(int argc, char **argv)
 {
+    setvbuf(stderr, NULL, _IONBF, 0);
+    SAY("start (argc %d)", argc);
     int want_w = 0, want_h = 0;
     const char *game = NULL;
     int selftest = 0;
@@ -785,15 +789,21 @@ int main(int argc, char **argv)
     else if (home && *home) snprintf(data_dir, sizeof data_dir, "%s/.the-churn", home);
     else snprintf(data_dir, sizeof data_dir, "%s/churn_data", dir);
 
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER) < 0 &&
-        SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) < 0) {
-        fprintf(stderr, "SDL: %s\n", SDL_GetError());
-        return 1;
+    SAY("game %s, data %s", game_path, data_dir);
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER) < 0) {
+        SAY("SDL_Init with audio failed (%s); trying without", SDL_GetError());
+        if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) < 0) {
+            SAY("SDL_Init failed: %s", SDL_GetError());
+            return 1;
+        }
     }
+    SAY("SDL started");
     SDL_ShowCursor(SDL_DISABLE);
-    if (!open_screen(want_w, want_h)) { fprintf(stderr, "no screen: %s\n", SDL_GetError()); return 1; }
+    if (!open_screen(want_w, want_h)) { SAY("no screen: %s", SDL_GetError()); return 1; }
+    SAY("screen %dx%d, %d bytes a pixel", screen->w, screen->h, screen->format->BytesPerPixel);
     SDL_WM_SetCaption("The Churn", "The Churn");
     audio_open();
+    SAY("audio %s", audio_ok ? "on" : "off");
     memset(canvas, WHITE, sizeof canvas);
     if (selftest) { int r = selftest_keys(); SDL_Quit(); return r; }
 
@@ -802,6 +812,7 @@ int main(int argc, char **argv)
     luaL_requiref(L, "solaros", open_solaros, 0);
     lua_pop(L, 1);
     int ok = 0;
+    SAY("running the game");
     lua_pushcfunction(L, traceback);
     if (luaL_loadfile(L, game_path) != LUA_OK) {
         show_error(lua_tostring(L, -1));
@@ -810,6 +821,7 @@ int main(int argc, char **argv)
     } else {
         ok = 1;
     }
+    SAY("the game ended (%s)", ok ? "ok" : "with an error");
     if (dump_file) SDL_SaveBMP(screen, dump_file);
     lua_close(L);
     SDL_CloseAudio();
