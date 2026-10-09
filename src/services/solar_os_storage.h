@@ -162,12 +162,14 @@ esp_err_t solar_os_storage_read_file(const char *path,
                                      void *buffer,
                                      size_t buffer_len,
                                      size_t *read_len);
-// Creates or truncates a regular file, or appends when append is true. Empty
-// data is allowed. Flushes and syncs before success; failures can leave partial
-// data. The caller resolves the path and creates any parent directories.
+// Writes len bytes to path. Without append the file is replaced atomically:
+// the data goes to a synced "<path>.tmp" sibling that then replaces path via
+// solar_os_storage_replace_file, so a failure never leaves a truncated file.
+// With append the bytes are added to the end (the file is created if needed).
+// len may be 0 (an empty file) and at most SOLAR_OS_STORAGE_WRITE_MAX_BYTES.
 esp_err_t solar_os_storage_write_file(const char *path,
                                       const void *data,
-                                      size_t data_len,
+                                      size_t len,
                                       bool append);
 typedef void (*solar_os_storage_copy_progress_fn)(uint64_t bytes_done,
                                                   uint64_t bytes_total,

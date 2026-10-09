@@ -72,14 +72,10 @@ Storage functions expose SD mount and filesystem service operations.
   plus the `stat()` metadata fields. `next_cursor` is `None` at the end.
 - `read_file(path[, max_bytes])`: return up to `max_bytes` bytes from a regular
   file. The default is 4096 and the maximum is 65536.
-- `write_file(path, data[, append])`: create or overwrite a regular file and
-  return the byte count written. `data` accepts a string (stored as UTF-8),
-  bytes, or another readable buffer, up to 65536 bytes per call. `append`
-  defaults to `False`; pass `True` to add data to the end. Empty data creates
-  an empty file, or truncates an existing file when `append` is `False`.
-  The file is flushed, synced, and closed before success. Parent directories
-  must exist; use `makedirs()` to create them. A failed write can leave partial
-  data; overwriting is not atomic.
+- `write_file(path, data[, append])`: write `bytes` or `str` data (at most
+  65536 bytes). Without `append` the file is replaced atomically through a
+  synced `<path>.tmp` sibling; with `append=True` the data is added to the end
+  and the file is created if missing. The parent directory must exist.
 - `rescan()`: rescan SD block devices and partitions.
 - `blocks()`: return a list of block device and partition dictionaries.
 - `block_count()`: return the number of known blocks.

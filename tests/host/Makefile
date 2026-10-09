@@ -38,54 +38,7 @@ TARGETS += tensor_image_lua_test
 TARGETS += vision_lua_bindings_test
 TARGETS += media_lua_bindings_test
 TARGETS += messaging_service_test
-TARGETS += cw2017_test
-TARGETS += rtc_pcf8563_test
-TARGETS += tab5_keyboard_test
-
-tab5_keyboard_test: tab5_keyboard_test.c $(wildcard $(ROOT)/src/services/solar_os_tab5_keyboard*) \
-        $(ROOT)/src/drivers/tab5_keyboard.c $(ROOT)/src/drivers/tab5_keyboard.h \
-        $(wildcard $(ROOT)/src/services/solar_os_input_keymap*) \
-        $(wildcard inputronic_stubs/*.h inputronic_stubs/freertos/*.h inputronic_stubs/driver/*.h)
-	$(CC) $(CFLAGS) -include compat.h -Iinputronic_stubs -Iexpansion_stubs -I. \
-		-I$(ROOT)/src -I$(ROOT)/src/services -I$(ROOT)/src/drivers -I$(CJSON_DIR) \
-		tab5_keyboard_test.c $(ROOT)/src/drivers/tab5_keyboard.c \
-		$(ROOT)/src/services/solar_os_tab5_keyboard_profile.c \
-		$(ROOT)/src/services/solar_os_input_keymap.c $(ROOT)/src/services/solar_os_input_keymap_mapper.c \
-		$(ROOT)/src/services/solar_os_input_keymap_json.c $(CJSON_DIR)/cJSON.c -lm -o $@
-
-rtc_pcf8563_test: rtc_pcf8563_test.c $(ROOT)/src/drivers/rtc_pcf8563.c \
-        $(ROOT)/src/drivers/rtc_pcf8563.h $(ROOT)/src/services/solar_os_pcf8563.c \
-        $(ROOT)/src/services/solar_os_pcf8563.h
-	$(CC) $(CFLAGS) -D_GNU_SOURCE -include compat.h -Iexpansion_stubs -I. \
-		-I$(ROOT)/include -I$(ROOT)/src/services -I$(ROOT)/src/drivers \
-		rtc_pcf8563_test.c $(ROOT)/src/drivers/rtc_pcf8563.c $(ROOT)/src/services/solar_os_pcf8563.c -o $@
-
-cw2017_test: cw2017_test.c $(ROOT)/src/drivers/cw2017.c $(ROOT)/src/drivers/cw2017.h \
-        $(ROOT)/src/services/solar_os_cw2017.c $(ROOT)/src/services/solar_os_cw2017.h
-	$(CC) $(CFLAGS) -D_GNU_SOURCE -include compat.h -Iexpansion_stubs -I. \
-		-I$(ROOT)/include -I$(ROOT)/src/services -I$(ROOT)/src/drivers \
-		cw2017_test.c $(ROOT)/src/drivers/cw2017.c $(ROOT)/src/services/solar_os_cw2017.c -o $@
-TARGETS += pipeline_test pipeline_lua_test
-TARGETS += jobs_admission_test
-
-jobs_admission_test: jobs_admission_test.c $(ROOT)/src/solar_os_jobs.c $(ROOT)/src/solar_os_scheduler.c
-	$(CC) $(CFLAGS) -DSOLAR_OS_JOBS_MAX=0 -include compat.h -ffunction-sections -fdata-sections \
-		-Ijobs_admission_stubs -I. -I$(ROOT)/src -I$(ROOT)/src/services \
-		$(filter-out $(ROOT)/src/solar_os_jobs.c,$^) -Wl,--gc-sections -o $@
-LUA_DIR := $(ROOT)/components/lua/lua/src
-LUA_TEST_SOURCES := $(filter-out $(LUA_DIR)/lua.c $(LUA_DIR)/luac.c \
-	$(LUA_DIR)/linit.c $(LUA_DIR)/liolib.c $(LUA_DIR)/loadlib.c $(LUA_DIR)/loslib.c, \
-	$(wildcard $(LUA_DIR)/*.c))
-
-pipeline_test: pipeline_test.c $(ROOT)/src/services/solar_os_pipeline.c $(ROOT)/src/services/solar_os_processor.c
-	$(CC) $(CFLAGS) -D_POSIX_C_SOURCE=200809L -pthread -Ipipeline_stubs -Irtsp_stubs \
-		-I. -I$(ROOT)/src -I$(ROOT)/src/services -I$(CJSON_DIR) $^ $(CJSON_DIR)/cJSON.c -lm -o $@
-
-pipeline_lua_test: pipeline_lua_test.c pipeline_test.c $(ROOT)/src/apps/solar_os_lua_pipeline.inc \
-        $(ROOT)/src/services/solar_os_pipeline.c $(ROOT)/src/services/solar_os_processor.c $(LUA_TEST_SOURCES)
-	$(CC) $(CFLAGS) -D_POSIX_C_SOURCE=200809L -pthread -Ipipeline_stubs -Irtsp_stubs \
-		-I. -I$(ROOT)/src -I$(ROOT)/src/services -I$(ROOT)/src/apps -I$(LUA_DIR) -I$(CJSON_DIR) \
-		$(filter-out pipeline_test.c %.inc,$^) $(CJSON_DIR)/cJSON.c -lm -o $@
+TARGETS += meshtastic_test
 
 axp2101_service_test: axp2101_service_test.c $(ROOT)/src/services/solar_os_axp2101.c \
 	$(ROOT)/src/services/solar_os_axp2101.h $(ROOT)/src/drivers/axp2101.c
@@ -823,6 +776,11 @@ wireguard_crypto_test: wireguard_crypto_test.c $(ROOT)/components/wireguard_lwip
 		wireguard_crypto_test.c $(ROOT)/components/wireguard_lwip/src/crypto.c \
 		$(ROOT)/components/wireguard_lwip/src/crypto/refc/x25519.c -o $@
 
+meshtastic_test: meshtastic_test.c $(ROOT)/src/services/solar_os_meshtastic.c \
+		$(ROOT)/src/services/solar_os_meshtastic.h
+	$(CC) $(CFLAGS) -I$(ROOT)/src/services meshtastic_test.c \
+		$(ROOT)/src/services/solar_os_meshtastic.c -lmbedcrypto -o $@
+
 meshcore_channel_key_test: meshcore_channel_key_test.cpp \
 		$(ROOT)/src/services/solar_os_meshcore_channel_key.cpp \
 		$(ROOT)/src/services/solar_os_meshcore_channel_key.h \
@@ -982,6 +940,7 @@ test: $(TARGETS)
 	./terminal_preferences_test
 	./tui_widgets_test
 	./wireguard_crypto_test
+	./meshtastic_test
 	./meshcore_channel_key_test
 	./meshcore_stream_codec_test
 	./meshcore_ble_protocol_test

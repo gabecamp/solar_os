@@ -526,7 +526,7 @@ a message, the footer follows its delivery state through `queued`, `sending`,
 Usage:
 
 ```text
-chat [gateway|meshcore|link|conversation-id]
+chat [gateway|meshcore|link|meshtastic|conversation-id]
 ```
 
 With no selector, Chat opens a unified view and initially selects the newest

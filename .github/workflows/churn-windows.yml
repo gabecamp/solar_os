@@ -1,0 +1,103 @@
+# The Churn as one file per system, no Python needed: TheChurn.exe (Windows),
+# TheChurn-linux.tar.gz and TheChurn-mac.zip. Each is built on its own runner
+# by examples/churn/python_version/build_exe.py, checked with --selftest, kept
+# as an artifact and (from main) published as the "churn-latest" release, so
+# the download links never change:
+# https://github.com/gabecamp/solar_os/releases/download/churn-latest/TheChurn.exe
+# https://github.com/gabecamp/solar_os/releases/download/churn-latest/TheChurn-linux.tar.gz
+# https://github.com/gabecamp/solar_os/releases/download/churn-latest/TheChurn-mac.zip
+name: The Churn - downloads
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - examples/churn/churn.lua
+      - examples/churn/python_version/**
+      - .github/workflows/churn-windows.yml
+
+permissions:
+  contents: write   # (to publish the release)
+
+concurrency:
+  group: churn-downloads
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            asset: TheChurn.exe
+          - os: ubuntu-latest
+            asset: TheChurn-linux.tar.gz
+          - os: macos-latest
+            asset: TheChurn-mac.zip
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: examples/churn/python_version
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install pygame-ce, lupa and PyInstaller (wheels only)
+        run: python -m pip install --only-binary ":all:" pygame-ce lupa pyinstaller
+
+      - name: Build
+        run: python build_exe.py
+
+      - name: Self-test (Windows; plays a few keys headless)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          SDL_VIDEODRIVER: dummy
+          SDL_AUDIODRIVER: dummy
+        run: |
+          $p = Start-Process -FilePath dist\TheChurn.exe -ArgumentList "--selftest" -Wait -PassThru
+          Get-Content (Join-Path $env:TEMP "churn_selftest.txt")
+          if ($p.ExitCode -ne 0) { throw "selftest failed ($($p.ExitCode))" }
+
+      - name: Self-test (Linux, macOS) and pack
+        if: runner.os != 'Windows'
+        env:
+          SDL_VIDEODRIVER: dummy
+          SDL_AUDIODRIVER: dummy
+        run: |
+          ./dist/TheChurn --selftest
+          cd dist
+          if [ "$RUNNER_OS" = "Linux" ]; then tar czf "${{ matrix.asset }}" TheChurn; else zip "${{ matrix.asset }}" TheChurn; fi
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: ${{ matrix.asset }}
+          path: examples/churn/python_version/dist/${{ matrix.asset }}
+
+  publish:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          path: assets
+          merge-multiple: true
+
+      - name: Publish as the churn-latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          ls -l assets
+          gh release delete churn-latest --cleanup-tag --yes || true
+          gh release create churn-latest assets/TheChurn.exe assets/TheChurn-linux.tar.gz assets/TheChurn-mac.zip \
+            --target "$GITHUB_SHA" \
+            --title "The Churn (latest downloads)" \
+            --notes "Built from $GITHUB_SHA. One file, nothing to install. Windows: TheChurn.exe (if Windows says the app is unrecognized: More info, then Run anyway). Linux: unpack TheChurn-linux.tar.gz and run ./TheChurn. Mac: unzip TheChurn-mac.zip; the first time, right-click TheChurn and choose Open (it isn't signed), or run xattr -d com.apple.quarantine TheChurn. Saves go to %APPDATA%\\TheChurn or ~/.local/share/the-churn." \
+            --prerelease

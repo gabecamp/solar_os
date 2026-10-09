@@ -1204,54 +1204,78 @@ esp_err_t solar_os_storage_read_file(const char *path,
     return ESP_OK;
 }
 
+static esp_err_t storage_write_all(FILE *file, const void *data, size_t len)
+{
+    if (len > 0U && fwrite(data, 1, len, file) != len) {
+        return ESP_FAIL;
+    }
+    return solar_os_storage_sync_file(file);
+}
+
 esp_err_t solar_os_storage_write_file(const char *path,
                                       const void *data,
-                                      size_t data_len,
+                                      size_t len,
                                       bool append)
 {
-    if (path == NULL || path[0] == '\0' || (data == NULL && data_len != 0U)) {
+    if (path == NULL || path[0] == '\0' || (data == NULL && len > 0U)) {
         errno = EINVAL;
         return ESP_ERR_INVALID_ARG;
     }
-    if (data_len > SOLAR_OS_STORAGE_WRITE_MAX_BYTES) {
+    if (len > SOLAR_OS_STORAGE_WRITE_MAX_BYTES) {
         errno = EFBIG;
         return ESP_ERR_INVALID_SIZE;
     }
 
-    struct stat info;
-    if (stat(path, &info) == 0) {
-        if (!S_ISREG(info.st_mode)) {
-            errno = S_ISDIR(info.st_mode) ? EISDIR : EINVAL;
-            return ESP_ERR_INVALID_ARG;
-        }
-    } else if (errno != ENOENT) {
-        return storage_errno_to_esp(errno);
+    struct stat st;
+    if (stat(path, &st) == 0 && !S_ISREG(st.st_mode)) {
+        errno = EISDIR;
+        return ESP_ERR_INVALID_STATE;
     }
 
-    FILE *file = fopen(path, append ? "ab" : "wb");
+    if (append) {
+        FILE *file = fopen(path, "ab");
+        if (file == NULL) {
+            return ESP_FAIL;
+        }
+        esp_err_t err = storage_write_all(file, data, len);
+        const int write_errno = errno;
+        if (fclose(file) != 0 && err == ESP_OK) {
+            err = ESP_FAIL;
+        } else if (err != ESP_OK) {
+            errno = write_errno;
+        }
+        return err;
+    }
+
+    char staged[SOLAR_OS_STORAGE_PATH_MAX];
+    char backup[SOLAR_OS_STORAGE_PATH_MAX];
+    esp_err_t err = solar_os_storage_sibling_path(path, ".tmp", staged, sizeof(staged));
+    if (err == ESP_OK) {
+        err = solar_os_storage_sibling_path(path, ".bak", backup, sizeof(backup));
+    }
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    FILE *file = fopen(staged, "wb");
     if (file == NULL) {
-        return storage_errno_to_esp(errno);
+        return ESP_FAIL;
     }
-
-    errno = 0;
-    esp_err_t result = ESP_OK;
-    if (data_len != 0U && fwrite(data, 1, data_len, file) != data_len) {
-        result = ESP_FAIL;
+    err = storage_write_all(file, data, len);
+    int saved_errno = errno;
+    if (fclose(file) != 0 && err == ESP_OK) {
+        err = ESP_FAIL;
+        saved_errno = errno;
     }
-    if (result == ESP_OK) {
-        result = solar_os_storage_sync_file(file);
+    if (err == ESP_OK) {
+        err = solar_os_storage_replace_file(staged, path, backup);
+        saved_errno = errno;
     }
-    const int write_errno = errno;
-    const int close_ret = fclose(file);
-    if (result != ESP_OK) {
-        errno = write_errno != 0 ? write_errno : EIO;
-    } else if (close_ret != 0) {
-        result = ESP_FAIL;
-        if (errno == 0) {
-            errno = EIO;
-        }
+    if (err != ESP_OK) {
+        (void)remove(staged);
+        errno = saved_errno;
     }
-    return result;
+    return err;
 }
 
 esp_err_t solar_os_storage_copy_file_progress_cancel(

@@ -83,7 +83,7 @@ messages list CONVERSATION_ID
 messages send CONVERSATION_ID TEXT [--allow-untrusted]
 messages read CONVERSATION_ID
 messages delete MESSAGE_ID
-messages clear gateway|meshcore|link|all
+messages clear gateway|meshcore|link|meshtastic|all
 messages outbox
 messages cancel MESSAGE_ID
 outbox [list]
