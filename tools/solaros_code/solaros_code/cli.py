@@ -8,6 +8,7 @@ import sys
 from typing import Any, Callable, IO
 
 from .agent import DEFAULT_MODEL, Agent
+from .mods import ModRegistry, load_mods
 from .permissions import MODES, Permissions
 from .prompt import build_system_prompt
 from .sessions import Session, SessionStore
@@ -22,6 +23,7 @@ HELP = """Commands:
   /perm [mode]     show or change permission mode: default, accept-edits, bypass
   /tools           list available tools
   /usage           show token usage for this run
+  /mods            list loaded mods and any that failed to load
   /exit            quit (also Ctrl-D)
 Anything else is sent to the model."""
 
@@ -56,6 +58,7 @@ class Repl:
             "/perm": self._perm,
             "/tools": self._tools,
             "/usage": self._usage,
+            "/mods": self._mods,
             "/exit": lambda _: False,
             "/quit": lambda _: False,
         }
@@ -67,11 +70,21 @@ class Repl:
             return True
         if line.startswith("/"):
             name, _, rest = line.partition(" ")
-            command = self.commands.get(name)
-            if command is None:
+            if name in self.commands:
+                return self.commands[name](rest.strip())
+            mod_command = self.agent.mods.commands.get(name)
+            if mod_command is None:
                 self.out.write(f"unknown command: {name} (try /help)\n")
                 return True
-            return command(rest.strip())
+            handler = mod_command[0]
+            try:
+                result = handler(rest.strip())
+            except Exception as exc:  # noqa: BLE001 - a mod must not end the session
+                self.out.write(f"{name} failed: {type(exc).__name__}: {exc}\n")
+                return True
+            if result:
+                self.out.write(str(result) + "\n")
+            return True
         try:
             self.agent.run_turn(line)
         except KeyboardInterrupt:
@@ -130,6 +143,18 @@ class Repl:
             self.out.write(f"  {spec.name:<12} {kind:<11} {spec.description}\n")
         return True
 
+    def _mods(self, _: str) -> bool:
+        registry = self.agent.mods
+        if not registry.records and not registry.errors:
+            self.out.write("no mods loaded\n")
+        for record in registry.records:
+            scope = "user" if record.trusted else "project"
+            commands = ", ".join(record.commands) or "hooks only"
+            self.out.write(f"  {record.name} ({scope})  {commands}\n")
+        for error in registry.errors:
+            self.out.write(f"  failed: {error}\n")
+        return True
+
     def _usage(self, _: str) -> bool:
         usage = self.agent.usage
         self.out.write(f"input tokens: {usage['input']}  output tokens: {usage['output']}\n")
@@ -144,6 +169,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--permission-mode", choices=MODES, default="default")
     parser.add_argument("--workspace", default=None, help="workspace root (default: current directory)")
     parser.add_argument("-c", "--continue", dest="resume", action="store_true", help="resume the latest conversation")
+    parser.add_argument(
+        "--allow-project-mods",
+        action="store_true",
+        help="load mods from <workspace>/.solaros-code/mods; they run with your full privileges, so enable only for repos you trust",
+    )
     return parser
 
 
@@ -163,6 +193,10 @@ def main(argv: list[str] | None = None, client: Any = None, stdin: IO[str] | Non
     asker = _ask_terminal if interactive else None
     permissions = Permissions(args.permission_mode, asker)
     session = store.latest(str(ws.root)) if args.resume else None
+    builtin = {"/help", "/clear", "/resume", "/sessions", "/model", "/perm", "/tools", "/usage", "/mods", "/exit", "/quit"}
+    mods = load_mods(builtin, ws.root, args.allow_project_mods, notify=lambda msg: out.write(f"[{msg}]\n"))
+    for error in mods.errors:
+        out.write(f"[mod load failed: {error}]\n")
     agent = Agent(
         client,
         ws,
@@ -172,6 +206,7 @@ def main(argv: list[str] | None = None, client: Any = None, stdin: IO[str] | Non
         session=session,
         store=store,
         model=args.model,
+        mods=mods,
     )
 
     if args.prompt or args.print_mode:

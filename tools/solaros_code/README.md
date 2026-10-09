@@ -39,12 +39,35 @@ Run from the repo root (the examples set `PYTHONPATH`), or pass `--workspace PAT
 - **Sessions:** every turn is saved to `~/.solaros-code/sessions/` (override with
   `SOLAROS_CODE_HOME`). Use `/sessions`, `/resume [id]`, `/clear`, or `-c`.
 - **Slash commands:** `/help`, `/clear`, `/resume`, `/sessions`, `/model`,
-  `/perm`, `/tools`, `/usage`, `/exit`.
+  `/perm`, `/tools`, `/usage`, `/mods`, `/exit`, plus any commands mods add.
+
+## Mods
+
+A mod is a Python file with a `register(api)` function. It can add slash
+commands and hook into the agent:
+
+```python
+def register(api):
+    api.command("/branch", lambda arg: current_branch(), help="show branch")
+    api.before_prompt(lambda text: text)                 # rewrite the request
+    api.before_tool(lambda tool, args: None)             # return a string to block
+    api.after_tool(lambda tool, args, output, err: None) # return a string to replace output
+```
+
+Mods load from `~/.solaros-code/mods/` (yours, always loaded) and from
+`<workspace>/.solaros-code/mods/` only with `--allow-project-mods`. Project mods
+run with your full privileges, so enable that only for repos you trust. A mod
+that fails to load or raises in a hook is reported with `/mods` and skipped; the
+session continues. Command names must look like `/my-command` and cannot reuse a
+built-in name.
+
+`examples/mods/guard.py` blocks destructive shell commands and adds `/branch`.
+Copy it into `~/.solaros-code/mods/` to try it.
 
 ## Not yet built
 
 This is a first version of a Claude Code-style agent, not a full clone. Missing
-for now: MCP servers, hooks, subagents, custom slash commands from files,
+for now: MCP servers, subagents, status-line and UI extensions for mods,
 context compaction for very long sessions, image input, and a full-screen TUI.
 Those are the next things to add.
 

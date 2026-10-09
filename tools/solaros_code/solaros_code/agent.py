@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import IO, Any
 
+from .mods import ModRegistry
 from .permissions import Permissions
 from .sessions import Session, SessionStore
 from .tools import TOOLS, Workspace, describe, run_tool
@@ -31,6 +32,7 @@ class Agent:
         store: SessionStore | None = None,
         model: str = DEFAULT_MODEL,
         max_tokens: int = DEFAULT_MAX_TOKENS,
+        mods: ModRegistry | None = None,
     ):
         self.client = client
         self.ws = workspace
@@ -43,6 +45,7 @@ class Agent:
         self.session = session or Session(workspace=str(workspace.root), model=model)
         self.session.model = model
         self.usage = {"input": 0, "output": 0}
+        self.mods = mods or ModRegistry()
 
     @property
     def messages(self) -> list[dict[str, Any]]:
@@ -58,7 +61,7 @@ class Agent:
     def run_turn(self, user_text: str) -> None:
         """Run one user request to completion. On failure the turn is rolled back."""
         checkpoint = len(self.messages)
-        self.messages.append({"role": "user", "content": user_text})
+        self.messages.append({"role": "user", "content": self.mods.apply_prompt(user_text)})
         try:
             self._loop()
         except BaseException:
@@ -99,9 +102,14 @@ class Agent:
             return _result(call, f"unknown tool: {name}", True)
         summary = describe(spec, args)
         self.out.write(f"\n> {name}: {summary}\n")
+        blocked = self.mods.check_tool(name, args)
+        if blocked is not None:
+            self.out.write(f"  {blocked}\n")
+            return _result(call, blocked, True)
         if not self.permissions.allow(spec, summary):
             return _result(call, "the user declined this tool call", True)
         output, is_error = run_tool(self.ws, name, args)
+        output = self.mods.transform_tool_output(name, args, output, is_error)
         self.out.write(_preview(output) + "\n")
         return _result(call, output, is_error)
 

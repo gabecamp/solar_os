@@ -10,6 +10,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from solaros_code.agent import Agent
+from solaros_code.mods import ModRegistry, load_mods
 from solaros_code.permissions import Permissions
 from solaros_code.sessions import Session, SessionStore
 from solaros_code.tools import TOOLS, ToolError, Workspace, edit_file, grep, read_file, run_tool, write_file
@@ -190,6 +191,91 @@ class AgentTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as store_dir:
             with self.assertRaises(ValueError):
                 SessionStore(Path(store_dir)).load("../etc")
+
+
+class ModTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def mod(self, name: str, source: str) -> Path:
+        path = self.dir / f"{name}.py"
+        path.write_text(source, encoding="utf-8")
+        return path
+
+    def registry(self, trusted: bool = True) -> ModRegistry:
+        reg = ModRegistry(reserved_commands={"/help"})
+        reg.load_dir(self.dir, trusted=trusted)
+        return reg
+
+    def test_command_and_hooks_are_registered(self):
+        self.mod("guard", """
+def register(api):
+    api.command("/hello", lambda arg: f"hello {arg}", help="say hello")
+    api.before_prompt(lambda text: text + " [mod]")
+    api.before_tool(lambda tool, args: "no bash" if tool == "bash" else None)
+    api.after_tool(lambda tool, args, out, err: out.upper())
+""")
+        reg = self.registry()
+        self.assertEqual(reg.errors, [])
+        self.assertEqual(reg.commands["/hello"][0]("world"), "hello world")
+        self.assertEqual(reg.apply_prompt("hi"), "hi [mod]")
+        self.assertIn("blocked by mod guard", reg.check_tool("bash", {}))
+        self.assertIsNone(reg.check_tool("read_file", {}))
+        self.assertEqual(reg.transform_tool_output("grep", {}, "abc", False), "ABC")
+
+    def test_broken_mod_is_reported_and_isolated(self):
+        self.mod("aaa_broken", "raise RuntimeError('boom')\n")
+        self.mod("zzz_good", "def register(api):\n    api.command('/good', lambda a: 'ok')\n")
+        reg = self.registry()
+        self.assertEqual(len(reg.errors), 1)
+        self.assertIn("boom", reg.errors[0])
+        self.assertIn("/good", reg.commands)
+
+    def test_half_loaded_mod_is_rolled_back(self):
+        self.mod("partial", "def register(api):\n    api.before_tool(lambda t, a: None)\n    raise ValueError('late')\n")
+        reg = self.registry()
+        self.assertEqual(reg.before_tool_hooks, [])
+
+    def test_failing_hook_does_not_stop_the_call(self):
+        self.mod("flaky", "def register(api):\n    api.before_tool(lambda t, a: 1 / 0)\n")
+        reg = self.registry()
+        self.assertIsNone(reg.check_tool("bash", {}))
+
+    def test_command_name_collisions_rejected(self):
+        self.mod("clash", "def register(api):\n    api.command('/help', lambda a: 'x')\n")
+        reg = self.registry()
+        self.assertEqual(len(reg.errors), 1)
+        self.assertNotIn("/help", reg.commands)
+
+    def test_mod_hook_blocks_agent_tool_call(self):
+        self.mod("nobash", "def register(api):\n    api.before_tool(lambda t, a: 'bash is off' if t == 'bash' else None)\n")
+        client = FakeClient([
+            ("", [{"type": "tool_use", "id": "t1", "name": "bash", "input": {"command": "ls"}}], "tool_use"),
+            ("done", [{"type": "text", "text": "done"}], "end_turn"),
+        ])
+        with tempfile.TemporaryDirectory() as ws_dir:
+            agent = Agent(client, Workspace(ws_dir), "sys", Permissions("bypass"), io.StringIO(), mods=self.registry())
+            agent.run_turn("list files")
+        result = agent.messages[2]["content"][0]
+        self.assertTrue(result["is_error"])
+        self.assertIn("bash is off", result["content"])
+
+    def test_project_mods_need_explicit_trust(self):
+        with tempfile.TemporaryDirectory() as ws_dir:
+            ws_root = Path(ws_dir)
+            (ws_root / ".solaros-code" / "mods").mkdir(parents=True)
+            (ws_root / ".solaros-code" / "mods" / "repo.py").write_text(
+                "def register(api):\n    api.command('/repo', lambda a: 'from repo')\n"
+            )
+            off = load_mods(set(), ws_root, allow_project_mods=False)
+            on = load_mods(set(), ws_root, allow_project_mods=True)
+        self.assertNotIn("/repo", off.commands)
+        self.assertIn("/repo", on.commands)
+        self.assertFalse(on.records[-1].trusted)
 
 
 if __name__ == "__main__":
