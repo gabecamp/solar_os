@@ -434,5 +434,46 @@ class RegistryTests(unittest.TestCase):
         self.assertIn("no registry", text)
 
 
+class NotifyTests(unittest.TestCase):
+    def test_modes_gate_events(self):
+        from solaros_code.notify import DONE, PROMPT, Notifier
+        self.assertFalse(Notifier("off").wants(PROMPT))
+        self.assertTrue(Notifier("prompt").wants(PROMPT))
+        self.assertFalse(Notifier("prompt").wants(DONE))
+        self.assertTrue(Notifier("all").wants(DONE))
+        with self.assertRaises(ValueError):
+            Notifier("loud")
+
+    def test_default_notice_is_bell(self):
+        from solaros_code.notify import PROMPT, Notifier
+        out = io.StringIO()
+        Notifier("prompt", out, command="").attention(PROMPT)
+        self.assertEqual(out.getvalue(), "\a")
+
+    def test_off_writes_nothing(self):
+        from solaros_code.notify import PROMPT, Notifier
+        out = io.StringIO()
+        Notifier("off", out, command="").attention(PROMPT)
+        self.assertEqual(out.getvalue(), "")
+
+    def test_custom_command_replaces_bell_and_failures_are_silent(self):
+        from solaros_code.notify import PROMPT, Notifier
+        out = io.StringIO()
+        with unittest.mock.patch("solaros_code.notify.subprocess.Popen") as popen:
+            Notifier("prompt", out, command="play bell.oga").attention(PROMPT)
+        self.assertEqual(out.getvalue(), "")
+        self.assertEqual(popen.call_args.args[0], "play bell.oga")
+        with unittest.mock.patch("solaros_code.notify.subprocess.Popen", side_effect=OSError):
+            Notifier("prompt", out, command="missing").attention(PROMPT)  # must not raise
+
+    def test_approval_prompt_rings_the_bell(self):
+        from solaros_code.cli import _make_asker
+        from solaros_code.notify import Notifier
+        out = io.StringIO()
+        ask = _make_asker(Notifier("prompt", out, command=""), out, io.StringIO("y\n"))
+        self.assertEqual(ask("bash", "ls"), "y\n")
+        self.assertIn("\a", out.getvalue())
+
+
 if __name__ == "__main__":
     unittest.main()

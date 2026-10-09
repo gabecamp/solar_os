@@ -123,6 +123,22 @@ index is trusted: only point the registry at indexes you trust. The index sets
 the hash, but it does not vouch for the mod's behaviour. Install prints the
 source and asks for confirmation before anything runs.
 
+## Sound notifications
+
+SolarOS Code rings the terminal bell when it needs you:
+
+- `--notify prompt` (default): a permission prompt is waiting for an answer.
+- `--notify all`: also when a turn finishes, in the REPL or print mode, or fails.
+- `--notify off`: never. Set `SOLAROS_CODE_NOTIFY` to change the default.
+
+The bell (BEL character) becomes a sound or a flash in most terminals. To play your
+own sound, set `SOLAROS_CODE_NOTIFY_CMD` to any command; it runs instead of the
+bell, in the background, and failures are ignored:
+
+```sh
+export SOLAROS_CODE_NOTIFY_CMD='paplay /usr/share/sounds/freedesktop/stereo/message.oga'
+```
+
 ## Not yet built
 
 This is a first version of a Claude Code-style agent, not a full clone. Missing

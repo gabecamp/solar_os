@@ -9,6 +9,7 @@ from typing import Any, Callable, IO
 
 from .agent import DEFAULT_MODEL, Agent
 from .mods import ModRegistry, load_mods
+from .notify import DONE, MODES as NOTIFY_MODES, PROMPT, Notifier
 from .permissions import MODES, Permissions
 from .prompt import build_system_prompt
 from .sharing import run_command as run_mods_command
@@ -39,17 +40,22 @@ def _make_client() -> Any:
     return anthropic.Anthropic()
 
 
-def _ask_terminal(tool: str, summary: str) -> str:
-    sys.stdout.write(f"  allow {tool}? [y]es / [n]o / [a]lways this session: ")
-    sys.stdout.flush()
-    return sys.stdin.readline() or "n"
+def _make_asker(notifier: Notifier, out: IO[str], stdin: IO[str]) -> Callable[[str, str], str]:
+    def ask(tool: str, summary: str) -> str:
+        notifier.attention(PROMPT, f"{tool} needs approval")
+        out.write(f"  allow {tool}? [y]es / [n]o / [a]lways this session: ")
+        out.flush()
+        return stdin.readline() or "n"
+
+    return ask
 
 
 class Repl:
-    def __init__(self, agent: Agent, store: SessionStore, out: IO[str]):
+    def __init__(self, agent: Agent, store: SessionStore, out: IO[str], notifier: Notifier | None = None):
         self.agent = agent
         self.store = store
         self.out = out
+        self.notifier = notifier or Notifier("off")
         self.commands: dict[str, Callable[[str], bool]] = {
             "/help": self._help,
             "/clear": self._clear,
@@ -88,10 +94,12 @@ class Repl:
             return True
         try:
             self.agent.run_turn(line)
+            self.notifier.attention(DONE, "turn finished")
         except KeyboardInterrupt:
             self.out.write("\n[interrupted; this request was dropped]\n")
         except Exception as exc:  # noqa: BLE001 - keep the REPL alive on API errors
             self.out.write(f"error: {type(exc).__name__}: {exc}\n")
+            self.notifier.attention(DONE, "turn failed")
         return True
 
     def _help(self, _: str) -> bool:
@@ -168,6 +176,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("-p", "--print", dest="print_mode", action="store_true", help="print mode; reads stdin if no prompt")
     parser.add_argument("--model", default=os.environ.get("SOLAROS_CODE_MODEL", DEFAULT_MODEL))
     parser.add_argument("--permission-mode", choices=MODES, default="default")
+    parser.add_argument(
+        "--notify",
+        choices=NOTIFY_MODES,
+        default=os.environ.get("SOLAROS_CODE_NOTIFY", "prompt"),
+        help="when to sound: off, prompt (approval waiting, default), or all (also turn done or failed)",
+    )
     parser.add_argument("--workspace", default=None, help="workspace root (default: current directory)")
     parser.add_argument("-c", "--continue", dest="resume", action="store_true", help="resume the latest conversation")
     parser.add_argument(
@@ -194,7 +208,8 @@ def main(argv: list[str] | None = None, client: Any = None, stdin: IO[str] | Non
     client = client or _make_client()
 
     interactive = not args.print_mode and not args.prompt and stdin.isatty()
-    asker = _ask_terminal if interactive else None
+    notifier = Notifier(args.notify, out)
+    asker = _make_asker(notifier, out, stdin) if interactive else None
     permissions = Permissions(args.permission_mode, asker)
     session = store.latest(str(ws.root)) if args.resume else None
     builtin = {"/help", "/clear", "/resume", "/sessions", "/model", "/perm", "/tools", "/usage", "/mods", "/exit", "/quit"}
@@ -216,9 +231,10 @@ def main(argv: list[str] | None = None, client: Any = None, stdin: IO[str] | Non
     if args.prompt or args.print_mode:
         request = " ".join(args.prompt) if args.prompt else stdin.read()
         agent.run_turn(request.strip())
+        notifier.attention(DONE, "turn finished")
         return 0
 
-    repl = Repl(agent, store, out)
+    repl = Repl(agent, store, out, notifier)
     out.write(f"SolarOS Code in {ws.root}  (model {agent.model}, /help for commands)\n")
     while True:
         try:
