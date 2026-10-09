@@ -115,6 +115,10 @@ the Checkpoint alive.
   `churn_update.lua` still does the same by hand.
 - **If it crashes:** the error and where it happened go to `churn/crash.txt`
   on the card and show on screen; send that file along with a bug report.
+- **On an RG350 or another OpenDingux handheld:** `rg350/` is a small C
+  program (SDL 1.2, Lua built in) that runs `churn.lua` unchanged; L and R
+  are shift keys so every key is reachable (see its README). Built and
+  tested on a PC; not yet run on a handheld.
 - **On a PC or Raspberry Pi:** `python_version/` runs this same game in a
   pygame window. One command installs it: `install.sh` on Linux or a Pi,
   `install.ps1` on Windows (see its README), or by hand `pip install pygame-ce lupa`,
