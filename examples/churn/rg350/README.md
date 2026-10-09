@@ -68,7 +68,16 @@ It looks for `bin/*-gcc` and an `sdl-config` under that folder, downloads
 and builds Lua 5.4, links it all into one program, and packs `churn.opk`
 (a squashfs with the program, `churn.lua`, the icon and the launcher entry).
 Copy the `.opk` to the SD card's `apps` folder, or install it from the
-handheld's file manager. `NATIVE=1 ./build_opk.sh` builds the package for
+handheld's file manager.
+
+**Or let GitHub build it.** `.github/workflows/churn-rg350.yml` tests the
+program on every change and, given a download link to the OpenDingux SDK,
+cross-builds `churn.opk` too. Set the repository variable
+`OPENDINGUX_TOOLCHAIN_URL` (Settings, Secrets and variables, Actions,
+Variables), or start the workflow by hand from the Actions tab and paste the
+link in the "toolchain_url" box. The file is then the run's `churn-rg350-opk`
+artifact and, from `main`, the `churn-rg350` release. The SDK has to be a
+tarball (or zip) with a `bin/*-gcc` and an `sdl-config` inside. `NATIVE=1 ./build_opk.sh` builds the package for
 your own computer, which only checks the packaging.
 
 Fonts: `make_font.py` bakes DejaVu Sans Mono (the PC port's fonts) into

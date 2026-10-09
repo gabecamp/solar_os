@@ -1,0 +1,153 @@
+# The Churn for the Anbernic RG350 and other OpenDingux handhelds
+# (examples/churn/rg350/): churn.opk, built on GitHub's runners.
+#
+# Two jobs:
+#   host  builds the program for the runner itself and runs `make test` (the real
+#         game headless, the button layers, an error screen, 320x240), then checks
+#         the OPK packaging. It needs nothing special and runs on every change.
+#   opk   cross-builds the real churn.opk. The program has to link against the
+#         handheld's own SDL 1.2, so it needs the OpenDingux SDK: give it a
+#         download link to the SDK tarball (a .tar.gz/.tar.bz2/.tar.xz/.zip with a
+#         bin/*-gcc and an sdl-config inside) in either
+#           - the repository variable OPENDINGUX_TOOLCHAIN_URL (Settings, Secrets
+#             and variables, Actions, Variables), used on every run, or
+#           - the "toolchain_url" box when you start the workflow by hand.
+#         The result is the artifact "churn-rg350-opk" on the run's page and, from
+#         main, the release "churn-rg350":
+#         https://github.com/gabecamp/solar_os/releases/download/churn-rg350/churn.opk
+name: The Churn - RG350 (OpenDingux)
+
+on:
+  workflow_dispatch:
+    inputs:
+      toolchain_url:
+        description: "Download link to the OpenDingux SDK (overrides the OPENDINGUX_TOOLCHAIN_URL variable)"
+        required: false
+        type: string
+  push:
+    branches: [main]
+    paths:
+      - examples/churn/churn.lua
+      - examples/churn/rg350/**
+      - .github/workflows/churn-rg350.yml
+  pull_request:
+    paths:
+      - examples/churn/rg350/**
+      - .github/workflows/churn-rg350.yml
+
+permissions:
+  contents: write   # (to publish the release)
+
+concurrency:
+  group: churn-rg350-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  host:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/churn/rg350
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install SDL 1.2, Lua, Pillow, fonts and squashfs-tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsdl1.2-dev liblua5.4-dev python3-pil fonts-dejavu-core squashfs-tools
+
+      - name: Build and test (the real game, headless)
+        run: make test
+
+      - name: Check the packaging (a build for this machine, not the handheld)
+        run: NATIVE=1 ./build_opk.sh
+
+  opk:
+    needs: host
+    runs-on: ubuntu-latest
+    env:
+      TOOLCHAIN_URL: ${{ inputs.toolchain_url || vars.OPENDINGUX_TOOLCHAIN_URL }}
+    defaults:
+      run:
+        working-directory: examples/churn/rg350
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Is there an SDK to build with?
+        id: sdk
+        run: |
+          if [ -z "$TOOLCHAIN_URL" ]; then
+            echo "has=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=No OpenDingux SDK::Set the repository variable OPENDINGUX_TOOLCHAIN_URL (or start this workflow by hand with a toolchain_url) to build churn.opk. The tests above passed; only the handheld build was skipped."
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then exit 1; fi
+          else
+            echo "has=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install tools
+        if: steps.sdk.outputs.has == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y squashfs-tools curl make
+
+      - name: Cache the SDK
+        if: steps.sdk.outputs.has == 'true'
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: ~/opendingux-sdk
+          key: opendingux-sdk-${{ env.TOOLCHAIN_URL }}
+
+      - name: Download and unpack the SDK
+        if: steps.sdk.outputs.has == 'true' && steps.cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/opendingux-sdk ~/sdk-download
+          curl -fSL --retry 3 -o ~/sdk-download/sdk "$TOOLCHAIN_URL"
+          case "$TOOLCHAIN_URL" in
+            *.zip) sudo apt-get install -y unzip && unzip -q ~/sdk-download/sdk -d ~/opendingux-sdk ;;
+            *)     tar xf ~/sdk-download/sdk -C ~/opendingux-sdk ;;
+          esac
+          rm -rf ~/sdk-download
+          # (a relocatable SDK says so: run its script once, in place)
+          reloc=$(find ~/opendingux-sdk -maxdepth 3 -name relocate-sdk.sh | head -n1 || true)
+          if [ -n "$reloc" ]; then (cd "$(dirname "$reloc")" && ./relocate-sdk.sh); fi
+
+      - name: Find the compiler
+        if: steps.sdk.outputs.has == 'true'
+        id: cc
+        run: |
+          gcc=$(find ~/opendingux-sdk -path '*/bin/*-gcc' -type f -o -path '*/bin/*-gcc' -type l | grep -v -- '-gcc-[0-9]' | head -n1)
+          [ -n "$gcc" ] || { echo "::error::no bin/*-gcc in the SDK"; exit 1; }
+          echo "compiler: $gcc"
+          echo "root=$(dirname "$(dirname "$gcc")")" >> "$GITHUB_OUTPUT"
+
+      - name: Build churn.opk
+        if: steps.sdk.outputs.has == 'true'
+        run: TOOLCHAIN="${{ steps.cc.outputs.root }}" ./build_opk.sh
+
+      - name: Check it is for the handheld
+        if: steps.sdk.outputs.has == 'true'
+        run: |
+          mkdir -p /tmp/opk && unsquashfs -d /tmp/opk/x churn.opk >/dev/null
+          file /tmp/opk/x/churn_sdl
+          file /tmp/opk/x/churn_sdl | grep -qi mips || { echo "::error::churn_sdl is not a MIPS program"; exit 1; }
+          ls -l churn.opk
+
+      - uses: actions/upload-artifact@v5
+        if: steps.sdk.outputs.has == 'true'
+        with:
+          name: churn-rg350-opk
+          path: examples/churn/rg350/churn.opk
+
+      - name: Publish as the churn-rg350 release
+        if: steps.sdk.outputs.has == 'true' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release delete churn-rg350 --cleanup-tag --yes || true
+          gh release create churn-rg350 churn.opk \
+            --target "$GITHUB_SHA" \
+            --title "The Churn for the RG350 (OpenDingux)" \
+            --notes "Built from $GITHUB_SHA. Copy churn.opk to the SD card's apps folder (or install it from the handheld's file manager). Hold L or R for the shifted buttons; the legend under the picture shows them. Saves go to ~/.the-churn. Untested on hardware: please report what works." \
+            --prerelease

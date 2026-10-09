@@ -16,7 +16,8 @@ CFLAGS ?= -O2 -Wall -Wextra
 churn_sdl: churn_sdl.c font_data.h
 	$(CC) $(CFLAGS) $(SDL_CFLAGS) $(LUA_CFLAGS) -o $@ churn_sdl.c $(SDL_LIBS) $(LUA_LIBS) -lm
 
-font_data.h: make_font.py
+# (font_data.h is checked in; `make font` bakes it again from the DejaVu fonts)
+font:
 	python3 make_font.py
 
 test: churn_sdl
