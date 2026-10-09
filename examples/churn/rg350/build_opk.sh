@@ -42,10 +42,14 @@ LUA_SRC="lua-$LUA_VER/src"
 mkdir -p "$STAGE/lua"
 for f in "$LUA_SRC"/*.c; do
     case "$f" in */lua.c|*/luac.c) continue ;; esac
-    "$CC" -O2 -DLUA_USE_POSIX -c "$f" -o "$STAGE/lua/$(basename "${f%.c}").o"
+    "$CC" -O2 -std=gnu99 -DLUA_USE_POSIX -c "$f" -o "$STAGE/lua/$(basename "${f%.c}").o"
 done
 
-"$CC" -O2 -Wall $SDL_CFLAGS -I"$LUA_SRC" -o "$STAGE/churn_sdl" churn_sdl.c "$STAGE"/lua/*.o $SDL_LIBS -lm
+"$CC" -O2 -std=gnu99 -Wall $SDL_CFLAGS -I"$LUA_SRC" -o "$STAGE/churn_sdl" churn_sdl.c "$STAGE"/lua/*.o $SDL_LIBS -lm
+if [ -z "${NATIVE:-}" ]; then   # (smaller: the handheld doesn't need the symbols)
+    STRIP="${CC%-gcc}-strip"
+    if [ -x "$STRIP" ]; then "$STRIP" "$STAGE/churn_sdl"; fi
+fi
 cp ../churn.lua default.gcw0.desktop icon.png "$STAGE/"
 [ -f DejaVu-LICENSE.txt ] && cp DejaVu-LICENSE.txt "$STAGE/"
 rm -rf "$STAGE/lua"

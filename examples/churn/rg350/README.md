@@ -9,9 +9,11 @@ button legend in the border:
 
 ![On a 640x480 screen](../previews/rg350_map.png)
 
-**Status: the program is built and tested on a PC (headless SDL, the real game,
-every button path). It has not been run on a handheld, and the MIPS cross-build
-has not been done; that needs the OpenDingux SDK, below.**
+**Status: built and tested on a PC (headless SDL, the real game, every button
+path), and cross-built for the handheld with the 2014 GCW Zero OpenDingux
+toolchain; that MIPS program was run under qemu with the SDK's own uClibc
+and SDL 1.2 (key layers, and the real game drawing a frame). It has not been
+run on a real handheld yet.**
 
 ## Buttons
 
@@ -56,29 +58,32 @@ liblua5.4-dev python3-pil fonts-dejavu-core`, then `make` and `make test`.
 button presses through the key code, and checks a broken game file is
 reported.
 
-For the handheld you need the OpenDingux SDK (a cross compiler for the
-MIPS chip plus the handheld's SDL libraries). I couldn't fetch one from the
-environment I wrote this in, so `build_opk.sh` takes it as a setting:
+For the handheld you need the OpenDingux SDK (a cross compiler for the MIPS
+chip plus the handheld's SDL libraries). The one used here is the 2014 GCW
+Zero toolchain (the original download is gone; the Wayback Machine has it:
+`https://web.archive.org/web/20200804143457/http://www.gcw-zero.com/files/opendingux-gcw0-toolchain.2014-08-20.tar.bz2`,
+144 MB). It runs on 32-bit x86 (`sudo apt install libc6-i386` on a 64-bit
+Linux) and expects to be at `/opt/gcw0-toolchain`:
 
 ```sh
-TOOLCHAIN=/opt/opendingux-toolchain ./build_opk.sh
+sudo mkdir -p /opt && sudo tar xjf opendingux-gcw0-toolchain.2014-08-20.tar.bz2 -C /opt
+TOOLCHAIN=/opt/gcw0-toolchain/usr ./build_opk.sh
 ```
 
-It looks for `bin/*-gcc` and an `sdl-config` under that folder, downloads
+`build_opk.sh` looks for `bin/*-gcc` and an `sdl-config` under that folder, downloads
 and builds Lua 5.4, links it all into one program, and packs `churn.opk`
 (a squashfs with the program, `churn.lua`, the icon and the launcher entry).
 Copy the `.opk` to the SD card's `apps` folder, or install it from the
 handheld's file manager.
 
 **Or let GitHub build it.** `.github/workflows/churn-rg350.yml` tests the
-program on every change and, given a download link to the OpenDingux SDK,
-cross-builds `churn.opk` too. Set the repository variable
-`OPENDINGUX_TOOLCHAIN_URL` (Settings, Secrets and variables, Actions,
-Variables), or start the workflow by hand from the Actions tab and paste the
-link in the "toolchain_url" box. The file is then the run's `churn-rg350-opk`
-artifact and, from `main`, the `churn-rg350` release. The SDK has to be a
-tarball (or zip) with a `bin/*-gcc` and an `sdl-config` inside. `NATIVE=1 ./build_opk.sh` builds the package for
-your own computer, which only checks the packaging.
+program on every change and cross-builds `churn.opk` with that same
+toolchain (downloaded from the Wayback Machine and cached), checks it is a
+MIPS program and runs it under qemu. The file is the run's `churn-rg350-opk`
+artifact and, from `main`, the `churn-rg350` release. To use another SDK, set
+the repository variable `OPENDINGUX_TOOLCHAIN_URL` (Settings, Secrets and
+variables, Actions, Variables) or paste a link in the "toolchain_url" box when
+starting the workflow by hand.
 
 Fonts: `make_font.py` bakes DejaVu Sans Mono (the PC port's fonts) into
 `font_data.h`, so neither SDL_ttf nor FreeType is needed on the device. The

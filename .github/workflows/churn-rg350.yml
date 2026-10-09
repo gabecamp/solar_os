@@ -6,9 +6,12 @@
 #         game headless, the button layers, an error screen, 320x240), then checks
 #         the OPK packaging. It needs nothing special and runs on every change.
 #   opk   cross-builds the real churn.opk. The program has to link against the
-#         handheld's own SDL 1.2, so it needs the OpenDingux SDK: give it a
-#         download link to the SDK tarball (a .tar.gz/.tar.bz2/.tar.xz/.zip with a
-#         bin/*-gcc and an sdl-config inside) in either
+#         handheld's own SDL 1.2, so it needs the OpenDingux SDK. By default it
+#         downloads the 2014 GCW Zero toolchain from the Wayback Machine (the
+#         original site no longer has it; it runs on 32-bit x86 and wants to
+#         sit at /opt/gcw0-toolchain, both handled below). Another SDK (a
+#         .tar.gz/.tar.bz2/.tar.xz/.zip with a usr/bin/*-gcc or bin/*-gcc and an
+#         sdl-config inside) can be given in either
 #           - the repository variable OPENDINGUX_TOOLCHAIN_URL (Settings, Secrets
 #             and variables, Actions, Variables), used on every run, or
 #           - the "toolchain_url" box when you start the workflow by hand.
@@ -21,7 +24,7 @@ on:
   workflow_dispatch:
     inputs:
       toolchain_url:
-        description: "Download link to the OpenDingux SDK (overrides the OPENDINGUX_TOOLCHAIN_URL variable)"
+        description: "Download link to another OpenDingux SDK (overrides the variable and the default)"
         required: false
         type: string
   push:
@@ -66,32 +69,23 @@ jobs:
     needs: host
     runs-on: ubuntu-latest
     env:
-      TOOLCHAIN_URL: ${{ inputs.toolchain_url || vars.OPENDINGUX_TOOLCHAIN_URL }}
+      TOOLCHAIN_URL: ${{ inputs.toolchain_url || vars.OPENDINGUX_TOOLCHAIN_URL || 'https://web.archive.org/web/20200804143457/http://www.gcw-zero.com/files/opendingux-gcw0-toolchain.2014-08-20.tar.bz2' }}
     defaults:
       run:
         working-directory: examples/churn/rg350
     steps:
       - uses: actions/checkout@v5
 
-      - name: Is there an SDK to build with?
-        id: sdk
-        run: |
-          if [ -z "$TOOLCHAIN_URL" ]; then
-            echo "has=false" >> "$GITHUB_OUTPUT"
-            echo "::warning title=No OpenDingux SDK::Set the repository variable OPENDINGUX_TOOLCHAIN_URL (or start this workflow by hand with a toolchain_url) to build churn.opk. The tests above passed; only the handheld build was skipped."
-            if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then exit 1; fi
-          else
-            echo "has=true" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Install tools
-        if: steps.sdk.outputs.has == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y squashfs-tools curl make
+          # (the 2014 toolchain's own programs are 32-bit x86)
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt-get install -y libc6-i386
 
       - name: Cache the SDK
-        if: steps.sdk.outputs.has == 'true'
         id: cache
         uses: actions/cache@v4
         with:
@@ -99,7 +93,7 @@ jobs:
           key: opendingux-sdk-${{ env.TOOLCHAIN_URL }}
 
       - name: Download and unpack the SDK
-        if: steps.sdk.outputs.has == 'true' && steps.cache.outputs.cache-hit != 'true'
+        if: steps.cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p ~/opendingux-sdk ~/sdk-download
           curl -fSL --retry 3 -o ~/sdk-download/sdk "$TOOLCHAIN_URL"
@@ -113,34 +107,48 @@ jobs:
           if [ -n "$reloc" ]; then (cd "$(dirname "$reloc")" && ./relocate-sdk.sh); fi
 
       - name: Find the compiler
-        if: steps.sdk.outputs.has == 'true'
         id: cc
         run: |
           gcc=$(find ~/opendingux-sdk -path '*/bin/*-gcc' -type f -o -path '*/bin/*-gcc' -type l | grep -v -- '-gcc-[0-9]' | head -n1)
           [ -n "$gcc" ] || { echo "::error::no bin/*-gcc in the SDK"; exit 1; }
           echo "compiler: $gcc"
-          echo "root=$(dirname "$(dirname "$gcc")")" >> "$GITHUB_OUTPUT"
+          root=$(dirname "$(dirname "$gcc")")
+          # The GCW Zero toolchain finds its own libraries through /opt/gcw0-toolchain
+          # (an RPATH baked in when it was built): put it there.
+          top=$(dirname "$root")
+          if [ "$(basename "$top")" = "gcw0-toolchain" ]; then
+            sudo ln -sfn "$top" /opt/gcw0-toolchain
+            root=/opt/gcw0-toolchain/usr
+          fi
+          echo "root=$root" >> "$GITHUB_OUTPUT"
 
       - name: Build churn.opk
-        if: steps.sdk.outputs.has == 'true'
         run: TOOLCHAIN="${{ steps.cc.outputs.root }}" ./build_opk.sh
 
       - name: Check it is for the handheld
-        if: steps.sdk.outputs.has == 'true'
         run: |
           mkdir -p /tmp/opk && unsquashfs -d /tmp/opk/x churn.opk >/dev/null
           file /tmp/opk/x/churn_sdl
           file /tmp/opk/x/churn_sdl | grep -qi mips || { echo "::error::churn_sdl is not a MIPS program"; exit 1; }
           ls -l churn.opk
 
+      - name: Run the MIPS program under qemu, with the SDK's own uClibc and SDL
+        run: |
+          sudo apt-get install -y qemu-user
+          sysroot=$(find ~/opendingux-sdk -name sysroot -type d | head -n1)
+          mkdir -p /tmp/opk && rm -rf /tmp/opk/x && unsquashfs -d /tmp/opk/x churn.opk >/dev/null
+          cd /tmp/opk/x
+          export SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy CHURN_DATA=$(mktemp -d)
+          qemu-mipsel -L "$sysroot" ./churn_sdl --size 640x480 --selftest-keys
+          qemu-mipsel -L "$sysroot" ./churn_sdl --size 640x480 --keys "$(printf '\n\n\033\nd')" churn.lua
+
       - uses: actions/upload-artifact@v5
-        if: steps.sdk.outputs.has == 'true'
         with:
           name: churn-rg350-opk
           path: examples/churn/rg350/churn.opk
 
       - name: Publish as the churn-rg350 release
-        if: steps.sdk.outputs.has == 'true' && github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
